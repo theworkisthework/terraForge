@@ -65,6 +65,8 @@ export class FluidNCClient extends EventEmitter {
     const lnMatch   = raw.match(/Ln:(\d+),(\d+)/);
 
     const stateStr = stateMatch?.[1] ?? "Unknown";
+    // FluidNC appends a substate number for some states: Hold:0, Hold:1, Door:0, etc.
+    const stateName = stateStr.split(":")[0];
     const validStates = [
       "Idle",
       "Run",
@@ -77,7 +79,7 @@ export class FluidNCClient extends EventEmitter {
       "Sleep",
     ];
     const state = (
-      validStates.includes(stateStr) ? stateStr : "Unknown"
+      validStates.includes(stateName) ? stateName : "Unknown"
     ) as MachineStatus["state"];
 
     const mpos = mposMatch
@@ -113,15 +115,28 @@ export class FluidNCClient extends EventEmitter {
   }
 
   async pauseJob(): Promise<void> {
-    await this.get("/pause");
+    // '!' is the Grbl/FluidNC realtime Feed Hold character — must be sent raw
+    this.sendRealtime("!");
   }
 
   async resumeJob(): Promise<void> {
-    await this.get("/resume");
+    // '~' is the Grbl/FluidNC realtime Cycle Start / Resume character — must be sent raw
+    this.sendRealtime("~");
   }
 
   async abortJob(): Promise<void> {
-    await this.get("/abort");
+    // 0x18 is the Grbl/FluidNC realtime Soft Reset character — must be sent raw
+    this.sendRealtime("\x18");
+  }
+
+  /** Send a realtime command byte directly over the WebSocket (bypasses HTTP). */
+  private sendRealtime(char: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(char);
+    } else {
+      // Fallback: send via HTTP command endpoint (may work depending on FW version)
+      this.sendCommand(char).catch(() => {});
+    }
   }
 
   // ─── File Management ─────────────────────────────────────────────────────
