@@ -1,0 +1,79 @@
+{
+  "name": "terraforge",
+  "version": "0.1.0",
+  "description": "FluidNC pen plotter UI — SVG to G-code, job management, machine control",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-builder --dir",
+    "dist": "electron-builder",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "keywords": [
+    "electron",
+    "fluidnc",
+    "gcode",
+    "plotter",
+    "svg"
+  ],
+  "author": "terraForge",
+  "license": "MIT",
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-tooltip": "^1.0.7",
+    "clsx": "^2.1.0",
+    "d3-path": "^3.1.0",
+    "form-data": "^4.0.0",
+    "immer": "^10.0.3",
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "serialport": "^12.0.0",
+    "svgson": "^5.3.1",
+    "uuid": "^9.0.1",
+    "ws": "^8.16.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "electron": "^28.2.3",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^1.0.29",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.2"
+  },
+  "build": {
+    "appId": "com.terraforge.app",
+    "productName": "terraForge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

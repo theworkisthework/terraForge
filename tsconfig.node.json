@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@types/*": ["./app/types/*"]
+    }
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/main/**/*.d.ts",
+    "src/preload/**/*.ts",
+    "src/preload/**/*.d.ts",
+    "src/machine/**/*.ts",
+    "src/tasks/**/*.ts",
+    "src/types/**/*.ts"
+  ]
+}
