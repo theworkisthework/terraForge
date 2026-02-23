@@ -114,6 +114,10 @@ export interface MachineStatus {
   wpos: { x: number; y: number; z: number };
   feedRate?: number;
   spindleSpeed?: number;
+  /** Current G-code line number being executed (from Ln:) */
+  lineNum?: number;
+  /** Total G-code lines in the file (from Ln:) */
+  lineTotal?: number;
 }
 
 // ─── IPC / Preload API Contract ───────────────────────────────────────────────

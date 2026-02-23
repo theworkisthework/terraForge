@@ -5,7 +5,14 @@ export function JobControls() {
   const status = useMachineStore((s) => s.status);
 
   const isRunning = status?.state === "Run";
-  const isHeld = status?.state === "Hold";
+  const isHeld    = status?.state === "Hold";
+  const isActive  = isRunning || isHeld;
+
+  const lineNum   = status?.lineNum;
+  const lineTotal = status?.lineTotal;
+  const progress  = lineNum != null && lineTotal != null && lineTotal > 0
+    ? Math.round((lineNum / lineTotal) * 100)
+    : null;
 
   const btn = (
     label: string,
@@ -34,36 +41,59 @@ export function JobControls() {
         Job
       </span>
 
-      {!isRunning &&
-        !isHeld &&
+      {/* Progress bar — visible while active */}
+      {isActive && (
+        <div className="flex flex-col gap-1 mb-1">
+          <div className="w-full h-2 bg-[#0f3460] rounded-full overflow-hidden">
+            {progress != null ? (
+              <div
+                className="h-full bg-[#e94560] transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            ) : (
+              /* indeterminate stripe when no Ln: data yet */
+              <div className="h-full w-1/3 bg-[#e94560] animate-pulse" />
+            )}
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-500">
+            <span>{isHeld ? "Paused" : "Running"}</span>
+            <span>
+              {lineNum != null && lineTotal != null
+                ? `line ${lineNum.toLocaleString()} / ${lineTotal.toLocaleString()}${progress != null ? ` (${progress}%)` : ""}`
+                : ""}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Start — only when idle */}
+      {!isActive &&
         btn(
           "▶ Start job",
           async () => {
-            // The user selects the file in the file browser panel; this starts the last run command
             await window.terraForge.fluidnc.sendCommand("$SD/Run");
           },
           "primary",
         )}
 
+      {/* Pause — only while running */}
       {isRunning &&
         btn(
           "⏸ Pause",
-          async () => {
-            await window.terraForge.fluidnc.pauseJob();
-          },
+          async () => { await window.terraForge.fluidnc.pauseJob(); },
           "secondary",
         )}
 
+      {/* Resume — only while held */}
       {isHeld &&
         btn(
           "▶ Resume",
-          async () => {
-            await window.terraForge.fluidnc.resumeJob();
-          },
+          async () => { await window.terraForge.fluidnc.resumeJob(); },
           "primary",
         )}
 
-      {(isRunning || isHeld) &&
+      {/* Abort — while running or held */}
+      {isActive &&
         btn(
           "✕ Abort",
           async () => {

@@ -58,10 +58,11 @@ export class FluidNCClient extends EventEmitter {
   }
 
   private parseStatus(raw: string): MachineStatus {
-    // FluidNC status: <Idle|MPos:0.000,0.000,0.000|FS:0,0>
+    // FluidNC status: <Idle|MPos:0.000,0.000,0.000|FS:0,0|Ln:42,1234>
     const stateMatch = raw.match(/<([^|>]+)/);
     const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
     const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
+    const lnMatch   = raw.match(/Ln:(\d+),(\d+)/);
 
     const stateStr = stateMatch?.[1] ?? "Unknown";
     const validStates = [
@@ -87,7 +88,10 @@ export class FluidNCClient extends EventEmitter {
       ? { x: +wposMatch[1], y: +wposMatch[2], z: +wposMatch[3] }
       : { ...mpos };
 
-    return { raw, state, mpos, wpos };
+    const lineNum   = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
+    const lineTotal = lnMatch ? parseInt(lnMatch[2], 10) : undefined;
+
+    return { raw, state, mpos, wpos, lineNum, lineTotal };
   }
 
   // ─── Commands ─────────────────────────────────────────────────────────────
@@ -306,6 +310,9 @@ export class FluidNCClient extends EventEmitter {
       if (gen !== this.wsGeneration) { ws.terminate(); return; }
       this.wsRetryDelay = 3000;
       this.emit("console", "[terraForge] WebSocket connected");
+      // Request automatic status reports every 500ms on this WS channel.
+      // $RI is per-channel, so it must be sent through the WebSocket itself.
+      try { ws.send("$RI=500\n"); } catch { /* ignore */ }
     });
 
     ws.on("message", (raw) => {
