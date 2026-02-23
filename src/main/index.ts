@@ -159,8 +159,8 @@ ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) =>
 ipcMain.handle("fluidnc:deleteFile", (_e, remotePath: string) =>
   fluidnc.deleteFile(remotePath),
 );
-ipcMain.handle("fluidnc:runFile", (_e, remotePath: string) =>
-  fluidnc.runFile(remotePath),
+ipcMain.handle("fluidnc:runFile", (_e, remotePath: string, filesystem?: "sd" | "fs") =>
+  fluidnc.runFile(remotePath, filesystem),
 );
 ipcMain.handle("fluidnc:pauseJob", () => fluidnc.pauseJob());
 ipcMain.handle("fluidnc:resumeJob", () => fluidnc.resumeJob());

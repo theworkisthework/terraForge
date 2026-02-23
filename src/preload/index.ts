@@ -27,7 +27,7 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
   downloadFile: (taskId, remotePath, localPath) =>
     invoke<void>("fluidnc:downloadFile", taskId, remotePath, localPath),
   deleteFile: (remotePath) => invoke<void>("fluidnc:deleteFile", remotePath),
-  runFile: (remotePath) => invoke<void>("fluidnc:runFile", remotePath),
+  runFile: (remotePath, filesystem) => invoke<void>("fluidnc:runFile", remotePath, filesystem),
   pauseJob: () => invoke<void>("fluidnc:pauseJob"),
   resumeJob: () => invoke<void>("fluidnc:resumeJob"),
   abortJob: () => invoke<void>("fluidnc:abortJob"),

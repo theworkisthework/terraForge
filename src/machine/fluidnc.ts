@@ -15,6 +15,8 @@ export class FluidNCClient extends EventEmitter {
   private wsReconnectTimer: NodeJS.Timeout | null = null;
   private wsHost = "";
   private wsPort = 80;
+  private wsRetryDelay = 3000;   // ms — doubles on each 503, resets on success
+  private wsEnabled = false;     // set false on disconnect to stop retry loop
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
@@ -100,8 +102,10 @@ export class FluidNCClient extends EventEmitter {
 
   // ─── Job Control ──────────────────────────────────────────────────────────
 
-  async runFile(remotePath: string): Promise<void> {
-    await this.get(`/run?file=${encodeURIComponent(remotePath)}`);
+  async runFile(remotePath: string, filesystem: "sd" | "fs" = "sd"): Promise<void> {
+    // FluidNC has no HTTP run endpoint — files are started via the command interface.
+    const cmd = filesystem === "sd" ? `$SD/Run=${remotePath}` : `$FS/Run=${remotePath}`;
+    await this.sendCommand(cmd);
   }
 
   async pauseJob(): Promise<void> {
@@ -242,10 +246,13 @@ export class FluidNCClient extends EventEmitter {
     this.wsHost = host;
     this.wsPort = port;
     this.setHost(host, port);
+    this.wsEnabled = true;
+    this.wsRetryDelay = 3000;
     this.openWs();
   }
 
   disconnectWebSocket(): void {
+    this.wsEnabled = false;
     if (this.wsReconnectTimer) {
       clearTimeout(this.wsReconnectTimer);
       this.wsReconnectTimer = null;
@@ -254,14 +261,22 @@ export class FluidNCClient extends EventEmitter {
     this.ws = null;
   }
 
+  private scheduleReconnect(): void {
+    if (!this.wsEnabled) return;
+    this.wsReconnectTimer = setTimeout(() => this.openWs(), this.wsRetryDelay);
+    // Exponential backoff, capped at 60s
+    this.wsRetryDelay = Math.min(this.wsRetryDelay * 2, 60_000);
+  }
+
   private openWs(): void {
+    if (!this.wsEnabled) return;
     const url = `ws://${this.wsHost}:${this.wsPort}/ws`;
-    console.log(`[FluidNC] Connecting WebSocket: ${url}`);
 
     this.ws = new WebSocket(url);
 
     this.ws.on("open", () => {
-      console.log("[FluidNC] WebSocket connected");
+      this.wsRetryDelay = 3000; // reset backoff on successful connect
+      this.emit("console", "[terraForge] WebSocket connected");
     });
 
     this.ws.on("message", (raw) => {
@@ -273,13 +288,23 @@ export class FluidNCClient extends EventEmitter {
       }
     });
 
-    this.ws.on("close", () => {
-      console.log("[FluidNC] WebSocket closed — reconnecting in 3s");
-      this.wsReconnectTimer = setTimeout(() => this.openWs(), 3000);
+    this.ws.on("close", (_code, reason) => {
+      const msg = reason?.toString();
+      // 503 = FluidNC already has a client or is busy — retry quietly with backoff
+      const is503 = msg?.includes("503") || this.wsRetryDelay > 3000;
+      if (!is503) {
+        this.emit("console", "[terraForge] WebSocket disconnected — retrying…");
+      }
+      this.scheduleReconnect();
     });
 
     this.ws.on("error", (err) => {
-      console.error("[FluidNC] WebSocket error:", err.message);
+      // 503 is logged at info level only — it's expected when machine is busy
+      const is503 = err.message.includes("503");
+      if (!is503) {
+        this.emit("console", `[terraForge] WebSocket error: ${err.message}`);
+      }
+      // close event fires after error, which triggers scheduleReconnect
     });
   }
 }

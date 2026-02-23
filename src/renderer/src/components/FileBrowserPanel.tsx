@@ -253,7 +253,7 @@ export function FileBrowserPanel() {
           connected={connected}
           listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
           deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
-          runFn={(p) => window.terraForge.fluidnc.runFile(p)}
+          runFn={(p) => window.terraForge.fluidnc.runFile(p, "fs")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"
@@ -266,7 +266,7 @@ export function FileBrowserPanel() {
           connected={connected}
           listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
           deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
-          runFn={(p) => window.terraForge.fluidnc.runFile(p)}
+          runFn={(p) => window.terraForge.fluidnc.runFile(p, "sd")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"
