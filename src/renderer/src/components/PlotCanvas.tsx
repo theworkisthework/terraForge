@@ -1,7 +1,7 @@
 ﻿import { useRef, useEffect, useState, useCallback } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
-import type { VectorObject } from "../../../types";
+import type { SvgImport } from "../../../types";
 
 const MM_TO_PX = 3; // display scale: 3px per mm
 const HANDLE_R = 5;  // handle radius in SVG pixels
@@ -12,10 +12,11 @@ const ALL_HANDLES: HandlePos[] = ["tl","t","tr","r","br","b","bl","l"];
 
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
-  const objects = useCanvasStore((s) => s.objects);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectObject = useCanvasStore((s) => s.selectObject);
-  const updateObject = useCanvasStore((s) => s.updateObject);
+  const imports = useCanvasStore((s) => s.imports);
+  const selectedImportId = useCanvasStore((s) => s.selectedImportId);
+  const selectImport = useCanvasStore((s) => s.selectImport);
+  const removeImport = useCanvasStore((s) => s.removeImport);
+  const updateImport = useCanvasStore((s) => s.updateImport);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const activeConfig = useMachineStore((s) => s.activeConfig);
@@ -50,18 +51,23 @@ export function PlotCanvas() {
   const [toolpathSelected, setToolpathSelected] = useState(false);
 
   useEffect(() => {
-    if (!toolpathSelected) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "Delete" || e.key === "Backspace") {
-        setGcodeToolpath(null);
-        setToolpathSelected(false);
+        if (selectedImportId) {
+          removeImport(selectedImportId);
+        } else if (toolpathSelected) {
+          setGcodeToolpath(null);
+          setToolpathSelected(false);
+        }
       } else if (e.key === "Escape") {
+        selectImport(null);
         setToolpathSelected(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toolpathSelected, setGcodeToolpath]);
+  }, [selectedImportId, toolpathSelected, removeImport, selectImport, setGcodeToolpath]);
 
   // Clear toolpath selection when toolpath is removed
   useEffect(() => {
@@ -81,39 +87,39 @@ export function PlotCanvas() {
   const getBedY = (mmY: number) => canvasH - 20 - mmY * MM_TO_PX;
 
   // ── Drag handlers ─────────────────────────────────────────────────────────────
-  const onObjMouseDown = useCallback(
-    (e: React.MouseEvent<SVGGElement>, id: string) => {
+  const onImportMouseDown = useCallback(
+    (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
-      selectObject(id);
-      const obj = useCanvasStore.getState().objects.find((o) => o.id === id);
-      if (!obj) return;
+      selectImport(id);
+      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
+      if (!imp) return;
       setDragging({
         id,
         startMouseX: e.clientX,
         startMouseY: e.clientY,
-        startObjX: obj.x,
-        startObjY: obj.y,
+        startObjX: imp.x,
+        startObjY: imp.y,
       });
     },
-    [selectObject],
+    [selectImport],
   );
 
   // ── Scale handle mouse down ────────────────────────────────────────────────────
   const onHandleMouseDown = useCallback(
     (e: React.MouseEvent<SVGCircleElement>, id: string, handle: HandlePos) => {
       e.stopPropagation();
-      const obj = useCanvasStore.getState().objects.find((o) => o.id === id);
-      if (!obj) return;
+      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
+      if (!imp) return;
       setScaling({
         id,
         handle,
         startMouseX: e.clientX,
         startMouseY: e.clientY,
-        startScale: obj.scale,
-        startObjX: obj.x,
-        startObjY: obj.y,
-        startW: obj.originalWidth * obj.scale * MM_TO_PX,
-        startH: obj.originalHeight * obj.scale * MM_TO_PX,
+        startScale: imp.scale,
+        startObjX: imp.x,
+        startObjY: imp.y,
+        startW: imp.svgWidth * imp.scale * MM_TO_PX,
+        startH: imp.svgHeight * imp.scale * MM_TO_PX,
       });
     },
     [],
@@ -122,19 +128,19 @@ export function PlotCanvas() {
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
       if (dragging && svgRef.current) {
-        const obj = useCanvasStore.getState().objects.find((o) => o.id === dragging.id);
-        if (!obj) return;
+        const imp = useCanvasStore.getState().imports.find((i) => i.id === dragging.id);
+        if (!imp) return;
         const dx = (e.clientX - dragging.startMouseX) / MM_TO_PX;
         const dy = -(e.clientY - dragging.startMouseY) / MM_TO_PX;
-        updateObject(dragging.id, {
+        updateImport(dragging.id, {
           x: Math.max(0, Math.min(dragging.startObjX + dx, bedW)),
           y: Math.max(0, Math.min(dragging.startObjY + dy, bedH)),
         });
       }
 
       if (scaling) {
-        const obj = useCanvasStore.getState().objects.find((o) => o.id === scaling.id);
-        if (!obj) return;
+        const imp = useCanvasStore.getState().imports.find((i) => i.id === scaling.id);
+        if (!imp) return;
 
         const dx = e.clientX - scaling.startMouseX;
         const dy = e.clientY - scaling.startMouseY;
@@ -151,10 +157,10 @@ export function PlotCanvas() {
 
         const dimPx = h === "t" || h === "b" ? scaling.startH : scaling.startW;
         const newScale = Math.max(0.05, scaling.startScale * (1 + delta / dimPx));
-        updateObject(scaling.id, { scale: newScale });
+        updateImport(scaling.id, { scale: newScale });
       }
     },
-    [dragging, scaling, bedW, bedH, updateObject],
+    [dragging, scaling, bedW, bedH, updateImport],
   );
 
   const onMouseUp = useCallback(() => {
@@ -178,7 +184,7 @@ export function PlotCanvas() {
         width={canvasW}
         height={canvasH}
         className="cursor-default select-none"
-        onClick={() => { selectObject(null); setToolpathSelected(false); }}
+        onClick={() => { selectImport(null); setToolpathSelected(false); }}
       >
         {/* Bed background */}
         <rect x={20} y={20} width={bedW * MM_TO_PX} height={bedH * MM_TO_PX}
@@ -243,7 +249,7 @@ export function PlotCanvas() {
                     x={minX} y={minY} width={maxX - minX} height={maxY - minY}
                     fill="transparent" style={{ cursor: "pointer" }}
                     vectorEffect="non-scaling-stroke"
-                    onClick={(e) => { e.stopPropagation(); selectObject(null); setToolpathSelected(true); }}
+                    onClick={(e) => { e.stopPropagation(); selectImport(null); setToolpathSelected(true); }}
                   />
                 </g>
               </g>
@@ -276,46 +282,57 @@ export function PlotCanvas() {
           );
         })()}
 
-        {/* Vector objects */}
-        {objects.filter((o) => o.visible).map((obj) => (
-          <VectorLayer key={obj.id} obj={obj}
-            selected={selectedId === obj.id}
-            onObjMouseDown={onObjMouseDown}
+        {/* SVG imports */}
+        {imports.filter((imp) => imp.visible).map((imp) => (
+          <ImportLayer
+            key={imp.id}
+            imp={imp}
+            selected={selectedImportId === imp.id}
+            onImportMouseDown={onImportMouseDown}
             onHandleMouseDown={onHandleMouseDown}
-            getBedY={getBedY} />
+            onDelete={() => removeImport(imp.id)}
+            getBedY={getBedY}
+          />
         ))}
       </svg>
     </div>
   );
 }
 
-// ─── Per-object SVG layer with scale handles ──────────────────────────────────
+// ─── Per-import SVG layer with scale handles ──────────────────────────────────
 
-interface VectorLayerProps {
-  obj: VectorObject;
+interface ImportLayerProps {
+  imp: SvgImport;
   selected: boolean;
-  onObjMouseDown: (e: React.MouseEvent<SVGGElement>, id: string) => void;
+  onImportMouseDown: (e: React.MouseEvent, id: string) => void;
   onHandleMouseDown: (e: React.MouseEvent<SVGCircleElement>, id: string, h: HandlePos) => void;
+  onDelete: () => void;
   getBedY: (mm: number) => number;
 }
 
-function VectorLayer({ obj, selected, onObjMouseDown, onHandleMouseDown, getBedY }: VectorLayerProps) {
-  // Top-left corner of the object in SVG space
-  const svgX = 20 + obj.x * MM_TO_PX;
-  const svgY = getBedY(obj.y) - obj.originalHeight * obj.scale * MM_TO_PX;
-  const wPx = obj.originalWidth * obj.scale * MM_TO_PX;
-  const hPx = obj.originalHeight * obj.scale * MM_TO_PX;
+function ImportLayer({ imp, selected, onImportMouseDown, onHandleMouseDown, onDelete, getBedY }: ImportLayerProps) {
+  const s     = imp.scale * MM_TO_PX;
+  const vbX   = imp.viewBoxX ?? 0;
+  const vbY   = imp.viewBoxY ?? 0;
+  const left  = 20 + imp.x * MM_TO_PX;
+  const top   = getBedY(imp.y + imp.svgHeight * imp.scale);
+  const bboxW = imp.svgWidth * s;
+  const bboxH = imp.svgHeight * s;
+  const right  = left + bboxW;
+  const bottom = top + bboxH;
 
-  // Handle positions in SVG coordinates (outside the per-object transform)
+  // group transform: maps SVG (vbX, vbY) → canvas (left, top)
+  const groupTransform = `translate(${left - vbX * s}, ${top - vbY * s}) scale(${s})`;
+
   const handleCoords: Record<HandlePos, [number, number]> = {
-    tl: [svgX,          svgY],
-    t:  [svgX + wPx/2,  svgY],
-    tr: [svgX + wPx,    svgY],
-    r:  [svgX + wPx,    svgY + hPx/2],
-    br: [svgX + wPx,    svgY + hPx],
-    b:  [svgX + wPx/2,  svgY + hPx],
-    bl: [svgX,          svgY + hPx],
-    l:  [svgX,          svgY + hPx/2],
+    tl: [left,          top],
+    t:  [left + bboxW/2, top],
+    tr: [right,          top],
+    r:  [right,          top + bboxH/2],
+    br: [right,          bottom],
+    b:  [left + bboxW/2, bottom],
+    bl: [left,           bottom],
+    l:  [left,           top + bboxH/2],
   };
 
   const cursorMap: Record<HandlePos, string> = {
@@ -324,43 +341,65 @@ function VectorLayer({ obj, selected, onObjMouseDown, onHandleMouseDown, getBedY
     bl: "nesw-resize", l: "ew-resize",
   };
 
+  const delCx = right + 12;
+  const delCy = top - 12;
+
   return (
     <g>
-      {/* Draggable object body */}
+      {/* Draggable group — all paths rendered in SVG coordinate space */}
       <g
-        transform={`translate(${svgX}, ${svgY}) scale(${obj.scale * MM_TO_PX}) rotate(${-obj.rotation})`}
-        onMouseDown={(e) => onObjMouseDown(e, obj.id)}
+        transform={groupTransform}
+        onMouseDown={(e) => onImportMouseDown(e, imp.id)}
         style={{ cursor: "grab" }}
       >
-        <g
-          dangerouslySetInnerHTML={{ __html: obj.svgSource }}
-          style={{ fill: "none", stroke: selected ? "#e94560" : "#60a0ff", strokeWidth: 0.5 }}
+        {imp.paths.filter((p) => p.visible).map((p) => (
+          <path
+            key={p.id}
+            d={p.d}
+            fill="none"
+            stroke={selected ? "#60a0ff" : "#3a6aaa"}
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {/* Hit-test rect covering the whole viewBox */}
+        <rect
+          x={vbX} y={vbY}
+          width={imp.svgWidth} height={imp.svgHeight}
+          fill="transparent"
         />
       </g>
 
-      {/* Selection rect + scale handles — rendered at SVG root level so handles are always same pixel size */}
+      {/* Bounding box */}
       {selected && (
-        <g>
-          {/* Dashed bounding rect */}
-          <rect
-            x={svgX} y={svgY} width={wPx} height={hPx}
-            fill="none" stroke="#e94560" strokeWidth={1} strokeDasharray="4 2"
-            pointerEvents="none"
-          />
+        <rect
+          x={left} y={top} width={bboxW} height={bboxH}
+          fill="none" stroke="#e94560" strokeWidth={1} strokeDasharray="4 2"
+          pointerEvents="none"
+        />
+      )}
 
-          {/* Scale handles */}
-          {ALL_HANDLES.map((h) => {
-            const [hx, hy] = handleCoords[h];
-            return (
-              <circle
-                key={h}
-                cx={hx} cy={hy} r={HANDLE_R}
-                fill="#16213e" stroke="#e94560" strokeWidth={1.5}
-                style={{ cursor: cursorMap[h] }}
-                onMouseDown={(e) => onHandleMouseDown(e, obj.id, h)}
-              />
-            );
-          })}
+      {/* Scale handles */}
+      {selected && ALL_HANDLES.map((h) => {
+        const [hx, hy] = handleCoords[h];
+        return (
+          <circle
+            key={h}
+            cx={hx} cy={hy} r={HANDLE_R}
+            fill="#16213e" stroke="#e94560" strokeWidth={1.5}
+            style={{ cursor: cursorMap[h] }}
+            onMouseDown={(e) => onHandleMouseDown(e, imp.id, h)}
+          />
+        );
+      })}
+
+      {/* Delete button */}
+      {selected && (
+        <g style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+          <circle cx={delCx} cy={delCy} r={9} fill="#e94560" />
+          <text x={delCx} y={delCy} textAnchor="middle" dominantBaseline="central"
+            fill="white" fontSize={12} fontWeight="bold" style={{ userSelect: "none" }}
+          >×</text>
         </g>
       )}
     </g>

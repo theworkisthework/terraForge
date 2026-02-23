@@ -7,9 +7,26 @@ import type {
   VectorObject,
   MachineConfig,
   GcodeOptions,
+  SvgImport,
+  SvgPath,
 } from "../../../types";
 import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
+
+// ─── SVG length → mm conversion ─────────────────────────────────────────────────
+// Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
+function parseSvgLengthMM(val: string | null | undefined): number | null {
+  if (!val) return null;
+  const num = parseFloat(val);
+  if (isNaN(num)) return null;
+  if (val.endsWith("mm")) return num;
+  if (val.endsWith("cm")) return num * 10;
+  if (val.endsWith("in")) return num * 25.4;
+  if (val.endsWith("pt")) return num * (25.4 / 72);
+  if (val.endsWith("pc")) return num * (25.4 / 6);
+  // px or unitless: 1 px = 25.4 / 96 mm  (SVG 1.1 / CSS default)
+  return num * (25.4 / 96);
+}
 
 // ─── Shape-to-path conversion ──────────────────────────────────────────────────
 // Converts SVG basic shapes (rect, circle, ellipse, line, polyline, polygon)
@@ -107,8 +124,8 @@ export function Toolbar() {
   const connected = useMachineStore((s) => s.connected);
   const wsLive = useMachineStore((s) => s.wsLive);
   const setConnected = useMachineStore((s) => s.setConnected);
-  const objects = useCanvasStore((s) => s.objects);
-  const addObject = useCanvasStore((s) => s.addObject);
+  const imports = useCanvasStore((s) => s.imports);
+  const addImport = useCanvasStore((s) => s.addImport);
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const [showJog, setShowJog] = useState(false);
@@ -152,77 +169,84 @@ export function Toolbar() {
     if (!filePath) return;
 
     const taskId = uuid();
-    upsertTask({
-      id: taskId,
-      type: "svg-parse",
-      label: "Parsing SVG…",
-      progress: null,
-      status: "running",
-    });
+    upsertTask({ id: taskId, type: "svg-parse", label: "Parsing SVG…", progress: null, status: "running" });
 
     try {
       const raw = await window.terraForge.fs.readFile(filePath);
       const parser = new DOMParser();
       const doc = parser.parseFromString(raw, "image/svg+xml");
 
-      // Extract viewBox to determine original dimensions
       const svgEl = doc.querySelector("svg");
-      const vb = svgEl?.getAttribute("viewBox")?.split(" ").map(Number);
-      const origW = vb ? vb[2] : +(svgEl?.getAttribute("width") ?? 100);
-      const origH = vb ? vb[3] : +(svgEl?.getAttribute("height") ?? 100);
+      const vbParts = svgEl?.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number);
+      const viewBoxX  = vbParts?.[0] ?? 0;
+      const viewBoxY  = vbParts?.[1] ?? 0;
+      const svgWidth  = vbParts?.[2] ?? +(svgEl?.getAttribute("width")  ?? 100);
+      const svgHeight = vbParts?.[3] ?? +(svgEl?.getAttribute("height") ?? 100);
 
-      const paths = Array.from(
-        doc.querySelectorAll(
-          "path, rect, circle, ellipse, line, polyline, polygon",
-        ),
+      // Compute initial scale: mm per SVG user-unit.
+      // SVG width/height attrs carry the physical size (may have mm/cm/in/px units).
+      // If they're in mm the result is exact; px/unitless uses 96 DPI.
+      const physW = parseSvgLengthMM(svgEl?.getAttribute("width"));
+      const physH = parseSvgLengthMM(svgEl?.getAttribute("height"));
+      // Prefer width-based scale; fall back to height, then to 1 (1 unit = 1 mm).
+      const initScale = physW != null ? physW / svgWidth
+                       : physH != null ? physH / svgHeight
+                       : 1;
+
+      // Default name = filename without extension
+      const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "import";
+
+      const els = Array.from(
+        doc.querySelectorAll("path, rect, circle, ellipse, line, polyline, polygon"),
       );
 
-      paths.forEach((el, _i) => {
-        const pathD = shapeToPathD(el);
-        if (!pathD) return; // skip empty
+      const paths: SvgPath[] = els
+        .map((el): SvgPath | null => {
+          const d = shapeToPathD(el);
+          if (!d) return null;
+          return {
+            id: uuid(),
+            d,
+            svgSource: el.outerHTML,
+            visible: true,
+            layer: (el.closest("[id]:not(svg)") as Element | null)?.id ?? el.id ?? undefined,
+          };
+        })
+        .filter((p): p is SvgPath => p !== null);
 
-        const bb = getBBox(el);
-        const origW = bb.width || 10;
-        const origH = bb.height || 10;
+      if (paths.length === 0) {
+        upsertTask({ id: taskId, type: "svg-parse", label: "No paths found in SVG", progress: null, status: "error" });
+        return;
+      }
 
-        const obj: VectorObject = {
-          id: uuid(),
-          svgSource: el.outerHTML,
-          path: pathD,
-          x: 10,
-          y: 10,
-          scale: 1,
-          rotation: 0,
-          visible: true,
-          originalWidth: origW,
-          originalHeight: origH,
-          layer: el.closest("[id]")?.id ?? undefined,
-        };
-        addObject(obj);
-      });
+      const imp: SvgImport = {
+        id: uuid(),
+        name,
+        paths,
+        x: 0,
+        y: 0,
+        scale: initScale,
+        rotation: 0,
+        visible: true,
+        svgWidth,
+        svgHeight,
+        viewBoxX,
+        viewBoxY,
+      };
 
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "SVG imported",
-        progress: 100,
-        status: "completed",
-      });
+      addImport(imp);
+      upsertTask({ id: taskId, type: "svg-parse", label: "SVG imported", progress: 100, status: "completed" });
     } catch (err) {
       upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "SVG import failed",
-        progress: null,
-        status: "error",
-        error: String(err),
+        id: taskId, type: "svg-parse", label: "SVG import failed",
+        progress: null, status: "error", error: String(err),
       });
     }
   };
 
   const handleGenerateGcode = async () => {
     const cfg = activeConfig();
-    if (!cfg || objects.length === 0) return;
+    if (!cfg || imports.length === 0) return;
 
     setGenerating(true);
     const taskId = uuid();
@@ -285,7 +309,7 @@ export function Toolbar() {
     worker.postMessage({
       type: "generate",
       taskId,
-      objects,
+      objects: useCanvasStore.getState().toVectorObjects(),
       config: cfg,
       options,
     });
@@ -343,7 +367,7 @@ export function Toolbar() {
       {/* Generate G-code */}
       <button
         onClick={handleGenerateGcode}
-        disabled={generating || objects.length === 0}
+        disabled={generating || imports.length === 0}
         className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors"
       >
         {generating ? "Generating…" : "Generate G-code"}

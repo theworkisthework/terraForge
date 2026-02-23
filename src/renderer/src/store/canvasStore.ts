@@ -1,64 +1,105 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { VectorObject } from "../../../types";
+import type { SvgImport, SvgPath, VectorObject } from "../../../types";
 import type { GcodeToolpath } from "../utils/gcodeParser";
 
 interface CanvasState {
-  objects: VectorObject[];
-  selectedId: string | null;
+  imports: SvgImport[];
+  selectedImportId: string | null;
+  selectedPathId: string | null;
   gcodeToolpath: GcodeToolpath | null;
 
-  addObject: (obj: VectorObject) => void;
-  removeObject: (id: string) => void;
-  updateObject: (id: string, patch: Partial<VectorObject>) => void;
-  selectObject: (id: string | null) => void;
-  clearObjects: () => void;
-  selectedObject: () => VectorObject | undefined;
+  addImport: (imp: SvgImport) => void;
+  removeImport: (id: string) => void;
+  updateImport: (id: string, patch: Partial<SvgImport>) => void;
+  updatePath: (importId: string, pathId: string, patch: Partial<SvgPath>) => void;
+  removePath: (importId: string, pathId: string) => void;
+  selectImport: (id: string | null) => void;
+  clearImports: () => void;
+  selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
+  toVectorObjects: () => VectorObject[];
 }
 
 export const useCanvasStore = create<CanvasState>()(
   immer((set, get) => ({
-    objects: [],
-    selectedId: null,
+    imports: [],
+    selectedImportId: null,
+    selectedPathId: null,
     gcodeToolpath: null,
 
-    addObject: (obj) =>
+    addImport: (imp) =>
+      set((state) => { state.imports.push(imp); }),
+
+    removeImport: (id) =>
       set((state) => {
-        state.objects.push(obj);
+        state.imports = state.imports.filter((i) => i.id !== id);
+        if (state.selectedImportId === id) {
+          state.selectedImportId = null;
+          state.selectedPathId = null;
+        }
       }),
 
-    removeObject: (id) =>
+    updateImport: (id, patch) =>
       set((state) => {
-        state.objects = state.objects.filter((o) => o.id !== id);
-        if (state.selectedId === id) state.selectedId = null;
+        const imp = state.imports.find((i) => i.id === id);
+        if (imp) Object.assign(imp, patch);
       }),
 
-    updateObject: (id, patch) =>
+    updatePath: (importId, pathId, patch) =>
       set((state) => {
-        const obj = state.objects.find((o) => o.id === id);
-        if (obj) Object.assign(obj, patch);
+        const imp = state.imports.find((i) => i.id === importId);
+        if (!imp) return;
+        const path = imp.paths.find((p) => p.id === pathId);
+        if (path) Object.assign(path, patch);
       }),
 
-    selectObject: (id) =>
+    removePath: (importId, pathId) =>
       set((state) => {
-        state.selectedId = id;
+        const imp = state.imports.find((i) => i.id === importId);
+        if (!imp) return;
+        imp.paths = imp.paths.filter((p) => p.id !== pathId);
+        if (state.selectedPathId === pathId) state.selectedPathId = null;
       }),
 
-    clearObjects: () =>
+    selectImport: (id) =>
       set((state) => {
-        state.objects = [];
-        state.selectedId = null;
+        state.selectedImportId = id;
+        state.selectedPathId = null;
       }),
 
-    selectedObject: () => {
-      const { objects, selectedId } = get();
-      return objects.find((o) => o.id === selectedId);
+    clearImports: () =>
+      set((state) => {
+        state.imports = [];
+        state.selectedImportId = null;
+        state.selectedPathId = null;
+      }),
+
+    selectedImport: () => {
+      const { imports, selectedImportId } = get();
+      return imports.find((i) => i.id === selectedImportId);
     },
 
     setGcodeToolpath: (tp) =>
-      set((state) => {
-        state.gcodeToolpath = tp as GcodeToolpath;
-      }),
+      set((state) => { state.gcodeToolpath = tp as GcodeToolpath; }),
+
+    toVectorObjects: (): VectorObject[] =>
+      get()
+        .imports.filter((imp) => imp.visible)
+        .flatMap((imp) =>
+          imp.paths.filter((p) => p.visible).map((p): VectorObject => ({
+            id: p.id,
+            svgSource: p.svgSource,
+            path: p.d,
+            x: imp.x,
+            y: imp.y,
+            scale: imp.scale,
+            rotation: imp.rotation,
+            visible: true,
+            originalWidth: imp.svgWidth,
+            originalHeight: imp.svgHeight,
+            layer: p.layer,
+          })),
+        ),
   })),
 );

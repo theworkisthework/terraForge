@@ -47,6 +47,41 @@ export interface VectorObject {
   layer?: string;
 }
 
+// ─── SVG Import Model ─────────────────────────────────────────────────────────
+
+/** A single path element extracted from an imported SVG file */
+export interface SvgPath {
+  id: string;
+  /** Path d-string in the SVG's user-unit coordinate space */
+  d: string;
+  /** Original element outerHTML (preserved for G-code worker) */
+  svgSource: string;
+  visible: boolean;
+  /** Layer/group name derived from closest ancestor with an id */
+  layer?: string;
+}
+
+/** One imported SVG file, treated as a positioned group on the bed */
+export interface SvgImport {
+  id: string;
+  /** Display name — defaults to filename without extension */
+  name: string;
+  paths: SvgPath[];
+  /** Position of the SVG's bottom-left corner on the bed (mm) */
+  x: number;
+  y: number;
+  /** SVG user units → mm scale factor */
+  scale: number;
+  rotation: number;
+  visible: boolean;
+  /** SVG viewBox dimensions in user units */
+  svgWidth: number;
+  svgHeight: number;
+  /** ViewBox origin (for SVGs with non-zero viewBox x/y offset) */
+  viewBoxX: number;
+  viewBoxY: number;
+}
+
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 
 export interface Job {
