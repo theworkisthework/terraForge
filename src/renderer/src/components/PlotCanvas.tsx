@@ -17,6 +17,7 @@ export function PlotCanvas() {
   const selectObject = useCanvasStore((s) => s.selectObject);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
+  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const config = activeConfig();
@@ -44,6 +45,28 @@ export function PlotCanvas() {
     startW: number;  // px
     startH: number;
   } | null>(null);
+
+  // ── Toolpath selection ────────────────────────────────────────────────────────
+  const [toolpathSelected, setToolpathSelected] = useState(false);
+
+  useEffect(() => {
+    if (!toolpathSelected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        setGcodeToolpath(null);
+        setToolpathSelected(false);
+      } else if (e.key === "Escape") {
+        setToolpathSelected(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toolpathSelected, setGcodeToolpath]);
+
+  // Clear toolpath selection when toolpath is removed
+  useEffect(() => {
+    if (!gcodeToolpath) setToolpathSelected(false);
+  }, [gcodeToolpath]);
 
   const canvasW = bedW * MM_TO_PX + 40;
   const canvasH = bedH * MM_TO_PX + 40;
@@ -155,7 +178,7 @@ export function PlotCanvas() {
         width={canvasW}
         height={canvasH}
         className="cursor-default select-none"
-        onClick={() => selectObject(null)}
+        onClick={() => { selectObject(null); setToolpathSelected(false); }}
       >
         {/* Bed background */}
         <rect x={20} y={20} width={bedW * MM_TO_PX} height={bedH * MM_TO_PX}
@@ -183,30 +206,75 @@ export function PlotCanvas() {
         </text>
 
         {/* G-code toolpath overlay */}
-        {gcodeToolpath && (
-          <g transform={`translate(${20}, ${20 + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}>
-            <clipPath id="bed-clip">
-              <rect x={0} y={0} width={bedW} height={bedH} />
-            </clipPath>
-            <g clipPath="url(#bed-clip)">
-              {gcodeToolpath.rapids && (
-                <path
-                  d={gcodeToolpath.rapids}
-                  stroke="#4a5568" strokeWidth={0.5} fill="none"
-                  strokeDasharray="2 1"
-                  vectorEffect="non-scaling-stroke"
-                />
+        {gcodeToolpath && (() => {
+          const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
+          const svgLeft   = 20 + minX * MM_TO_PX;
+          const svgRight  = 20 + maxX * MM_TO_PX;
+          const svgTop    = 20 + (bedH - maxY) * MM_TO_PX;
+          const svgBottom = 20 + (bedH - minY) * MM_TO_PX;
+          const bboxW = svgRight - svgLeft;
+          const bboxH = svgBottom - svgTop;
+          const delCx = svgRight + 8;
+          const delCy = svgTop - 8;
+          return (
+            <>
+              <g transform={`translate(${20}, ${20 + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}>
+                <clipPath id="bed-clip">
+                  <rect x={0} y={0} width={bedW} height={bedH} />
+                </clipPath>
+                <g clipPath="url(#bed-clip)">
+                  {gcodeToolpath.rapids && (
+                    <path
+                      d={gcodeToolpath.rapids}
+                      stroke="#4a5568" strokeWidth={0.5} fill="none"
+                      strokeDasharray="2 1"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {gcodeToolpath.cuts && (
+                    <path
+                      d={gcodeToolpath.cuts}
+                      stroke={toolpathSelected ? "#38bdf8" : "#0ea5e9"} strokeWidth={1.5} fill="none"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {/* Invisible hit area for clicking the toolpath */}
+                  <rect
+                    x={minX} y={minY} width={maxX - minX} height={maxY - minY}
+                    fill="transparent" style={{ cursor: "pointer" }}
+                    vectorEffect="non-scaling-stroke"
+                    onClick={(e) => { e.stopPropagation(); selectObject(null); setToolpathSelected(true); }}
+                  />
+                </g>
+              </g>
+
+              {/* Bounding box + delete button — rendered in SVG root coords */}
+              {toolpathSelected && (
+                <g pointerEvents="none">
+                  <rect
+                    x={svgLeft} y={svgTop} width={bboxW} height={bboxH}
+                    fill="none" stroke="#38bdf8" strokeWidth={1} strokeDasharray="5 3"
+                  />
+                  {/* Corner ticks */}
+                  {[[svgLeft, svgTop], [svgRight, svgTop], [svgLeft, svgBottom], [svgRight, svgBottom]].map(([cx, cy], i) => (
+                    <circle key={i} cx={cx} cy={cy} r={2.5} fill="#38bdf8" />
+                  ))}
+                </g>
               )}
-              {gcodeToolpath.cuts && (
-                <path
-                  d={gcodeToolpath.cuts}
-                  stroke="#0ea5e9" strokeWidth={1.5} fill="none"
-                  vectorEffect="non-scaling-stroke"
-                />
+              {toolpathSelected && (
+                <g
+                  style={{ cursor: "pointer" }}
+                  onClick={(e) => { e.stopPropagation(); setGcodeToolpath(null); }}
+                >
+                  <circle cx={delCx} cy={delCy} r={8} fill="#e94560" />
+                  <text x={delCx} y={delCy} textAnchor="middle" dominantBaseline="central"
+                    fill="white" fontSize={11} fontWeight="bold" style={{ userSelect: "none" }}
+                  >×</text>
+                </g>
               )}
-            </g>
-          </g>
-        )}
+            </>
+          );
+        })()}
 
         {/* Vector objects */}
         {objects.filter((o) => o.visible).map((obj) => (
