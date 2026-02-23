@@ -270,7 +270,8 @@ export class FluidNCClient extends EventEmitter {
 
   private openWs(): void {
     if (!this.wsEnabled) return;
-    const url = `ws://${this.wsHost}:${this.wsPort}/ws`;
+    // FluidNC's WebSocket server runs on port 81 at the root path (ESP3D convention)
+    const url = `ws://${this.wsHost}:81/`;
 
     this.ws = new WebSocket(url);
 
