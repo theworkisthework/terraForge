@@ -98,7 +98,7 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
   };
 
   const handleUpload = async () => {
-    const localPath = await window.terraForge.fs.openSvgDialog();
+    const localPath = await window.terraForge.fs.openFileDialog();
     if (!localPath) return;
     const name = localPath.split(/[\\/]/).pop()!;
     const remotePath = (path === "/" ? "" : path) + "/" + name;

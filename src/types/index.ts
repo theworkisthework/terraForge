@@ -196,6 +196,7 @@ export interface SerialApi {
 
 export interface FsApi {
   openSvgDialog: () => Promise<string | null>;
+  openFileDialog: () => Promise<string | null>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   saveGcodeDialog: (defaultName: string) => Promise<string | null>;

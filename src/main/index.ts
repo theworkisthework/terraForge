@@ -241,6 +241,15 @@ ipcMain.handle("fs:openSvgDialog", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("fs:openFileDialog", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Select File to Upload",
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle("fs:readFile", (_e, filePath: string) =>
   readFile(filePath, "utf-8"),
 );
