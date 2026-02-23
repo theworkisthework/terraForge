@@ -105,6 +105,7 @@ export function Toolbar() {
   const setActiveConfigId = useMachineStore((s) => s.setActiveConfigId);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const connected = useMachineStore((s) => s.connected);
+  const wsLive = useMachineStore((s) => s.wsLive);
   const setConnected = useMachineStore((s) => s.setConnected);
   const objects = useCanvasStore((s) => s.objects);
   const addObject = useCanvasStore((s) => s.addObject);
@@ -367,10 +368,13 @@ export function Toolbar() {
       {/* Connection status indicator */}
       <div className="ml-auto flex items-center gap-3">
         <span
-          className={`w-2 h-2 rounded-full ${connected ? "bg-green-400" : "bg-gray-600"}`}
+          className={`w-2 h-2 rounded-full transition-colors ${
+            !connected ? "bg-gray-600" : wsLive ? "bg-green-400" : "bg-amber-400 animate-pulse"
+          }`}
+          title={!connected ? "Offline" : wsLive ? "Connected — WebSocket live" : "Connected — waiting for WebSocket"}
         />
         <span className="text-xs text-gray-400">
-          {connected ? "Connected" : "Offline"}
+          {!connected ? "Offline" : wsLive ? "Connected" : "Connecting…"}
         </span>
 
         {/* Settings */}

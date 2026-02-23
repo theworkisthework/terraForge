@@ -12,6 +12,7 @@ import { useConsoleStore } from "./store/consoleStore";
 export default function App() {
   const setConfigs = useMachineStore((s) => s.setConfigs);
   const setStatus = useMachineStore((s) => s.setStatus);
+  const setWsLive = useMachineStore((s) => s.setWsLive);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
 
@@ -28,12 +29,23 @@ export default function App() {
     // Subscribe to background task updates
     const offTask = window.terraForge.tasks.onTaskUpdate(upsertTask);
 
+    // Ping watchdog — if no ping within 15s, mark WS as dead
+    let pingTimer: ReturnType<typeof setTimeout> | null = null;
+    const resetPingTimer = () => {
+      setWsLive(true);
+      if (pingTimer) clearTimeout(pingTimer);
+      pingTimer = setTimeout(() => setWsLive(false), 15_000);
+    };
+    const offPing = window.terraForge.fluidnc.onPing(resetPingTimer);
+
     return () => {
       offStatus();
       offConsole();
       offTask();
+      offPing();
+      if (pingTimer) clearTimeout(pingTimer);
     };
-  }, [setConfigs, setStatus, upsertTask, appendLine]);
+  }, [setConfigs, setStatus, setWsLive, upsertTask, appendLine]);
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] text-gray-200 overflow-hidden">

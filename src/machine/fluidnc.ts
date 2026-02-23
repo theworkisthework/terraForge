@@ -241,28 +241,47 @@ export class FluidNCClient extends EventEmitter {
   }
 
   // ─── WebSocket ────────────────────────────────────────────────────────────
+  //
+  // FluidNC (ESP3D) supports only ~3 simultaneous WebSocket slots.
+  // To avoid stacking stale connections we use a generation counter:
+  // every openWs() call gets a unique generation ID and all event handlers
+  // bail out if they're from a superseded generation.
+
+  private wsGeneration = 0;
 
   async connectWebSocket(host: string, port: number): Promise<void> {
     this.wsHost = host;
     this.wsPort = port;
     this.setHost(host, port);
+    // Tear down any existing connection & pending reconnect first
+    this.killWs();
     this.wsEnabled = true;
     this.wsRetryDelay = 3000;
     this.openWs();
   }
 
   disconnectWebSocket(): void {
+    this.killWs();
+  }
+
+  /** Hard-stop: cancel reconnect timer, terminate socket, bump generation. */
+  private killWs(): void {
     this.wsEnabled = false;
+    this.wsGeneration++;                     // invalidate all in-flight handlers
     if (this.wsReconnectTimer) {
       clearTimeout(this.wsReconnectTimer);
       this.wsReconnectTimer = null;
     }
-    this.ws?.close();
-    this.ws = null;
+    if (this.ws) {
+      // terminate() sends TCP RST immediately — no waiting for the close handshake.
+      // This is essential so FluidNC frees the slot before we reopen.
+      try { this.ws.terminate(); } catch { /* already dead */ }
+      this.ws = null;
+    }
   }
 
-  private scheduleReconnect(): void {
-    if (!this.wsEnabled) return;
+  private scheduleReconnect(gen: number): void {
+    if (!this.wsEnabled || gen !== this.wsGeneration) return;
     this.wsReconnectTimer = setTimeout(() => this.openWs(), this.wsRetryDelay);
     // Exponential backoff, capped at 60s
     this.wsRetryDelay = Math.min(this.wsRetryDelay * 2, 60_000);
@@ -270,42 +289,55 @@ export class FluidNCClient extends EventEmitter {
 
   private openWs(): void {
     if (!this.wsEnabled) return;
+
+    // Terminate any socket that might still be lingering before opening a new one
+    if (this.ws) {
+      try { this.ws.terminate(); } catch { /* ignore */ }
+      this.ws = null;
+    }
+
+    const gen = ++this.wsGeneration;
     // FluidNC's WebSocket server runs on port 81 at the root path (ESP3D convention)
     const url = `ws://${this.wsHost}:81/`;
+    const ws = new WebSocket(url);
+    this.ws = ws;
 
-    this.ws = new WebSocket(url);
-
-    this.ws.on("open", () => {
-      this.wsRetryDelay = 3000; // reset backoff on successful connect
+    ws.on("open", () => {
+      if (gen !== this.wsGeneration) { ws.terminate(); return; }
+      this.wsRetryDelay = 3000;
       this.emit("console", "[terraForge] WebSocket connected");
     });
 
-    this.ws.on("message", (raw) => {
-      const text = raw.toString();
+    ws.on("message", (raw) => {
+      if (gen !== this.wsGeneration) return;
+      const text = raw.toString().trim();
       if (text.startsWith("<")) {
         this.emit("status", this.parseStatus(text));
-      } else {
+      } else if (text.startsWith("PING:")) {
+        // Keep-alive heartbeat — suppress from console, emit as ping signal
+        this.emit("ping");
+      } else if (text.length > 0) {
         this.emit("console", text);
       }
     });
 
-    this.ws.on("close", (_code, reason) => {
-      const msg = reason?.toString();
-      // 503 = FluidNC already has a client or is busy — retry quietly with backoff
-      const is503 = msg?.includes("503") || this.wsRetryDelay > 3000;
-      if (!is503) {
+    ws.on("close", (_code, reason) => {
+      if (gen !== this.wsGeneration) return;
+      const msg = reason?.toString() ?? "";
+      const is503 = msg.includes("503");
+      if (!is503 && this.wsRetryDelay <= 3000) {
         this.emit("console", "[terraForge] WebSocket disconnected — retrying…");
       }
-      this.scheduleReconnect();
+      this.scheduleReconnect(gen);
     });
 
-    this.ws.on("error", (err) => {
-      // 503 is logged at info level only — it's expected when machine is busy
+    ws.on("error", (err) => {
+      if (gen !== this.wsGeneration) return;
       const is503 = err.message.includes("503");
       if (!is503) {
         this.emit("console", `[terraForge] WebSocket error: ${err.message}`);
       }
-      // close event fires after error, which triggers scheduleReconnect
+      // close event fires after error and will call scheduleReconnect
     });
   }
 }

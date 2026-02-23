@@ -142,6 +142,7 @@ export interface FluidNCApi {
   disconnectWebSocket: () => Promise<void>;
   onStatusUpdate: (cb: (status: MachineStatus) => void) => () => void;
   onConsoleMessage: (cb: (message: string) => void) => () => void;
+  onPing: (cb: () => void) => () => void;
 }
 
 export interface SerialApi {

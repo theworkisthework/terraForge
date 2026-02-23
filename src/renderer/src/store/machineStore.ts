@@ -7,11 +7,13 @@ interface MachineState {
   activeConfigId: string | null;
   status: MachineStatus | null;
   connected: boolean;
+  wsLive: boolean;
 
   setConfigs: (configs: MachineConfig[]) => void;
   setActiveConfigId: (id: string | null) => void;
   setStatus: (status: MachineStatus) => void;
   setConnected: (connected: boolean) => void;
+  setWsLive: (live: boolean) => void;
   activeConfig: () => MachineConfig | undefined;
 
   // CRUD helpers that also persist via IPC
@@ -27,6 +29,7 @@ export const useMachineStore = create<MachineState>()(
     activeConfigId: null,
     status: null,
     connected: false,
+    wsLive: false,
 
     setConfigs: (configs) =>
       set((state) => {
@@ -49,6 +52,12 @@ export const useMachineStore = create<MachineState>()(
     setConnected: (connected) =>
       set((state) => {
         state.connected = connected;
+        if (!connected) state.wsLive = false;
+      }),
+
+    setWsLive: (live) =>
+      set((state) => {
+        state.wsLive = live;
       }),
 
     activeConfig: () => {

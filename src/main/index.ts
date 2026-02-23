@@ -81,6 +81,10 @@ fluidnc.on("console", (message: string) => {
   mainWindow?.webContents.send("fluidnc:console", message);
 });
 
+fluidnc.on("ping", () => {
+  mainWindow?.webContents.send("fluidnc:ping");
+});
+
 serial.on("data", (data: string) => {
   mainWindow?.webContents.send("serial:data", data);
 });
