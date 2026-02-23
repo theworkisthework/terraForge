@@ -153,6 +153,9 @@ ipcMain.handle("fluidnc:sendCommand", (_e, cmd: string) =>
 ipcMain.handle("fluidnc:listFiles", (_e, path?: string) =>
   fluidnc.listFiles(path),
 );
+ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) =>
+  fluidnc.listSDFiles(path),
+);
 ipcMain.handle("fluidnc:deleteFile", (_e, remotePath: string) =>
   fluidnc.deleteFile(remotePath),
 );

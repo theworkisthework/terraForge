@@ -132,6 +132,24 @@ export class FluidNCClient extends EventEmitter {
     }));
   }
 
+  // SD card file listing — FluidNC exposes the SD card via GET /upload?path=
+  // Directories are identified by size === "-1" (returned as a string).
+  async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    const res = await this.get(`/upload?path=${encodeURIComponent(remotePath)}`);
+    const json = (await res.json()) as {
+      files: Array<{ name: string; shortname: string; size: string; datetime: string }>;
+      path: string;
+      status: string;
+    };
+    const prefix = remotePath === "/" ? "" : remotePath.replace(/\/$/, "");
+    return (json.files ?? []).map((f) => ({
+      name: f.name,
+      path: `${prefix}/${f.name}`,
+      size: parseInt(f.size, 10),
+      isDirectory: f.size === "-1",
+    }));
+  }
+
   async deleteFile(remotePath: string): Promise<void> {
     await this.get(`/delete?path=${encodeURIComponent(remotePath)}`);
   }

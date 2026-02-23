@@ -21,6 +21,7 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
   getStatus: () => invoke<MachineStatus>("fluidnc:getStatus"),
   sendCommand: (cmd) => invoke<string>("fluidnc:sendCommand", cmd),
   listFiles: (path) => invoke<RemoteFile[]>("fluidnc:listFiles", path),
+  listSDFiles: (path) => invoke<RemoteFile[]>("fluidnc:listSDFiles", path),
   uploadFile: (taskId, localPath, remotePath) =>
     invoke<void>("fluidnc:uploadFile", taskId, localPath, remotePath),
   downloadFile: (taskId, remotePath, localPath) =>

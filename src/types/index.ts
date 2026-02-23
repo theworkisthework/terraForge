@@ -122,6 +122,7 @@ export interface FluidNCApi {
   getStatus: () => Promise<MachineStatus>;
   sendCommand: (cmd: string) => Promise<string>;
   listFiles: (path?: string) => Promise<RemoteFile[]>;
+  listSDFiles: (path?: string) => Promise<RemoteFile[]>;
   uploadFile: (
     taskId: string,
     localPath: string,
