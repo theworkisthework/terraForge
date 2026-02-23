@@ -2,7 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
+import { useCanvasStore } from "../store/canvasStore";
+import { parseGcode } from "../utils/gcodeParser";
 import type { RemoteFile } from "../../../types";
+
+const GCODE_EXTS = [".gcode", ".nc", ".g", ".gc", ".gco", ".ngc", ".ncc", ".cnc", ".tap"];
+const isGcodeFile = (name: string) => GCODE_EXTS.some((e) => name.toLowerCase().endsWith(e));
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +66,8 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
 
   const navigate = useCallback(async (target: string) => {
     if (!connected) return;
@@ -87,7 +94,7 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
     if (!localPath) return;
     const taskId = uuid();
     upsertTask({ id: taskId, type: "file-download", label: `Downloading ${file.name}`, progress: 0, status: "running" });
-    await window.terraForge.fluidnc.downloadFile(taskId, file.path, localPath);
+    await window.terraForge.fluidnc.downloadFile(taskId, file.path, localPath, label === "sdcard" ? "sdcard" : "internal");
   };
 
   const handleUpload = async () => {
@@ -98,6 +105,22 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
     const taskId = uuid();
     uploadFn(localPath, remotePath, taskId, name);
     setTimeout(() => navigate(path), 1500);
+  };
+
+  const handlePreview = async (file: RemoteFile) => {
+    setPreviewing(file.path);
+    try {
+      const text = await window.terraForge.fluidnc.fetchFileText(
+        file.path,
+        label === "sdcard" ? "sdcard" : "internal",
+      );
+      const toolpath = parseGcode(text);
+      setGcodeToolpath(toolpath);
+    } catch (err) {
+      console.error("Preview failed:", err);
+    } finally {
+      setPreviewing(null);
+    }
   };
 
   const atRoot = path === "/";
@@ -187,6 +210,14 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
                   <span className="text-gray-600 text-[9px] hidden group-hover:block shrink-0">›</span>
                 ) : (
                   <div className="hidden group-hover:flex gap-0.5 shrink-0">
+                    {isGcodeFile(file.name) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePreview(file); }}
+                        title="Preview toolpath"
+                        disabled={previewing === file.path}
+                        className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
+                      >{previewing === file.path ? "…" : "👁"}</button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); runFn(file.path); }}
                       title="Run" className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56]"

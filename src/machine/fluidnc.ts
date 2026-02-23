@@ -173,6 +173,17 @@ export class FluidNCClient extends EventEmitter {
     }));
   }
 
+  /** Fetch the text content of a remote file (for G-code preview). */
+  async fetchFileText(remotePath: string, filesystem: "internal" | "sdcard" = "sdcard"): Promise<string> {
+    // FluidNC serves files directly by path:
+    //   SD card:  GET /sd/filename.gcode
+    //   LocalFS:  GET /localfs/filename  (or just /filename)
+    const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
+    const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
+    const res = await this.get(`${prefix}${filePath}`);
+    return res.text();
+  }
+
   async deleteFile(remotePath: string): Promise<void> {
     await this.get(`/delete?path=${encodeURIComponent(remotePath)}`);
   }
@@ -223,11 +234,12 @@ export class FluidNCClient extends EventEmitter {
   async downloadFile(
     remotePath: string,
     localPath: string,
+    filesystem: "internal" | "sdcard" = "sdcard",
     onProgress?: (percent: number) => void,
   ): Promise<void> {
-    const res = await this.get(
-      `/download?file=${encodeURIComponent(remotePath)}`,
-    );
+    const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
+    const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
+    const res = await this.get(`${prefix}${filePath}`);
     const total = Number(res.headers.get("content-length") ?? 0);
     let received = 0;
 

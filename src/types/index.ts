@@ -136,7 +136,9 @@ export interface FluidNCApi {
     taskId: string,
     remotePath: string,
     localPath: string,
+    filesystem?: "internal" | "sdcard",
   ) => Promise<void>;
+  fetchFileText: (remotePath: string, filesystem?: "internal" | "sdcard") => Promise<string>;
   deleteFile: (remotePath: string) => Promise<void>;
   runFile: (remotePath: string, filesystem?: "sd" | "fs") => Promise<void>;
   pauseJob: () => Promise<void>;

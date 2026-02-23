@@ -160,6 +160,9 @@ ipcMain.handle("fluidnc:listFiles", (_e, path?: string) =>
 ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) =>
   fluidnc.listSDFiles(path),
 );
+ipcMain.handle("fluidnc:fetchFileText", (_e, remotePath: string, filesystem?: "internal" | "sdcard") =>
+  fluidnc.fetchFileText(remotePath, filesystem),
+);
 ipcMain.handle("fluidnc:deleteFile", (_e, remotePath: string) =>
   fluidnc.deleteFile(remotePath),
 );
@@ -199,14 +202,14 @@ ipcMain.handle(
 
 ipcMain.handle(
   "fluidnc:downloadFile",
-  async (_e, taskId: string, remotePath: string, localPath: string) => {
+  async (_e, taskId: string, remotePath: string, localPath: string, filesystem?: "internal" | "sdcard") => {
     const task = taskManager.create(
       taskId,
       "file-download",
       `Downloading ${remotePath}`,
     );
     try {
-      await fluidnc.downloadFile(remotePath, localPath, (progress) => {
+      await fluidnc.downloadFile(remotePath, localPath, filesystem, (progress) => {
         taskManager.update(taskId, { progress });
         mainWindow?.webContents.send("task:update", taskManager.get(taskId));
       });

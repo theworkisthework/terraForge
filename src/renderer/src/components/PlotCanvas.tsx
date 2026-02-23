@@ -16,6 +16,7 @@ export function PlotCanvas() {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const selectObject = useCanvasStore((s) => s.selectObject);
   const updateObject = useCanvasStore((s) => s.updateObject);
+  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const config = activeConfig();
@@ -180,6 +181,32 @@ export function PlotCanvas() {
         <text x={20 + bedW * MM_TO_PX - 20} y={canvasH - 4} fill="#4a5568" fontSize={9}>
           {bedW}mm
         </text>
+
+        {/* G-code toolpath overlay */}
+        {gcodeToolpath && (
+          <g transform={`translate(${20}, ${20 + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}>
+            <clipPath id="bed-clip">
+              <rect x={0} y={0} width={bedW} height={bedH} />
+            </clipPath>
+            <g clipPath="url(#bed-clip)">
+              {gcodeToolpath.rapids && (
+                <path
+                  d={gcodeToolpath.rapids}
+                  stroke="#4a5568" strokeWidth={0.5} fill="none"
+                  strokeDasharray="2 1"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {gcodeToolpath.cuts && (
+                <path
+                  d={gcodeToolpath.cuts}
+                  stroke="#0ea5e9" strokeWidth={1.5} fill="none"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+            </g>
+          </g>
+        )}
 
         {/* Vector objects */}
         {objects.filter((o) => o.visible).map((obj) => (
