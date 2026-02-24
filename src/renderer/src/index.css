@@ -1,6 +1,23 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #1a1a2e;
+  --color-surface-50: #f0f0f8;
+  --color-surface-100: #e1e1f1;
+  --color-surface-200: #c3c3e3;
+  --color-surface-300: #a5a5d5;
+  --color-surface-400: #8787c7;
+  --color-surface-500: #6969b9;
+  --color-surface-600: #4b4bab;
+  --color-surface-700: #2d2d9d;
+  --color-surface-800: #0f0f8f;
+  --color-surface-900: #000071;
+  --color-accent: #e94560;
+  --color-accent-hover: #c73d56;
+  --color-panel: #16213e;
+  --color-border-custom: #0f3460;
+  --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
+}
 
 @layer base {
   * {
