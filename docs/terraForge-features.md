@@ -3,6 +3,7 @@
 ## Implemented
 
 ### SVG Import & Canvas
+
 - [x] Import SVG files via native open dialog (filtered to `.svg`)
 - [x] Parse all SVG shape types → path `d` strings: `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`
 - [x] Rounded-rect support (`rx`/`ry` attributes)
@@ -18,6 +19,7 @@
 - [x] Escape key deselects
 
 ### Canvas Display
+
 - [x] Bed grid based on machine config dimensions
 - [x] 10 mm minor gridlines, 50 mm major gridlines
 - [x] Origin marker (red dot at 0,0)
@@ -26,6 +28,7 @@
 - [x] `non-scaling-stroke` on G-code toolpath overlay too
 
 ### G-code Generation
+
 - [x] Runs in a Web Worker (renderer never blocks)
 - [x] Full SVG path command support: M, L, H, V, C, S, Q, T, A, Z (absolute and relative variants)
 - [x] Cubic and quadratic Bézier flattening to polylines
@@ -40,6 +43,7 @@
 - [x] `toVectorObjects()` flattens grouped import model for worker compatibility
 
 ### G-code Preview
+
 - [x] Fetch and parse `.gcode`/`.nc` files from the file browser
 - [x] Toolpath overlay on canvas — rapids in grey dashed, cuts in blue
 - [x] Bounding box highlight when toolpath selected
@@ -47,6 +51,7 @@
 - [x] Correct Y-axis flip (machine origin at bottom-left)
 
 ### Machine Connection
+
 - [x] Wi-Fi (WebSocket) connection to FluidNC `/ws`
 - [x] USB serial connection
 - [x] Connect / Disconnect button
@@ -57,12 +62,14 @@
 - [x] Machine state display (Idle, Run, Hold, Alarm, etc.)
 
 ### Machine Configuration
+
 - [x] Multiple machine config profiles (add, edit, delete)
 - [x] Machine selector dropdown in toolbar
 - [x] Config fields: name, bed width/height, origin, pen type, pen up/down commands, feedrate, connection (Wi-Fi host/port or serial path)
 - [x] Configs persisted to disk via IPC
 
 ### File Browser
+
 - [x] Internal FluidNC filesystem browser (`/files` endpoint)
 - [x] SD card filesystem browser (`/sd` endpoint)
 - [x] Directory navigation (click folders to enter, `/ ` to go up)
@@ -76,6 +83,7 @@
 - [x] Auto-refresh listing after upload
 
 ### Job Control
+
 - [x] Start job button
 - [x] Pause job
 - [x] Resume job
@@ -85,6 +93,7 @@
 - [x] Running / Paused state labels
 
 ### Jog Controls
+
 - [x] X+, X-, Y+, Y- jog buttons
 - [x] Z+, Z- jog buttons
 - [x] Step size selector: 0.1 / 1 / 10 / 100 mm
@@ -93,12 +102,14 @@
 - [x] Jog panel shown/hidden via toolbar toggle
 
 ### Console
+
 - [x] Real-time console output from FluidNC (WebSocket stream)
 - [x] Scrollable, monospaced log panel
 - [x] Clear button
 - [x] Command input (send raw G-code commands)
 
 ### Background Task UX
+
 - [x] Global task bar (below toolbar) showing all running tasks
 - [x] Determinate progress bar when progress % is known
 - [x] Indeterminate spinner when progress is unknown
@@ -107,7 +118,8 @@
 - [x] Task types: `svg-parse`, `gcode-generate`, `file-upload`, `file-download`, `file-delete`, `job-start`, `ws-connect`
 
 ### Architecture
-- [x] Electron + React 18 + TypeScript throughout
+
+- [x] Electron + React 19 + TypeScript throughout
 - [x] Node integration disabled in renderer — all IPC via `contextBridge`
 - [x] Fully typed `window.terraForge` API (`fluidnc`, `serial`, `fs`, `tasks`, `jobs`, `config`)
 - [x] Zustand stores: `canvasStore`, `machineStore`, `taskStore`, `consoleStore`
@@ -119,6 +131,7 @@
 ## Not Yet Implemented
 
 ### Canvas
+
 - [ ] **Rotation** — spec calls for rotation handle/input; `rotation` field exists in the data model but is not applied on canvas or in G-code output
 - [ ] **Canvas zoom / pan** — bed is fixed-scale; no scroll-to-zoom or middle-mouse pan
 - [ ] **Snap to grid** — no grid snapping when dragging
@@ -127,6 +140,7 @@
 - [ ] **Multi-select** — can only select one import at a time
 
 ### SVG Import
+
 - [ ] **SVG `transform` attribute resolution** — Inkscape files often embed `transform="translate(...) scale(...)"` on `<g>` elements; these are currently ignored so paths may be mispositioned for complex layered files
 - [ ] **Import multiple SVGs at once** — dialog is single-select
 - [ ] **Layer / group visibility control before import** — no pre-import layer preview
@@ -134,6 +148,7 @@
 - [ ] **Paste SVG from clipboard**
 
 ### G-code Generation
+
 - [ ] **Arc fitting (G2/G3)** — `arcFitting` option exists in the data model and worker message, but the worker always uses linear segments; the UI has no toggle for it
 - [ ] **G-code optimizer** — no path reordering to minimise rapid travel distance (travelling salesman / nearest-neighbour)
 - [ ] **Top-left origin mode** — `origin: "top-left"` is in the config but canvas and G-code always assume bottom-left
@@ -141,6 +156,7 @@
 - [ ] **Toolpath simulation** — animate pen movement before sending, estimate job duration
 
 ### Machine Control
+
 - [ ] **Auto-reconnect on WebSocket drop** — watchdog detects the loss, but reconnection must be manual
 - [ ] **Serial streaming** — streaming G-code line-by-line over USB serial is not implemented; current serial API only sends individual commands
 - [ ] **Homing sequence button** (`$H`)
@@ -148,16 +164,19 @@
 - [ ] **Alarm clear button** (`$X`)
 
 ### Job Control
+
 - [ ] **Direct streaming to machine** — current flow requires upload to SD first; streaming G-code directly from the app without an SD card is not supported
 - [ ] **Job queue** — only one job at a time, no queue management
 - [ ] **Saved job history**
 
 ### File Browser
+
 - [ ] **Download save dialog** — currently uses the G-code save dialog (`.gcode`/`.nc` filter) even for non-G-code files
 - [ ] **Rename file on machine**
 - [ ] **Create directory**
 
 ### UX / Polish
+
 - [ ] **Keyboard shortcut map** — no documented or configurable shortcuts beyond Delete/Escape
 - [ ] **First-run onboarding wizard** — no guidance for new users to set up a machine config
 - [ ] **Recent files list**
@@ -168,6 +187,7 @@
 - [ ] **Print / export canvas as image**
 
 ### Nice-to-Have (Not in Spec)
+
 - [ ] **Path reorder in properties panel** (drag-to-reorder paths within an import)
 - [ ] **Air/vacuum pen control** (non-solenoid accessories)
 - [ ] **Jog with keyboard arrow keys**

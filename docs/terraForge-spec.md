@@ -30,7 +30,7 @@ The target hardware is the TerraPen, but the app must support multiple FluidNCâ€
 
 2. Technology Stack (Fixed and Mandatory)
    Electron
-   Electron 28+
+   Electron 35+
 
 Node integration disabled in renderer
 
@@ -49,8 +49,7 @@ File system access
 Background task orchestration
 
 React
-React 18 functional components only
-
+React 19 functional components only
 TypeScript everywhere
 
 State management: Zustand

@@ -7,7 +7,13 @@ Full specification begins:
 
 Full specification ends.
 
+Full feature list and status begins:
+
+[PASTE CONTENTS OF terraForge-features.md HERE]
+
+Full feature list and status ends.
+
 Acknowledge with:
-“terraForge specification loaded and ready.”
+“terraForge specification & feature list loaded and ready.”
 
 After that, follow the specification for all future responses in this session.
