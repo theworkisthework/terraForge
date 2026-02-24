@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      # Matches v1.2.3, v1.2.3-beta.1, etc.
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+# Needed to create the GitHub Release and upload assets
+permissions:
+  contents: write
+
+jobs:
+  # ── Windows ──────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Stamp package.json with the tag version (strips the leading "v")
+      - name: Set version from tag
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package
+        run: npm run dist:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          # Grab the NSIS installer; exclude .blockmap (checksums, not needed by users)
+          path: |
+            release/*.exe
+          if-no-files-found: error
+
+  # ── macOS ─────────────────────────────────────────────────────────────────────
+  build-mac:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set version from tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package
+        run: npm run dist:mac
+        env:
+          # No signing certs → unsigned build. Add CSC_LINK / CSC_KEY_PASSWORD
+          # secrets here if you ever get an Apple Developer account.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: |
+            release/*.dmg
+          if-no-files-found: error
+
+  # ── Linux ─────────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # serialport native module needs libudev on Linux
+      - name: Install native deps
+        run: sudo apt-get install -y libudev-dev
+
+      - name: Set version from tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package
+        run: npm run dist:linux
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            release/*.AppImage
+          if-no-files-found: error
+
+  # ── Create GitHub Release ─────────────────────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      # Download all three platform artifacts into a flat directory
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release and upload binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Mark as pre-release if the tag contains anything after the patch
+          # version (e.g. v0.0.1-pre1, v1.0.0-beta.2, v2.1.0-rc1)
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-.+ ]]; then
+            PRERELEASE="--prerelease"
+          else
+            PRERELEASE=""
+          fi
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "terraForge $TAG" \
+            --generate-notes \
+            $PRERELEASE \
+            artifacts/*
