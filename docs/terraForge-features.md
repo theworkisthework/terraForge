@@ -124,7 +124,7 @@
 - [x] Fully typed `window.terraForge` API (`fluidnc`, `serial`, `fs`, `tasks`, `jobs`, `config`)
 - [x] Zustand stores: `canvasStore`, `machineStore`, `taskStore`, `consoleStore`
 - [x] SVG → G-code engine in Web Worker (`svgWorker.ts`)
-- [x] TailwindCSS styling, Vite + electron-vite build
+- [x] TailwindCSS styling, Vite 7 + electron-vite 5 build
 
 ---
 

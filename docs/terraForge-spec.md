@@ -56,7 +56,7 @@ State management: Zustand
 
 Styling: TailwindCSS
 
-Bundler: Vite
+Bundler: Vite 7
 
 No class components, no Redux, no CSS‑in‑JS
 
