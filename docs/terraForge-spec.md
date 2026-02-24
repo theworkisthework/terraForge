@@ -30,7 +30,7 @@ The target hardware is the TerraPen, but the app must support multiple FluidNCâ€
 
 2. Technology Stack (Fixed and Mandatory)
    Electron
-   Electron 35+
+   Electron 40+
 
 Node integration disabled in renderer
 
