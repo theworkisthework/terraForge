@@ -131,6 +131,9 @@ function transformPt(
   svgX: number,
   svgY: number,
 ): Pt {
+  // Scale from SVG user units. During import, path coordinates are normalised
+  // so (0, 0) is the top-left of the content bounding box and the full extent
+  // is (svgWidth × svgHeight) in user units.
   let x = svgX * obj.scale;
   let y = svgY * obj.scale;
   if (obj.rotation !== 0) {
@@ -140,14 +143,26 @@ function transformPt(
     [x, y] = [x * cos - y * sin, x * sin + y * cos];
   }
   x += obj.x;
-  y += obj.y;
-  if (config.origin === "bottom-left" || config.origin === "bottom-right")
-    y = config.bedHeight - y;
+
+  // obj.y is the machine Y coordinate of the BOTTOM edge of the content
+  // (matching how the canvas uses imp.y via getBedY(imp.y + svgHeight * scale)).
+  // SVG Y increases downward; machine Y (for bottom-origin machines) increases
+  // upward.  Correct mapping:
+  //   machine Y = obj.y + (originalHeight - svgY) * scale
+  // i.e. svgY=originalHeight → machine Y = obj.y  (bottom edge at obj.y) ✓
+  //      svgY=0             → machine Y = obj.y + height  (top edge above) ✓
+  if (config.origin === "bottom-left" || config.origin === "bottom-right") {
+    y = obj.y + obj.originalHeight * obj.scale - y;
+  } else {
+    // top-left / top-right: machine Y increases downward, same as SVG Y.
+    y += obj.y;
+  }
+
   if (config.origin === "bottom-right" || config.origin === "top-right")
     x = config.bedWidth - x;
   if (config.origin === "center") {
     x = x - config.bedWidth / 2;
-    y = config.bedHeight / 2 - y; // SVG y is down; machine y is up from center
+    y = config.bedHeight / 2 - y;
   }
   return { x, y };
 }

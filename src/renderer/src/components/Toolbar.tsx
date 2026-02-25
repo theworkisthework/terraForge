@@ -350,16 +350,29 @@ export function Toolbar() {
       // space. Recompute the content extents so the selection bounding box,
       // canvas group transform, and G-code origin all reflect the actual
       // occupied area rather than the raw SVG viewBox.
+      //
+      // We also normalize path coordinates to start at (0, 0) by translating
+      // every path by (-minX, -minY). This ensures the G-code worker always
+      // receives coordinates whose origin is the top-left of the content
+      // bounding box, which is what its transformPt formula expects.
       const bounds = computePathsBounds(paths.map((p) => p.d));
-      const effVbX = bounds?.minX ?? viewBoxX;
-      const effVbY = bounds?.minY ?? viewBoxY;
       const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
       const effH = bounds ? bounds.maxY - bounds.minY : svgHeight;
+
+      const normalizedPaths = bounds
+        ? paths.map((p) => ({
+            ...p,
+            d: applyMatrixToPathD(
+              p.d,
+              new DOMMatrix([1, 0, 0, 1, -bounds.minX, -bounds.minY]),
+            ),
+          }))
+        : paths;
 
       const imp: SvgImport = {
         id: uuid(),
         name,
-        paths,
+        paths: normalizedPaths,
         x: 0,
         y: 0,
         scale: initScale,
@@ -367,8 +380,8 @@ export function Toolbar() {
         visible: true,
         svgWidth: effW,
         svgHeight: effH,
-        viewBoxX: effVbX,
-        viewBoxY: effVbY,
+        viewBoxX: 0,
+        viewBoxY: 0,
       };
 
       addImport(imp);
