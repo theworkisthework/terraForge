@@ -535,6 +535,16 @@ export function Toolbar() {
 
       <div className="h-4 w-px bg-[#0f3460]" />
 
+      {/* Home */}
+      <button
+        onClick={() => window.terraForge.fluidnc.sendCommand("$H")}
+        disabled={!connected}
+        title="Run homing cycle ($H)"
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
+      >
+        Home
+      </button>
+
       {/* Jog toggle */}
       <button
         onClick={() => setShowJog((v) => !v)}
