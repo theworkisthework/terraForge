@@ -39,7 +39,7 @@ export function PlotCanvas() {
   const bedH = config?.bedHeight ?? 200;
   const origin = config?.origin ?? "bottom-left";
   const isBottom = origin === "bottom-left" || origin === "bottom-right";
-  const isRight  = origin === "bottom-right" || origin === "top-right";
+  const isRight = origin === "bottom-right" || origin === "top-right";
   const isCenter = origin === "center";
   // Bed coordinate bounds in machine mm (center origin uses ±half-dim)
   const bedXMin = isCenter ? -bedW / 2 : 0;
@@ -378,7 +378,17 @@ export function PlotCanvas() {
         updateImport(scaling.id, { scale: newScale });
       }
     },
-    [dragging, scaling, bedXMin, bedXMax, bedYMin, bedYMax, updateImport, setVp, setFitted],
+    [
+      dragging,
+      scaling,
+      bedXMin,
+      bedXMax,
+      bedYMin,
+      bedYMax,
+      updateImport,
+      setVp,
+      setFitted,
+    ],
   );
 
   const onMouseUp = useCallback(() => {
@@ -782,7 +792,7 @@ function RulerOverlay({
   containerH,
 }: RulerOverlayProps) {
   const isBottom = origin === "bottom-left" || origin === "bottom-right";
-  const isRight  = origin === "bottom-right" || origin === "top-right";
+  const isRight = origin === "bottom-right" || origin === "top-right";
   const isCenter = origin === "center";
   const R = RULER_W;
 
@@ -828,7 +838,12 @@ function RulerOverlay({
               ? [100, 20]
               : [200, 50];
 
-  const makeTicks = (a: number, b: number, minMm: number, maxMm: number): number[] => {
+  const makeTicks = (
+    a: number,
+    b: number,
+    minMm: number,
+    maxMm: number,
+  ): number[] => {
     const lo = Math.ceil(Math.min(a, b) / minor) * minor;
     const hi = Math.floor(Math.max(a, b) / minor) * minor;
     const out: number[] = [];
@@ -857,7 +872,12 @@ function RulerOverlay({
   const yBedMin = isCenter ? -bedH / 2 : 0;
   const yBedMax = isCenter ? bedH / 2 : bedH;
   const xTicks = makeTicks(sxToMm(R), sxToMm(xTickEdge), xBedMin, xBedMax);
-  const yTicks = makeTicks(syToMm(yStripTopY), syToMm(yStripBotY), yBedMin, yBedMax);
+  const yTicks = makeTicks(
+    syToMm(yStripTopY),
+    syToMm(yStripBotY),
+    yBedMin,
+    yBedMax,
+  );
 
   // ── Visuals ───────────────────────────────────────────────────────────────
   const TICK_COL = "#2a5a8a";
