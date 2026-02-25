@@ -12,6 +12,10 @@ import type {
 } from "../../../types";
 import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
+import {
+  getAccumulatedTransform,
+  applyMatrixToPathD,
+} from "../utils/svgTransform";
 
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
@@ -310,8 +314,13 @@ export function Toolbar() {
 
       const paths: SvgPath[] = els
         .map((el): SvgPath | null => {
-          const d = shapeToPathD(el);
-          if (!d) return null;
+          const rawD = shapeToPathD(el);
+          if (!rawD) return null;
+          // Resolve all ancestor transform attributes and bake them into the
+          // path coordinates so the canvas and G-code worker see pre-transformed
+          // positions (fixes Inkscape layer/group transforms).
+          const matrix = getAccumulatedTransform(el);
+          const d = applyMatrixToPathD(rawD, matrix);
           return {
             id: uuid(),
             d,

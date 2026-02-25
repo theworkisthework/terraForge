@@ -133,15 +133,15 @@
 ### Canvas
 
 - [ ] **Rotation** — spec calls for rotation handle/input; `rotation` field exists in the data model but is not applied on canvas or in G-code output
-- [ ] **Canvas zoom / pan** — bed is fixed-scale; no scroll-to-zoom or middle-mouse pan
+- [x] **Canvas zoom / pan** — bed is fixed-scale; no scroll-to-zoom or middle-mouse pan
 - [ ] **Snap to grid** — no grid snapping when dragging
 - [ ] **Undo / redo** — no history stack
-- [ ] **Canvas ruler / dimension overlay**
+- [x] **Canvas ruler / dimension overlay**
 - [ ] **Multi-select** — can only select one import at a time
 
 ### SVG Import
 
-- [ ] **SVG `transform` attribute resolution** — Inkscape files often embed `transform="translate(...) scale(...)"` on `<g>` elements; these are currently ignored so paths may be mispositioned for complex layered files
+- [x] **SVG `transform` attribute resolution** — `transform` attributes on `<path>`, `<g>`, and all ancestor elements are resolved and baked into the path `d` coordinates at import time; handles `translate`, `scale`, `rotate`, `matrix`, and arbitrary compositions including Inkscape layer matrices
 - [ ] **Import multiple SVGs at once** — dialog is single-select
 - [ ] **Layer / group visibility control before import** — no pre-import layer preview
 - [ ] **DXF import** — only SVG supported
