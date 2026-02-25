@@ -400,6 +400,85 @@ export function applyMatrixToPathD(d: string, m: DOMMatrix): string {
   return parts.join(" ");
 }
 
+// ── Path bounds computation ─────────────────────────────────────────────────
+
+export interface PathBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * Computes the axis-aligned bounding box of a collection of already-transformed
+ * path `d` strings.
+ *
+ * Uses all explicit coordinate values (endpoints and control points) from the
+ * absolutized path — this gives a correct or conservative bound. For arcs the
+ * end-point is used; mid-arc extrema are not computed, but this is acceptable
+ * for a selection-box calculation.
+ *
+ * Returns null when the array is empty or contains no finite coordinates.
+ */
+export function computePathsBounds(paths: string[]): PathBounds | null {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+
+  const see = (x: number, y: number) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+
+  for (const d of paths) {
+    if (!d) continue;
+    const abs = toAbsoluteExpanded(tokenizePath(d));
+    for (const cmd of abs) {
+      const a = cmd.args;
+      switch (cmd.type) {
+        case "M":
+        case "L":
+          for (let i = 0; i + 1 < a.length; i += 2) see(a[i], a[i + 1]);
+          break;
+        case "C":
+          // All six coordinates: cp1, cp2, endpoint
+          for (let i = 0; i + 5 < a.length; i += 6) {
+            see(a[i], a[i + 1]);
+            see(a[i + 2], a[i + 3]);
+            see(a[i + 4], a[i + 5]);
+          }
+          break;
+        case "S":
+          for (let i = 0; i + 3 < a.length; i += 4) {
+            see(a[i], a[i + 1]);
+            see(a[i + 2], a[i + 3]);
+          }
+          break;
+        case "Q":
+          for (let i = 0; i + 3 < a.length; i += 4) {
+            see(a[i], a[i + 1]);
+            see(a[i + 2], a[i + 3]);
+          }
+          break;
+        case "T":
+          for (let i = 0; i + 1 < a.length; i += 2) see(a[i], a[i + 1]);
+          break;
+        case "A":
+          // Use end-point (index 5,6 within each 7-value arc segment)
+          for (let i = 0; i + 6 < a.length; i += 7) see(a[i + 5], a[i + 6]);
+          break;
+      }
+    }
+  }
+
+  if (!isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY };
+}
+
 // ── Accumulated transform walker ──────────────────────────────────────────────
 
 /**

@@ -15,6 +15,7 @@ import { MachineConfigDialog } from "./MachineConfigDialog";
 import {
   getAccumulatedTransform,
   applyMatrixToPathD,
+  computePathsBounds,
 } from "../utils/svgTransform";
 
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
@@ -345,6 +346,16 @@ export function Toolbar() {
         return;
       }
 
+      // After baking transforms the paths live in the transformed coordinate
+      // space. Recompute the content extents so the selection bounding box,
+      // canvas group transform, and G-code origin all reflect the actual
+      // occupied area rather than the raw SVG viewBox.
+      const bounds = computePathsBounds(paths.map((p) => p.d));
+      const effVbX = bounds?.minX ?? viewBoxX;
+      const effVbY = bounds?.minY ?? viewBoxY;
+      const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
+      const effH = bounds ? bounds.maxY - bounds.minY : svgHeight;
+
       const imp: SvgImport = {
         id: uuid(),
         name,
@@ -354,10 +365,10 @@ export function Toolbar() {
         scale: initScale,
         rotation: 0,
         visible: true,
-        svgWidth,
-        svgHeight,
-        viewBoxX,
-        viewBoxY,
+        svgWidth: effW,
+        svgHeight: effH,
+        viewBoxX: effVbX,
+        viewBoxY: effVbY,
       };
 
       addImport(imp);
