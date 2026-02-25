@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
@@ -39,35 +39,43 @@ function shapeToPathD(el: Element): string {
   if (tag === "path") return el.getAttribute("d") ?? "";
 
   if (tag === "rect") {
-    const x = g("x"), y = g("y"), w = g("width"), h = g("height");
+    const x = g("x"),
+      y = g("y"),
+      w = g("width"),
+      h = g("height");
     const rx = Math.min(g("rx") || g("ry"), w / 2);
     const ry = Math.min(g("ry") || g("rx"), h / 2);
     if (rx === 0 && ry === 0) {
-      return `M${x},${y} H${x+w} V${y+h} H${x} Z`;
+      return `M${x},${y} H${x + w} V${y + h} H${x} Z`;
     }
     // Rounded rect via arcs
     return [
-      `M${x+rx},${y}`,
-      `H${x+w-rx}`,
-      `A${rx},${ry},0,0,1,${x+w},${y+ry}`,
-      `V${y+h-ry}`,
-      `A${rx},${ry},0,0,1,${x+w-rx},${y+h}`,
-      `H${x+rx}`,
-      `A${rx},${ry},0,0,1,${x},${y+h-ry}`,
-      `V${y+ry}`,
-      `A${rx},${ry},0,0,1,${x+rx},${y}`,
+      `M${x + rx},${y}`,
+      `H${x + w - rx}`,
+      `A${rx},${ry},0,0,1,${x + w},${y + ry}`,
+      `V${y + h - ry}`,
+      `A${rx},${ry},0,0,1,${x + w - rx},${y + h}`,
+      `H${x + rx}`,
+      `A${rx},${ry},0,0,1,${x},${y + h - ry}`,
+      `V${y + ry}`,
+      `A${rx},${ry},0,0,1,${x + rx},${y}`,
       "Z",
     ].join(" ");
   }
 
   if (tag === "circle") {
-    const cx = g("cx"), cy = g("cy"), r = g("r");
-    return `M${cx-r},${cy} A${r},${r},0,0,1,${cx+r},${cy} A${r},${r},0,0,1,${cx-r},${cy} Z`;
+    const cx = g("cx"),
+      cy = g("cy"),
+      r = g("r");
+    return `M${cx - r},${cy} A${r},${r},0,0,1,${cx + r},${cy} A${r},${r},0,0,1,${cx - r},${cy} Z`;
   }
 
   if (tag === "ellipse") {
-    const cx = g("cx"), cy = g("cy"), rx2 = g("rx"), ry2 = g("ry");
-    return `M${cx-rx2},${cy} A${rx2},${ry2},0,0,1,${cx+rx2},${cy} A${rx2},${ry2},0,0,1,${cx-rx2},${cy} Z`;
+    const cx = g("cx"),
+      cy = g("cy"),
+      rx2 = g("rx"),
+      ry2 = g("ry");
+    return `M${cx - rx2},${cy} A${rx2},${ry2},0,0,1,${cx + rx2},${cy} A${rx2},${ry2},0,0,1,${cx - rx2},${cy} Z`;
   }
 
   if (tag === "line") {
@@ -75,18 +83,26 @@ function shapeToPathD(el: Element): string {
   }
 
   if (tag === "polyline") {
-    const pts = (el.getAttribute("points") ?? "").trim().split(/[\s,]+/).map(Number);
+    const pts = (el.getAttribute("points") ?? "")
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (pts.length < 2) return "";
     const cmds = [`M${pts[0]},${pts[1]}`];
-    for (let i = 2; i < pts.length; i += 2) cmds.push(`L${pts[i]},${pts[i+1]}`);
+    for (let i = 2; i < pts.length; i += 2)
+      cmds.push(`L${pts[i]},${pts[i + 1]}`);
     return cmds.join(" ");
   }
 
   if (tag === "polygon") {
-    const pts = (el.getAttribute("points") ?? "").trim().split(/[\s,]+/).map(Number);
+    const pts = (el.getAttribute("points") ?? "")
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (pts.length < 2) return "";
     const cmds = [`M${pts[0]},${pts[1]}`];
-    for (let i = 2; i < pts.length; i += 2) cmds.push(`L${pts[i]},${pts[i+1]}`);
+    for (let i = 2; i < pts.length; i += 2)
+      cmds.push(`L${pts[i]},${pts[i + 1]}`);
     cmds.push("Z");
     return cmds.join(" ");
   }
@@ -94,26 +110,68 @@ function shapeToPathD(el: Element): string {
   return "";
 }
 
-function getBBox(el: Element): { x: number; y: number; width: number; height: number } {
+function getBBox(el: Element): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
   const tag = el.tagName.toLowerCase();
   const g = (attr: string) => parseFloat(el.getAttribute(attr) ?? "0");
 
-  if (tag === "rect")    return { x: g("x"), y: g("y"), width: g("width"), height: g("height") };
-  if (tag === "circle")  { const r = g("r"); return { x: g("cx")-r, y: g("cy")-r, width: r*2, height: r*2 }; }
-  if (tag === "ellipse") { const rx=g("rx"),ry=g("ry"); return { x:g("cx")-rx, y:g("cy")-ry, width:rx*2, height:ry*2 }; }
-  if (tag === "line")    { const x1=g("x1"),y1=g("y1"),x2=g("x2"),y2=g("y2"); return { x:Math.min(x1,x2), y:Math.min(y1,y2), width:Math.abs(x2-x1), height:Math.abs(y2-y1) }; }
+  if (tag === "rect")
+    return { x: g("x"), y: g("y"), width: g("width"), height: g("height") };
+  if (tag === "circle") {
+    const r = g("r");
+    return { x: g("cx") - r, y: g("cy") - r, width: r * 2, height: r * 2 };
+  }
+  if (tag === "ellipse") {
+    const rx = g("rx"),
+      ry = g("ry");
+    return { x: g("cx") - rx, y: g("cy") - ry, width: rx * 2, height: ry * 2 };
+  }
+  if (tag === "line") {
+    const x1 = g("x1"),
+      y1 = g("y1"),
+      x2 = g("x2"),
+      y2 = g("y2");
+    return {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1),
+    };
+  }
   if (tag === "polyline" || tag === "polygon") {
-    const pts = (el.getAttribute("points") ?? "").trim().split(/[\s,]+/).map(Number);
-    const xs = pts.filter((_,i) => i % 2 === 0), ys = pts.filter((_,i) => i % 2 === 1);
-    const minX = Math.min(...xs), minY = Math.min(...ys);
-    return { x: minX, y: minY, width: Math.max(...xs)-minX, height: Math.max(...ys)-minY };
+    const pts = (el.getAttribute("points") ?? "")
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    const xs = pts.filter((_, i) => i % 2 === 0),
+      ys = pts.filter((_, i) => i % 2 === 1);
+    const minX = Math.min(...xs),
+      minY = Math.min(...ys);
+    return {
+      x: minX,
+      y: minY,
+      width: Math.max(...xs) - minX,
+      height: Math.max(...ys) - minY,
+    };
   }
   // path — use a rough estimate from the d attribute numbers
-  const nums = (el.getAttribute("d") ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
-  const xs = nums.filter((_,i) => i%2===0), ys = nums.filter((_,i) => i%2===1);
-  if (!xs.length) return { x:0, y:0, width:100, height:100 };
-  const minX=Math.min(...xs), minY=Math.min(...ys);
-  return { x:minX, y:minY, width:Math.max(...xs)-minX, height:Math.max(...ys)-minY };
+  const nums =
+    (el.getAttribute("d") ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
+  const xs = nums.filter((_, i) => i % 2 === 0),
+    ys = nums.filter((_, i) => i % 2 === 1);
+  if (!xs.length) return { x: 0, y: 0, width: 100, height: 100 };
+  const minX = Math.min(...xs),
+    minY = Math.min(...ys);
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(...xs) - minX,
+    height: Math.max(...ys) - minY,
+  };
 }
 
 export function Toolbar() {
@@ -129,8 +187,39 @@ export function Toolbar() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const [showJog, setShowJog] = useState(false);
+  const [jogPos, setJogPos] = useState(() => ({
+    x: Math.max(0, window.innerWidth - 300),
+    y: 60,
+  }));
+  const jogDragRef = useRef<{
+    startX: number;
+    startY: number;
+    panelX: number;
+    panelY: number;
+  } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  const startJogDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    jogDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      panelX: jogPos.x,
+      panelY: jogPos.y,
+    };
+  };
+  const onJogPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!jogDragRef.current) return;
+    const { startX, startY, panelX, panelY } = jogDragRef.current;
+    setJogPos({
+      x: panelX + e.clientX - startX,
+      y: panelY + e.clientY - startY,
+    });
+  };
+  const onJogPointerUp = () => {
+    jogDragRef.current = null;
+  };
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -169,7 +258,13 @@ export function Toolbar() {
     if (!filePath) return;
 
     const taskId = uuid();
-    upsertTask({ id: taskId, type: "svg-parse", label: "Parsing SVG…", progress: null, status: "running" });
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: "Parsing SVG…",
+      progress: null,
+      status: "running",
+    });
 
     try {
       const raw = await window.terraForge.fs.readFile(filePath);
@@ -177,10 +272,14 @@ export function Toolbar() {
       const doc = parser.parseFromString(raw, "image/svg+xml");
 
       const svgEl = doc.querySelector("svg");
-      const vbParts = svgEl?.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number);
-      const viewBoxX  = vbParts?.[0] ?? 0;
-      const viewBoxY  = vbParts?.[1] ?? 0;
-      const svgWidth  = vbParts?.[2] ?? +(svgEl?.getAttribute("width")  ?? 100);
+      const vbParts = svgEl
+        ?.getAttribute("viewBox")
+        ?.trim()
+        .split(/[\s,]+/)
+        .map(Number);
+      const viewBoxX = vbParts?.[0] ?? 0;
+      const viewBoxY = vbParts?.[1] ?? 0;
+      const svgWidth = vbParts?.[2] ?? +(svgEl?.getAttribute("width") ?? 100);
       const svgHeight = vbParts?.[3] ?? +(svgEl?.getAttribute("height") ?? 100);
 
       // Compute initial scale: mm per SVG user-unit.
@@ -189,15 +288,24 @@ export function Toolbar() {
       const physW = parseSvgLengthMM(svgEl?.getAttribute("width"));
       const physH = parseSvgLengthMM(svgEl?.getAttribute("height"));
       // Prefer width-based scale; fall back to height, then to 1 (1 unit = 1 mm).
-      const initScale = physW != null ? physW / svgWidth
-                       : physH != null ? physH / svgHeight
-                       : 1;
+      const initScale =
+        physW != null
+          ? physW / svgWidth
+          : physH != null
+            ? physH / svgHeight
+            : 1;
 
       // Default name = filename without extension
-      const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "import";
+      const name =
+        filePath
+          .split(/[\\/]/)
+          .pop()
+          ?.replace(/\.[^.]+$/, "") ?? "import";
 
       const els = Array.from(
-        doc.querySelectorAll("path, rect, circle, ellipse, line, polyline, polygon"),
+        doc.querySelectorAll(
+          "path, rect, circle, ellipse, line, polyline, polygon",
+        ),
       );
 
       const paths: SvgPath[] = els
@@ -209,13 +317,22 @@ export function Toolbar() {
             d,
             svgSource: el.outerHTML,
             visible: true,
-            layer: (el.closest("[id]:not(svg)") as Element | null)?.id ?? el.id ?? undefined,
+            layer:
+              (el.closest("[id]:not(svg)") as Element | null)?.id ??
+              el.id ??
+              undefined,
           };
         })
         .filter((p): p is SvgPath => p !== null);
 
       if (paths.length === 0) {
-        upsertTask({ id: taskId, type: "svg-parse", label: "No paths found in SVG", progress: null, status: "error" });
+        upsertTask({
+          id: taskId,
+          type: "svg-parse",
+          label: "No paths found in SVG",
+          progress: null,
+          status: "error",
+        });
         return;
       }
 
@@ -235,11 +352,21 @@ export function Toolbar() {
       };
 
       addImport(imp);
-      upsertTask({ id: taskId, type: "svg-parse", label: "SVG imported", progress: 100, status: "completed" });
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "SVG imported",
+        progress: 100,
+        status: "completed",
+      });
     } catch (err) {
       upsertTask({
-        id: taskId, type: "svg-parse", label: "SVG import failed",
-        progress: null, status: "error", error: String(err),
+        id: taskId,
+        type: "svg-parse",
+        label: "SVG import failed",
+        progress: null,
+        status: "error",
+        error: String(err),
       });
     }
   };
@@ -384,8 +511,22 @@ export function Toolbar() {
       </button>
 
       {showJog && (
-        <div className="absolute top-12 right-4 z-50 bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl p-4">
-          <JogControls onClose={() => setShowJog(false)} />
+        <div
+          className="fixed z-50 bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
+          style={{ left: jogPos.x, top: jogPos.y }}
+          onPointerMove={onJogPointerMove}
+          onPointerUp={onJogPointerUp}
+          onPointerCancel={onJogPointerUp}
+        >
+          {/* Drag handle */}
+          <div
+            className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-[#0f3460]/50 hover:bg-[#0f3460] transition-colors"
+            title="Drag to move"
+            onPointerDown={startJogDrag}
+          />
+          <div className="p-4">
+            <JogControls onClose={() => setShowJog(false)} />
+          </div>
         </div>
       )}
 
@@ -393,9 +534,19 @@ export function Toolbar() {
       <div className="ml-auto flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full transition-colors ${
-            !connected ? "bg-gray-600" : wsLive ? "bg-green-400" : "bg-amber-400 animate-pulse"
+            !connected
+              ? "bg-gray-600"
+              : wsLive
+                ? "bg-green-400"
+                : "bg-amber-400 animate-pulse"
           }`}
-          title={!connected ? "Offline" : wsLive ? "Connected — WebSocket live" : "Connected — waiting for WebSocket"}
+          title={
+            !connected
+              ? "Offline"
+              : wsLive
+                ? "Connected — WebSocket live"
+                : "Connected — waiting for WebSocket"
+          }
         />
         <span className="text-xs text-gray-400">
           {!connected ? "Offline" : wsLive ? "Connected" : "Connecting…"}
@@ -411,7 +562,9 @@ export function Toolbar() {
         </button>
       </div>
 
-      {showSettings && <MachineConfigDialog onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <MachineConfigDialog onClose={() => setShowSettings(false)} />
+      )}
     </header>
   );
 }
