@@ -61,7 +61,7 @@ export function PlotCanvas() {
   // ── Fit helpers ───────────────────────────────────────────────────────────────
   const computeFit = useCallback(
     (w: number, h: number): Vp => {
-      const pad = 32;
+      const pad = 8;
       const zoom = Math.max(
         MIN_ZOOM,
         Math.min((w - pad * 2) / canvasW, (h - pad * 2) / canvasH),
