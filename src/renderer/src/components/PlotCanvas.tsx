@@ -4,6 +4,7 @@ import { useMachineStore } from "../store/machineStore";
 import type { SvgImport } from "../../../types";
 
 const MM_TO_PX = 3; // internal SVG scale: 3 px per mm
+const PAD = 30; // margin around bed in SVG pixels
 const HANDLE_R = 5; // handle radius in SVG pixels
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 20;
@@ -37,8 +38,8 @@ export function PlotCanvas() {
   const bedW = config?.bedWidth ?? 220;
   const bedH = config?.bedHeight ?? 200;
 
-  const canvasW = bedW * MM_TO_PX + 40;
-  const canvasH = bedH * MM_TO_PX + 40;
+  const canvasW = bedW * MM_TO_PX + PAD * 2;
+  const canvasH = bedH * MM_TO_PX + PAD * 2;
 
   // ── Viewport state ────────────────────────────────────────────────────────────
   // vpRef mirrors vp for use inside event-handler closures without stale captures.
@@ -268,7 +269,7 @@ export function PlotCanvas() {
   }, [gcodeToolpath]);
 
   // ── SVG coordinate helpers ────────────────────────────────────────────────────
-  const getBedY = (mmY: number) => canvasH - 20 - mmY * MM_TO_PX;
+  const getBedY = (mmY: number) => canvasH - PAD - mmY * MM_TO_PX;
 
   // ── Object drag handlers ──────────────────────────────────────────────────────
   const onImportMouseDown = useCallback(
@@ -466,8 +467,8 @@ export function PlotCanvas() {
         >
           {/* Bed background */}
           <rect
-            x={20}
-            y={20}
+            x={PAD}
+            y={PAD}
             width={bedW * MM_TO_PX}
             height={bedH * MM_TO_PX}
             fill="#0d1117"
@@ -482,10 +483,10 @@ export function PlotCanvas() {
           ).map((mm) => (
             <line
               key={`vg-${mm}`}
-              x1={20 + mm * MM_TO_PX}
-              y1={20}
-              x2={20 + mm * MM_TO_PX}
-              y2={20 + bedH * MM_TO_PX}
+              x1={PAD + mm * MM_TO_PX}
+              y1={PAD}
+              x2={PAD + mm * MM_TO_PX}
+              y2={PAD + bedH * MM_TO_PX}
               stroke="#0f3460"
               strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
             />
@@ -496,9 +497,9 @@ export function PlotCanvas() {
           ).map((mm) => (
             <line
               key={`hg-${mm}`}
-              x1={20}
+              x1={PAD}
               y1={getBedY(mm)}
-              x2={20 + bedW * MM_TO_PX}
+              x2={PAD + bedW * MM_TO_PX}
               y2={getBedY(mm)}
               stroke="#0f3460"
               strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
@@ -517,10 +518,10 @@ export function PlotCanvas() {
           {gcodeToolpath &&
             (() => {
               const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
-              const svgLeft = 20 + minX * MM_TO_PX;
-              const svgRight = 20 + maxX * MM_TO_PX;
-              const svgTop = 20 + (bedH - maxY) * MM_TO_PX;
-              const svgBottom = 20 + (bedH - minY) * MM_TO_PX;
+              const svgLeft = PAD + minX * MM_TO_PX;
+              const svgRight = PAD + maxX * MM_TO_PX;
+              const svgTop = PAD + (bedH - maxY) * MM_TO_PX;
+              const svgBottom = PAD + (bedH - minY) * MM_TO_PX;
               const bboxW = svgRight - svgLeft;
               const bboxH = svgBottom - svgTop;
               const delCx = svgRight + 8;
@@ -528,7 +529,7 @@ export function PlotCanvas() {
               return (
                 <>
                   <g
-                    transform={`translate(${20}, ${20 + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}
+                    transform={`translate(${PAD}, ${PAD + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}
                   >
                     <clipPath id="bed-clip">
                       <rect x={0} y={0} width={bedW} height={bedH} />
@@ -710,9 +711,9 @@ function Rulers({ bedW, bedH, origin, canvasH }: RulerProps) {
   const isBottomLeft = origin !== "top-left";
 
   // Bed corners in SVG space
-  const bedLeft = 20;
-  const bedTop = 20;
-  const bedBottom = 20 + bedH * MM_TO_PX;
+  const bedLeft = PAD;
+  const bedTop = PAD;
+  const bedBottom = PAD + bedH * MM_TO_PX;
 
   // X ruler: sits on the bed edge where Y=0 lives
   const xBaseY = isBottomLeft ? bedBottom : bedTop;
@@ -877,7 +878,7 @@ function ImportLayer({
   const s = imp.scale * MM_TO_PX;
   const vbX = imp.viewBoxX ?? 0;
   const vbY = imp.viewBoxY ?? 0;
-  const left = 20 + imp.x * MM_TO_PX;
+  const left = PAD + imp.x * MM_TO_PX;
   const top = getBedY(imp.y + imp.svgHeight * imp.scale);
   const bboxW = imp.svgWidth * s;
   const bboxH = imp.svgHeight * s;
