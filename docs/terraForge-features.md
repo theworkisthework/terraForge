@@ -151,7 +151,7 @@
 
 - [ ] **Arc fitting (G2/G3)** — `arcFitting` option exists in the data model and worker message, but the worker always uses linear segments; the UI has no toggle for it
 - [ ] **G-code optimizer** — no path reordering to minimise rapid travel distance (travelling salesman / nearest-neighbour)
-- [ ] **Top-left origin mode** — `origin: "top-left"` is in the config but canvas and G-code always assume bottom-left
+- [x] **origin mode** — `origin: "top-left"` G-code should observe origin setting
 - [ ] **Per-import feedrate override**
 - [ ] **Toolpath simulation** — animate pen movement before sending, estimate job duration
 
