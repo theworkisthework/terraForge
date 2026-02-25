@@ -703,7 +703,7 @@ export function PlotCanvas() {
 
       {/* ── Zoom / pan overlay controls ───────────────────────────────────── */}
       <div
-        className="absolute bottom-4 right-4 flex flex-col gap-1 z-10"
+        className="absolute bottom-9 right-4 flex flex-col gap-1 z-10"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
