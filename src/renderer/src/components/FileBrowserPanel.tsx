@@ -277,7 +277,7 @@ function FsPane({
                   key={file.path}
                   className={`flex items-center group px-3 py-1 cursor-pointer border-b border-[#0f3460]/20 transition-colors ${
                     isSelectedForJob
-                      ? "bg-[#162035] hover:bg-[#1d2d45]"
+                      ? "bg-[#1a3a6e] hover:bg-[#1f4480]"
                       : "hover:bg-[#1a1a2e]"
                   }`}
                   onClick={() => {
