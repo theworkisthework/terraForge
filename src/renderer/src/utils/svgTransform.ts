@@ -26,8 +26,7 @@ interface PathToken {
 
 function tokenizePath(d: string): PathToken[] {
   const tokens: PathToken[] = [];
-  const re =
-    /([MmLlHhVvCcSsQqTtAaZz])([\s\S]*?)(?=[MmLlHhVvCcSsQqTtAaZz]|$)/g;
+  const re = /([MmLlHhVvCcSsQqTtAaZz])([\s\S]*?)(?=[MmLlHhVvCcSsQqTtAaZz]|$)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(d)) !== null) {
     const args = m[2].trim()
@@ -428,9 +427,7 @@ export function getAccumulatedTransform(el: Element): DOMMatrix {
       const consolidated = baseVal.consolidate();
       if (consolidated) {
         const lm = consolidated.matrix;
-        matrices.unshift(
-          new DOMMatrix([lm.a, lm.b, lm.c, lm.d, lm.e, lm.f]),
-        );
+        matrices.unshift(new DOMMatrix([lm.a, lm.b, lm.c, lm.d, lm.e, lm.f]));
       }
     }
     node = node.parentElement;
