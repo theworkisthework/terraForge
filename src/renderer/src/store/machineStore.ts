@@ -2,23 +2,34 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { MachineConfig, MachineStatus } from "../../../types";
 
+export interface SelectedJobFile {
+  path: string;
+  source: "fs" | "sd";
+  name: string;
+}
+
 interface MachineState {
   configs: MachineConfig[];
   activeConfigId: string | null;
   status: MachineStatus | null;
   connected: boolean;
   wsLive: boolean;
+  selectedJobFile: SelectedJobFile | null;
 
   setConfigs: (configs: MachineConfig[]) => void;
   setActiveConfigId: (id: string | null) => void;
   setStatus: (status: MachineStatus) => void;
   setConnected: (connected: boolean) => void;
   setWsLive: (live: boolean) => void;
+  setSelectedJobFile: (file: SelectedJobFile | null) => void;
   activeConfig: () => MachineConfig | undefined;
 
   // CRUD helpers that also persist via IPC
   addConfig: (cfg: MachineConfig) => Promise<void>;
-  updateConfig: (id: string, patch: Partial<Omit<MachineConfig, "id">>) => Promise<void>;
+  updateConfig: (
+    id: string,
+    patch: Partial<Omit<MachineConfig, "id">>,
+  ) => Promise<void>;
   deleteConfig: (id: string) => Promise<void>;
   setActiveConfig: (id: string) => void;
 }
@@ -30,6 +41,7 @@ export const useMachineStore = create<MachineState>()(
     status: null,
     connected: false,
     wsLive: false,
+    selectedJobFile: null,
 
     setConfigs: (configs) =>
       set((state) => {
@@ -58,6 +70,11 @@ export const useMachineStore = create<MachineState>()(
     setWsLive: (live) =>
       set((state) => {
         state.wsLive = live;
+      }),
+
+    setSelectedJobFile: (file) =>
+      set((state) => {
+        state.selectedJobFile = file;
       }),
 
     activeConfig: () => {

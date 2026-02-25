@@ -6,8 +6,19 @@ import { useCanvasStore } from "../store/canvasStore";
 import { parseGcode } from "../utils/gcodeParser";
 import type { RemoteFile } from "../../../types";
 
-const GCODE_EXTS = [".gcode", ".nc", ".g", ".gc", ".gco", ".ngc", ".ncc", ".cnc", ".tap"];
-const isGcodeFile = (name: string) => GCODE_EXTS.some((e) => name.toLowerCase().endsWith(e));
+const GCODE_EXTS = [
+  ".gcode",
+  ".nc",
+  ".g",
+  ".gc",
+  ".gco",
+  ".ngc",
+  ".ncc",
+  ".cnc",
+  ".tap",
+];
+const isGcodeFile = (name: string) =>
+  GCODE_EXTS.some((e) => name.toLowerCase().endsWith(e));
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -18,13 +29,23 @@ function parentPath(path: string): string {
   return parts.length === 0 ? "/" : "/" + parts.join("/");
 }
 
-function Breadcrumb({ path, navigate }: { path: string; navigate: (p: string) => void }) {
+function Breadcrumb({
+  path,
+  navigate,
+}: {
+  path: string;
+  navigate: (p: string) => void;
+}) {
   const parts = path.split("/").filter(Boolean);
   return (
     <div className="flex items-center gap-0.5 text-[10px] overflow-x-auto flex-1 min-w-0">
       <button
         onClick={() => navigate("/")}
-        className={path === "/" ? "text-white font-semibold" : "text-[#e94560] hover:text-white"}
+        className={
+          path === "/"
+            ? "text-white font-semibold"
+            : "text-[#e94560] hover:text-white"
+        }
       >
         /
       </button>
@@ -35,7 +56,11 @@ function Breadcrumb({ path, navigate }: { path: string; navigate: (p: string) =>
             <span className="text-gray-600">/</span>
             <button
               onClick={() => navigate(segPath)}
-              className={segPath === path ? "text-white font-semibold" : "text-[#e94560] hover:text-white"}
+              className={
+                segPath === path
+                  ? "text-white font-semibold"
+                  : "text-[#e94560] hover:text-white"
+              }
             >
               {seg}
             </button>
@@ -52,15 +77,30 @@ interface FsPaneProps {
   label: string;
   accentColor: string;
   connected: boolean;
+  source: "fs" | "sd";
   listFn: (path: string) => Promise<RemoteFile[]>;
   deleteFn: (path: string) => Promise<void>;
-  runFn: (path: string) => Promise<void>;
-  uploadFn: (localPath: string, remotePath: string, taskId: string, name: string) => void;
+  uploadFn: (
+    localPath: string,
+    remotePath: string,
+    taskId: string,
+    name: string,
+  ) => void;
   upsertTask: ReturnType<typeof useTaskStore>["upsertTask"];
   taskType: "file-upload" | "file-download";
 }
 
-function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, uploadFn, upsertTask, taskType }: FsPaneProps) {
+function FsPane({
+  label,
+  accentColor,
+  connected,
+  source,
+  listFn,
+  deleteFn,
+  uploadFn,
+  upsertTask,
+  taskType,
+}: FsPaneProps) {
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [path, setPath] = useState("/");
   const [loading, setLoading] = useState(false);
@@ -68,33 +108,54 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
   const [open, setOpen] = useState(true);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
+  const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
+  const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
-  const navigate = useCallback(async (target: string) => {
-    if (!connected) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await listFn(target);
-      setFiles(list);
-      setPath(target);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [connected, listFn]);
+  const navigate = useCallback(
+    async (target: string) => {
+      if (!connected) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const list = await listFn(target);
+        setFiles(list);
+        setPath(target);
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [connected, listFn],
+  );
 
   useEffect(() => {
-    if (connected) { navigate("/"); }
-    else { setFiles([]); setPath("/"); setError(null); }
+    if (connected) {
+      navigate("/");
+    } else {
+      setFiles([]);
+      setPath("/");
+      setError(null);
+    }
   }, [connected]);
 
   const handleDownload = async (file: RemoteFile) => {
     const localPath = await window.terraForge.fs.saveGcodeDialog(file.name);
     if (!localPath) return;
     const taskId = uuid();
-    upsertTask({ id: taskId, type: "file-download", label: `Downloading ${file.name}`, progress: 0, status: "running" });
-    await window.terraForge.fluidnc.downloadFile(taskId, file.path, localPath, label === "sdcard" ? "sdcard" : "internal");
+    upsertTask({
+      id: taskId,
+      type: "file-download",
+      label: `Downloading ${file.name}`,
+      progress: 0,
+      status: "running",
+    });
+    await window.terraForge.fluidnc.downloadFile(
+      taskId,
+      file.path,
+      localPath,
+      label === "sdcard" ? "sdcard" : "internal",
+    );
   };
 
   const handleUpload = async () => {
@@ -125,11 +186,14 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
 
   const atRoot = path === "/";
   const bgAccent = accentColor === "blue" ? "bg-[#0a1628]" : "bg-[#1a0d1a]";
-  const borderAccent = accentColor === "blue" ? "border-[#0f3460]" : "border-[#3d1060]";
-  const labelColor = accentColor === "blue" ? "text-[#60a0ff]" : "text-[#c084fc]";
-  const btnColor = accentColor === "blue"
-    ? "text-[#60a0ff] hover:text-white"
-    : "text-[#c084fc] hover:text-white";
+  const borderAccent =
+    accentColor === "blue" ? "border-[#0f3460]" : "border-[#3d1060]";
+  const labelColor =
+    accentColor === "blue" ? "text-[#60a0ff]" : "text-[#c084fc]";
+  const btnColor =
+    accentColor === "blue"
+      ? "text-[#60a0ff] hover:text-white"
+      : "text-[#c084fc] hover:text-white";
 
   return (
     <div className={`flex flex-col border-b ${borderAccent}`}>
@@ -138,12 +202,17 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none ${bgAccent}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}>
+        <span
+          className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}
+        >
           {open ? "▾" : "▸"} {label}
         </span>
         {open && (
           <button
-            onClick={(e) => { e.stopPropagation(); navigate(path); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(path);
+            }}
             disabled={!connected || loading}
             title="Refresh"
             className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
@@ -156,7 +225,9 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
       {!open ? null : (
         <>
           {/* Breadcrumb + up */}
-          <div className={`flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}>
+          <div
+            className={`flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}
+          >
             <button
               onClick={() => navigate(parentPath(path))}
               disabled={atRoot || !connected}
@@ -171,11 +242,17 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
           {/* File list */}
           <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
             {!connected ? (
-              <p className="text-[10px] text-gray-600 text-center py-4 px-3">Not connected.</p>
+              <p className="text-[10px] text-gray-600 text-center py-4 px-3">
+                Not connected.
+              </p>
             ) : error ? (
-              <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">{error}</p>
+              <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">
+                {error}
+              </p>
             ) : files.length === 0 && !loading ? (
-              <p className="text-[10px] text-gray-600 text-center py-4 px-3">Empty.</p>
+              <p className="text-[10px] text-gray-600 text-center py-4 px-3">
+                Empty.
+              </p>
             ) : null}
 
             {/* ".." row */}
@@ -189,51 +266,105 @@ function FsPane({ label, accentColor, connected, listFn, deleteFn, runFn, upload
               </div>
             )}
 
-            {files.map((file) => (
-              <div
-                key={file.path}
-                className="flex items-center group px-3 py-1 hover:bg-[#1a1a2e] cursor-pointer border-b border-[#0f3460]/20"
-                onClick={() => file.isDirectory && navigate(file.path)}
-              >
-                <span className="mr-1.5 text-[11px]">{file.isDirectory ? "📁" : "📄"}</span>
-                <span className="flex-1 text-[10px] truncate" title={file.name}>{file.name}</span>
-                {!file.isDirectory && file.size > 0 && (
-                  <span className="text-[9px] text-gray-600 mr-1 shrink-0">
-                    {file.size > 1_000_000
-                      ? `${(file.size / 1_000_000).toFixed(1)}M`
-                      : file.size > 1_000
-                      ? `${(file.size / 1_000).toFixed(0)}K`
-                      : `${file.size}B`}
+            {files.map((file) => {
+              const isSelectedForJob =
+                !file.isDirectory &&
+                selectedJobFile?.path === file.path &&
+                selectedJobFile?.source === source;
+
+              return (
+                <div
+                  key={file.path}
+                  className={`flex items-center group px-3 py-1 cursor-pointer border-b border-[#0f3460]/20 transition-colors ${
+                    isSelectedForJob
+                      ? "bg-[#162035] hover:bg-[#1d2d45]"
+                      : "hover:bg-[#1a1a2e]"
+                  }`}
+                  onClick={() => {
+                    if (file.isDirectory) {
+                      navigate(file.path);
+                    } else {
+                      setSelectedJobFile(
+                        isSelectedForJob
+                          ? null
+                          : { path: file.path, source, name: file.name },
+                      );
+                    }
+                  }}
+                >
+                  <span className="mr-1.5 text-[11px]">
+                    {file.isDirectory ? "📁" : "📄"}
                   </span>
-                )}
-                {file.isDirectory ? (
-                  <span className="text-gray-600 text-[9px] hidden group-hover:block shrink-0">›</span>
-                ) : (
-                  <div className="hidden group-hover:flex gap-0.5 shrink-0">
-                    {isGcodeFile(file.name) && (
+                  <span
+                    className="flex-1 text-[10px] truncate"
+                    title={file.name}
+                  >
+                    {file.name}
+                  </span>
+                  {!file.isDirectory && file.size > 0 && (
+                    <span className="text-[9px] text-gray-600 mr-1 shrink-0">
+                      {file.size > 1_000_000
+                        ? `${(file.size / 1_000_000).toFixed(1)}M`
+                        : file.size > 1_000
+                          ? `${(file.size / 1_000).toFixed(0)}K`
+                          : `${file.size}B`}
+                    </span>
+                  )}
+                  {file.isDirectory ? (
+                    <span className="text-gray-600 text-[9px] hidden group-hover:block shrink-0">
+                      ›
+                    </span>
+                  ) : (
+                    <div className="hidden group-hover:flex gap-0.5 shrink-0">
+                      {isGcodeFile(file.name) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePreview(file);
+                          }}
+                          title="Preview toolpath"
+                          disabled={previewing === file.path}
+                          className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
+                        >
+                          {previewing === file.path ? "…" : "👁"}
+                        </button>
+                      )}
                       <button
-                        onClick={(e) => { e.stopPropagation(); handlePreview(file); }}
-                        title="Preview toolpath"
-                        disabled={previewing === file.path}
-                        className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
-                      >{previewing === file.path ? "…" : "👁"}</button>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); runFn(file.path); }}
-                      title="Run" className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56]"
-                    >▶</button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDownload(file); }}
-                      title="Download" className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a]"
-                    >↓</button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Delete ${file.name}?`)) deleteFn(file.path).then(() => navigate(path)); }}
-                      title="Delete" className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020]"
-                    >✕</button>
-                  </div>
-                )}
-              </div>
-            ))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.terraForge.fluidnc.runFile(file.path, source);
+                        }}
+                        title="Run job now"
+                        className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
+                      >
+                        ▶
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(file);
+                        }}
+                        title="Download"
+                        className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a]"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete ${file.name}?`))
+                            deleteFn(file.path).then(() => navigate(path));
+                        }}
+                        title="Delete"
+                        className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Upload footer */}
@@ -262,9 +393,22 @@ export function FileBrowserPanel() {
   const connected = useMachineStore((s) => s.connected);
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
-  const uploadFn = (localPath: string, remotePath: string, taskId: string, name: string) => {
-    upsertTask({ id: taskId, type: "file-upload", label: `Uploading ${name}`, progress: 0, status: "running" });
-    window.terraForge.fluidnc.uploadFile(taskId, localPath, remotePath).catch(console.error);
+  const uploadFn = (
+    localPath: string,
+    remotePath: string,
+    taskId: string,
+    name: string,
+  ) => {
+    upsertTask({
+      id: taskId,
+      type: "file-upload",
+      label: `Uploading ${name}`,
+      progress: 0,
+      status: "running",
+    });
+    window.terraForge.fluidnc
+      .uploadFile(taskId, localPath, remotePath)
+      .catch(console.error);
   };
 
   return (
@@ -282,9 +426,9 @@ export function FileBrowserPanel() {
           label="internal"
           accentColor="blue"
           connected={connected}
+          source="fs"
           listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
           deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
-          runFn={(p) => window.terraForge.fluidnc.runFile(p, "fs")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"
@@ -295,9 +439,9 @@ export function FileBrowserPanel() {
           label="sdcard"
           accentColor="purple"
           connected={connected}
+          source="sd"
           listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
           deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
-          runFn={(p) => window.terraForge.fluidnc.runFile(p, "sd")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"

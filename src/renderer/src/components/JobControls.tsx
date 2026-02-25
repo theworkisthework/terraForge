@@ -1,18 +1,37 @@
 import { useMachineStore } from "../store/machineStore";
 
+const GCODE_EXTS = [
+  ".gcode",
+  ".nc",
+  ".g",
+  ".gc",
+  ".gco",
+  ".ngc",
+  ".ncc",
+  ".cnc",
+  ".tap",
+];
+const isGcodeFile = (name: string) =>
+  GCODE_EXTS.some((e) => name.toLowerCase().endsWith(e));
+
 export function JobControls() {
   const connected = useMachineStore((s) => s.connected);
   const status = useMachineStore((s) => s.status);
+  const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
+
+  const jobFileValid =
+    selectedJobFile != null && isGcodeFile(selectedJobFile.name);
 
   const isRunning = status?.state === "Run";
-  const isHeld    = status?.state === "Hold";
-  const isActive  = isRunning || isHeld;
+  const isHeld = status?.state === "Hold";
+  const isActive = isRunning || isHeld;
 
-  const lineNum   = status?.lineNum;
+  const lineNum = status?.lineNum;
   const lineTotal = status?.lineTotal;
-  const progress  = lineNum != null && lineTotal != null && lineTotal > 0
-    ? Math.round((lineNum / lineTotal) * 100)
-    : null;
+  const progress =
+    lineNum != null && lineTotal != null && lineTotal > 0
+      ? Math.round((lineNum / lineTotal) * 100)
+      : null;
 
   const btn = (
     label: string,
@@ -66,21 +85,48 @@ export function JobControls() {
         </div>
       )}
 
+      {/* Selected file indicator */}
+      {!isActive && (
+        <div
+          className="text-[9px] truncate px-0.5 -mt-1 mb-0.5"
+          title={selectedJobFile?.path ?? undefined}
+        >
+          {!selectedJobFile ? (
+            <span className="italic text-gray-500">
+              No file selected — pick one in File Browser
+            </span>
+          ) : jobFileValid ? (
+            <span className="text-gray-300">📄 {selectedJobFile.name}</span>
+          ) : (
+            <span className="text-amber-400">
+              ⚠ {selectedJobFile.name} — not a G-code file
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Start — only when idle */}
       {!isActive &&
         btn(
           "▶ Start job",
           async () => {
-            await window.terraForge.fluidnc.sendCommand("$SD/Run");
+            if (!jobFileValid) return;
+            await window.terraForge.fluidnc.runFile(
+              selectedJobFile!.path,
+              selectedJobFile!.source,
+            );
           },
           "primary",
+          !jobFileValid, // disabled unless a valid G-code file is selected
         )}
 
       {/* Pause — only while running */}
       {isRunning &&
         btn(
           "⏸ Pause",
-          async () => { await window.terraForge.fluidnc.pauseJob(); },
+          async () => {
+            await window.terraForge.fluidnc.pauseJob();
+          },
           "secondary",
         )}
 
@@ -88,7 +134,9 @@ export function JobControls() {
       {isHeld &&
         btn(
           "▶ Resume",
-          async () => { await window.terraForge.fluidnc.resumeJob(); },
+          async () => {
+            await window.terraForge.fluidnc.resumeJob();
+          },
           "primary",
         )}
 
