@@ -7,7 +7,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useMachineStore } from "../store/machineStore";
-import type { MachineConfig, ConnectionType, OriginType, PenType } from "../../../../types";
+import type {
+  MachineConfig,
+  ConnectionType,
+  OriginType,
+  PenType,
+} from "../../../../types";
 
 interface Props {
   onClose: () => void;
@@ -26,11 +31,17 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
 };
 
 export function MachineConfigDialog({ onClose }: Props) {
-  const { configs, activeConfigId, addConfig, updateConfig, deleteConfig, setActiveConfig } =
-    useMachineStore();
+  const {
+    configs,
+    activeConfigId,
+    addConfig,
+    updateConfig,
+    deleteConfig,
+    setActiveConfig,
+  } = useMachineStore();
 
   const [selectedId, setSelectedId] = useState<string | null>(
-    activeConfigId ?? (configs[0]?.id ?? null)
+    activeConfigId ?? configs[0]?.id ?? null,
   );
   const [form, setForm] = useState<Omit<MachineConfig, "id">>(EMPTY_CONFIG);
   const [isDirty, setIsDirty] = useState(false);
@@ -104,7 +115,9 @@ export function MachineConfigDialog({ onClose }: Props) {
       <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-[780px] max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Machine Configurations</h2>
+          <h2 className="text-lg font-semibold text-white">
+            Machine Configurations
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors text-xl leading-none"
@@ -120,7 +133,10 @@ export function MachineConfigDialog({ onClose }: Props) {
               {configs.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => { setSelectedId(c.id); setIsNew(false); }}
+                  onClick={() => {
+                    setSelectedId(c.id);
+                    setIsNew(false);
+                  }}
                   className={`w-full text-left px-4 py-2 text-sm transition-colors truncate ${
                     selectedId === c.id && !isNew
                       ? "bg-indigo-600 text-white"
@@ -174,7 +190,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                     type="number"
                     value={form.bedWidth}
                     min={1}
-                    onChange={(e) => change({ bedWidth: Number(e.target.value) })}
+                    onChange={(e) =>
+                      change({ bedWidth: Number(e.target.value) })
+                    }
                     className={inputCls}
                   />
                 </Field>
@@ -183,24 +201,32 @@ export function MachineConfigDialog({ onClose }: Props) {
                     type="number"
                     value={form.bedHeight}
                     min={1}
-                    onChange={(e) => change({ bedHeight: Number(e.target.value) })}
+                    onChange={(e) =>
+                      change({ bedHeight: Number(e.target.value) })
+                    }
                     className={inputCls}
                   />
                 </Field>
                 <Field label="Origin">
                   <select
                     value={form.origin}
-                    onChange={(e) => change({ origin: e.target.value as OriginType })}
+                    onChange={(e) =>
+                      change({ origin: e.target.value as OriginType })
+                    }
                     className={inputCls}
                   >
                     <option value="bottom-left">Bottom-left</option>
                     <option value="top-left">Top-left</option>
+                    <option value="bottom-right">Bottom-right</option>
+                    <option value="top-right">Top-right</option>
                   </select>
                 </Field>
                 <Field label="Pen type">
                   <select
                     value={form.penType}
-                    onChange={(e) => change({ penType: e.target.value as PenType })}
+                    onChange={(e) =>
+                      change({ penType: e.target.value as PenType })
+                    }
                     className={inputCls}
                   >
                     <option value="solenoid">Solenoid</option>
@@ -237,7 +263,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                     type="number"
                     value={form.feedrate}
                     min={1}
-                    onChange={(e) => change({ feedrate: Number(e.target.value) })}
+                    onChange={(e) =>
+                      change({ feedrate: Number(e.target.value) })
+                    }
                     className={inputCls}
                   />
                 </Field>
@@ -248,7 +276,10 @@ export function MachineConfigDialog({ onClose }: Props) {
             <Section title="Connection">
               <div className="flex gap-3 mb-3">
                 {(["wifi", "usb"] as ConnectionType[]).map((ct) => (
-                  <label key={ct} className="flex items-center gap-2 cursor-pointer">
+                  <label
+                    key={ct}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
                     <input
                       type="radio"
                       name="connType"
@@ -264,7 +295,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                       }
                       className="accent-indigo-500"
                     />
-                    <span className="text-sm text-gray-300 capitalize">{ct}</span>
+                    <span className="text-sm text-gray-300 capitalize">
+                      {ct}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -286,7 +319,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                       value={form.connection.port ?? 80}
                       min={1}
                       max={65535}
-                      onChange={(e) => changeConn({ port: Number(e.target.value) })}
+                      onChange={(e) =>
+                        changeConn({ port: Number(e.target.value) })
+                      }
                       className={inputCls}
                     />
                   </Field>
@@ -296,7 +331,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                   {portList.length > 0 ? (
                     <select
                       value={form.connection.serialPath ?? ""}
-                      onChange={(e) => changeConn({ serialPath: e.target.value })}
+                      onChange={(e) =>
+                        changeConn({ serialPath: e.target.value })
+                      }
                       className={inputCls + " font-mono"}
                     >
                       {portList.map((p) => (
@@ -309,7 +346,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <input
                       type="text"
                       value={form.connection.serialPath ?? ""}
-                      onChange={(e) => changeConn({ serialPath: e.target.value })}
+                      onChange={(e) =>
+                        changeConn({ serialPath: e.target.value })
+                      }
                       className={inputCls + " font-mono"}
                       placeholder="/dev/ttyUSB0"
                     />
@@ -352,7 +391,13 @@ export function MachineConfigDialog({ onClose }: Props) {
 
 // ── Small reusable components ─────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
@@ -363,7 +408,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label className="block text-xs text-gray-400 mb-1">{label}</label>

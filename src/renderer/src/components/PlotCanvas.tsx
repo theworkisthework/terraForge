@@ -37,6 +37,9 @@ export function PlotCanvas() {
   const config = activeConfig();
   const bedW = config?.bedWidth ?? 220;
   const bedH = config?.bedHeight ?? 200;
+  const origin = config?.origin ?? "bottom-left";
+  const isBottom = origin === "bottom-left" || origin === "bottom-right";
+  const isRight = origin === "bottom-right" || origin === "top-right";
 
   const canvasW = bedW * MM_TO_PX + PAD * 2;
   const canvasH = bedH * MM_TO_PX + PAD * 2;
@@ -272,8 +275,13 @@ export function PlotCanvas() {
     if (!gcodeToolpath) setToolpathSelected(false);
   }, [gcodeToolpath]);
 
-  // ── SVG coordinate helpers ────────────────────────────────────────────────────
-  const getBedY = (mmY: number) => canvasH - PAD - mmY * MM_TO_PX;
+  // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
+  // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
+  const getBedY = (mmY: number) =>
+    isBottom ? canvasH - PAD - mmY * MM_TO_PX : PAD + mmY * MM_TO_PX;
+  // X: right-origins flip so mm=0 is at the right of the bed rectangle.
+  const getBedX = (mmX: number) =>
+    isRight ? PAD + (bedW - mmX) * MM_TO_PX : PAD + mmX * MM_TO_PX;
 
   // ── Object drag handlers ──────────────────────────────────────────────────────
   const onImportMouseDown = useCallback(
@@ -516,10 +524,18 @@ export function PlotCanvas() {
           {gcodeToolpath &&
             (() => {
               const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
-              const svgLeft = PAD + minX * MM_TO_PX;
-              const svgRight = PAD + maxX * MM_TO_PX;
-              const svgTop = PAD + (bedH - maxY) * MM_TO_PX;
-              const svgBottom = PAD + (bedH - minY) * MM_TO_PX;
+              const svgLeft = isRight
+                ? PAD + (bedW - maxX) * MM_TO_PX
+                : PAD + minX * MM_TO_PX;
+              const svgRight = isRight
+                ? PAD + (bedW - minX) * MM_TO_PX
+                : PAD + maxX * MM_TO_PX;
+              const svgTop = isBottom
+                ? PAD + (bedH - maxY) * MM_TO_PX
+                : PAD + minY * MM_TO_PX;
+              const svgBottom = isBottom
+                ? PAD + (bedH - minY) * MM_TO_PX
+                : PAD + maxY * MM_TO_PX;
               const bboxW = svgRight - svgLeft;
               const bboxH = svgBottom - svgTop;
               const delCx = svgRight + 8;
@@ -527,7 +543,9 @@ export function PlotCanvas() {
               return (
                 <>
                   <g
-                    transform={`translate(${PAD}, ${PAD + bedH * MM_TO_PX}) scale(${MM_TO_PX}, ${-MM_TO_PX})`}
+                    transform={`translate(${isRight ? PAD + bedW * MM_TO_PX : PAD}, ${
+                      isBottom ? PAD + bedH * MM_TO_PX : PAD
+                    }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isBottom ? -MM_TO_PX : MM_TO_PX})`}
                   >
                     <clipPath id="bed-clip">
                       <rect x={0} y={0} width={bedW} height={bedH} />
@@ -721,7 +739,7 @@ interface RulerOverlayProps {
   vp: Vp;
   bedW: number;
   bedH: number;
-  origin: "bottom-left" | "top-left";
+  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right";
   containerW: number;
   containerH: number;
 }
@@ -734,20 +752,29 @@ function RulerOverlay({
   containerW,
   containerH,
 }: RulerOverlayProps) {
-  const isBottomLeft = origin !== "top-left";
+  const isBottom = origin === "bottom-left" || origin === "bottom-right";
+  const isRight = origin === "bottom-right" || origin === "top-right";
   const R = RULER_W;
 
   // ── Coordinate conversions ────────────────────────────────────────────────
-  const mmToSx = (mm: number) => vp.panX + (PAD + mm * MM_TO_PX) * vp.zoom;
+  // X: right-origins mirror horizontally (mm=0 at right bed edge)
+  const mmToSx = (mm: number) =>
+    isRight
+      ? vp.panX + (PAD + (bedW - mm) * MM_TO_PX) * vp.zoom
+      : vp.panX + (PAD + mm * MM_TO_PX) * vp.zoom;
+  // Y: bottom-origins flip vertically (mm=0 at bottom bed edge)
   const mmToSy = (mm: number) =>
-    isBottomLeft
+    isBottom
       ? vp.panY + (PAD + (bedH - mm) * MM_TO_PX) * vp.zoom
       : vp.panY + (PAD + mm * MM_TO_PX) * vp.zoom;
-  const sxToMm = (sx: number) => ((sx - vp.panX) / vp.zoom - PAD) / MM_TO_PX;
-  const syToMm = (sy: number) =>
-    isBottomLeft
-      ? bedH - ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX
-      : ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX;
+  const sxToMm = (sx: number) => {
+    const raw = ((sx - vp.panX) / vp.zoom - PAD) / MM_TO_PX;
+    return isRight ? bedW - raw : raw;
+  };
+  const syToMm = (sy: number) => {
+    const raw = ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX;
+    return isBottom ? bedH - raw : raw;
+  };
 
   // ── Adaptive tick density (~40–100 px between major ticks on screen) ──────
   const pxPerMm = vp.zoom * MM_TO_PX;
@@ -773,20 +800,22 @@ function RulerOverlay({
     return out;
   };
 
-  // ── Layout: X ruler strip ─────────────────────────────────────────────────
-  // bottom-left → strip sits at the bottom; top-left → strip sits at the top.
-  const xSepY = isBottomLeft ? containerH - R : R; // separator line Y
-  const xTickDir = isBottomLeft ? 1 : -1; // tick direction INTO the strip
-  const xLabelY = isBottomLeft ? containerH - R / 2 : R / 2; // label centre Y
+  // ── Layout: X ruler strip (bottom-origins → bottom edge; top-origins → top edge) ──
+  const xSepY = isBottom ? containerH - R : R;
+  const xTickDir = isBottom ? 1 : -1; // into the strip
+  const xLabelY = isBottom ? containerH - R / 2 : R / 2;
 
-  // ── Layout: Y ruler strip (always left) ──────────────────────────────────
-  const ySepX = R; // separator line X
-  const yStripTopY = isBottomLeft ? 0 : R; // strip top
-  const yStripBotY = isBottomLeft ? containerH - R : containerH; // strip bottom
-  const yLabelX = R / 2; // label centre X (rotated)
+  // ── Layout: Y ruler strip (right-origins → right edge; left-origins → left edge) ──
+  const ySepX = isRight ? containerW - R : R;
+  const yTickDir = isRight ? 1 : -1; // into the strip
+  const yLabelX = isRight ? containerW - R / 2 : R / 2;
+  const yStripEdgeX = isRight ? containerW - R : 0;
+  const yStripTopY = isBottom ? 0 : R;
+  const yStripBotY = isBottom ? containerH - R : containerH;
 
   // ── Tick ranges ───────────────────────────────────────────────────────────
-  const xTicks = makeTicks(sxToMm(R), sxToMm(containerW), bedW);
+  const xTickEdge = isRight ? containerW - R : containerW;
+  const xTicks = makeTicks(sxToMm(R), sxToMm(xTickEdge), bedW);
   const yTicks = makeTicks(syToMm(yStripTopY), syToMm(yStripBotY), bedH);
 
   // ── Visuals ───────────────────────────────────────────────────────────────
@@ -798,17 +827,22 @@ function RulerOverlay({
   const MAJOR_LEN = Math.round(R * 0.4);
   const MINOR_LEN = Math.round(R * 0.2);
 
-  // Origin dot — show in the canvas area (not inside a ruler strip)
+  // Origin dot — visible in the canvas area (between the ruler strips)
   const originSx = mmToSx(0);
   const originSy = mmToSy(0);
   const originVisible =
     originSx >= R &&
-    originSx <= containerW &&
+    originSx <= containerW - R &&
     originSy >= yStripTopY &&
     originSy <= yStripBotY;
 
   // Corner square position
-  const cornerY = isBottomLeft ? containerH - R : 0;
+  const cornerX = isRight ? containerW - R : 0;
+  const cornerY = isBottom ? containerH - R : 0;
+
+  // X separator spans between the Y strips
+  const xSepX1 = isRight ? 0 : R;
+  const xSepX2 = isRight ? containerW - R : containerW;
 
   return (
     <svg
@@ -823,30 +857,27 @@ function RulerOverlay({
       pointerEvents="none"
     >
       {/* ── Strip backgrounds ─────────────────────────────────────────────── */}
-      {/* X ruler strip */}
       <rect
-        x={R}
-        y={isBottomLeft ? containerH - R : 0}
-        width={containerW - R}
+        x={xSepX1}
+        y={isBottom ? containerH - R : 0}
+        width={xSepX2 - xSepX1}
         height={R}
         fill={BG}
       />
-      {/* Y ruler strip (excludes corner) */}
       <rect
-        x={0}
+        x={yStripEdgeX}
         y={yStripTopY}
         width={R}
         height={yStripBotY - yStripTopY}
         fill={BG}
       />
-      {/* Corner square (drawn last so it covers any tick overflow) */}
-      <rect x={0} y={cornerY} width={R} height={R} fill={BG} />
+      <rect x={cornerX} y={cornerY} width={R} height={R} fill={BG} />
 
       {/* ── Separator lines ───────────────────────────────────────────────── */}
       <line
-        x1={R}
+        x1={xSepX1}
         y1={xSepY}
-        x2={containerW}
+        x2={xSepX2}
         y2={xSepY}
         stroke={TICK_COL}
         strokeWidth={0.5}
@@ -863,7 +894,7 @@ function RulerOverlay({
       {/* ── X ticks ───────────────────────────────────────────────────────── */}
       {xTicks.map((mm) => {
         const sx = mmToSx(mm);
-        if (sx < R || sx > containerW) return null;
+        if (sx < R || sx > xTickEdge) return null;
         const isMajor = mm % major === 0;
         const tLen = isMajor ? MAJOR_LEN : MINOR_LEN;
         const col = mm === 0 ? ORIGIN_COL : TICK_COL;
@@ -906,7 +937,7 @@ function RulerOverlay({
             <line
               x1={ySepX}
               y1={sy}
-              x2={ySepX - tLen}
+              x2={ySepX + yTickDir * tLen}
               y2={sy}
               stroke={col}
               strokeWidth={0.5}

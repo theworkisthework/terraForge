@@ -1,7 +1,11 @@
 // ─── Machine Configuration ────────────────────────────────────────────────────
 
 export type ConnectionType = "wifi" | "usb";
-export type OriginType = "bottom-left" | "top-left";
+export type OriginType =
+  | "bottom-left"
+  | "top-left"
+  | "bottom-right"
+  | "top-right";
 export type PenType = "solenoid" | "servo" | "stepper";
 
 export interface MachineConnection {
@@ -173,7 +177,10 @@ export interface FluidNCApi {
     localPath: string,
     filesystem?: "internal" | "sdcard",
   ) => Promise<void>;
-  fetchFileText: (remotePath: string, filesystem?: "internal" | "sdcard") => Promise<string>;
+  fetchFileText: (
+    remotePath: string,
+    filesystem?: "internal" | "sdcard",
+  ) => Promise<string>;
   deleteFile: (remotePath: string) => Promise<void>;
   runFile: (remotePath: string, filesystem?: "sd" | "fs") => Promise<void>;
   pauseJob: () => Promise<void>;
