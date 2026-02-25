@@ -1,3 +1,5 @@
+// Portions of SVG icon data (square-x) from Lucide (https://lucide.dev)
+// Copyright (c) 2020, Lucide Contributors — ISC License
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
@@ -666,32 +668,29 @@ export function PlotCanvas() {
                         setGcodeToolpath(null);
                       }}
                     >
-                      <rect
+                      <svg
                         x={-8}
                         y={-8}
                         width={16}
                         height={16}
-                        rx={3}
-                        fill="#e94560"
-                      />
-                      <line
-                        x1={-3.5}
-                        y1={-3.5}
-                        x2={3.5}
-                        y2={3.5}
-                        stroke="white"
-                        strokeWidth={1.5}
+                        viewBox="0 0 24 24"
+                        fill="none"
                         strokeLinecap="round"
-                      />
-                      <line
-                        x1={3.5}
-                        y1={-3.5}
-                        x2={-3.5}
-                        y2={3.5}
-                        stroke="white"
-                        strokeWidth={1.5}
-                        strokeLinecap="round"
-                      />
+                        strokeLinejoin="round"
+                      >
+                        <rect
+                          width="18"
+                          height="18"
+                          x="3"
+                          y="3"
+                          rx="2"
+                          ry="2"
+                          fill="#e94560"
+                          stroke="none"
+                        />
+                        <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+                        <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+                      </svg>
                     </g>
                   )}
                 </>
@@ -1184,25 +1183,29 @@ function ImportLayer({
             onDelete();
           }}
         >
-          <rect x={-9} y={-9} width={18} height={18} rx={3} fill="#e94560" />
-          <line
-            x1={-4}
-            y1={-4}
-            x2={4}
-            y2={4}
-            stroke="white"
-            strokeWidth={1.5}
+          <svg
+            x={-9}
+            y={-9}
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
             strokeLinecap="round"
-          />
-          <line
-            x1={4}
-            y1={-4}
-            x2={-4}
-            y2={4}
-            stroke="white"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
+            strokeLinejoin="round"
+          >
+            <rect
+              width="18"
+              height="18"
+              x="3"
+              y="3"
+              rx="2"
+              ry="2"
+              fill="#e94560"
+              stroke="none"
+            />
+            <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+            <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+          </svg>
         </g>
       )}
     </g>
