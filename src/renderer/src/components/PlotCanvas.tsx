@@ -562,8 +562,8 @@ export function PlotCanvas() {
                   : PAD + maxY * MM_TO_PX;
               const bboxW = svgRight - svgLeft;
               const bboxH = svgBottom - svgTop;
-              const delCx = svgRight + 8;
-              const delCy = svgTop - 8;
+              const delCx = svgRight + 14;
+              const delCy = svgTop - 14;
               return (
                 <>
                   <g
@@ -659,25 +659,39 @@ export function PlotCanvas() {
                   )}
                   {toolpathSelected && (
                     <g
+                      transform={`translate(${delCx}, ${delCy})`}
                       style={{ cursor: "pointer" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setGcodeToolpath(null);
                       }}
                     >
-                      <circle cx={delCx} cy={delCy} r={8} fill="#e94560" />
-                      <text
-                        x={delCx}
-                        y={delCy}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill="white"
-                        fontSize={11}
-                        fontWeight="bold"
-                        style={{ userSelect: "none" }}
-                      >
-                        ×
-                      </text>
+                      <rect
+                        x={-8}
+                        y={-8}
+                        width={16}
+                        height={16}
+                        rx={3}
+                        fill="#e94560"
+                      />
+                      <line
+                        x1={-3.5}
+                        y1={-3.5}
+                        x2={3.5}
+                        y2={3.5}
+                        stroke="white"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                      />
+                      <line
+                        x1={3.5}
+                        y1={-3.5}
+                        x2={-3.5}
+                        y2={3.5}
+                        stroke="white"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                      />
                     </g>
                   )}
                 </>
@@ -1093,8 +1107,8 @@ function ImportLayer({
     l: "ew-resize",
   };
 
-  const delCx = right + 12;
-  const delCy = top - 12;
+  const delCx = right + 18;
+  const delCy = top - 18;
 
   return (
     <g>
@@ -1163,25 +1177,32 @@ function ImportLayer({
       {/* Delete button */}
       {selected && (
         <g
+          transform={`translate(${delCx}, ${delCy})`}
           style={{ cursor: "pointer" }}
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
         >
-          <circle cx={delCx} cy={delCy} r={9} fill="#e94560" />
-          <text
-            x={delCx}
-            y={delCy}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="white"
-            fontSize={12}
-            fontWeight="bold"
-            style={{ userSelect: "none" }}
-          >
-            ×
-          </text>
+          <rect x={-9} y={-9} width={18} height={18} rx={3} fill="#e94560" />
+          <line
+            x1={-4}
+            y1={-4}
+            x2={4}
+            y2={4}
+            stroke="white"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+          />
+          <line
+            x1={4}
+            y1={-4}
+            x2={-4}
+            y2={4}
+            stroke="white"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+          />
         </g>
       )}
     </g>
