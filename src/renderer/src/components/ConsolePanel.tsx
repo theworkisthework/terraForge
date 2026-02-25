@@ -7,11 +7,14 @@ export function ConsolePanel() {
   const lines = useConsoleStore((s) => s.lines);
   const clear = useConsoleStore((s) => s.clear);
   const status = useMachineStore((s) => s.status);
+  const connected = useMachineStore((s) => s.connected);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
+
+  const isAlarm = status?.state === "Alarm";
 
   return (
     <div className="flex h-full">
@@ -22,19 +25,27 @@ export function ConsolePanel() {
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Console
             </span>
-            {status && (
-              <span
-                className={`text-xs px-2 py-0.5 rounded ${
-                  status.state === "Run"
-                    ? "bg-green-900 text-green-300"
-                    : status.state === "Alarm"
-                      ? "bg-red-900 text-red-300"
+            {status &&
+              (isAlarm ? (
+                <button
+                  onClick={() => window.terraForge.fluidnc.sendCommand("$X")}
+                  disabled={!connected}
+                  title="Clear alarm ($X)"
+                  className="text-xs px-2 py-0.5 rounded bg-red-900 text-red-300 hover:bg-red-700 hover:text-white disabled:opacity-50 transition-colors animate-pulse"
+                >
+                  ⚠ ALARM — click to unlock
+                </button>
+              ) : (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    status.state === "Run"
+                      ? "bg-green-900 text-green-300"
                       : "bg-[#0f3460] text-gray-300"
-                }`}
-              >
-                {status.state}
-              </span>
-            )}
+                  }`}
+                >
+                  {status.state}
+                </span>
+              ))}
             {status && (
               <span className="text-xs text-gray-500">
                 X:{status.wpos.x.toFixed(2)} Y:{status.wpos.y.toFixed(2)} Z:

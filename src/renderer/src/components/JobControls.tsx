@@ -152,11 +152,7 @@ export function JobControls() {
           "danger",
         )}
 
-      <div className="mt-auto">
-        {btn("Unlock", async () => {
-          await window.terraForge.fluidnc.sendCommand("$X");
-        })}
-      </div>
+      <div className="mt-auto" />
     </div>
   );
 }
