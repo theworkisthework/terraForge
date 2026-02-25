@@ -77,14 +77,17 @@
 - [x] Upload any file type (unrestricted native dialog)
 - [x] Download file (save to local disk)
 - [x] Delete file
-- [x] Run file on machine
+- [x] Run file on machine immediately via ▶ button per file row
+- [x] Click file row to select it as the queued job file (highlighted in blue); clicking again deselects
 - [x] G-code preview button on `.gcode`/`.nc` files — loads toolpath overlay on canvas
 - [x] Upload/download progress tracked in task bar
 - [x] Auto-refresh listing after upload
 
 ### Job Control
 
-- [x] Start job button
+- [x] Start job button — disabled until a valid G-code file is selected in the file browser
+- [x] Selected job file shown in Job panel with name; warns if selected file is not a recognised G-code extension
+- [x] Supported G-code extensions: `.gcode`, `.nc`, `.g`, `.gc`, `.gco`, `.ngc`, `.ncc`, `.cnc`, `.tap`
 - [x] Pause job
 - [x] Resume job
 - [x] Abort job
@@ -98,8 +101,9 @@
 - [x] Z+, Z- jog buttons
 - [x] Step size selector: 0.1 / 1 / 10 / 100 mm
 - [x] Configurable feedrate input
-- [x] Home (Go to X0 Y0) button
+- [x] Go-to-origin button (G0 X0 Y0)
 - [x] Jog panel shown/hidden via toolbar toggle
+- [x] Homing cycle button (`$H`) in main toolbar — disabled when not connected
 
 ### Console
 
@@ -107,6 +111,7 @@
 - [x] Scrollable, monospaced log panel
 - [x] Clear button
 - [x] Command input (send raw G-code commands)
+- [x] Alarm state badge becomes a clickable button — sends `$X` to clear the alarm
 
 ### Background Task UX
 
@@ -159,9 +164,9 @@
 
 - [ ] **Auto-reconnect on WebSocket drop** — watchdog detects the loss, but reconnection must be manual
 - [ ] **Serial streaming** — streaming G-code line-by-line over USB serial is not implemented; current serial API only sends individual commands
-- [ ] **Homing sequence button** (`$H`)
+- [x] **Homing sequence button** (`$H`) — in main toolbar, disabled when not connected
 - [ ] **Probe / touch-off**
-- [ ] **Alarm clear button** (`$X`)
+- [x] **Alarm clear** (`$X`) — clicking the pulsing ALARM badge in the console header sends `$X`
 
 ### Job Control
 
