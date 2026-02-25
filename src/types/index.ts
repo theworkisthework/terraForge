@@ -5,7 +5,8 @@ export type OriginType =
   | "bottom-left"
   | "top-left"
   | "bottom-right"
-  | "top-right";
+  | "top-right"
+  | "center";
 export type PenType = "solenoid" | "servo" | "stepper";
 
 export interface MachineConnection {

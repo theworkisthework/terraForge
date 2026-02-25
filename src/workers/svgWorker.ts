@@ -145,6 +145,10 @@ function transformPt(
     y = config.bedHeight - y;
   if (config.origin === "bottom-right" || config.origin === "top-right")
     x = config.bedWidth - x;
+  if (config.origin === "center") {
+    x = x - config.bedWidth / 2;
+    y = config.bedHeight / 2 - y; // SVG y is down; machine y is up from center
+  }
   return { x, y };
 }
 

@@ -219,6 +219,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <option value="top-left">Top-left</option>
                     <option value="bottom-right">Bottom-right</option>
                     <option value="top-right">Top-right</option>
+                    <option value="center">Center</option>
                   </select>
                 </Field>
                 <Field label="Pen type">

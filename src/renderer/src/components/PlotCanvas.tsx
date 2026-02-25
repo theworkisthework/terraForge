@@ -39,7 +39,13 @@ export function PlotCanvas() {
   const bedH = config?.bedHeight ?? 200;
   const origin = config?.origin ?? "bottom-left";
   const isBottom = origin === "bottom-left" || origin === "bottom-right";
-  const isRight = origin === "bottom-right" || origin === "top-right";
+  const isRight  = origin === "bottom-right" || origin === "top-right";
+  const isCenter = origin === "center";
+  // Bed coordinate bounds in machine mm (center origin uses ±half-dim)
+  const bedXMin = isCenter ? -bedW / 2 : 0;
+  const bedXMax = isCenter ? bedW / 2 : bedW;
+  const bedYMin = isCenter ? -bedH / 2 : 0;
+  const bedYMax = isCenter ? bedH / 2 : bedH;
 
   const canvasW = bedW * MM_TO_PX + PAD * 2;
   const canvasH = bedH * MM_TO_PX + PAD * 2;
@@ -344,8 +350,8 @@ export function PlotCanvas() {
         const dx = (e.clientX - dragging.startMouseX) / (MM_TO_PX * zoom);
         const dy = -(e.clientY - dragging.startMouseY) / (MM_TO_PX * zoom);
         updateImport(dragging.id, {
-          x: Math.max(0, Math.min(dragging.startObjX + dx, bedW)),
-          y: Math.max(0, Math.min(dragging.startObjY + dy, bedH)),
+          x: Math.max(bedXMin, Math.min(dragging.startObjX + dx, bedXMax)),
+          y: Math.max(bedYMin, Math.min(dragging.startObjY + dy, bedYMax)),
         });
       }
 
@@ -372,7 +378,7 @@ export function PlotCanvas() {
         updateImport(scaling.id, { scale: newScale });
       }
     },
-    [dragging, scaling, bedW, bedH, updateImport, setVp, setFitted],
+    [dragging, scaling, bedXMin, bedXMax, bedYMin, bedYMax, updateImport, setVp, setFitted],
   );
 
   const onMouseUp = useCallback(() => {
@@ -524,18 +530,26 @@ export function PlotCanvas() {
           {gcodeToolpath &&
             (() => {
               const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
-              const svgLeft = isRight
-                ? PAD + (bedW - maxX) * MM_TO_PX
-                : PAD + minX * MM_TO_PX;
-              const svgRight = isRight
-                ? PAD + (bedW - minX) * MM_TO_PX
-                : PAD + maxX * MM_TO_PX;
-              const svgTop = isBottom
-                ? PAD + (bedH - maxY) * MM_TO_PX
-                : PAD + minY * MM_TO_PX;
-              const svgBottom = isBottom
-                ? PAD + (bedH - minY) * MM_TO_PX
-                : PAD + maxY * MM_TO_PX;
+              const svgLeft = isCenter
+                ? PAD + (bedW / 2 + minX) * MM_TO_PX
+                : isRight
+                  ? PAD + (bedW - maxX) * MM_TO_PX
+                  : PAD + minX * MM_TO_PX;
+              const svgRight = isCenter
+                ? PAD + (bedW / 2 + maxX) * MM_TO_PX
+                : isRight
+                  ? PAD + (bedW - minX) * MM_TO_PX
+                  : PAD + maxX * MM_TO_PX;
+              const svgTop = isCenter
+                ? PAD + (bedH / 2 - maxY) * MM_TO_PX
+                : isBottom
+                  ? PAD + (bedH - maxY) * MM_TO_PX
+                  : PAD + minY * MM_TO_PX;
+              const svgBottom = isCenter
+                ? PAD + (bedH / 2 - minY) * MM_TO_PX
+                : isBottom
+                  ? PAD + (bedH - minY) * MM_TO_PX
+                  : PAD + maxY * MM_TO_PX;
               const bboxW = svgRight - svgLeft;
               const bboxH = svgBottom - svgTop;
               const delCx = svgRight + 8;
@@ -543,12 +557,27 @@ export function PlotCanvas() {
               return (
                 <>
                   <g
-                    transform={`translate(${isRight ? PAD + bedW * MM_TO_PX : PAD}, ${
-                      isBottom ? PAD + bedH * MM_TO_PX : PAD
-                    }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isBottom ? -MM_TO_PX : MM_TO_PX})`}
+                    transform={`translate(${
+                      isCenter
+                        ? PAD + (bedW / 2) * MM_TO_PX
+                        : isRight
+                          ? PAD + bedW * MM_TO_PX
+                          : PAD
+                    }, ${
+                      isCenter
+                        ? PAD + (bedH / 2) * MM_TO_PX
+                        : isBottom
+                          ? PAD + bedH * MM_TO_PX
+                          : PAD
+                    }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isCenter || isBottom ? -MM_TO_PX : MM_TO_PX})`}
                   >
                     <clipPath id="bed-clip">
-                      <rect x={0} y={0} width={bedW} height={bedH} />
+                      <rect
+                        x={isCenter ? -bedW / 2 : 0}
+                        y={isCenter ? -bedH / 2 : 0}
+                        width={bedW}
+                        height={bedH}
+                      />
                     </clipPath>
                     <g clipPath="url(#bed-clip)">
                       {gcodeToolpath.rapids && (
@@ -739,7 +768,7 @@ interface RulerOverlayProps {
   vp: Vp;
   bedW: number;
   bedH: number;
-  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right";
+  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center";
   containerW: number;
   containerH: number;
 }
@@ -753,26 +782,34 @@ function RulerOverlay({
   containerH,
 }: RulerOverlayProps) {
   const isBottom = origin === "bottom-left" || origin === "bottom-right";
-  const isRight = origin === "bottom-right" || origin === "top-right";
+  const isRight  = origin === "bottom-right" || origin === "top-right";
+  const isCenter = origin === "center";
   const R = RULER_W;
 
   // ── Coordinate conversions ────────────────────────────────────────────────
-  // X: right-origins mirror horizontally (mm=0 at right bed edge)
+  // Center: machine (0,0) at centre of bed; X right, Y up.
+  // Right-origins: X mirrors (mm=0 at right edge).
+  // Bottom-origins: Y mirrors (mm=0 at bottom edge).
   const mmToSx = (mm: number) =>
-    isRight
-      ? vp.panX + (PAD + (bedW - mm) * MM_TO_PX) * vp.zoom
-      : vp.panX + (PAD + mm * MM_TO_PX) * vp.zoom;
-  // Y: bottom-origins flip vertically (mm=0 at bottom bed edge)
+    isCenter
+      ? vp.panX + (PAD + (bedW / 2 + mm) * MM_TO_PX) * vp.zoom
+      : isRight
+        ? vp.panX + (PAD + (bedW - mm) * MM_TO_PX) * vp.zoom
+        : vp.panX + (PAD + mm * MM_TO_PX) * vp.zoom;
   const mmToSy = (mm: number) =>
-    isBottom
-      ? vp.panY + (PAD + (bedH - mm) * MM_TO_PX) * vp.zoom
-      : vp.panY + (PAD + mm * MM_TO_PX) * vp.zoom;
+    isCenter
+      ? vp.panY + (PAD + (bedH / 2 - mm) * MM_TO_PX) * vp.zoom
+      : isBottom
+        ? vp.panY + (PAD + (bedH - mm) * MM_TO_PX) * vp.zoom
+        : vp.panY + (PAD + mm * MM_TO_PX) * vp.zoom;
   const sxToMm = (sx: number) => {
     const raw = ((sx - vp.panX) / vp.zoom - PAD) / MM_TO_PX;
+    if (isCenter) return raw - bedW / 2;
     return isRight ? bedW - raw : raw;
   };
   const syToMm = (sy: number) => {
     const raw = ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX;
+    if (isCenter) return bedH / 2 - raw;
     return isBottom ? bedH - raw : raw;
   };
 
@@ -791,32 +828,36 @@ function RulerOverlay({
               ? [100, 20]
               : [200, 50];
 
-  const makeTicks = (a: number, b: number, maxMm: number): number[] => {
+  const makeTicks = (a: number, b: number, minMm: number, maxMm: number): number[] => {
     const lo = Math.ceil(Math.min(a, b) / minor) * minor;
     const hi = Math.floor(Math.max(a, b) / minor) * minor;
     const out: number[] = [];
     for (let mm = lo; mm <= hi; mm += minor)
-      if (mm >= 0 && mm <= maxMm) out.push(mm);
+      if (mm >= minMm && mm <= maxMm) out.push(mm);
     return out;
   };
 
   // ── Layout: X ruler strip (bottom-origins → bottom edge; top-origins → top edge) ──
-  const xSepY = isBottom ? containerH - R : R;
-  const xTickDir = isBottom ? 1 : -1; // into the strip
-  const xLabelY = isBottom ? containerH - R / 2 : R / 2;
+  const xSepY = isBottom || isCenter ? containerH - R : R;
+  const xTickDir = isBottom || isCenter ? 1 : -1; // into the strip
+  const xLabelY = isBottom || isCenter ? containerH - R / 2 : R / 2;
 
   // ── Layout: Y ruler strip (right-origins → right edge; left-origins → left edge) ──
   const ySepX = isRight ? containerW - R : R;
   const yTickDir = isRight ? 1 : -1; // into the strip
   const yLabelX = isRight ? containerW - R / 2 : R / 2;
   const yStripEdgeX = isRight ? containerW - R : 0;
-  const yStripTopY = isBottom ? 0 : R;
-  const yStripBotY = isBottom ? containerH - R : containerH;
+  const yStripTopY = isBottom || isCenter ? 0 : R;
+  const yStripBotY = isBottom || isCenter ? containerH - R : containerH;
 
   // ── Tick ranges ───────────────────────────────────────────────────────────
   const xTickEdge = isRight ? containerW - R : containerW;
-  const xTicks = makeTicks(sxToMm(R), sxToMm(xTickEdge), bedW);
-  const yTicks = makeTicks(syToMm(yStripTopY), syToMm(yStripBotY), bedH);
+  const xBedMin = isCenter ? -bedW / 2 : 0;
+  const xBedMax = isCenter ? bedW / 2 : bedW;
+  const yBedMin = isCenter ? -bedH / 2 : 0;
+  const yBedMax = isCenter ? bedH / 2 : bedH;
+  const xTicks = makeTicks(sxToMm(R), sxToMm(xTickEdge), xBedMin, xBedMax);
+  const yTicks = makeTicks(syToMm(yStripTopY), syToMm(yStripBotY), yBedMin, yBedMax);
 
   // ── Visuals ───────────────────────────────────────────────────────────────
   const TICK_COL = "#2a5a8a";
@@ -838,7 +879,7 @@ function RulerOverlay({
 
   // Corner square position
   const cornerX = isRight ? containerW - R : 0;
-  const cornerY = isBottom ? containerH - R : 0;
+  const cornerY = isBottom || isCenter ? containerH - R : 0;
 
   // X separator spans between the Y strips
   const xSepX1 = isRight ? 0 : R;
@@ -859,7 +900,7 @@ function RulerOverlay({
       {/* ── Strip backgrounds ─────────────────────────────────────────────── */}
       <rect
         x={xSepX1}
-        y={isBottom ? containerH - R : 0}
+        y={isBottom || isCenter ? containerH - R : 0}
         width={xSepX2 - xSepX1}
         height={R}
         fill={BG}
