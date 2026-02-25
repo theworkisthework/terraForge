@@ -50,6 +50,9 @@ export function PlotCanvas() {
     _setVp(next);
   }, []);
 
+  // Container dimensions — fed to RulerOverlay (screen-space rulers).
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+
   // fittedRef: true → resize re-fits the bed; false → resize preserves zoom + center.
   const [fitted, _setFitted] = useState(true);
   const fittedRef = useRef(true);
@@ -112,6 +115,7 @@ export function PlotCanvas() {
     let first = true;
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
+      setContainerSize({ w: width, h: height });
       if (first || fittedRef.current) {
         first = false;
         setVp(computeFit(width, height));
@@ -506,13 +510,7 @@ export function PlotCanvas() {
             />
           ))}
 
-          {/* Rulers + origin marker */}
-          <Rulers
-            bedW={bedW}
-            bedH={bedH}
-            origin={config?.origin ?? "bottom-left"}
-            canvasH={canvasH}
-          />
+          {/* Rulers are rendered as a screen-space overlay — see below */}
 
           {/* G-code toolpath overlay */}
           {gcodeToolpath &&
@@ -681,6 +679,18 @@ export function PlotCanvas() {
         </button>
       </div>
 
+      {/* ── Ruler overlay — screen-space, always crisp ──────────────────── */}
+      {containerSize.w > 0 && (
+        <RulerOverlay
+          vp={vp}
+          bedW={bedW}
+          bedH={bedH}
+          origin={config?.origin ?? "bottom-left"}
+          containerW={containerSize.w}
+          containerH={containerSize.h}
+        />
+      )}
+
       {/* ── Zoom-level badge ─────────────────────────────────────────────── */}
       <div className="absolute bottom-4 left-4 z-10 text-[10px] text-[#4a5568] font-mono pointer-events-none">
         {Math.round(vp.zoom * 100)}%
@@ -698,84 +708,184 @@ export function PlotCanvas() {
   );
 }
 
-// ─── Rulers ──────────────────────────────────────────────────────────────────
+// ─── Ruler overlay — renders in screen space so text is always native res ─────
+//
+// X ruler: bottom edge for bottom-left origin, top edge for top-left origin.
+// Y ruler: always on the left edge.
+// Ticks point INTO the canvas; labels are centered inside their strip.
+// Y labels are rotated 90° so they fit the narrow strip without truncation.
 
-interface RulerProps {
+const RULER_W = 20; // ruler strip width in screen pixels
+
+interface RulerOverlayProps {
+  vp: Vp;
   bedW: number;
   bedH: number;
   origin: "bottom-left" | "top-left";
-  canvasH: number;
+  containerW: number;
+  containerH: number;
 }
 
-function Rulers({ bedW, bedH, origin, canvasH }: RulerProps) {
+function RulerOverlay({
+  vp,
+  bedW,
+  bedH,
+  origin,
+  containerW,
+  containerH,
+}: RulerOverlayProps) {
   const isBottomLeft = origin !== "top-left";
+  const R = RULER_W;
 
-  // Bed corners in SVG space
-  const bedLeft = PAD;
-  const bedTop = PAD;
-  const bedBottom = PAD + bedH * MM_TO_PX;
+  // ── Coordinate conversions ────────────────────────────────────────────────
+  const mmToSx = (mm: number) => vp.panX + (PAD + mm * MM_TO_PX) * vp.zoom;
+  const mmToSy = (mm: number) =>
+    isBottomLeft
+      ? vp.panY + (PAD + (bedH - mm) * MM_TO_PX) * vp.zoom
+      : vp.panY + (PAD + mm * MM_TO_PX) * vp.zoom;
+  const sxToMm = (sx: number) => ((sx - vp.panX) / vp.zoom - PAD) / MM_TO_PX;
+  const syToMm = (sy: number) =>
+    isBottomLeft
+      ? bedH - ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX
+      : ((sy - vp.panY) / vp.zoom - PAD) / MM_TO_PX;
 
-  // X ruler: sits on the bed edge where Y=0 lives
-  const xBaseY = isBottomLeft ? bedBottom : bedTop;
-  const xTickDir = isBottomLeft ? 1 : -1; // +1 = tick goes downward (into bottom margin)
+  // ── Adaptive tick density (~40–100 px between major ticks on screen) ──────
+  const pxPerMm = vp.zoom * MM_TO_PX;
+  const [major, minor] =
+    pxPerMm >= 30
+      ? [5, 1]
+      : pxPerMm >= 12
+        ? [10, 2]
+        : pxPerMm >= 6
+          ? [20, 5]
+          : pxPerMm >= 2
+            ? [50, 10]
+            : pxPerMm >= 0.8
+              ? [100, 20]
+              : [200, 50];
 
-  // Y ruler: always on the left edge; origin value is at xBaseY
-  // svgY for a given mm value along the Y axis:
-  const ySvgOfMm = (mm: number) =>
-    isBottomLeft ? bedBottom - mm * MM_TO_PX : bedTop + mm * MM_TO_PX;
+  const makeTicks = (a: number, b: number, maxMm: number): number[] => {
+    const lo = Math.ceil(Math.min(a, b) / minor) * minor;
+    const hi = Math.floor(Math.max(a, b) / minor) * minor;
+    const out: number[] = [];
+    for (let mm = lo; mm <= hi; mm += minor)
+      if (mm >= 0 && mm <= maxMm) out.push(mm);
+    return out;
+  };
 
-  const MINOR_LEN = 4; // px, 10 mm ticks
-  const MAJOR_LEN = 8; // px, 50 mm ticks
-  const LABEL_GAP = 2; // gap between tick end and label
-  const FONT = 7;
-  const TICK_COLOR = "#1e406a";
-  const LABEL_COLOR = "#4a6080";
-  const LINE_COLOR = "#1a3060";
+  // ── Layout: X ruler strip ─────────────────────────────────────────────────
+  // bottom-left → strip sits at the bottom; top-left → strip sits at the top.
+  const xSepY = isBottomLeft ? containerH - R : R; // separator line Y
+  const xTickDir = isBottomLeft ? 1 : -1; // tick direction INTO the strip
+  const xLabelY = isBottomLeft ? containerH - R / 2 : R / 2; // label centre Y
 
-  const xTicks = Array.from(
-    { length: Math.floor(bedW / 10) + 1 },
-    (_, i) => i * 10,
-  );
-  const yTicks = Array.from(
-    { length: Math.floor(bedH / 10) + 1 },
-    (_, i) => i * 10,
-  );
+  // ── Layout: Y ruler strip (always left) ──────────────────────────────────
+  const ySepX = R; // separator line X
+  const yStripTopY = isBottomLeft ? 0 : R; // strip top
+  const yStripBotY = isBottomLeft ? containerH - R : containerH; // strip bottom
+  const yLabelX = R / 2; // label centre X (rotated)
+
+  // ── Tick ranges ───────────────────────────────────────────────────────────
+  const xTicks = makeTicks(sxToMm(R), sxToMm(containerW), bedW);
+  const yTicks = makeTicks(syToMm(yStripTopY), syToMm(yStripBotY), bedH);
+
+  // ── Visuals ───────────────────────────────────────────────────────────────
+  const TICK_COL = "#2a5a8a";
+  const LABEL_COL = "#7090b0";
+  const ORIGIN_COL = "#e94560";
+  const BG = "#0d1520";
+  const FONT = 9;
+  const MAJOR_LEN = Math.round(R * 0.4);
+  const MINOR_LEN = Math.round(R * 0.2);
+
+  // Origin dot — show in the canvas area (not inside a ruler strip)
+  const originSx = mmToSx(0);
+  const originSy = mmToSy(0);
+  const originVisible =
+    originSx >= R &&
+    originSx <= containerW &&
+    originSy >= yStripTopY &&
+    originSy <= yStripBotY;
+
+  // Corner square position
+  const cornerY = isBottomLeft ? containerH - R : 0;
 
   return (
-    <g pointerEvents="none">
-      {/* ── X ruler ──────────────────────────────────────────────────────── */}
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: containerW,
+        height: containerH,
+        overflow: "hidden",
+        zIndex: 15,
+      }}
+      pointerEvents="none"
+    >
+      {/* ── Strip backgrounds ─────────────────────────────────────────────── */}
+      {/* X ruler strip */}
+      <rect
+        x={R}
+        y={isBottomLeft ? containerH - R : 0}
+        width={containerW - R}
+        height={R}
+        fill={BG}
+      />
+      {/* Y ruler strip (excludes corner) */}
+      <rect
+        x={0}
+        y={yStripTopY}
+        width={R}
+        height={yStripBotY - yStripTopY}
+        fill={BG}
+      />
+      {/* Corner square (drawn last so it covers any tick overflow) */}
+      <rect x={0} y={cornerY} width={R} height={R} fill={BG} />
+
+      {/* ── Separator lines ───────────────────────────────────────────────── */}
       <line
-        x1={bedLeft}
-        y1={xBaseY}
-        x2={bedLeft + bedW * MM_TO_PX}
-        y2={xBaseY}
-        stroke={LINE_COLOR}
+        x1={R}
+        y1={xSepY}
+        x2={containerW}
+        y2={xSepY}
+        stroke={TICK_COL}
         strokeWidth={0.5}
       />
+      <line
+        x1={ySepX}
+        y1={yStripTopY}
+        x2={ySepX}
+        y2={yStripBotY}
+        stroke={TICK_COL}
+        strokeWidth={0.5}
+      />
+
+      {/* ── X ticks ───────────────────────────────────────────────────────── */}
       {xTicks.map((mm) => {
-        const x = bedLeft + mm * MM_TO_PX;
-        const isMajor = mm % 50 === 0;
+        const sx = mmToSx(mm);
+        if (sx < R || sx > containerW) return null;
+        const isMajor = mm % major === 0;
         const tLen = isMajor ? MAJOR_LEN : MINOR_LEN;
-        const y2 = xBaseY + xTickDir * tLen;
+        const col = mm === 0 ? ORIGIN_COL : TICK_COL;
         return (
-          <g key={`xt-${mm}`}>
+          <g key={`rx-${mm}`}>
             <line
-              x1={x}
-              y1={xBaseY}
-              x2={x}
-              y2={y2}
-              stroke={TICK_COLOR}
+              x1={sx}
+              y1={xSepY}
+              x2={sx}
+              y2={xSepY + xTickDir * tLen}
+              stroke={col}
               strokeWidth={0.5}
             />
             {isMajor && (
               <text
-                x={x}
-                y={y2 + xTickDir * LABEL_GAP}
+                x={sx}
+                y={xLabelY}
                 textAnchor="middle"
-                dominantBaseline={isBottomLeft ? "hanging" : "auto"}
-                fill={mm === 0 ? "#e94560" : LABEL_COLOR}
+                dominantBaseline="middle"
+                fill={mm === 0 ? ORIGIN_COL : LABEL_COL}
                 fontSize={FONT}
-                fontWeight={mm === 0 ? "bold" : "normal"}
+                fontFamily="monospace"
               >
                 {mm}
               </text>
@@ -784,38 +894,33 @@ function Rulers({ bedW, bedH, origin, canvasH }: RulerProps) {
         );
       })}
 
-      {/* ── Y ruler ──────────────────────────────────────────────────────── */}
-      <line
-        x1={bedLeft}
-        y1={bedTop}
-        x2={bedLeft}
-        y2={bedBottom}
-        stroke={LINE_COLOR}
-        strokeWidth={0.5}
-      />
+      {/* ── Y ticks ───────────────────────────────────────────────────────── */}
       {yTicks.map((mm) => {
-        const y = ySvgOfMm(mm);
-        const isMajor = mm % 50 === 0;
+        const sy = mmToSy(mm);
+        if (sy < yStripTopY || sy > yStripBotY) return null;
+        const isMajor = mm % major === 0;
         const tLen = isMajor ? MAJOR_LEN : MINOR_LEN;
+        const col = mm === 0 ? ORIGIN_COL : TICK_COL;
         return (
-          <g key={`yt-${mm}`}>
+          <g key={`ry-${mm}`}>
             <line
-              x1={bedLeft}
-              y1={y}
-              x2={bedLeft - tLen}
-              y2={y}
-              stroke={TICK_COLOR}
+              x1={ySepX}
+              y1={sy}
+              x2={ySepX - tLen}
+              y2={sy}
+              stroke={col}
               strokeWidth={0.5}
             />
             {isMajor && (
               <text
-                x={bedLeft - tLen - LABEL_GAP}
-                y={y}
-                textAnchor="end"
+                transform={`rotate(-90, ${yLabelX}, ${sy})`}
+                x={yLabelX}
+                y={sy}
+                textAnchor="middle"
                 dominantBaseline="middle"
-                fill={mm === 0 ? "#e94560" : LABEL_COLOR}
+                fill={mm === 0 ? ORIGIN_COL : LABEL_COL}
                 fontSize={FONT}
-                fontWeight={mm === 0 ? "bold" : "normal"}
+                fontFamily="monospace"
               >
                 {mm}
               </text>
@@ -824,31 +929,17 @@ function Rulers({ bedW, bedH, origin, canvasH }: RulerProps) {
         );
       })}
 
-      {/* ── Origin dot ───────────────────────────────────────────────────── */}
-      <circle cx={bedLeft} cy={xBaseY} r={3.5} fill="#e94560" />
-
-      {/* ── Far-end dimension label ───────────────────────────────────────── */}
-      <text
-        x={bedLeft + bedW * MM_TO_PX}
-        y={xBaseY + xTickDir * (MAJOR_LEN + LABEL_GAP)}
-        textAnchor="end"
-        dominantBaseline={isBottomLeft ? "hanging" : "auto"}
-        fill={LABEL_COLOR}
-        fontSize={FONT}
-      >
-        {bedW} mm
-      </text>
-      <text
-        x={bedLeft - MAJOR_LEN - LABEL_GAP}
-        y={isBottomLeft ? bedTop : bedBottom}
-        textAnchor="end"
-        dominantBaseline={isBottomLeft ? "hanging" : "auto"}
-        fill={LABEL_COLOR}
-        fontSize={FONT}
-      >
-        {bedH} mm
-      </text>
-    </g>
+      {/* ── Origin dot ────────────────────────────────────────────────────── */}
+      {originVisible && (
+        <circle
+          cx={originSx}
+          cy={originSy}
+          r={3}
+          fill={ORIGIN_COL}
+          opacity={0.9}
+        />
+      )}
+    </svg>
   );
 }
 
