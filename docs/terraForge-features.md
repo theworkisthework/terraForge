@@ -164,6 +164,7 @@
 
 - [ ] **Auto-reconnect on WebSocket drop** — watchdog detects the loss, but reconnection must be manual
 - [ ] **Serial streaming** — streaming G-code line-by-line over USB serial is not implemented; current serial API only sends individual commands
+- [ ] **Bluetooth connection** — FluidNC supports Bluetooth; `MachineConfig.connection` type could be extended to `"wifi" | "usb" | "bluetooth"`
 - [x] **Homing sequence button** (`$H`) — in main toolbar, disabled when not connected
 - [ ] **Probe / touch-off**
 - [x] **Alarm clear** (`$X`) — clicking the pulsing ALARM badge in the console header sends `$X`
@@ -190,6 +191,11 @@
 - [ ] **Dark / light theme toggle**
 - [ ] **Zoom-to-fit** button to centre the bed in the canvas viewport
 - [ ] **Print / export canvas as image**
+
+### Distribution / Build
+
+- [ ] **Code signing (Authenticode)** — currently unsigned; causes AV false positives on the NSIS installer (SpiderBanner.dll flagged 1/72 on VirusTotal). Fix: obtain an Authenticode cert and sign the installer + app binary in CI
+- [ ] **Portable / zip target** — switching `win.target` from `nsis` to `["portable","zip"]` eliminates the NSIS plugin bundle entirely and avoids the SpiderBanner false positive; portable EXE is arguably better UX for a developer tool
 
 ### Nice-to-Have (Not in Spec)
 
