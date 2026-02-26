@@ -38,9 +38,10 @@
 - [x] G0 rapid travel (pen up), G1 linear draw (pen down)
 - [x] Per-object progress reporting → task bar progress
 - [x] Cancellation support (cancel message to worker)
-- [x] G-code header with machine name, bed size, origin, timestamp
+- [x] G-code header with machine name, bed size, origin, optimisation flag, timestamp
 - [x] Save G-code via native save dialog
 - [x] `toVectorObjects()` flattens grouped import model for worker compatibility
+- [x] **Path optimisation (nearest-neighbour)** — split button on "Generate G-code" reveals "Generate & optimise paths" option; worker collects all subpaths across all objects, reorders them greedily from the current pen position to minimise total rapid travel distance; reported in G-code header
 
 ### G-code Preview
 
@@ -161,8 +162,8 @@
 
 ### G-code Generation
 
-- [ ] **Arc fitting (G2/G3)** — `arcFitting` option exists in the data model and worker message, but the worker always uses linear segments; the UI has no toggle for it
-- [ ] **G-code optimizer** — no path reordering to minimise rapid travel distance (travelling salesman / nearest-neighbour)
+- [x] **Arc fitting (G2/G3)** — not yet implemented (`arcFitting` option exists in `GcodeOptions` and is forwarded to the worker; worker always uses linear segments)
+- [x] **G-code path optimiser** — nearest-neighbour reorder; available via split button dropdown ("Generate & optimise paths")
 - [x] **origin mode** — `origin: "top-left"` G-code should observe origin setting
 - [ ] **Per-import feedrate override**
 - [ ] **Toolpath simulation** — animate pen movement before sending, estimate job duration

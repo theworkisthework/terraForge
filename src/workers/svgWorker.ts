@@ -118,6 +118,35 @@ interface Pt {
   y: number;
 }
 type Subpath = Pt[];
+// ── Nearest-neighbour path optimiser ─────────────────────────────────────────────
+// Greedily reorders subpaths so each successive path starts as close as
+// possible to where the pen currently is, minimising total rapid travel.
+function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
+  if (subpaths.length === 0) return [];
+  const remaining = subpaths.slice();
+  const sorted: Subpath[] = [];
+  let curX = 0,
+    curY = 0;
+
+  while (remaining.length > 0) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const s = remaining[i][0];
+      const d = (s.x - curX) ** 2 + (s.y - curY) ** 2;
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    const chosen = remaining.splice(bestIdx, 1)[0];
+    sorted.push(chosen);
+    const last = chosen[chosen.length - 1];
+    curX = last.x;
+    curY = last.y;
+  }
+  return sorted;
+}
 interface PathToken {
   type: string;
   args: number[];

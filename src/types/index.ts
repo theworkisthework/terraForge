@@ -102,6 +102,7 @@ export interface Job {
 export interface GcodeOptions {
   arcFitting: boolean;
   arcTolerance: number; // mm tolerance for fitting arcs
+  optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
