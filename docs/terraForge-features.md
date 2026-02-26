@@ -10,10 +10,11 @@
 - [x] Physical size detection from SVG `width`/`height` attributes — handles `mm`, `cm`, `in`, `pt`, `pc`, `px`/unitless (96 DPI), so imported SVGs appear at their correct real-world scale by default
 - [x] ViewBox offset support — SVGs with non-zero viewBox origins render correctly
 - [x] Grouped import model: one `SvgImport` per file containing `SvgPath[]`, paths preserve relative positions
-- [x] Per-import x/y position on bed (mm)
+- [x] Per-import x/y position on bed (mm) — clamped so the object's far edge stays within bed bounds
 - [x] Per-import uniform scale
-- [x] Drag to move import on canvas
-- [x] 8-handle bounding box for scaling (tl, t, tr, r, br, b, bl, l) with correct resize cursors
+- [x] Per-import width and height inputs (mm) — back-calculate scale from size; aspect ratio always preserved; clamped to bed boundary from current origin
+- [x] Drag to move import on canvas — origin clamped so far edge cannot leave bed boundary
+- [x] 8-handle bounding box for scaling (tl, t, tr, r, br, b, bl, l) with correct resize cursors — scale clamped so object cannot grow past bed boundary
 - [x] Delete (×) button on selected import
 - [x] Delete/Backspace key removes selected import
 - [x] Escape key deselects
@@ -77,7 +78,7 @@
 - [x] Directory navigation (click folders to enter, `/ ` to go up)
 - [x] File listing with size display
 - [x] Upload any file type (unrestricted native dialog)
-- [x] Download file (save to local disk)
+- [x] Download file (save to local disk) — G-code files use a `.gcode`/`.nc`/`.cnc`-filtered save dialog; all other file types use an unfiltered save dialog
 - [x] Delete file
 - [x] Run file on machine immediately via ▶ button per file row
 - [x] Click file row to select it as the queued job file (highlighted in blue); clicking again deselects
@@ -122,6 +123,7 @@
 - [x] Determinate progress bar when progress % is known
 - [x] Indeterminate spinner when progress is unknown
 - [x] Per-task label
+- [x] Tooltip on task label shows full text when truncated by overflow
 - [x] Status icons: ✓ green for completed, ✕ red for cancelled, ! red for errors
 - [x] Completed and cancelled toasts auto-dismiss after 8 s; errors never auto-dismiss (must be manually dismissed)
 - [x] Error toasts surface the error message as a second line below the label
@@ -185,7 +187,7 @@
 
 ### File Browser
 
-- [ ] **Download save dialog** — currently uses the G-code save dialog (`.gcode`/`.nc` filter) even for non-G-code files
+- [x] **Download save dialog** — G-code files use a filtered dialog; non-G-code files use an unfiltered dialog
 - [ ] **Rename file on machine**
 - [ ] **Create directory**
 
