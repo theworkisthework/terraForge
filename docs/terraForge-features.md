@@ -41,7 +41,8 @@
 - [x] G-code header with machine name, bed size, origin, optimisation flag, timestamp
 - [x] Save G-code via native save dialog
 - [x] `toVectorObjects()` flattens grouped import model for worker compatibility
-- [x] **Path optimisation (nearest-neighbour)** — split button on "Generate G-code" reveals "Generate & optimise paths" option; worker collects all subpaths across all objects, reorders them greedily from the current pen position to minimise total rapid travel distance; reported in G-code header
+- [x] **Path optimisation (nearest-neighbour)** — split button on "Generate G-code" reveals "Generate & optimise" option; worker collects all subpaths from every visible object into a single pool, reorders them greedily from the current pen position to minimise total rapid travel distance; emitted as a flat optimised sequence (no per-object grouping); optimisation flag reported in G-code header
+- [x] **Smart save filename** — default filename in the save dialog is derived from the import name(s) from the Properties panel; single import uses its name directly; multiple imports appends `+N` (e.g. `logo+1.gcode`); optimised jobs append `_opt` (e.g. `logo_opt.gcode`, `logo+1_opt.gcode`)
 
 ### G-code Preview
 
@@ -162,8 +163,7 @@
 
 ### G-code Generation
 
-- [x] **Arc fitting (G2/G3)** — not yet implemented (`arcFitting` option exists in `GcodeOptions` and is forwarded to the worker; worker always uses linear segments)
-- [x] **G-code path optimiser** — nearest-neighbour reorder; available via split button dropdown ("Generate & optimise paths")
+- [ ] **Arc fitting (G2/G3)** — not yet implemented (`arcFitting` option exists in `GcodeOptions` and is forwarded to the worker; worker always uses linear segments)
 - [x] **origin mode** — `origin: "top-left"` G-code should observe origin setting
 - [ ] **Per-import feedrate override**
 - [ ] **Toolpath simulation** — animate pen movement before sending, estimate job duration

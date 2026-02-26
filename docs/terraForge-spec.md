@@ -1,4 +1,4 @@
-terraForge — Master Project Specification (Updated With Background‑Task UX Requirements)
+terraForge — Master Project Specification (Updated 2026-02-26)
 You are the primary software engineer for terraForge, a cross‑platform Electron + React application that serves as a full UI, job manager, and SVG→G‑code engine for the TerraPen pen plotter (FluidNC‑based). You must design and implement the entire application in a consistent, modular, production‑ready way.
 
 Your outputs must always follow the architecture, constraints, and definitions below. Do not invent APIs, libraries, or patterns not explicitly allowed here.
@@ -121,12 +121,16 @@ All methods must be explicitly typed.
    Code
    {
    id: string
-   path: string
-   x: number
-   y: number
+   path: string          // absolute SVG path d string
+   svgSource: string     // original SVG element tag name
+   x: number             // import X position on bed (mm)
+   y: number             // import Y position on bed (mm)
    scale: number
    rotation: number
    visible: boolean
+   originalWidth: number  // SVG viewBox width in user units
+   originalHeight: number // SVG viewBox height in user units
+   layer?: string
    }
    Job
    Code
@@ -141,8 +145,9 @@ All methods must be explicitly typed.
    Code
    {
    id: string
-   type: "svg-parse" | "gcode-generate" | "file-upload" | "file-download" | ...
-   progress: number | null
+   type: "svg-parse" | "gcode-generate" | "file-upload" | "file-download" | "file-delete" | "job-start" | "ws-connect"
+   label: string         // human-readable description shown in the toast
+   progress: number | null  // 0–100 or null for indeterminate
    status: "running" | "completed" | "cancelled" | "error"
    error?: string
    }
@@ -196,7 +201,33 @@ Pen down for drawing
 
 Pen up at end
 
-Arc Support
+Path Optimisation
+A nearest-neighbour optimiser is available as an alternative generation mode:
+
+User invokes "Generate & optimise" from the split-button dropdown
+
+Worker collects all subpaths from all visible objects into a single pool
+
+Subpaths are reordered greedily from the current pen position (0,0) to minimise total rapid travel distance
+
+Output is a flat sequence (no per-object grouping)
+
+Optimisation flag and mode are recorded in the G-code header comment
+
+The save-dialog default filename appends `_opt` when optimisation is active
+
+   Save Filename
+The default filename in the native save dialog is derived from the import name(s):
+
+Single import: `<name>.gcode`
+
+Multiple imports: `<first-name>+<N>.gcode` (e.g. `logo+1.gcode`)
+
+Optimised jobs append `_opt` before the extension
+
+Illegal filesystem characters in the name are replaced with `_`
+
+   Arc Support
 When arc fitting is enabled:
 
 Fit arcs (G2/G3) where possible
@@ -206,6 +237,8 @@ Use FluidNC‑supported arc syntax
 Ensure arcs respect machine coordinate system
 
 Fallback to linear segments when arc fitting fails
+
+(Arc fitting is scaffolded — `arcFitting` option exists in `GcodeOptions` and is forwarded to the worker — but the worker currently always uses linear segments.)
 
 Background Task Requirements
 G‑code generation must run in a worker
