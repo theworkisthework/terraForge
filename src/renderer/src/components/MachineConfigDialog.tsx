@@ -27,7 +27,7 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   penUpCommand: "M3 S0",
   penDownCommand: "M3 S100",
   feedrate: 3000,
-  connection: { type: "wifi", host: "192.168.1.100", port: 80 },
+  connection: { type: "wifi", host: "fluidnc.local", port: 80 },
 };
 
 export function MachineConfigDialog({ onClose }: Props) {
@@ -290,7 +290,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                         changeConn({
                           type: ct,
                           ...(ct === "wifi"
-                            ? { host: "192.168.1.100", port: 80 }
+                            ? { host: "fluidnc.local", port: 80 }
                             : { serialPath: portList[0] ?? "/dev/ttyUSB0" }),
                         })
                       }
@@ -311,10 +311,10 @@ export function MachineConfigDialog({ onClose }: Props) {
                       value={form.connection.host ?? ""}
                       onChange={(e) => changeConn({ host: e.target.value })}
                       className={inputCls + " font-mono"}
-                      placeholder="192.168.1.100"
+                      placeholder="fluidnc.local"
                     />
                   </Field>
-                  <Field label="Port">
+                  <Field label="HTTP port">
                     <input
                       type="number"
                       value={form.connection.port ?? 80}
@@ -326,6 +326,33 @@ export function MachineConfigDialog({ onClose }: Props) {
                       className={inputCls}
                     />
                   </Field>
+                  <Field label="WS port override">
+                    <input
+                      type="number"
+                      value={form.connection.wsPort ?? ""}
+                      min={1}
+                      max={65535}
+                      placeholder={String(form.connection.port ?? 80)}
+                      onChange={(e) =>
+                        changeConn({
+                          wsPort:
+                            e.target.value === ""
+                              ? undefined
+                              : Number(e.target.value),
+                        })
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+                  <div className="flex items-center">
+                    <p className="text-xs text-gray-500">
+                      Leave blank to auto-detect from firmware version
+                      ([ESP800]). FluidNC 4.x uses the HTTP port; older ESP3D
+                      firmware uses{" "}
+                      <span className="font-mono text-gray-400">81</span>. Set
+                      an explicit value only if auto-detect fails.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <Field label="Serial port">

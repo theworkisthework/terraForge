@@ -15,8 +15,8 @@ export class FluidNCClient extends EventEmitter {
   private wsReconnectTimer: NodeJS.Timeout | null = null;
   private wsHost = "";
   private wsPort = 80;
-  private wsRetryDelay = 3000;   // ms — doubles on each 503, resets on success
-  private wsEnabled = false;     // set false on disconnect to stop retry loop
+  private wsRetryDelay = 3000; // ms — doubles on each 503, resets on success
+  private wsEnabled = false; // set false on disconnect to stop retry loop
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ export class FluidNCClient extends EventEmitter {
     const stateMatch = raw.match(/<([^|>]+)/);
     const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
     const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
-    const lnMatch   = raw.match(/Ln:(\d+),(\d+)/);
+    const lnMatch = raw.match(/Ln:(\d+),(\d+)/);
 
     const stateStr = stateMatch?.[1] ?? "Unknown";
     // FluidNC appends a substate number for some states: Hold:0, Hold:1, Door:0, etc.
@@ -90,7 +90,7 @@ export class FluidNCClient extends EventEmitter {
       ? { x: +wposMatch[1], y: +wposMatch[2], z: +wposMatch[3] }
       : { ...mpos };
 
-    const lineNum   = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
+    const lineNum = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
     const lineTotal = lnMatch ? parseInt(lnMatch[2], 10) : undefined;
 
     return { raw, state, mpos, wpos, lineNum, lineTotal };
@@ -108,9 +108,13 @@ export class FluidNCClient extends EventEmitter {
 
   // ─── Job Control ──────────────────────────────────────────────────────────
 
-  async runFile(remotePath: string, filesystem: "sd" | "fs" = "sd"): Promise<void> {
+  async runFile(
+    remotePath: string,
+    filesystem: "sd" | "fs" = "sd",
+  ): Promise<void> {
     // FluidNC has no HTTP run endpoint — files are started via the command interface.
-    const cmd = filesystem === "sd" ? `$SD/Run=${remotePath}` : `$FS/Run=${remotePath}`;
+    const cmd =
+      filesystem === "sd" ? `$SD/Run=${remotePath}` : `$FS/Run=${remotePath}`;
     await this.sendCommand(cmd);
   }
 
@@ -158,9 +162,16 @@ export class FluidNCClient extends EventEmitter {
   // SD card file listing — FluidNC exposes the SD card via GET /upload?path=
   // Directories are identified by size === "-1" (returned as a string).
   async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
-    const res = await this.get(`/upload?path=${encodeURIComponent(remotePath)}`);
+    const res = await this.get(
+      `/upload?path=${encodeURIComponent(remotePath)}`,
+    );
     const json = (await res.json()) as {
-      files: Array<{ name: string; shortname: string; size: string; datetime: string }>;
+      files: Array<{
+        name: string;
+        shortname: string;
+        size: string;
+        datetime: string;
+      }>;
       path: string;
       status: string;
     };
@@ -174,7 +185,10 @@ export class FluidNCClient extends EventEmitter {
   }
 
   /** Fetch the text content of a remote file (for G-code preview). */
-  async fetchFileText(remotePath: string, filesystem: "internal" | "sdcard" = "sdcard"): Promise<string> {
+  async fetchFileText(
+    remotePath: string,
+    filesystem: "internal" | "sdcard" = "sdcard",
+  ): Promise<string> {
     // FluidNC serves files directly by path:
     //   SD card:  GET /sd/filename.gcode
     //   LocalFS:  GET /localfs/filename  (or just /filename)
@@ -280,10 +294,77 @@ export class FluidNCClient extends EventEmitter {
 
   private wsGeneration = 0;
 
-  async connectWebSocket(host: string, port: number): Promise<void> {
+  /**
+   * Probe the controller over HTTP to determine FluidNC firmware version.
+   * Uses the synchronous `plain=[ESP800]` form so the full response
+   * is returned in the HTTP body (no WebSocket needed).
+   *
+   * Returns the parsed major version number, or null if the probe fails
+   * (e.g. server unreachable, unexpected response format).
+   */
+  async probeFirmwareVersion(): Promise<{
+    raw: string;
+    version: string;
+    major: number;
+  } | null> {
+    try {
+      const url = `${this.baseUrl}/command?plain=${encodeURIComponent("[ESP800]")}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+      if (!res.ok) return null;
+      const text = await res.text();
+      // Response contains a line like: "FW version:FluidNC v4.0.1"
+      const match = text.match(/FW version[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/);
+      if (!match) return null;
+      const major = parseInt(match[1], 10);
+      const version = `${match[1]}.${match[2]}`;
+      return { raw: text.trim(), version, major };
+    } catch {
+      return null;
+    }
+  }
+
+  async connectWebSocket(
+    host: string,
+    port: number,
+    wsPort?: number,
+  ): Promise<void> {
     this.wsHost = host;
-    this.wsPort = port;
     this.setHost(host, port);
+
+    if (wsPort !== undefined) {
+      // Explicit override from machine config — use as-is.
+      this.wsPort = wsPort;
+      this.emit("console", `[terraForge] WS port override: ${wsPort}`);
+    } else {
+      // Auto-detect from firmware version via [ESP800].
+      // FluidNC 4.x: WebSocket on the HTTP port (same AsyncWebServer instance).
+      // FluidNC 3.x / old ESP3D: WebSocket on a separate server at port 81.
+      const probe = await this.probeFirmwareVersion();
+      if (probe) {
+        if (probe.major >= 4) {
+          this.wsPort = port;
+          this.emit(
+            "console",
+            `[terraForge] Detected FluidNC ${probe.version} — WS on HTTP port ${port}`,
+          );
+        } else {
+          this.wsPort = 81;
+          this.emit(
+            "console",
+            `[terraForge] Detected FluidNC ${probe.version} — WS on legacy port 81`,
+          );
+        }
+      } else {
+        // Probe failed — default to modern same-port behaviour and let the
+        // error surface naturally if it's wrong.
+        this.wsPort = port;
+        this.emit(
+          "console",
+          `[terraForge] Firmware probe failed — assuming WS on port ${port}`,
+        );
+      }
+    }
+
     // Tear down any existing connection & pending reconnect first
     this.killWs();
     this.wsEnabled = true;
@@ -298,7 +379,7 @@ export class FluidNCClient extends EventEmitter {
   /** Hard-stop: cancel reconnect timer, terminate socket, bump generation. */
   private killWs(): void {
     this.wsEnabled = false;
-    this.wsGeneration++;                     // invalidate all in-flight handlers
+    this.wsGeneration++; // invalidate all in-flight handlers
     if (this.wsReconnectTimer) {
       clearTimeout(this.wsReconnectTimer);
       this.wsReconnectTimer = null;
@@ -306,7 +387,11 @@ export class FluidNCClient extends EventEmitter {
     if (this.ws) {
       // terminate() sends TCP RST immediately — no waiting for the close handshake.
       // This is essential so FluidNC frees the slot before we reopen.
-      try { this.ws.terminate(); } catch { /* already dead */ }
+      try {
+        this.ws.terminate();
+      } catch {
+        /* already dead */
+      }
       this.ws = null;
     }
   }
@@ -323,33 +408,55 @@ export class FluidNCClient extends EventEmitter {
 
     // Terminate any socket that might still be lingering before opening a new one
     if (this.ws) {
-      try { this.ws.terminate(); } catch { /* ignore */ }
+      try {
+        this.ws.terminate();
+      } catch {
+        /* ignore */
+      }
       this.ws = null;
     }
 
     const gen = ++this.wsGeneration;
-    // FluidNC's WebSocket server runs on port 81 at the root path (ESP3D convention)
-    const url = `ws://${this.wsHost}:81/`;
+    // FluidNC WebSocket always uses root path "/".
+    // FluidNC 4.x: same port as HTTP (wsPort === httpPort).
+    // Old ESP3D firmware: port 81 (set wsPort explicitly in machine config).
+    const url = `ws://${this.wsHost}:${this.wsPort}/`;
     const ws = new WebSocket(url);
     this.ws = ws;
 
     ws.on("open", () => {
-      if (gen !== this.wsGeneration) { ws.terminate(); return; }
+      if (gen !== this.wsGeneration) {
+        ws.terminate();
+        return;
+      }
       this.wsRetryDelay = 3000;
       this.emit("console", "[terraForge] WebSocket connected");
       // Request automatic status reports every 500ms on this WS channel.
       // $RI is per-channel, so it must be sent through the WebSocket itself.
-      try { ws.send("$RI=500\n"); } catch { /* ignore */ }
+      try {
+        ws.send("$RI=500\n");
+      } catch {
+        /* ignore */
+      }
     });
 
     ws.on("message", (raw) => {
       if (gen !== this.wsGeneration) return;
       const text = raw.toString().trim();
       if (text.startsWith("<")) {
+        // Grbl/FluidNC real-time status report
         this.emit("status", this.parseStatus(text));
-      } else if (text.startsWith("PING:")) {
-        // Keep-alive heartbeat — suppress from console, emit as ping signal
+      } else if (text === "PING" || text.startsWith("PING:")) {
+        // Server-to-client keep-alive heartbeat ("PING" no colon) or ping
+        // reply ("PING:60000:60000"). Suppress from console; emit as ping signal.
         this.emit("ping");
+      } else if (
+        text.startsWith("currentID:") ||
+        text.startsWith("CURRENT_ID:") ||
+        text.startsWith("activeID:") ||
+        text.startsWith("ACTIVE_ID:")
+      ) {
+        // FluidNC WebUI session-management messages — not user-facing output.
       } else if (text.length > 0) {
         this.emit("console", text);
       }

@@ -177,8 +177,10 @@ ipcMain.handle("fluidnc:pauseJob", () => fluidnc.pauseJob());
 ipcMain.handle("fluidnc:resumeJob", () => fluidnc.resumeJob());
 ipcMain.handle("fluidnc:abortJob", () => fluidnc.abortJob());
 
-ipcMain.handle("fluidnc:connectWebSocket", (_e, host: string, port: number) =>
-  fluidnc.connectWebSocket(host, port),
+ipcMain.handle(
+  "fluidnc:connectWebSocket",
+  (_e, host: string, port: number, wsPort?: number) =>
+    fluidnc.connectWebSocket(host, port, wsPort),
 );
 ipcMain.handle("fluidnc:disconnectWebSocket", () =>
   fluidnc.disconnectWebSocket(),

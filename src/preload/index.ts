@@ -40,8 +40,8 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
   pauseJob: () => invoke<void>("fluidnc:pauseJob"),
   resumeJob: () => invoke<void>("fluidnc:resumeJob"),
   abortJob: () => invoke<void>("fluidnc:abortJob"),
-  connectWebSocket: (host, port) =>
-    invoke<void>("fluidnc:connectWebSocket", host, port),
+  connectWebSocket: (host, port, wsPort) =>
+    invoke<void>("fluidnc:connectWebSocket", host, port, wsPort),
   disconnectWebSocket: () => invoke<void>("fluidnc:disconnectWebSocket"),
 
   onStatusUpdate: (cb) => {

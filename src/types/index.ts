@@ -13,6 +13,12 @@ export interface MachineConnection {
   type: ConnectionType;
   host?: string;
   port?: number;
+  /**
+   * WebSocket port override.
+   * - Leave unset for FluidNC 4.x: WebSocket shares the HTTP port (default 80).
+   * - Set to 81 for older ESP3D-based FluidNC firmware (separate WS port).
+   */
+  wsPort?: number;
   serialPath?: string;
 }
 
@@ -188,7 +194,11 @@ export interface FluidNCApi {
   pauseJob: () => Promise<void>;
   resumeJob: () => Promise<void>;
   abortJob: () => Promise<void>;
-  connectWebSocket: (host: string, port: number) => Promise<void>;
+  connectWebSocket: (
+    host: string,
+    port: number,
+    wsPort?: number,
+  ) => Promise<void>;
   disconnectWebSocket: () => Promise<void>;
   onStatusUpdate: (cb: (status: MachineStatus) => void) => () => void;
   onConsoleMessage: (cb: (message: string) => void) => () => void;

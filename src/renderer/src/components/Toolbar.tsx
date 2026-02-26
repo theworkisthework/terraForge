@@ -260,6 +260,7 @@ export function Toolbar() {
         await window.terraForge.fluidnc.connectWebSocket(
           cfg.connection.host!,
           cfg.connection.port ?? 80,
+          cfg.connection.wsPort,
         );
       } else {
         await window.terraForge.serial.connect(
