@@ -488,9 +488,20 @@ export function Toolbar() {
         unregisterCancelCallback(taskId);
         setGenerating(false);
 
-        const savePath = await window.terraForge.fs.saveGcodeDialog(
-          "terraforge-job.gcode",
-        );
+        // Build a meaningful default filename from the import names.
+        const baseName =
+          imports.length === 1
+            ? imports[0].name
+            : `${imports[0].name}+${imports.length - 1}`;
+        const safeName = baseName
+          .replace(/\.[^.]+$/, "") // strip any existing extension
+          .replace(/[\\/:*?"<>|]/g, "_"); // remove filesystem-illegal chars
+        const defaultFilename = optimise
+          ? `${safeName}_opt.gcode`
+          : `${safeName}.gcode`;
+
+        const savePath =
+          await window.terraForge.fs.saveGcodeDialog(defaultFilename);
         if (savePath) {
           await window.terraForge.fs.writeFile(savePath, msg.gcode);
         }
