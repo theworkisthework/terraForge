@@ -189,28 +189,68 @@ export function PropertiesPanel() {
                       const objH = imp.svgHeight * imp.scale;
                       const maxX = Math.max(0, bedW - objW);
                       const maxY = Math.max(0, bedH - objH);
+                      // Max W/H = remaining bed space from the object's current origin
+                      const maxW = Math.max(0.001, bedW - imp.x);
+                      const maxH = Math.max(0.001, bedH - imp.y);
                       return (
                         <>
-                          {numField(
-                            "X (mm)",
-                            imp.x,
-                            (v) =>
-                              updateImport(imp.id, {
-                                x: Math.max(0, Math.min(v, maxX)),
-                              }),
-                            0.5,
-                            0,
-                          )}
-                          {numField(
-                            "Y (mm)",
-                            imp.y,
-                            (v) =>
-                              updateImport(imp.id, {
-                                y: Math.max(0, Math.min(v, maxY)),
-                              }),
-                            0.5,
-                            0,
-                          )}
+                          {/* X / Y — two columns */}
+                          <div className="grid grid-cols-2 gap-2 mb-0">
+                            {numField(
+                              "X (mm)",
+                              imp.x,
+                              (v) =>
+                                updateImport(imp.id, {
+                                  x: Math.max(0, Math.min(v, maxX)),
+                                }),
+                              0.5,
+                              0,
+                            )}
+                            {numField(
+                              "Y (mm)",
+                              imp.y,
+                              (v) =>
+                                updateImport(imp.id, {
+                                  y: Math.max(0, Math.min(v, maxY)),
+                                }),
+                              0.5,
+                              0,
+                            )}
+                          </div>
+                          {/* W / H — two columns, linked to scale */}
+                          <div className="grid grid-cols-2 gap-2 mb-0">
+                            {numField(
+                              "W (mm)",
+                              objW,
+                              (v) => {
+                                const clamped = Math.max(
+                                  0.001,
+                                  Math.min(v, maxW),
+                                );
+                                updateImport(imp.id, {
+                                  scale: clamped / imp.svgWidth,
+                                });
+                              },
+                              0.5,
+                              0.001,
+                            )}
+                            {numField(
+                              "H (mm)",
+                              objH,
+                              (v) => {
+                                const clamped = Math.max(
+                                  0.001,
+                                  Math.min(v, maxH),
+                                );
+                                updateImport(imp.id, {
+                                  scale: clamped / imp.svgHeight,
+                                });
+                              },
+                              0.5,
+                              0.001,
+                            )}
+                          </div>
+                          {/* Scale — full width */}
                           {numField(
                             "Scale",
                             imp.scale,
@@ -221,9 +261,6 @@ export function PropertiesPanel() {
                             0.05,
                             0.001,
                           )}
-                          <div className="text-[9px] text-gray-600 mt-1">
-                            {objW.toFixed(1)} × {objH.toFixed(1)} mm
-                          </div>
                         </>
                       );
                     })()}
