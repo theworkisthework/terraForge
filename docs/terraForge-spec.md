@@ -121,14 +121,14 @@ All methods must be explicitly typed.
    Code
    {
    id: string
-   path: string          // absolute SVG path d string
-   svgSource: string     // original SVG element tag name
-   x: number             // import X position on bed (mm)
-   y: number             // import Y position on bed (mm)
+   path: string // absolute SVG path d string
+   svgSource: string // original SVG element tag name
+   x: number // import X position on bed (mm)
+   y: number // import Y position on bed (mm)
    scale: number
    rotation: number
    visible: boolean
-   originalWidth: number  // SVG viewBox width in user units
+   originalWidth: number // SVG viewBox width in user units
    originalHeight: number // SVG viewBox height in user units
    layer?: string
    }
@@ -146,8 +146,8 @@ All methods must be explicitly typed.
    {
    id: string
    type: "svg-parse" | "gcode-generate" | "file-upload" | "file-download" | "file-delete" | "job-start" | "ws-connect"
-   label: string         // human-readable description shown in the toast
-   progress: number | null  // 0–100 or null for indeterminate
+   label: string // human-readable description shown in the toast
+   progress: number | null // 0–100 or null for indeterminate
    status: "running" | "completed" | "cancelled" | "error"
    error?: string
    }
@@ -216,7 +216,7 @@ Optimisation flag and mode are recorded in the G-code header comment
 
 The save-dialog default filename appends `_opt` when optimisation is active
 
-   Save Filename
+Save Filename
 The default filename in the native save dialog is derived from the import name(s):
 
 Single import: `<name>.gcode`
@@ -227,7 +227,7 @@ Optimised jobs append `_opt` before the extension
 
 Illegal filesystem characters in the name are replaced with `_`
 
-   Arc Support
+Arc Support
 When arc fitting is enabled:
 
 Fit arcs (G2/G3) where possible
