@@ -115,11 +115,18 @@
 
 ### Background Task UX
 
-- [x] Global task bar (below toolbar) showing all running tasks
+- [x] Toast stack overlay — tasks appear as a floating stack in the top-right corner of the main canvas panel (not in the document flow; nothing is pushed or reflowed)
+- [x] Fixed 280 px width on all toasts — consistent size regardless of label length
 - [x] Determinate progress bar when progress % is known
 - [x] Indeterminate spinner when progress is unknown
 - [x] Per-task label
-- [x] Cancel button on each running task
+- [x] Status icons: ✓ green for completed, ✕ red for cancelled, ! red for errors
+- [x] Completed and cancelled toasts auto-dismiss after 8 s; errors never auto-dismiss (must be manually dismissed)
+- [x] Error toasts surface the error message as a second line below the label
+- [x] Cancel button on each running task — calls renderer-side cancel callback directly (no IPC round-trip) for tasks whose work runs in the renderer
+- [x] G-code generation cancellation: cancel button posts a `cancel` message directly to the Web Worker via a callback registered in `taskStore`; worker emits a distinct `cancelled` message type (not re-used as `error`)
+- [x] Cancel callbacks stored in a plain module-level `Map` outside of immer state to avoid immer's freeze/proxy cycle breaking function values
+- [x] IPC fallback for main-process tasks (file upload/download) that have no renderer-side callback
 - [x] Task types: `svg-parse`, `gcode-generate`, `file-upload`, `file-download`, `file-delete`, `job-start`, `ws-connect`
 
 ### Architecture
@@ -186,8 +193,8 @@
 - [ ] **Keyboard shortcut map** — no documented or configurable shortcuts beyond Delete/Escape
 - [ ] **First-run onboarding wizard** — no guidance for new users to set up a machine config
 - [ ] **Recent files list**
-- [ ] **Notifications for completed tasks** — task bar disappears silently; no toast for "Upload complete" etc.
-- [ ] **Error detail expansion** — errored tasks show no detail beyond a label
+- [x] **Notifications for completed/cancelled/failed tasks** — toast stack with auto-dismiss for completed/cancelled (8 s) and persistent display for errors
+- [x] **Error detail in task toasts** — errored tasks show the error string as a second line below the label
 - [ ] **Dark / light theme toggle**
 - [ ] **Zoom-to-fit** button to centre the bed in the canvas viewport
 - [ ] **Print / export canvas as image**
