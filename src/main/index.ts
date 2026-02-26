@@ -160,14 +160,18 @@ ipcMain.handle("fluidnc:listFiles", (_e, path?: string) =>
 ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) =>
   fluidnc.listSDFiles(path),
 );
-ipcMain.handle("fluidnc:fetchFileText", (_e, remotePath: string, filesystem?: "internal" | "sdcard") =>
-  fluidnc.fetchFileText(remotePath, filesystem),
+ipcMain.handle(
+  "fluidnc:fetchFileText",
+  (_e, remotePath: string, filesystem?: "internal" | "sdcard") =>
+    fluidnc.fetchFileText(remotePath, filesystem),
 );
 ipcMain.handle("fluidnc:deleteFile", (_e, remotePath: string) =>
   fluidnc.deleteFile(remotePath),
 );
-ipcMain.handle("fluidnc:runFile", (_e, remotePath: string, filesystem?: "sd" | "fs") =>
-  fluidnc.runFile(remotePath, filesystem),
+ipcMain.handle(
+  "fluidnc:runFile",
+  (_e, remotePath: string, filesystem?: "sd" | "fs") =>
+    fluidnc.runFile(remotePath, filesystem),
 );
 ipcMain.handle("fluidnc:pauseJob", () => fluidnc.pauseJob());
 ipcMain.handle("fluidnc:resumeJob", () => fluidnc.resumeJob());
@@ -202,17 +206,28 @@ ipcMain.handle(
 
 ipcMain.handle(
   "fluidnc:downloadFile",
-  async (_e, taskId: string, remotePath: string, localPath: string, filesystem?: "internal" | "sdcard") => {
+  async (
+    _e,
+    taskId: string,
+    remotePath: string,
+    localPath: string,
+    filesystem?: "internal" | "sdcard",
+  ) => {
     const task = taskManager.create(
       taskId,
       "file-download",
       `Downloading ${remotePath}`,
     );
     try {
-      await fluidnc.downloadFile(remotePath, localPath, filesystem, (progress) => {
-        taskManager.update(taskId, { progress });
-        mainWindow?.webContents.send("task:update", taskManager.get(taskId));
-      });
+      await fluidnc.downloadFile(
+        remotePath,
+        localPath,
+        filesystem,
+        (progress) => {
+          taskManager.update(taskId, { progress });
+          mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+        },
+      );
       taskManager.complete(taskId);
     } catch (err: unknown) {
       taskManager.fail(taskId, String(err));
@@ -264,6 +279,15 @@ ipcMain.handle("fs:saveGcodeDialog", async (_e, defaultName: string) => {
     title: "Save G-code",
     defaultPath: defaultName,
     filters: [{ name: "G-code Files", extensions: ["gcode", "nc", "cnc"] }],
+  });
+  return result.canceled ? null : result.filePath;
+});
+
+ipcMain.handle("fs:saveFileDialog", async (_e, defaultName: string) => {
+  if (!mainWindow) return null;
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Save File",
+    defaultPath: defaultName,
   });
   return result.canceled ? null : result.filePath;
 });

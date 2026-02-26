@@ -25,10 +25,18 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
   uploadFile: (taskId, localPath, remotePath) =>
     invoke<void>("fluidnc:uploadFile", taskId, localPath, remotePath),
   downloadFile: (taskId, remotePath, localPath, filesystem?) =>
-    invoke<void>("fluidnc:downloadFile", taskId, remotePath, localPath, filesystem),
-  fetchFileText: (remotePath, filesystem?) => invoke<string>("fluidnc:fetchFileText", remotePath, filesystem),
+    invoke<void>(
+      "fluidnc:downloadFile",
+      taskId,
+      remotePath,
+      localPath,
+      filesystem,
+    ),
+  fetchFileText: (remotePath, filesystem?) =>
+    invoke<string>("fluidnc:fetchFileText", remotePath, filesystem),
   deleteFile: (remotePath) => invoke<void>("fluidnc:deleteFile", remotePath),
-  runFile: (remotePath, filesystem) => invoke<void>("fluidnc:runFile", remotePath, filesystem),
+  runFile: (remotePath, filesystem) =>
+    invoke<void>("fluidnc:runFile", remotePath, filesystem),
   pauseJob: () => invoke<void>("fluidnc:pauseJob"),
   resumeJob: () => invoke<void>("fluidnc:resumeJob"),
   abortJob: () => invoke<void>("fluidnc:abortJob"),
@@ -85,6 +93,8 @@ const fs: TerraForgeAPI["fs"] = {
     invoke<void>("fs:writeFile", filePath, content),
   saveGcodeDialog: (defaultName) =>
     invoke<string | null>("fs:saveGcodeDialog", defaultName),
+  saveFileDialog: (defaultName) =>
+    invoke<string | null>("fs:saveFileDialog", defaultName),
   loadConfigs: () => invoke<MachineConfig[]>("fs:loadConfigs"),
   saveConfigs: (configs) => invoke<void>("fs:saveConfigs", configs),
 };

@@ -209,6 +209,7 @@ export interface FsApi {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   saveGcodeDialog: (defaultName: string) => Promise<string | null>;
+  saveFileDialog: (defaultName: string) => Promise<string | null>;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }

@@ -1,17 +1,22 @@
 import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
+import { useMachineStore } from "../store/machineStore";
 
 export function PropertiesPanel() {
-  const imports        = useCanvasStore((s) => s.imports);
+  const imports = useCanvasStore((s) => s.imports);
   const selectedImportId = useCanvasStore((s) => s.selectedImportId);
-  const selectImport   = useCanvasStore((s) => s.selectImport);
-  const removeImport   = useCanvasStore((s) => s.removeImport);
-  const updateImport   = useCanvasStore((s) => s.updateImport);
-  const updatePath     = useCanvasStore((s) => s.updatePath);
-  const removePath     = useCanvasStore((s) => s.removePath);
+  const selectImport = useCanvasStore((s) => s.selectImport);
+  const removeImport = useCanvasStore((s) => s.removeImport);
+  const updateImport = useCanvasStore((s) => s.updateImport);
+  const updatePath = useCanvasStore((s) => s.updatePath);
+  const removePath = useCanvasStore((s) => s.removePath);
+  const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(null);
+  const [editingName, setEditingName] = useState<{
+    id: string;
+    value: string;
+  } | null>(null);
 
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => {
@@ -71,7 +76,10 @@ export function PropertiesPanel() {
                   {/* Expand toggle */}
                   <button
                     className="text-gray-500 hover:text-gray-200 text-[10px] w-4 shrink-0"
-                    onClick={(e) => { e.stopPropagation(); toggleExpand(imp.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExpand(imp.id);
+                    }}
                   >
                     {isExpanded ? "▾" : "▸"}
                   </button>
@@ -80,7 +88,10 @@ export function PropertiesPanel() {
                   <span
                     className="text-gray-500 hover:text-gray-200 text-[10px] cursor-pointer shrink-0"
                     title="Toggle visibility"
-                    onClick={(e) => { e.stopPropagation(); updateImport(imp.id, { visible: !imp.visible }); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateImport(imp.id, { visible: !imp.visible });
+                    }}
                   >
                     {imp.visible ? "👁" : "○"}
                   </span>
@@ -92,13 +103,18 @@ export function PropertiesPanel() {
                       value={editingName.value}
                       className="flex-1 min-w-0 bg-[#1a1a2e] border border-[#e94560] rounded px-1 text-[10px] outline-none"
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setEditingName({ id: imp.id, value: e.target.value })}
+                      onChange={(e) =>
+                        setEditingName({ id: imp.id, value: e.target.value })
+                      }
                       onBlur={() => {
                         updateImport(imp.id, { name: editingName!.value });
                         setEditingName(null);
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") { updateImport(imp.id, { name: editingName!.value }); setEditingName(null); }
+                        if (e.key === "Enter") {
+                          updateImport(imp.id, { name: editingName!.value });
+                          setEditingName(null);
+                        }
                         if (e.key === "Escape") setEditingName(null);
                       }}
                     />
@@ -106,7 +122,10 @@ export function PropertiesPanel() {
                     <span
                       className="flex-1 min-w-0 text-[10px] truncate text-gray-300"
                       title="Double-click to rename"
-                      onDoubleClick={(e) => { e.stopPropagation(); setEditingName({ id: imp.id, value: imp.name }); }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingName({ id: imp.id, value: imp.name });
+                      }}
                     >
                       {imp.name}
                     </span>
@@ -118,7 +137,10 @@ export function PropertiesPanel() {
                   <button
                     className="ml-1 text-gray-600 hover:text-[#e94560] shrink-0"
                     title="Delete import"
-                    onClick={(e) => { e.stopPropagation(); removeImport(imp.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImport(imp.id);
+                    }}
                   >
                     ✕
                   </button>
@@ -128,10 +150,15 @@ export function PropertiesPanel() {
                 {isExpanded && (
                   <div className="pl-6 pb-1 border-t border-[#0f3460]/20">
                     {imp.paths.map((p) => (
-                      <div key={p.id} className="flex items-center gap-1 py-0.5 text-[9px]">
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-1 py-0.5 text-[9px]"
+                      >
                         <span
                           className="text-gray-500 hover:text-gray-200 cursor-pointer"
-                          onClick={() => updatePath(imp.id, p.id, { visible: !p.visible })}
+                          onClick={() =>
+                            updatePath(imp.id, p.id, { visible: !p.visible })
+                          }
                           title="Toggle path visibility"
                         >
                           {p.visible ? "👁" : "○"}
@@ -154,12 +181,52 @@ export function PropertiesPanel() {
                 {/* Properties form — shown when import is selected */}
                 {isSelected && (
                   <div className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30">
-                    {numField("X (mm)", imp.x, (v) => updateImport(imp.id, { x: Math.max(0, v) }), 0.5, 0)}
-                    {numField("Y (mm)", imp.y, (v) => updateImport(imp.id, { y: Math.max(0, v) }), 0.5, 0)}
-                    {numField("Scale", imp.scale, (v) => updateImport(imp.id, { scale: Math.max(0.001, v) }), 0.05, 0.001)}
-                    <div className="text-[9px] text-gray-600 mt-1">
-                      {(imp.svgWidth * imp.scale).toFixed(1)} × {(imp.svgHeight * imp.scale).toFixed(1)} mm
-                    </div>
+                    {(() => {
+                      const cfg = activeConfig();
+                      const bedW = cfg?.bedWidth ?? Infinity;
+                      const bedH = cfg?.bedHeight ?? Infinity;
+                      const objW = imp.svgWidth * imp.scale;
+                      const objH = imp.svgHeight * imp.scale;
+                      const maxX = Math.max(0, bedW - objW);
+                      const maxY = Math.max(0, bedH - objH);
+                      return (
+                        <>
+                          {numField(
+                            "X (mm)",
+                            imp.x,
+                            (v) =>
+                              updateImport(imp.id, {
+                                x: Math.max(0, Math.min(v, maxX)),
+                              }),
+                            0.5,
+                            0,
+                          )}
+                          {numField(
+                            "Y (mm)",
+                            imp.y,
+                            (v) =>
+                              updateImport(imp.id, {
+                                y: Math.max(0, Math.min(v, maxY)),
+                              }),
+                            0.5,
+                            0,
+                          )}
+                          {numField(
+                            "Scale",
+                            imp.scale,
+                            (v) =>
+                              updateImport(imp.id, {
+                                scale: Math.max(0.001, v),
+                              }),
+                            0.05,
+                            0.001,
+                          )}
+                          <div className="text-[9px] text-gray-600 mt-1">
+                            {objW.toFixed(1)} × {objH.toFixed(1)} mm
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

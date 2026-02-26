@@ -140,7 +140,9 @@ function FsPane({
   }, [connected]);
 
   const handleDownload = async (file: RemoteFile) => {
-    const localPath = await window.terraForge.fs.saveGcodeDialog(file.name);
+    const localPath = isGcodeFile(file.name)
+      ? await window.terraForge.fs.saveGcodeDialog(file.name)
+      : await window.terraForge.fs.saveFileDialog(file.name);
     if (!localPath) return;
     const taskId = uuid();
     upsertTask({
