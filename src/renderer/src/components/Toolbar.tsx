@@ -190,6 +190,15 @@ export function Toolbar() {
   const imports = useCanvasStore((s) => s.imports);
   const addImport = useCanvasStore((s) => s.addImport);
   const upsertTask = useTaskStore((s) => s.upsertTask);
+  const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
+  const unregisterCancelCallback = useTaskStore(
+    (s) => s.unregisterCancelCallback,
+  );
+
+  // Holds a reference to the active G-code worker so cancellation can reach it.
+  const activeWorkerRef = useRef<{ worker: Worker; taskId: string } | null>(
+    null,
+  );
 
   const [showJog, setShowJog] = useState(false);
   const [jogPos, setJogPos] = useState(() => ({
@@ -417,6 +426,14 @@ export function Toolbar() {
       { type: "module" },
     );
 
+    activeWorkerRef.current = { worker, taskId };
+
+    // Register a direct cancel callback so TaskBar can stop the worker without
+    // an IPC round-trip through the main process.
+    registerCancelCallback(taskId, () => {
+      worker.postMessage({ type: "cancel", taskId });
+    });
+
     upsertTask({
       id: taskId,
       type: "gcode-generate",
@@ -444,6 +461,8 @@ export function Toolbar() {
           status: "completed",
         });
         worker.terminate();
+        activeWorkerRef.current = null;
+        unregisterCancelCallback(taskId);
         setGenerating(false);
 
         const savePath = await window.terraForge.fs.saveGcodeDialog(
@@ -452,6 +471,18 @@ export function Toolbar() {
         if (savePath) {
           await window.terraForge.fs.writeFile(savePath, msg.gcode);
         }
+      } else if (msg.type === "cancelled") {
+        upsertTask({
+          id: taskId,
+          type: "gcode-generate",
+          label: "G-code cancelled",
+          progress: null,
+          status: "cancelled",
+        });
+        worker.terminate();
+        activeWorkerRef.current = null;
+        unregisterCancelCallback(taskId);
+        setGenerating(false);
       } else if (msg.type === "error") {
         upsertTask({
           id: taskId,
@@ -462,6 +493,8 @@ export function Toolbar() {
           error: msg.error,
         });
         worker.terminate();
+        activeWorkerRef.current = null;
+        unregisterCancelCallback(taskId);
         setGenerating(false);
       }
     };

@@ -52,9 +52,6 @@ export default function App() {
       {/* Top toolbar */}
       <Toolbar />
 
-      {/* Active task toasts */}
-      <TaskBar />
-
       {/* Main work area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel — SD card file browser */}
@@ -65,6 +62,8 @@ export default function App() {
         {/* Centre — plot canvas */}
         <main className="flex-1 overflow-hidden relative">
           <PlotCanvas />
+          {/* Toast stack — absolute within canvas area, clear of side panels */}
+          <TaskBar />
         </main>
 
         {/* Right panel — object properties */}

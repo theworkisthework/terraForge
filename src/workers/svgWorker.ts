@@ -68,7 +68,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   for (let i = 0; i < total; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
-      self.postMessage({ type: "error", taskId, error: "Cancelled" });
+      self.postMessage({ type: "cancelled", taskId });
       return;
     }
 
@@ -88,7 +88,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
       for (let s = 1; s < subpath.length; s++) {
         if (cancelled.has(taskId)) {
           cancelled.delete(taskId);
-          self.postMessage({ type: "error", taskId, error: "Cancelled" });
+          self.postMessage({ type: "cancelled", taskId });
           return;
         }
         lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
