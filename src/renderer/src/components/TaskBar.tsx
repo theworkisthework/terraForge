@@ -77,7 +77,9 @@ function Toast({ task }: { task: BackgroundTask }) {
 
       {/* Label + optional error detail */}
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-xs text-gray-300 truncate">{task.label}</span>
+        <span className="text-xs text-gray-300 truncate" title={task.label}>
+          {task.label}
+        </span>
         {isError && task.error && (
           <span
             className="text-[10px] text-[#e94560]/80 truncate"

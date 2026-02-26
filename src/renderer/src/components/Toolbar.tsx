@@ -458,7 +458,7 @@ export function Toolbar() {
     upsertTask({
       id: taskId,
       type: "gcode-generate",
-      label: optimise ? "Generating G-code (optimised)…" : "Generating G-code…",
+      label: optimise ? "Generating G-code (optimised)" : "Generating G-code",
       progress: 0,
       status: "running",
     });
@@ -470,8 +470,8 @@ export function Toolbar() {
           id: taskId,
           type: "gcode-generate",
           label: optimise
-            ? "Generating G-code (optimised)…"
-            : "Generating G-code…",
+            ? "Generating G-code (optimised)"
+            : "Generating G-code",
           progress: msg.percent,
           status: "running",
         });
