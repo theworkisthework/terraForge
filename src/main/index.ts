@@ -121,7 +121,7 @@ function getDefaultConfigs(): MachineConfig[] {
       feedrate: 3000,
       connection: {
         type: "wifi",
-        host: "192.168.1.100",
+        host: "fluidnc.local",
         port: 80,
       },
     },
