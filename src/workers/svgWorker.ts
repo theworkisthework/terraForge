@@ -48,13 +48,16 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
 // ── G-code generation ─────────────────────────────────────────────────────────
 
 async function generate(msg: GenerateMessage): Promise<void> {
-  const { taskId, objects, config } = msg;
+  const { taskId, objects, config, options } = msg;
   const lines: string[] = [];
+
+  const optimise = options?.optimisePaths ?? false;
 
   lines.push("; ── terraForge G-code ──────────────────────────────────────");
   lines.push(`; Machine  : ${config.name}`);
   lines.push(`; Bed      : ${config.bedWidth} x ${config.bedHeight} mm`);
   lines.push(`; Origin   : ${config.origin}`);
+  lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push("; ────────────────────────────────────────────────────────────");
   lines.push("G90      ; Absolute coordinates");
@@ -63,46 +66,101 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push("");
 
   const visibleObjects = objects.filter((o) => o.visible);
-  const total = visibleObjects.length;
 
-  for (let i = 0; i < total; i++) {
-    if (cancelled.has(taskId)) {
-      cancelled.delete(taskId);
-      self.postMessage({ type: "cancelled", taskId });
-      return;
+  if (optimise) {
+    // ── Optimised mode: collect all subpaths across all objects, then
+    //    reorder globally with nearest-neighbour before emitting. ──────────
+    const allSubpaths: Subpath[] = [];
+
+    for (let i = 0; i < visibleObjects.length; i++) {
+      if (cancelled.has(taskId)) {
+        cancelled.delete(taskId);
+        self.postMessage({ type: "cancelled", taskId });
+        return;
+      }
+      const subpaths = flattenToSubpaths(visibleObjects[i], config);
+      for (const sp of subpaths) {
+        if (sp.length >= 2) allSubpaths.push(sp);
+      }
+      self.postMessage({
+        type: "progress",
+        taskId,
+        percent: Math.round(((i + 1) / visibleObjects.length) * 50),
+      });
+      await sleep(0);
     }
 
-    const obj = visibleObjects[i];
+    const sorted = nearestNeighbourSort(allSubpaths);
+
     lines.push(
-      `; ── Object ${i + 1} (${obj.id.slice(0, 8)}) ─────────────────`,
+      `; ── Optimised path (${sorted.length} subpaths) ──────────────`,
     );
-
-    const subpaths = flattenToSubpaths(obj, config);
-
-    for (const subpath of subpaths) {
-      if (subpath.length < 2) continue;
+    for (let i = 0; i < sorted.length; i++) {
+      if (cancelled.has(taskId)) {
+        cancelled.delete(taskId);
+        self.postMessage({ type: "cancelled", taskId });
+        return;
+      }
+      const subpath = sorted[i];
       const first = subpath[0];
       lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
       lines.push(`F${config.feedrate}`);
       lines.push(config.penDownCommand + " ; Pen down");
       for (let s = 1; s < subpath.length; s++) {
-        if (cancelled.has(taskId)) {
-          cancelled.delete(taskId);
-          self.postMessage({ type: "cancelled", taskId });
-          return;
-        }
         lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
       }
       lines.push(config.penUpCommand + " ; Pen up");
+      lines.push("");
+      self.postMessage({
+        type: "progress",
+        taskId,
+        percent: 50 + Math.round(((i + 1) / sorted.length) * 50),
+      });
+      await sleep(0);
     }
+  } else {
+    // ── Unoptimised mode: emit each object's subpaths in import order. ────
+    const total = visibleObjects.length;
 
-    lines.push("");
-    self.postMessage({
-      type: "progress",
-      taskId,
-      percent: Math.round(((i + 1) / total) * 100),
-    });
-    await sleep(0);
+    for (let i = 0; i < total; i++) {
+      if (cancelled.has(taskId)) {
+        cancelled.delete(taskId);
+        self.postMessage({ type: "cancelled", taskId });
+        return;
+      }
+
+      const obj = visibleObjects[i];
+      lines.push(
+        `; ── Object ${i + 1} (${obj.id.slice(0, 8)}) ─────────────────`,
+      );
+
+      const subpaths = flattenToSubpaths(obj, config);
+
+      for (const subpath of subpaths) {
+        if (subpath.length < 2) continue;
+        const first = subpath[0];
+        lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
+        lines.push(`F${config.feedrate}`);
+        lines.push(config.penDownCommand + " ; Pen down");
+        for (let s = 1; s < subpath.length; s++) {
+          if (cancelled.has(taskId)) {
+            cancelled.delete(taskId);
+            self.postMessage({ type: "cancelled", taskId });
+            return;
+          }
+          lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
+        }
+        lines.push(config.penUpCommand + " ; Pen up");
+      }
+
+      lines.push("");
+      self.postMessage({
+        type: "progress",
+        taskId,
+        percent: Math.round(((i + 1) / total) * 100),
+      });
+      await sleep(0);
+    }
   }
 
   lines.push("; ── End of job ──────────────────────────────────────────────");
