@@ -77,7 +77,7 @@
 - [x] Configs persisted to disk via IPC
 - [x] Duplicate existing config — "Copy" button in sidebar creates a deep clone of the selected config with name prefixed "Copy of …", assigns a new UUID, persists it, and selects it for editing
 - [x] Reorder configs in config list — drag-and-drop via `@dnd-kit/sortable`; each sidebar row has a grab handle on the left; new order is persisted atomically via `fs.saveConfigs`
-- [ ] Should not be able to change machine config while connected
+- [x] Should not be able to change machine config while connected — active config form is read-only (fieldset disabled + amber banner) when connected; machine selector dropdown in toolbar is disabled; "Set as Active" and "Del" buttons are blocked; non-active configs remain editable
 - [ ] Changing pen type should change commands (M3 solenoid, G0Z0/G0Z10 for stepper and similar for servo)
 
 ### File Browser
