@@ -17,6 +17,7 @@ import {
   applyMatrixToPathD,
   computePathsBounds,
 } from "../utils/svgTransform";
+import { parseGcode } from "../utils/gcodeParser";
 
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
@@ -187,8 +188,10 @@ export function Toolbar() {
   const connected = useMachineStore((s) => s.connected);
   const wsLive = useMachineStore((s) => s.wsLive);
   const setConnected = useMachineStore((s) => s.setConnected);
+  const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const imports = useCanvasStore((s) => s.imports);
   const addImport = useCanvasStore((s) => s.addImport);
+  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -431,6 +434,45 @@ export function Toolbar() {
     }
   };
 
+  const handleImportGcode = async () => {
+    const filePath = await window.terraForge.fs.openGcodeDialog();
+    if (!filePath) return;
+
+    const name = filePath.split(/[\\/]/).pop() ?? "import.gcode";
+    const taskId = uuid();
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: `Importing ${name}…`,
+      progress: null,
+      status: "running",
+    });
+
+    try {
+      const text = await window.terraForge.fs.readFile(filePath);
+      const toolpath = parseGcode(text);
+      setGcodeToolpath(toolpath);
+      // Selecting this as the queued job (local source — will upload on Start)
+      setSelectedJobFile({ path: filePath, source: "local", name });
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: `G-code imported: ${name}`,
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "G-code import failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
   const handleGenerateGcode = async (optimise = false) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
@@ -592,6 +634,15 @@ export function Toolbar() {
         className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
       >
         Import SVG
+      </button>
+
+      {/* Import G-code */}
+      <button
+        onClick={handleImportGcode}
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+        title="Import a G-code file from your computer — previews toolpath and queues it for plotting"
+      >
+        Import G-code
       </button>
 
       {/* Generate G-code — split button */}

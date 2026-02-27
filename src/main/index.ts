@@ -347,6 +347,31 @@ ipcMain.handle("fs:openFileDialog", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("fs:openGcodeDialog", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Import G-code",
+    filters: [
+      {
+        name: "G-code Files",
+        extensions: [
+          "gcode",
+          "nc",
+          "g",
+          "gc",
+          "gco",
+          "ngc",
+          "ncc",
+          "cnc",
+          "tap",
+        ],
+      },
+    ],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle("fs:readFile", (_e, filePath: string) =>
   readFile(filePath, "utf-8"),
 );

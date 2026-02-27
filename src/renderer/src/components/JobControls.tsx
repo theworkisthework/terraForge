@@ -1,4 +1,6 @@
+import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
+import { useTaskStore } from "../store/taskStore";
 
 const GCODE_EXTS = [
   ".gcode",
@@ -18,6 +20,7 @@ export function JobControls() {
   const connected = useMachineStore((s) => s.connected);
   const status = useMachineStore((s) => s.status);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
+  const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const jobFileValid =
     selectedJobFile != null && isGcodeFile(selectedJobFile.name);
@@ -96,7 +99,15 @@ export function JobControls() {
               No file selected — pick one in File Browser
             </span>
           ) : jobFileValid ? (
-            <span className="text-gray-300">📄 {selectedJobFile.name}</span>
+            <span className="text-gray-300">
+              {selectedJobFile.source === "local" ? "🖥" : "📄"}{" "}
+              {selectedJobFile.name}
+              {selectedJobFile.source === "local" && (
+                <span className="text-gray-500 ml-1">
+                  (local — will upload)
+                </span>
+              )}
+            </span>
           ) : (
             <span className="text-amber-400">
               ⚠ {selectedJobFile.name} — not a G-code file
@@ -111,10 +122,41 @@ export function JobControls() {
           "▶ Start job",
           async () => {
             if (!jobFileValid) return;
-            await window.terraForge.fluidnc.runFile(
-              selectedJobFile!.path,
-              selectedJobFile!.source,
-            );
+            if (selectedJobFile!.source === "local") {
+              // Local file: upload to SD card root first, then run
+              const { name, path: localPath } = selectedJobFile!;
+              const remotePath = "/" + name;
+              const taskId = uuid();
+              upsertTask({
+                id: taskId,
+                type: "file-upload",
+                label: `Uploading ${name}…`,
+                progress: 0,
+                status: "running",
+              });
+              try {
+                await window.terraForge.fluidnc.uploadFile(
+                  taskId,
+                  localPath,
+                  remotePath,
+                );
+                await window.terraForge.fluidnc.runFile(remotePath, "sd");
+              } catch (err) {
+                upsertTask({
+                  id: taskId,
+                  type: "file-upload",
+                  label: `Upload failed: ${name}`,
+                  progress: null,
+                  status: "error",
+                  error: String(err),
+                });
+              }
+            } else {
+              await window.terraForge.fluidnc.runFile(
+                selectedJobFile!.path,
+                selectedJobFile!.source as "fs" | "sd",
+              );
+            }
           },
           "primary",
           !jobFileValid, // disabled unless a valid G-code file is selected

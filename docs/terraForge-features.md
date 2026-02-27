@@ -55,8 +55,8 @@
 
 ### G-code Import
 
-- [ ] Fetch and parse `.gcode`/`.nc` files from the host file system and display as per previewing gcode files from SD
-- [ ] Allow plotting of imported gcode from memory or temp file (i.e. imported and not on SD card)
+- [x] Fetch and parse `.gcode`/`.nc` files from the host file system and display as per previewing gcode files from SD — "Import G-code" button in the toolbar opens a filtered file dialog (all recognised G-code extensions); file is read from the host filesystem, parsed with `parseGcode`, and displayed as a toolpath overlay on the canvas exactly as SD-sourced previews are
+- [x] Allow plotting of imported gcode from memory or temp file (i.e. imported and not on SD card) — "Start job" detects `source: "local"` and automatically uploads the local file to the SD card root before issuing the FluidNC run command; the Job panel labels the file with 🖥 and "(local — will upload)" so the user knows the upload step will occur
 
 ### Machine Connection
 

@@ -4,7 +4,8 @@ import type { MachineConfig, MachineStatus } from "../../../types";
 
 export interface SelectedJobFile {
   path: string;
-  source: "fs" | "sd";
+  /** "fs"/"sd" = FluidNC remote filesystem; "local" = host computer file */
+  source: "fs" | "sd" | "local";
   name: string;
 }
 

@@ -89,6 +89,7 @@ const serial: TerraForgeAPI["serial"] = {
 const fs: TerraForgeAPI["fs"] = {
   openSvgDialog: () => invoke<string | null>("fs:openSvgDialog"),
   openFileDialog: () => invoke<string | null>("fs:openFileDialog"),
+  openGcodeDialog: () => invoke<string | null>("fs:openGcodeDialog"),
   readFile: (filePath) => invoke<string>("fs:readFile", filePath),
   writeFile: (filePath, content) =>
     invoke<void>("fs:writeFile", filePath, content),
