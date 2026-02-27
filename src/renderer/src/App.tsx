@@ -26,6 +26,9 @@ export default function App() {
     const offStatus = window.terraForge.fluidnc.onStatusUpdate(setStatus);
     const offConsole = window.terraForge.fluidnc.onConsoleMessage(appendLine);
 
+    // Serial data — route to console the same way WebSocket messages are
+    const offSerialData = window.terraForge.serial.onData(appendLine);
+
     // Subscribe to background task updates
     const offTask = window.terraForge.tasks.onTaskUpdate(upsertTask);
 
@@ -41,6 +44,7 @@ export default function App() {
     return () => {
       offStatus();
       offConsole();
+      offSerialData();
       offTask();
       offPing();
       if (pingTimer) clearTimeout(pingTimer);

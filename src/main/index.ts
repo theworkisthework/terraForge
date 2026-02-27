@@ -67,12 +67,16 @@ const fluidnc = new FluidNCClient();
 const serial = new SerialClient();
 const taskManager = new TaskManager();
 
-// ─── Push task updates to renderer ───────────────────────────────────────────
+// Tracks which transport is currently active so IPC handlers can route correctly.
+let connectionType: "wifi" | "serial" | null = null;
+
+// ─── Push events to renderer ──────────────────────────────────────────────────
 
 taskManager.on("task-update", (task: BackgroundTask) => {
   mainWindow?.webContents.send("task:update", task);
 });
 
+// Wi-Fi events
 fluidnc.on("status", (status: MachineStatus) => {
   mainWindow?.webContents.send("fluidnc:status", status);
 });
@@ -82,6 +86,14 @@ fluidnc.on("console", (message: string) => {
 });
 
 fluidnc.on("ping", () => {
+  mainWindow?.webContents.send("fluidnc:ping");
+});
+
+// Serial events — status goes to the same channel as Wi-Fi status so the
+// renderer doesn't need to care which transport is active.
+// Also emit a ping so the 15s watchdog timer stays alive over serial.
+serial.on("status", (status: MachineStatus) => {
+  mainWindow?.webContents.send("fluidnc:status", status);
   mainWindow?.webContents.send("fluidnc:ping");
 });
 
@@ -148,43 +160,94 @@ ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
   await saveConfigs(configs.filter((c) => c.id !== id));
 });
 
-// ─── IPC Handlers — FluidNC ───────────────────────────────────────────────────
+// ─── IPC Handlers — FluidNC ──────────────────────────────────────────────────
+// All handlers transparently route to either the HTTP client (Wi-Fi) or the
+// serial command layer (USB) depending on which transport is active.
 
-ipcMain.handle("fluidnc:getStatus", () => fluidnc.getStatus());
-ipcMain.handle("fluidnc:sendCommand", (_e, cmd: string) =>
-  fluidnc.sendCommand(cmd),
-);
-ipcMain.handle("fluidnc:listFiles", (_e, path?: string) =>
-  fluidnc.listFiles(path),
-);
-ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) =>
-  fluidnc.listSDFiles(path),
-);
+ipcMain.handle("fluidnc:getStatus", () => {
+  if (connectionType === "serial") return serial.sendCommand("?");
+  return fluidnc.getStatus();
+});
+
+ipcMain.handle("fluidnc:sendCommand", (_e, cmd: string) => {
+  if (connectionType === "serial") return serial.sendCommand(cmd);
+  return fluidnc.sendCommand(cmd);
+});
+
+ipcMain.handle("fluidnc:listFiles", (_e, path?: string) => {
+  if (connectionType === "serial") return serial.listFiles(path);
+  return fluidnc.listFiles(path);
+});
+
+ipcMain.handle("fluidnc:listSDFiles", (_e, path?: string) => {
+  if (connectionType === "serial") return serial.listSDFiles(path);
+  return fluidnc.listSDFiles(path);
+});
+
 ipcMain.handle(
   "fluidnc:fetchFileText",
-  (_e, remotePath: string, filesystem?: "internal" | "sdcard") =>
-    fluidnc.fetchFileText(remotePath, filesystem),
+  (_e, remotePath: string, filesystem?: "internal" | "sdcard") => {
+    if (connectionType === "serial")
+      return serial.fetchFileText(remotePath, filesystem);
+    return fluidnc.fetchFileText(remotePath, filesystem);
+  },
 );
-ipcMain.handle("fluidnc:deleteFile", (_e, remotePath: string) =>
-  fluidnc.deleteFile(remotePath),
+
+ipcMain.handle(
+  "fluidnc:deleteFile",
+  (_e, remotePath: string, source?: "sd" | "fs") => {
+    // Determine source from path prefix or fall back to sd
+    if (connectionType === "serial")
+      return serial.deleteFile(remotePath, source ?? "sd");
+    return fluidnc.deleteFile(remotePath);
+  },
 );
+
 ipcMain.handle(
   "fluidnc:runFile",
-  (_e, remotePath: string, filesystem?: "sd" | "fs") =>
-    fluidnc.runFile(remotePath, filesystem),
+  (_e, remotePath: string, filesystem?: "sd" | "fs") => {
+    if (connectionType === "serial")
+      return serial.runFile(remotePath, filesystem ?? "sd");
+    return fluidnc.runFile(remotePath, filesystem);
+  },
 );
-ipcMain.handle("fluidnc:pauseJob", () => fluidnc.pauseJob());
-ipcMain.handle("fluidnc:resumeJob", () => fluidnc.resumeJob());
-ipcMain.handle("fluidnc:abortJob", () => fluidnc.abortJob());
+
+ipcMain.handle("fluidnc:pauseJob", () => {
+  if (connectionType === "serial") {
+    serial.sendRealtime("!");
+    return;
+  }
+  return fluidnc.pauseJob();
+});
+
+ipcMain.handle("fluidnc:resumeJob", () => {
+  if (connectionType === "serial") {
+    serial.sendRealtime("~");
+    return;
+  }
+  return fluidnc.resumeJob();
+});
+
+ipcMain.handle("fluidnc:abortJob", () => {
+  if (connectionType === "serial") {
+    serial.sendRealtime("\x18");
+    return;
+  }
+  return fluidnc.abortJob();
+});
 
 ipcMain.handle(
   "fluidnc:connectWebSocket",
-  (_e, host: string, port: number, wsPort?: number) =>
-    fluidnc.connectWebSocket(host, port, wsPort),
+  (_e, host: string, port: number, wsPort?: number) => {
+    connectionType = "wifi";
+    return fluidnc.connectWebSocket(host, port, wsPort);
+  },
 );
-ipcMain.handle("fluidnc:disconnectWebSocket", () =>
-  fluidnc.disconnectWebSocket(),
-);
+
+ipcMain.handle("fluidnc:disconnectWebSocket", () => {
+  connectionType = null;
+  return fluidnc.disconnectWebSocket();
+});
 
 ipcMain.handle(
   "fluidnc:uploadFile",
@@ -240,10 +303,27 @@ ipcMain.handle(
 // ─── IPC Handlers — Serial ────────────────────────────────────────────────────
 
 ipcMain.handle("serial:listPorts", () => serial.listPorts());
-ipcMain.handle("serial:connect", (_e, path: string, baudRate?: number) =>
-  serial.connect(path, baudRate),
+
+ipcMain.handle(
+  "serial:connect",
+  async (_e, path: string, baudRate?: number) => {
+    await serial.connect(path, baudRate);
+    connectionType = "serial";
+    // Start polling `?` for status reports (same cadence as WS $RI=500).
+    serial.startStatusPolling(500);
+    mainWindow?.webContents.send(
+      "serial:data",
+      `[terraForge] Serial connected to ${path} @ ${baudRate ?? 115200} baud`,
+    );
+  },
 );
-ipcMain.handle("serial:disconnect", () => serial.disconnect());
+
+ipcMain.handle("serial:disconnect", async () => {
+  serial.stopStatusPolling();
+  connectionType = null;
+  await serial.disconnect();
+});
+
 ipcMain.handle("serial:send", (_e, data: string) => serial.send(data));
 
 // ─── IPC Handlers — File System ───────────────────────────────────────────────

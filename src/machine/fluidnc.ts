@@ -175,6 +175,18 @@ export class FluidNCClient extends EventEmitter {
       path: string;
       status: string;
     };
+    // If the SD card is not mounted FluidNC still returns HTTP 200 but with
+    // a non-ok status string (e.g. "SD CARD READER FAILED" / "No SD card").
+    // Surface this as a thrown error so FsPane shows the message rather than
+    // silently falling through to an empty list.
+    if (
+      json.status &&
+      typeof json.status === "string" &&
+      !json.status.toLowerCase().startsWith("ok") &&
+      !json.files
+    ) {
+      throw new Error(`SD card: ${json.status}`);
+    }
     const prefix = remotePath === "/" ? "" : remotePath.replace(/\/$/, "");
     return (json.files ?? []).map((f) => ({
       name: f.name,

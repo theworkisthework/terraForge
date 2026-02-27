@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
 import { JobControls } from "./JobControls";
@@ -6,15 +6,32 @@ import { JobControls } from "./JobControls";
 export function ConsolePanel() {
   const lines = useConsoleStore((s) => s.lines);
   const clear = useConsoleStore((s) => s.clear);
+  const appendLine = useConsoleStore((s) => s.appendLine);
   const status = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [cmd, setCmd] = useState("");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
   const isAlarm = status?.state === "Alarm";
+
+  const handleSend = async () => {
+    const trimmed = cmd.trim();
+    if (!trimmed || !connected) return;
+    appendLine(`> ${trimmed}`);
+    setCmd("");
+    try {
+      // Response lines arrive in the console via the data stream automatically
+      // (serial: 'data' events; Wi-Fi: WebSocket console messages).
+      // We fire-and-forget here; errors are caught and shown explicitly.
+      await window.terraForge.fluidnc.sendCommand(trimmed);
+    } catch (err) {
+      appendLine(`[error] ${String(err)}`);
+    }
+  };
 
   return (
     <div className="flex h-full">
@@ -67,6 +84,31 @@ export function ConsolePanel() {
             </div>
           ))}
           <div ref={bottomRef} />
+        </div>
+
+        {/* Command input */}
+        <div className="flex items-center border-t border-[#0f3460] px-2 py-1 shrink-0 bg-[#0d1117]">
+          <span className="text-green-600 font-mono text-xs mr-2 shrink-0">
+            {">"}
+          </span>
+          <input
+            type="text"
+            value={cmd}
+            onChange={(e) => setCmd(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSend();
+            }}
+            disabled={!connected}
+            placeholder={connected ? "Send command…" : "Not connected"}
+            className="flex-1 bg-transparent font-mono text-xs text-green-400 placeholder-gray-700 outline-none disabled:opacity-40"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!connected || !cmd.trim()}
+            className="text-[10px] px-2 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 text-gray-300 shrink-0 ml-1"
+          >
+            Send
+          </button>
         </div>
       </div>
 

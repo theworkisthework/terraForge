@@ -77,6 +77,7 @@ interface FsPaneProps {
   label: string;
   accentColor: string;
   connected: boolean;
+  serialMode: boolean;
   source: "fs" | "sd";
   listFn: (path: string) => Promise<RemoteFile[]>;
   deleteFn: (path: string) => Promise<void>;
@@ -94,6 +95,7 @@ function FsPane({
   label,
   accentColor,
   connected,
+  serialMode,
   source,
   listFn,
   deleteFn,
@@ -247,6 +249,10 @@ function FsPane({
               <p className="text-[10px] text-gray-600 text-center py-4 px-3">
                 Not connected.
               </p>
+            ) : error && /no sd card/i.test(error) ? (
+              <p className="text-[10px] text-gray-500 text-center py-4 px-3">
+                No SD card.
+              </p>
             ) : error ? (
               <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">
                 {error}
@@ -346,8 +352,13 @@ function FsPane({
                           e.stopPropagation();
                           handleDownload(file);
                         }}
-                        title="Download"
-                        className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a]"
+                        disabled={serialMode}
+                        title={
+                          serialMode
+                            ? "File download not available over serial"
+                            : "Download"
+                        }
+                        className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40"
                       >
                         ↓
                       </button>
@@ -373,7 +384,10 @@ function FsPane({
           <div className={`px-2 py-1.5 border-t ${borderAccent}/50`}>
             <button
               onClick={handleUpload}
-              disabled={!connected}
+              disabled={!connected || serialMode}
+              title={
+                serialMode ? "File upload not available over serial" : undefined
+              }
               className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${
                 accentColor === "blue"
                   ? "bg-[#0f3460] hover:bg-[#1a4a8a]"
@@ -393,6 +407,8 @@ function FsPane({
 
 export function FileBrowserPanel() {
   const connected = useMachineStore((s) => s.connected);
+  const activeConfig = useMachineStore((s) => s.activeConfig);
+  const serialMode = connected && activeConfig()?.connection.type === "usb";
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const uploadFn = (
@@ -428,9 +444,10 @@ export function FileBrowserPanel() {
           label="internal"
           accentColor="blue"
           connected={connected}
+          serialMode={serialMode}
           source="fs"
           listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
-          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
+          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "fs")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"
@@ -441,9 +458,10 @@ export function FileBrowserPanel() {
           label="sdcard"
           accentColor="purple"
           connected={connected}
+          serialMode={serialMode}
           source="sd"
           listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
-          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p)}
+          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "sd")}
           uploadFn={uploadFn}
           upsertTask={upsertTask}
           taskType="file-upload"

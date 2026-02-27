@@ -53,6 +53,11 @@
 - [x] Delete toolpath with Delete key or × button
 - [x] Correct Y-axis flip (machine origin at bottom-left)
 
+### G-code Import
+
+- [ ] Fetch and parse `.gcode`/`.nc` files from the host file system and display as per previewing gcode files from SD
+- [ ] Allow plotting of imported gcode from memory or temp file (i.e. imported and not on SD card)
+
 ### Machine Connection
 
 - [x] Wi-Fi (WebSocket) connection to FluidNC `/ws`
@@ -70,6 +75,10 @@
 - [x] Machine selector dropdown in toolbar
 - [x] Config fields: name, bed width/height, origin, pen type, pen up/down commands, feedrate, connection (Wi-Fi host/port or serial path)
 - [x] Configs persisted to disk via IPC
+- [ ] Duplicate existing config
+- [ ] Reorder configs in config list
+- [ ] Should not be able to change machine config while connected
+- [ ] Changing pen type should change commands (M3 solenoid, G0Z0/G0Z10 for stepper and similar for servo)
 
 ### File Browser
 
