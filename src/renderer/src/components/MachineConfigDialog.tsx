@@ -106,6 +106,21 @@ export function MachineConfigDialog({ onClose }: Props) {
     setIsNew(false);
   };
 
+  const handleDuplicate = async () => {
+    if (!selectedId) return;
+    const src = configs.find((c) => c.id === selectedId);
+    if (!src) return;
+    const copy: MachineConfig = {
+      ...JSON.parse(JSON.stringify(src)),
+      id: crypto.randomUUID(),
+      name: `Copy of ${src.name}`,
+    };
+    await addConfig(copy);
+    setSelectedId(copy.id);
+    setIsNew(false);
+    setIsDirty(false);
+  };
+
   const handleActivate = () => {
     if (selectedId) setActiveConfig(selectedId);
   };
@@ -158,16 +173,26 @@ export function MachineConfigDialog({ onClose }: Props) {
             <div className="p-2 border-t border-gray-700 flex gap-1">
               <button
                 onClick={handleNew}
+                title="New config"
                 className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
               >
                 + New
               </button>
               <button
+                onClick={handleDuplicate}
+                disabled={!selectedId || isNew}
+                title="Duplicate selected config"
+                className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Copy
+              </button>
+              <button
                 onClick={handleDelete}
                 disabled={!selectedId || configs.length <= 1}
+                title="Delete selected config"
                 className="flex-1 px-2 py-1.5 text-xs bg-red-800 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Delete
+                Del
               </button>
             </div>
           </div>
