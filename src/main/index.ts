@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import { join } from "path";
-import { readFile, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { readFile, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { FluidNCClient } from "../machine/fluidnc";
 import { SerialClient } from "../machine/serial";
@@ -248,6 +249,38 @@ ipcMain.handle("fluidnc:disconnectWebSocket", () => {
   connectionType = null;
   return fluidnc.disconnectWebSocket();
 });
+
+ipcMain.handle(
+  "fluidnc:uploadGcode",
+  async (_e, taskId: string, content: string, remotePath: string) => {
+    // Use the desired remote filename for the temp file so the multipart
+    // form carries the right name — FluidNC writes the multipart filename
+    // to the SD card, not the local path.
+    const remoteFilename = remotePath.split(/[\\/]/).pop()!;
+    const tempPath = join(tmpdir(), `tf-${Date.now()}-${remoteFilename}`);
+    taskManager.create(taskId, "file-upload", `Uploading ${remoteFilename}`);
+    try {
+      await writeFile(tempPath, content, "utf-8");
+      await fluidnc.uploadFile(
+        tempPath,
+        remotePath,
+        (progress) => {
+          taskManager.update(taskId, { progress });
+          mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+        },
+        remoteFilename, // ← override multipart filename so SD card gets the right name
+      );
+      taskManager.complete(taskId);
+      mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+    } catch (err: unknown) {
+      taskManager.fail(taskId, String(err));
+      mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+      throw err;
+    } finally {
+      await unlink(tempPath).catch(() => {});
+    }
+  },
+);
 
 ipcMain.handle(
   "fluidnc:uploadFile",

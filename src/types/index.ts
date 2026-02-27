@@ -191,6 +191,16 @@ export interface FluidNCApi {
   ) => Promise<string>;
   deleteFile: (remotePath: string, source?: "sd" | "fs") => Promise<void>;
   runFile: (remotePath: string, filesystem?: "sd" | "fs") => Promise<void>;
+  /**
+   * Upload a G-code string directly to the machine SD card.
+   * Main process writes a temp file, streams it via the existing upload
+   * endpoint, then deletes the temp file.
+   */
+  uploadGcode: (
+    taskId: string,
+    content: string,
+    remotePath: string,
+  ) => Promise<void>;
   pauseJob: () => Promise<void>;
   resumeJob: () => Promise<void>;
   abortJob: () => Promise<void>;

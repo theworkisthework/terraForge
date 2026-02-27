@@ -218,6 +218,8 @@ export class FluidNCClient extends EventEmitter {
     localPath: string,
     remotePath: string,
     onProgress?: (percent: number) => void,
+    /** Override the filename sent in the multipart form (what FluidNC writes to SD). */
+    remoteFilename?: string,
   ): Promise<void> {
     const stats = await stat(localPath);
     const total = stats.size;
@@ -236,7 +238,7 @@ export class FluidNCClient extends EventEmitter {
 
     form.append("path", remotePath);
     form.append("file", stream, {
-      filename: localPath.split(/[\\/]/).pop(),
+      filename: remoteFilename ?? localPath.split(/[\\/]/).pop(),
       knownLength: total,
     });
 

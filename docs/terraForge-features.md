@@ -40,7 +40,8 @@
 - [x] Per-object progress reporting → task bar progress
 - [x] Cancellation support (cancel message to worker)
 - [x] G-code header with machine name, bed size, origin, optimisation flag, timestamp
-- [x] Save G-code via native save dialog
+- [x] Save G-code via native save dialog — falls back to save dialog when not connected; when connected, G-code is uploaded directly to SD card root instead (see below)
+- [x] **Direct SD upload on generation** — when connected, "Generate G-code" / "Generate & optimise" uploads the result directly to the machine SD card root (no save dialog); the uploaded file is auto-selected as the queued job so "Start job" is immediately ready; when not connected the save dialog is used as before
 - [x] `toVectorObjects()` flattens grouped import model for worker compatibility
 - [x] **Path optimisation (nearest-neighbour)** — split button on "Generate G-code" reveals "Generate & optimise" option; worker collects all subpaths from every visible object into a single pool, reorders them greedily from the current pen position to minimise total rapid travel distance; emitted as a flat optimised sequence (no per-object grouping); optimisation flag reported in G-code header
 - [x] **Smart save filename** — default filename in the save dialog is derived from the import name(s) from the Properties panel; single import uses its name directly; multiple imports appends `+N` (e.g. `logo+1.gcode`); optimised jobs append `_opt` (e.g. `logo_opt.gcode`, `logo+1_opt.gcode`)

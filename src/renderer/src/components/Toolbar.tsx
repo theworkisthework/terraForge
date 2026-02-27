@@ -519,13 +519,6 @@ export function Toolbar() {
           status: "running",
         });
       } else if (msg.type === "complete") {
-        upsertTask({
-          id: taskId,
-          type: "gcode-generate",
-          label: "G-code ready",
-          progress: 100,
-          status: "completed",
-        });
         worker.terminate();
         activeWorkerRef.current = null;
         unregisterCancelCallback(taskId);
@@ -543,10 +536,46 @@ export function Toolbar() {
           ? `${safeName}_opt.gcode`
           : `${safeName}.gcode`;
 
-        const savePath =
-          await window.terraForge.fs.saveGcodeDialog(defaultFilename);
-        if (savePath) {
-          await window.terraForge.fs.writeFile(savePath, msg.gcode);
+        // ── Connected: upload directly to SD card root ────────────────────
+        if (useMachineStore.getState().connected) {
+          const uploadTaskId = uuid();
+          const remotePath = "/" + defaultFilename;
+          upsertTask({
+            id: taskId,
+            type: "gcode-generate",
+            label: "G-code ready",
+            progress: 100,
+            status: "completed",
+          });
+          try {
+            await window.terraForge.fluidnc.uploadGcode(
+              uploadTaskId,
+              msg.gcode,
+              remotePath,
+            );
+            // Auto-select the uploaded file so Start Job is ready immediately
+            setSelectedJobFile({
+              path: remotePath,
+              source: "sd",
+              name: defaultFilename,
+            });
+          } catch {
+            // Upload error is already surfaced via the task toast — nothing else needed.
+          }
+        } else {
+          // ── Not connected: fall back to save dialog ───────────────────────
+          upsertTask({
+            id: taskId,
+            type: "gcode-generate",
+            label: "G-code ready",
+            progress: 100,
+            status: "completed",
+          });
+          const savePath =
+            await window.terraForge.fs.saveGcodeDialog(defaultFilename);
+          if (savePath) {
+            await window.terraForge.fs.writeFile(savePath, msg.gcode);
+          }
         }
       } else if (msg.type === "cancelled") {
         upsertTask({
