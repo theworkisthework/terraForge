@@ -6,6 +6,21 @@
  */
 
 import React, { useState, useEffect } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useMachineStore } from "../store/machineStore";
 import type {
   MachineConfig,
@@ -37,6 +52,7 @@ export function MachineConfigDialog({ onClose }: Props) {
     addConfig,
     updateConfig,
     deleteConfig,
+    reorderConfigs,
     setActiveConfig,
   } = useMachineStore();
 
@@ -121,6 +137,19 @@ export function MachineConfigDialog({ onClose }: Props) {
     setIsDirty(false);
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = configs.findIndex((c) => c.id === active.id);
+    const newIndex = configs.findIndex((c) => c.id === over.id);
+    const newOrder = arrayMove(configs, oldIndex, newIndex).map((c) => c.id);
+    await reorderConfigs(newOrder);
+  };
+
   const handleActivate = () => {
     if (selectedId) setActiveConfig(selectedId);
   };
@@ -145,25 +174,29 @@ export function MachineConfigDialog({ onClose }: Props) {
           {/* Sidebar — machine list */}
           <div className="w-52 border-r border-gray-700 flex flex-col">
             <div className="flex-1 overflow-y-auto py-2">
-              {configs.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setSelectedId(c.id);
-                    setIsNew(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors truncate ${
-                    selectedId === c.id && !isNew
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-300 hover:bg-gray-800"
-                  }`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={configs.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  {c.name}
-                  {c.id === activeConfigId && (
-                    <span className="ml-1 text-xs text-green-400">✓</span>
-                  )}
-                </button>
-              ))}
+                  {configs.map((c) => (
+                    <SortableConfigItem
+                      key={c.id}
+                      config={c}
+                      isSelected={selectedId === c.id && !isNew}
+                      isActive={c.id === activeConfigId}
+                      onSelect={() => {
+                        setSelectedId(c.id);
+                        setIsNew(false);
+                      }}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
               {isNew && (
                 <div className="px-4 py-2 text-sm bg-indigo-600 text-white truncate">
                   New Machine
@@ -438,6 +471,67 @@ export function MachineConfigDialog({ onClose }: Props) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Sortable config list item ────────────────────────────────────────────────
+
+interface SortableConfigItemProps {
+  config: { id: string; name: string };
+  isSelected: boolean;
+  isActive: boolean;
+  onSelect: () => void;
+}
+
+function SortableConfigItem({
+  config,
+  isSelected,
+  isActive,
+  onSelect,
+}: SortableConfigItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: config.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center group ${
+        isSelected ? "bg-indigo-600" : "hover:bg-gray-800"
+      }`}
+    >
+      {/* drag handle */}
+      <span
+        {...attributes}
+        {...listeners}
+        className="px-2 py-2 cursor-grab active:cursor-grabbing text-gray-600 group-hover:text-gray-400 flex-shrink-0 select-none"
+        title="Drag to reorder"
+      >
+        ⠿
+      </span>
+      <button
+        onClick={onSelect}
+        className={`flex-1 text-left py-2 pr-4 text-sm transition-colors truncate min-w-0 ${
+          isSelected ? "text-white" : "text-gray-300"
+        }`}
+      >
+        {config.name}
+        {isActive && <span className="ml-1 text-xs text-green-400">✓</span>}
+      </button>
     </div>
   );
 }

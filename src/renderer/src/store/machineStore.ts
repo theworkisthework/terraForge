@@ -31,6 +31,7 @@ interface MachineState {
     patch: Partial<Omit<MachineConfig, "id">>,
   ) => Promise<void>;
   deleteConfig: (id: string) => Promise<void>;
+  reorderConfigs: (orderedIds: string[]) => Promise<void>;
   setActiveConfig: (id: string) => void;
 }
 
@@ -106,6 +107,21 @@ export const useMachineStore = create<MachineState>()(
         }
       });
       await window.terraForge.config.deleteMachineConfig(id);
+    },
+
+    reorderConfigs: async (orderedIds) => {
+      set((state) => {
+        const map = new Map(state.configs.map((c) => [c.id, c]));
+        const reordered = orderedIds
+          .map((id) => map.get(id))
+          .filter(Boolean) as MachineConfig[];
+        // preserve any configs not in orderedIds (safety)
+        state.configs = [
+          ...reordered,
+          ...state.configs.filter((c) => !orderedIds.includes(c.id)),
+        ];
+      });
+      await window.terraForge.fs.saveConfigs(get().configs);
     },
 
     setActiveConfig: (id) =>
