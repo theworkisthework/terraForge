@@ -78,7 +78,7 @@
 - [x] Duplicate existing config — "Copy" button in sidebar creates a deep clone of the selected config with name prefixed "Copy of …", assigns a new UUID, persists it, and selects it for editing
 - [x] Reorder configs in config list — drag-and-drop via `@dnd-kit/sortable`; each sidebar row has a grab handle on the left; new order is persisted atomically via `fs.saveConfigs`
 - [x] Should not be able to change machine config while connected — active config form is read-only (fieldset disabled + amber banner) when connected; machine selector dropdown in toolbar is disabled; "Set as Active" and "Del" buttons are blocked; non-active configs remain editable
-- [ ] Changing pen type should change commands (M3 solenoid, G0Z0/G0Z10 for stepper and similar for servo)
+- [x] Changing pen type should change commands — selecting a pen type auto-populates defaults (solenoid: `M3S0`/`M3S1`; servo & stepper: `G0Z15`/`G0Z0`); prompts before overwriting custom values; ⇕ Swap button reverses up/down (handles reversed solenoid wiring); ↺ Reset button restores type defaults; commands remain free-text editable; contextual hint shown per type
 
 ### File Browser
 

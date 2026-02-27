@@ -33,14 +33,25 @@ interface Props {
   onClose: () => void;
 }
 
+// ── Per-type pen command defaults ─────────────────────────────────────────────
+
+const PEN_DEFAULTS: Record<
+  PenType,
+  { penUpCommand: string; penDownCommand: string }
+> = {
+  solenoid: { penUpCommand: "M3S0", penDownCommand: "M3S1" },
+  servo: { penUpCommand: "G0Z15", penDownCommand: "G0Z0" },
+  stepper: { penUpCommand: "G0Z15", penDownCommand: "G0Z0" },
+};
+
 const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   name: "New Machine",
   bedWidth: 220,
   bedHeight: 200,
   origin: "bottom-left",
   penType: "solenoid",
-  penUpCommand: "M3 S0",
-  penDownCommand: "M3 S100",
+  penUpCommand: PEN_DEFAULTS.solenoid.penUpCommand,
+  penDownCommand: PEN_DEFAULTS.solenoid.penDownCommand,
   feedrate: 3000,
   connection: { type: "wifi", host: "fluidnc.local", port: 80 },
 };
@@ -96,6 +107,39 @@ export function MachineConfigDialog({ onClose }: Props) {
   const changeConn = (patch: Partial<typeof form.connection>) => {
     setForm((f) => ({ ...f, connection: { ...f.connection, ...patch } }));
     setIsDirty(true);
+  };
+
+  // When pen type changes, auto-populate the default commands for that type.
+  // If the user has already customised the commands, ask before overwriting.
+  const handlePenTypeChange = (newType: PenType) => {
+    const defaults = PEN_DEFAULTS[newType];
+    const currentDefaults = PEN_DEFAULTS[form.penType];
+    const commandsAreCustomised =
+      form.penUpCommand !== currentDefaults.penUpCommand ||
+      form.penDownCommand !== currentDefaults.penDownCommand;
+    if (
+      commandsAreCustomised &&
+      !confirm(
+        `Reset pen commands to defaults for "${newType}"?\n\n` +
+          `Up: ${defaults.penUpCommand}\nDown: ${defaults.penDownCommand}`,
+      )
+    ) {
+      // User declined — only change the type label, keep their commands
+      change({ penType: newType });
+    } else {
+      change({
+        penType: newType,
+        penUpCommand: defaults.penUpCommand,
+        penDownCommand: defaults.penDownCommand,
+      });
+    }
+  };
+
+  const handleSwapCommands = () => {
+    change({
+      penUpCommand: form.penDownCommand,
+      penDownCommand: form.penUpCommand,
+    });
   };
 
   const handleSave = async () => {
@@ -306,7 +350,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <select
                       value={form.penType}
                       onChange={(e) =>
-                        change({ penType: e.target.value as PenType })
+                        handlePenTypeChange(e.target.value as PenType)
                       }
                       className={inputCls}
                     >
@@ -327,7 +371,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                       value={form.penUpCommand}
                       onChange={(e) => change({ penUpCommand: e.target.value })}
                       className={inputCls + " font-mono"}
-                      placeholder="e.g. M3 S0"
+                      placeholder={PEN_DEFAULTS[form.penType].penUpCommand}
                     />
                   </Field>
                   <Field label="Pen down command">
@@ -338,21 +382,50 @@ export function MachineConfigDialog({ onClose }: Props) {
                         change({ penDownCommand: e.target.value })
                       }
                       className={inputCls + " font-mono"}
-                      placeholder="e.g. M3 S100"
-                    />
-                  </Field>
-                  <Field label="Feedrate (mm/min)">
-                    <input
-                      type="number"
-                      value={form.feedrate}
-                      min={1}
-                      onChange={(e) =>
-                        change({ feedrate: Number(e.target.value) })
-                      }
-                      className={inputCls}
+                      placeholder={PEN_DEFAULTS[form.penType].penDownCommand}
                     />
                   </Field>
                 </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSwapCommands}
+                    className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors font-mono"
+                    title="Swap pen-up and pen-down commands (useful for reversed solenoid wiring)"
+                  >
+                    ⇕ Swap up / down
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = PEN_DEFAULTS[form.penType];
+                      change({
+                        penUpCommand: d.penUpCommand,
+                        penDownCommand: d.penDownCommand,
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-400 rounded transition-colors"
+                    title="Reset to default commands for the selected pen type"
+                  >
+                    ↺ Reset to defaults
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    {form.penType === "solenoid"
+                      ? "Solenoid: M3Sn spindle speed controls the solenoid"
+                      : "Servo / Stepper: G0 Z moves the Z axis"}
+                  </span>
+                </div>
+                <Field label="Feedrate (mm/min)">
+                  <input
+                    type="number"
+                    value={form.feedrate}
+                    min={1}
+                    onChange={(e) =>
+                      change({ feedrate: Number(e.target.value) })
+                    }
+                    className={inputCls}
+                  />
+                </Field>
               </Section>
 
               {/* Connection */}
