@@ -92,11 +92,18 @@ describe("parseFluidNCStatus", () => {
 
   // ── All valid states ────────────────────────────────────────────────────
 
-  it.each(["Idle", "Run", "Hold", "Jog", "Alarm", "Door", "Check", "Home", "Sleep"])(
-    "recognises %s as a valid state",
-    (state) => {
-      const s = parseFluidNCStatus(`<${state}|MPos:0,0,0>`);
-      expect(s.state).toBe(state);
-    },
-  );
+  it.each([
+    "Idle",
+    "Run",
+    "Hold",
+    "Jog",
+    "Alarm",
+    "Door",
+    "Check",
+    "Home",
+    "Sleep",
+  ])("recognises %s as a valid state", (state) => {
+    const s = parseFluidNCStatus(`<${state}|MPos:0,0,0>`);
+    expect(s.state).toBe(state);
+  });
 });

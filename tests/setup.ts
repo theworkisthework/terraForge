@@ -13,7 +13,9 @@ if (typeof globalThis.DOMMatrix === "undefined") {
     e: number;
     f: number;
 
-    constructor(init?: [number, number, number, number, number, number] | number[]) {
+    constructor(
+      init?: [number, number, number, number, number, number] | number[],
+    ) {
       if (init && init.length >= 6) {
         this.a = init[0];
         this.b = init[1];
@@ -68,7 +70,9 @@ if (typeof globalThis.DOMMatrix === "undefined") {
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {
     _cb: ResizeObserverCallback;
-    constructor(cb: ResizeObserverCallback) { this._cb = cb; }
+    constructor(cb: ResizeObserverCallback) {
+      this._cb = cb;
+    }
     observe() {}
     unobserve() {}
     disconnect() {}

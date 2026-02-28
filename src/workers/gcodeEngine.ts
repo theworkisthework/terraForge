@@ -24,8 +24,7 @@ export interface PathToken {
 
 export function tokenizePath(d: string): PathToken[] {
   const tokens: PathToken[] = [];
-  const re =
-    /([MmLlHhVvCcSsQqTtAaZz])([\s\S]*?)(?=[MmLlHhVvCcSsQqTtAaZz]|$)/g;
+  const re = /([MmLlHhVvCcSsQqTtAaZz])([\s\S]*?)(?=[MmLlHhVvCcSsQqTtAaZz]|$)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(d)) !== null) {
     const args = m[2].trim()
