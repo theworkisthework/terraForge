@@ -205,6 +205,7 @@ export function Toolbar() {
 
   const [showJog, setShowJog] = useState(false);
   const [showOptMenu, setShowOptMenu] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const optMenuRef = useRef<HTMLDivElement>(null);
 
   // Close the optimise dropdown when the user clicks outside it
@@ -258,6 +259,19 @@ export function Toolbar() {
   const handleConnect = async () => {
     const cfg = activeConfig();
     if (!cfg) return;
+    const taskId = uuid();
+    const label =
+      cfg.connection.type === "wifi"
+        ? `Connecting to ${cfg.connection.host}…`
+        : `Connecting to ${cfg.connection.serialPath}…`;
+    upsertTask({
+      id: taskId,
+      type: "ws-connect",
+      label,
+      progress: null,
+      status: "running",
+    });
+    setIsConnecting(true);
     try {
       if (cfg.connection.type === "wifi") {
         await window.terraForge.fluidnc.connectWebSocket(
@@ -272,8 +286,25 @@ export function Toolbar() {
         );
       }
       setConnected(true);
+      upsertTask({
+        id: taskId,
+        type: "ws-connect",
+        label: "Connected",
+        progress: 100,
+        status: "completed",
+      });
     } catch (err) {
       console.error("Connection failed", err);
+      upsertTask({
+        id: taskId,
+        type: "ws-connect",
+        label: "Connection failed",
+        progress: null,
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -648,10 +679,36 @@ export function Toolbar() {
       ) : (
         <button
           onClick={handleConnect}
-          disabled={!activeConfigId}
-          className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors"
+          disabled={!activeConfigId || isConnecting}
+          className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors flex items-center gap-1.5"
         >
-          Connect
+          {isConnecting ? (
+            <>
+              <svg
+                className="animate-spin h-3 w-3 shrink-0"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+              Connecting…
+            </>
+          ) : (
+            "Connect"
+          )}
         </button>
       )}
 
