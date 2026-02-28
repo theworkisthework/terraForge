@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { WebSocket } from "ws";
 import { createWriteStream, createReadStream } from "fs";
 import { stat } from "fs/promises";
+import { lookup } from "dns/promises";
 import FormData from "form-data";
 import type { MachineStatus, RemoteFile } from "../types";
 
@@ -17,6 +18,12 @@ export class FluidNCClient extends EventEmitter {
   private wsPort = 80;
   private wsRetryDelay = 3000; // ms — doubles on each 503, resets on success
   private wsEnabled = false; // set false on disconnect to stop retry loop
+  /**
+   * Firmware major version detected during connectWebSocket.
+   * null = unknown (probe failed or not yet connected).
+   * Used to select the correct API surface (4.x REST vs 3.x command interface).
+   */
+  private fwMajor: number | null = null;
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
@@ -24,6 +31,22 @@ export class FluidNCClient extends EventEmitter {
     this.baseUrl = `http://${host}:${port}`;
     this.wsHost = host;
     this.wsPort = port;
+  }
+
+  /**
+   * Resolve a hostname to an IP address using Node's native DNS resolver,
+   * which honours the system resolver (including mDNS/.local on Windows).
+   * Node's fetch (undici) has its own resolver that does NOT handle mDNS,
+   * so any HTTP call to a .local hostname must use the resolved IP instead.
+   * Falls back to the original hostname if resolution fails.
+   */
+  private async resolveHost(host: string): Promise<string> {
+    try {
+      const { address } = await lookup(host, { family: 4 });
+      return address;
+    } catch {
+      return host; // fall back; fetch may still work for plain IPs / hostnames
+    }
   }
 
   // ─── REST Helpers ─────────────────────────────────────────────────────────
@@ -182,7 +205,7 @@ export class FluidNCClient extends EventEmitter {
       status?: string;
     };
     try {
-      json = await res.json();
+      json = (await res.json()) as typeof json;
     } catch {
       throw new Error("SD card: unexpected response format");
     }
@@ -332,109 +355,110 @@ export class FluidNCClient extends EventEmitter {
   private wsGeneration = 0;
 
   /**
-   * Probe the controller over HTTP to determine FluidNC firmware version.
+   * Probe the controller over HTTP to determine FluidNC firmware version and
+   * the WebSocket port.
    *
-   * Tries multiple strategies in order:
-   *  1. GET /command?plain=[ESP800]  — ESP3D-compat synchronous form (old 3.x)
-   *  2. POST /command commandText=[ESP800]  — canonical FluidNC HTTP API (3.9.x+)
+   * The [ESP800] response body contains everything we need, e.g.:
+   *   "FW version: FluidNC v4.0.1 # ... # webcommunication: Sync: 80 # ..."
+   *   "FW version: FluidNC v3.9.7 # ... # webcommunication: Sync: 81 # ..."
    *
-   * Recognised response formats across FluidNC versions:
-   *  "FW version:FluidNC v3.9.7 # ESP3D compatible #..."  (3.x)
-   *  "[MSG:INFO: FW version:FluidNC v3.9.7]"              (3.9.x MSG wrapper)
-   *  "[VER:3.9.7.FluidNC v3.9.7:]"                        ($I / build-info)
-   *  "FW version:FluidNC v4.0.1"                          (4.x)
+   * The `webcommunication: Sync: <port>` field is the authoritative WS port
+   * and is parsed directly rather than inferred from the major version.
    *
    * Returns null if all strategies fail or the controller is unreachable.
    */
-  async probeFirmwareVersion(): Promise<{
+  async probeFirmwareVersion(probeBaseUrl?: string): Promise<{
     raw: string;
     version: string;
     major: number;
+    wsPort: number | null;
   } | null> {
-    /** Try to extract a version from any known response format. */
     const tryParse = (
       text: string,
-    ): { raw: string; version: string; major: number } | null => {
-      // "FW version:FluidNC v3.9.7" or "[MSG:INFO: FW version: FluidNC v4.0.1]"
+    ): {
+      raw: string;
+      version: string;
+      major: number;
+      wsPort: number | null;
+    } | null => {
+      // "FW version: FluidNC v4.0.1" — space after colon, then optional "FluidNC "
       const fwMatch = text.match(
-        /FW\s+version[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i,
+        /FW\s+version\s*:\s*(?:FluidNC\s+)?v?(\d+)\.(\d+)/i,
       );
-      if (fwMatch) {
-        const major = parseInt(fwMatch[1], 10);
-        return {
-          raw: text.trim(),
-          version: `${fwMatch[1]}.${fwMatch[2]}`,
-          major,
-        };
-      }
       // "[VER:3.9.7.FluidNC...]" or "[VER:FluidNC v3.9.7:]"
-      const verMatch = text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i);
-      if (verMatch) {
-        const major = parseInt(verMatch[1], 10);
-        return {
-          raw: text.trim(),
-          version: `${verMatch[1]}.${verMatch[2]}`,
-          major,
-        };
-      }
-      // Last resort: bare semver anywhere in the body, e.g. "v3.9.7"
-      const semver = text.match(/\bv?(\d+)\.(\d+)\.\d+/);
-      if (semver) {
-        const major = parseInt(semver[1], 10);
-        return {
-          raw: text.trim(),
-          version: `${semver[1]}.${semver[2]}`,
-          major,
-        };
-      }
-      return null;
+      const verMatch = !fwMatch
+        ? text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i)
+        : null;
+      // Last resort: bare semver anywhere, e.g. "v3.9.7"
+      const semver =
+        !fwMatch && !verMatch ? text.match(/\bv?(\d+)\.(\d+)\.\d+/) : null;
+
+      const m = fwMatch ?? verMatch ?? semver;
+      if (!m) return null;
+
+      const major = parseInt(m[1], 10);
+      const version = `${m[1]}.${m[2]}`;
+
+      // Parse WS port directly from "webcommunication: Sync: <port>"
+      const wsPortMatch = text.match(/webcommunication[^#]*Sync:\s*(\d+)/i);
+      const wsPort = wsPortMatch ? parseInt(wsPortMatch[1], 10) : null;
+
+      return { raw: text.trim(), version, major, wsPort };
     };
 
-    // Strategy 1: GET /command?plain=[ESP800] (ESP3D compat — works on older 3.x)
-    try {
-      const url = `${this.baseUrl}/command?plain=${encodeURIComponent("[ESP800]")}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-      if (res.ok) {
-        const parsed = tryParse(await res.text());
-        if (parsed) return parsed;
-      }
-    } catch {
-      /* fall through to strategy 2 */
-    }
+    const strategies: Array<() => Promise<string | null>> = [
+      // Strategy 1: GET /command?plain=[ESP800] (ESP3D-compat, all versions)
+      async () => {
+        const base = probeBaseUrl ?? this.baseUrl;
+        const url = `${base}/command?plain=${encodeURIComponent("[ESP800]")}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+        return res.ok ? res.text() : null;
+      },
+      // Strategy 2: POST /command commandText=[ESP800] (canonical FluidNC HTTP API)
+      async () => {
+        const base = probeBaseUrl ?? this.baseUrl;
+        const res = await fetch(`${base}/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `commandText=${encodeURIComponent("[ESP800]")}`,
+          signal: AbortSignal.timeout(5_000),
+        });
+        return res.ok ? res.text() : null;
+      },
+      // Strategy 3: POST /command commandText=$I (Grbl build-info fallback)
+      async () => {
+        const base = probeBaseUrl ?? this.baseUrl;
+        const res = await fetch(`${base}/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `commandText=${encodeURIComponent("$I")}`,
+          signal: AbortSignal.timeout(5_000),
+        });
+        return res.ok ? res.text() : null;
+      },
+    ];
 
-    // Strategy 2: POST /command commandText=[ESP800] (canonical FluidNC HTTP API)
-    try {
-      const url = `${this.baseUrl}/command`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `commandText=${encodeURIComponent("[ESP800]")}`,
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (res.ok) {
-        const parsed = tryParse(await res.text());
-        if (parsed) return parsed;
+    for (const strategy of strategies) {
+      try {
+        const body = await strategy();
+        if (body !== null) {
+          const parsed = tryParse(body);
+          if (parsed) return parsed;
+          // Body returned but contained no version — log it for diagnostics
+          const preview = body.trim().slice(0, 160).replace(/\n/g, "↵");
+          this.emit(
+            "console",
+            `[terraForge] Probe: no version in response: "${preview || "(empty)"}"`,
+          );
+        }
+      } catch (e) {
+        this.emit(
+          "console",
+          `[terraForge] Probe strategy failed: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
       }
-    } catch {
-      /* fall through to strategy 3 */
-    }
-
-    // Strategy 3: POST /command commandText=$I (Grbl $I build-info — works on
-    // FluidNC 3.9.x where [ESP800] output is routed to WebSocket only)
-    try {
-      const url = `${this.baseUrl}/command`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `commandText=${encodeURIComponent("$I")}`,
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (res.ok) {
-        const parsed = tryParse(await res.text());
-        if (parsed) return parsed;
-      }
-    } catch {
-      /* all strategies exhausted */
     }
 
     return null;
@@ -453,28 +477,33 @@ export class FluidNCClient extends EventEmitter {
       this.wsPort = wsPort;
       this.emit("console", `[terraForge] WS port override: ${wsPort}`);
     } else {
-      // Auto-detect from firmware version via [ESP800].
-      // FluidNC 4.x: WebSocket on the HTTP port (same AsyncWebServer instance).
-      // FluidNC 3.x / old ESP3D: WebSocket on a separate server at port 81.
-      const probe = await this.probeFirmwareVersion();
+      // Resolve the hostname to an IP first so that Node's fetch (undici) can
+      // reach it. undici has its own DNS resolver that does not use the system
+      // stub resolver and therefore cannot resolve mDNS .local names on Windows.
+      // Node's dns.lookup() goes through the OS resolver (Bonjour/mDNS aware).
+      const resolvedIp = await this.resolveHost(host);
+      const probeBaseUrl = `http://${resolvedIp}:${port}`;
+      if (resolvedIp !== host) {
+        this.emit("console", `[terraForge] Resolved ${host} → ${resolvedIp}`);
+      }
+
+      // Auto-detect via [ESP800] using the resolved IP.
+      // The response contains "webcommunication: Sync: <port>" which is the
+      // authoritative WS port — parse and use it directly.
+      const probe = await this.probeFirmwareVersion(probeBaseUrl);
       if (probe) {
-        if (probe.major >= 4) {
-          this.wsPort = port;
-          this.emit(
-            "console",
-            `[terraForge] Detected FluidNC ${probe.version} — WS on HTTP port ${port}`,
-          );
-        } else {
-          this.wsPort = 81;
-          this.emit(
-            "console",
-            `[terraForge] Detected FluidNC ${probe.version} — WS on legacy port 81`,
-          );
-        }
+        this.fwMajor = probe.major;
+        const detectedWsPort = probe.wsPort ?? (probe.major >= 4 ? port : 81);
+        this.wsPort = detectedWsPort;
+        const src =
+          probe.wsPort !== null ? "ESP800 response" : "version heuristic";
+        this.emit(
+          "console",
+          `[terraForge] Detected FluidNC ${probe.version} — WS port ${detectedWsPort} (from ${src})`,
+        );
       } else {
-        // Probe failed — default to modern same-port behaviour.
-        // If connecting fails and you're on FluidNC 3.x, set a WS port
-        // override of 81 in the machine config.
+        // Probe failed — default to same-port (FluidNC 4.x / modern behaviour).
+        // If on FluidNC 3.x, set a WS port override of 81 in the machine config.
         this.wsPort = port;
         this.emit(
           "console",
@@ -491,6 +520,7 @@ export class FluidNCClient extends EventEmitter {
   }
 
   disconnectWebSocket(): void {
+    this.fwMajor = null;
     this.killWs();
   }
 
