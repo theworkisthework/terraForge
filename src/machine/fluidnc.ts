@@ -51,10 +51,17 @@ export class FluidNCClient extends EventEmitter {
 
   // ─── REST Helpers ─────────────────────────────────────────────────────────
 
-  private async get(path: string, timeoutMs = 10_000): Promise<Response> {
+  private async get(
+    path: string,
+    timeoutMs = 10_000,
+    method: "GET" | "DELETE" = "GET",
+  ): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) throw new Error(`HTTP ${res.status} GET ${url}`);
+    const res = await fetch(url, {
+      method,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${method} ${url}`);
     return res;
   }
 
@@ -135,10 +142,17 @@ export class FluidNCClient extends EventEmitter {
     remotePath: string,
     filesystem: "sd" | "fs" = "sd",
   ): Promise<void> {
-    // FluidNC has no HTTP run endpoint — files are started via the command interface.
+    // Both FluidNC 3.x and 4.x support GET /command?plain=$SD/Run=<path>.
+    // The `plain=` parameter executes the command as if sent over serial and
+    // returns the response synchronously. Commands starting with "$/" are
+    // handled inline (no websocket deferral). POST /command with commandText=
+    // returns HTTP 500 on 4.x for $SD/Run; the /run?file= endpoint does not
+    // exist. Using plain= GET is the correct approach for all versions.
     const cmd =
-      filesystem === "sd" ? `$SD/Run=${remotePath}` : `$FS/Run=${remotePath}`;
-    await this.sendCommand(cmd);
+      filesystem === "sd"
+        ? `$SD/Run=${remotePath}`
+        : `$LocalFS/Run=${remotePath}`;
+    await this.get(`/command?plain=${encodeURIComponent(cmd)}`);
   }
 
   async pauseJob(): Promise<void> {
@@ -249,14 +263,23 @@ export class FluidNCClient extends EventEmitter {
     remotePath: string,
     source: "sd" | "fs" = "fs",
   ): Promise<void> {
-    if (source === "sd") {
-      // SD card: use the FluidNC command interface, same as serial transport.
-      // The HTTP /upload?action=delete endpoint returns 200 silently but does
-      // not reliably delete the file on current FluidNC builds.
-      await this.sendCommand(`$SD/Delete=${remotePath}`);
+    const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
+    if (this.fwMajor === null || this.fwMajor >= 4) {
+      // FluidNC 4.x: REST endpoints
+      if (source === "sd") {
+        await this.get(
+          `/upload?action=delete&filename=${encodeURIComponent(filePath)}`,
+        );
+      } else {
+        await this.get(`/localfs${filePath}`, 10_000, "DELETE");
+      }
     } else {
-      // Internal FS
-      await this.sendCommand(`$LocalFS/Delete=${remotePath}`);
+      // FluidNC 3.x: command interface
+      if (source === "sd") {
+        await this.sendCommand(`$SD/Delete=${remotePath}`);
+      } else {
+        await this.sendCommand(`$LocalFS/Delete=${remotePath}`);
+      }
     }
   }
 
@@ -485,6 +508,9 @@ export class FluidNCClient extends EventEmitter {
       const probeBaseUrl = `http://${resolvedIp}:${port}`;
       if (resolvedIp !== host) {
         this.emit("console", `[terraForge] Resolved ${host} → ${resolvedIp}`);
+        // Use the resolved IP for all subsequent HTTP calls — Node's fetch
+        // (undici) cannot resolve mDNS .local names on Windows.
+        this.baseUrl = probeBaseUrl;
       }
 
       // Auto-detect via [ESP800] using the resolved IP.
