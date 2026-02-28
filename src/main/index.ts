@@ -197,10 +197,9 @@ ipcMain.handle(
 ipcMain.handle(
   "fluidnc:deleteFile",
   (_e, remotePath: string, source?: "sd" | "fs") => {
-    // Determine source from path prefix or fall back to sd
     if (connectionType === "serial")
       return serial.deleteFile(remotePath, source ?? "sd");
-    return fluidnc.deleteFile(remotePath);
+    return fluidnc.deleteFile(remotePath, source ?? "fs");
   },
 );
 

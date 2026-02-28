@@ -28,9 +28,9 @@ export class FluidNCClient extends EventEmitter {
 
   // ─── REST Helpers ─────────────────────────────────────────────────────────
 
-  private async get(path: string): Promise<Response> {
+  private async get(path: string, timeoutMs = 10_000): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw new Error(`HTTP ${res.status} GET ${url}`);
     return res;
   }
@@ -159,22 +159,34 @@ export class FluidNCClient extends EventEmitter {
     }));
   }
 
-  // SD card file listing — FluidNC exposes the SD card via GET /upload?path=
+  // SD card file listing.
+  // FluidNC 4.x / most 3.x: GET /upload?path=  (returns JSON with files[])
+  // FluidNC 3.9.x slow SD: same endpoint but may need up to 30 s for init.
   // Directories are identified by size === "-1" (returned as a string).
   async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    // Use a generous 30 s timeout — SD card initialisation can be slow on
+    // first access in FluidNC 3.x.
     const res = await this.get(
       `/upload?path=${encodeURIComponent(remotePath)}`,
+      30_000,
     );
-    const json = (await res.json()) as {
-      files: Array<{
+
+    let json: {
+      files?: Array<{
         name: string;
-        shortname: string;
+        shortname?: string;
         size: string;
-        datetime: string;
+        datetime?: string;
       }>;
-      path: string;
-      status: string;
+      path?: string;
+      status?: string;
     };
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error("SD card: unexpected response format");
+    }
+
     // If the SD card is not mounted FluidNC still returns HTTP 200 but with
     // a non-ok status string (e.g. "SD CARD READER FAILED" / "No SD card").
     // Surface this as a thrown error so FsPane shows the message rather than
@@ -210,8 +222,19 @@ export class FluidNCClient extends EventEmitter {
     return res.text();
   }
 
-  async deleteFile(remotePath: string): Promise<void> {
-    await this.get(`/delete?path=${encodeURIComponent(remotePath)}`);
+  async deleteFile(
+    remotePath: string,
+    source: "sd" | "fs" = "fs",
+  ): Promise<void> {
+    if (source === "sd") {
+      // SD card: use the FluidNC command interface, same as serial transport.
+      // The HTTP /upload?action=delete endpoint returns 200 silently but does
+      // not reliably delete the file on current FluidNC builds.
+      await this.sendCommand(`$SD/Delete=${remotePath}`);
+    } else {
+      // Internal FS
+      await this.sendCommand(`$LocalFS/Delete=${remotePath}`);
+    }
   }
 
   async uploadFile(
@@ -310,31 +333,111 @@ export class FluidNCClient extends EventEmitter {
 
   /**
    * Probe the controller over HTTP to determine FluidNC firmware version.
-   * Uses the synchronous `plain=[ESP800]` form so the full response
-   * is returned in the HTTP body (no WebSocket needed).
    *
-   * Returns the parsed major version number, or null if the probe fails
-   * (e.g. server unreachable, unexpected response format).
+   * Tries multiple strategies in order:
+   *  1. GET /command?plain=[ESP800]  — ESP3D-compat synchronous form (old 3.x)
+   *  2. POST /command commandText=[ESP800]  — canonical FluidNC HTTP API (3.9.x+)
+   *
+   * Recognised response formats across FluidNC versions:
+   *  "FW version:FluidNC v3.9.7 # ESP3D compatible #..."  (3.x)
+   *  "[MSG:INFO: FW version:FluidNC v3.9.7]"              (3.9.x MSG wrapper)
+   *  "[VER:3.9.7.FluidNC v3.9.7:]"                        ($I / build-info)
+   *  "FW version:FluidNC v4.0.1"                          (4.x)
+   *
+   * Returns null if all strategies fail or the controller is unreachable.
    */
   async probeFirmwareVersion(): Promise<{
     raw: string;
     version: string;
     major: number;
   } | null> {
+    /** Try to extract a version from any known response format. */
+    const tryParse = (
+      text: string,
+    ): { raw: string; version: string; major: number } | null => {
+      // "FW version:FluidNC v3.9.7" or "[MSG:INFO: FW version: FluidNC v4.0.1]"
+      const fwMatch = text.match(
+        /FW\s+version[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i,
+      );
+      if (fwMatch) {
+        const major = parseInt(fwMatch[1], 10);
+        return {
+          raw: text.trim(),
+          version: `${fwMatch[1]}.${fwMatch[2]}`,
+          major,
+        };
+      }
+      // "[VER:3.9.7.FluidNC...]" or "[VER:FluidNC v3.9.7:]"
+      const verMatch = text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i);
+      if (verMatch) {
+        const major = parseInt(verMatch[1], 10);
+        return {
+          raw: text.trim(),
+          version: `${verMatch[1]}.${verMatch[2]}`,
+          major,
+        };
+      }
+      // Last resort: bare semver anywhere in the body, e.g. "v3.9.7"
+      const semver = text.match(/\bv?(\d+)\.(\d+)\.\d+/);
+      if (semver) {
+        const major = parseInt(semver[1], 10);
+        return {
+          raw: text.trim(),
+          version: `${semver[1]}.${semver[2]}`,
+          major,
+        };
+      }
+      return null;
+    };
+
+    // Strategy 1: GET /command?plain=[ESP800] (ESP3D compat — works on older 3.x)
     try {
       const url = `${this.baseUrl}/command?plain=${encodeURIComponent("[ESP800]")}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-      if (!res.ok) return null;
-      const text = await res.text();
-      // Response contains a line like: "FW version:FluidNC v4.0.1"
-      const match = text.match(/FW version[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/);
-      if (!match) return null;
-      const major = parseInt(match[1], 10);
-      const version = `${match[1]}.${match[2]}`;
-      return { raw: text.trim(), version, major };
+      if (res.ok) {
+        const parsed = tryParse(await res.text());
+        if (parsed) return parsed;
+      }
     } catch {
-      return null;
+      /* fall through to strategy 2 */
     }
+
+    // Strategy 2: POST /command commandText=[ESP800] (canonical FluidNC HTTP API)
+    try {
+      const url = `${this.baseUrl}/command`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `commandText=${encodeURIComponent("[ESP800]")}`,
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (res.ok) {
+        const parsed = tryParse(await res.text());
+        if (parsed) return parsed;
+      }
+    } catch {
+      /* fall through to strategy 3 */
+    }
+
+    // Strategy 3: POST /command commandText=$I (Grbl $I build-info — works on
+    // FluidNC 3.9.x where [ESP800] output is routed to WebSocket only)
+    try {
+      const url = `${this.baseUrl}/command`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `commandText=${encodeURIComponent("$I")}`,
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (res.ok) {
+        const parsed = tryParse(await res.text());
+        if (parsed) return parsed;
+      }
+    } catch {
+      /* all strategies exhausted */
+    }
+
+    return null;
   }
 
   async connectWebSocket(
@@ -369,12 +472,13 @@ export class FluidNCClient extends EventEmitter {
           );
         }
       } else {
-        // Probe failed — default to modern same-port behaviour and let the
-        // error surface naturally if it's wrong.
+        // Probe failed — default to modern same-port behaviour.
+        // If connecting fails and you're on FluidNC 3.x, set a WS port
+        // override of 81 in the machine config.
         this.wsPort = port;
         this.emit(
           "console",
-          `[terraForge] Firmware probe failed — assuming WS on port ${port}`,
+          `[terraForge] Firmware probe failed — assuming WS on port ${port} (set WS port override to 81 for FluidNC 3.x)`,
         );
       }
     }
@@ -489,6 +593,28 @@ export class FluidNCClient extends EventEmitter {
     ws.on("error", (err) => {
       if (gen !== this.wsGeneration) return;
       const is503 = err.message.includes("503");
+
+      // "Unexpected server response: 200" means the HTTP server answered instead
+      // of performing a WS upgrade — classic FluidNC 3.x symptom where the
+      // WebSocket runs on port 81, not the HTTP port.
+      const isHttp200 =
+        err.message.includes("200") ||
+        /unexpected server response/i.test(err.message);
+
+      if (isHttp200 && this.wsPort !== 81) {
+        this.emit(
+          "console",
+          `[terraForge] WS got HTTP response instead of 101 Upgrade on port ${this.wsPort} — switching to port 81 (FluidNC 3.x)`,
+        );
+        this.wsPort = 81;
+        // Reconnect immediately on the corrected port (don't go through the
+        // exponential backoff path — this is a one-shot self-correction).
+        this.wsRetryDelay = 3000;
+        // The close event will fire after this error and call scheduleReconnect,
+        // which will openWs() with the new wsPort.
+        return;
+      }
+
       if (!is503) {
         this.emit("console", `[terraForge] WebSocket error: ${err.message}`);
       }
