@@ -253,6 +253,10 @@ export interface ConfigApi {
   getMachineConfigs: () => Promise<MachineConfig[]>;
   saveMachineConfig: (config: MachineConfig) => Promise<void>;
   deleteMachineConfig: (id: string) => Promise<void>;
+  /** Export all configs to a user-chosen .json file. Returns the path written, or null if cancelled. */
+  exportConfigs: () => Promise<string | null>;
+  /** Import configs from a .json file chosen by the user. Returns the number of configs added. */
+  importConfigs: () => Promise<number>;
 }
 
 export interface TerraForgeAPI {

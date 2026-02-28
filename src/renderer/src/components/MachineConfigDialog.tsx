@@ -66,6 +66,7 @@ export function MachineConfigDialog({ onClose }: Props) {
     deleteConfig,
     reorderConfigs,
     setActiveConfig,
+    setConfigs,
   } = useMachineStore();
 
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -186,6 +187,34 @@ export function MachineConfigDialog({ onClose }: Props) {
     setIsDirty(false);
   };
 
+  const handleExport = async () => {
+    try {
+      const path = await window.terraForge.config.exportConfigs();
+      if (path) alert(`Configs exported to:\n${path}`);
+    } catch (err) {
+      alert(`Export failed: ${String(err)}`);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const count = await window.terraForge.config.importConfigs();
+      if (count === 0) return; // cancelled or empty
+      // Reload the full config list from disk into the store
+      const updated = await window.terraForge.config.getMachineConfigs();
+      setConfigs(updated);
+      // Select the first of the newly imported configs (they are appended)
+      const newId = updated[updated.length - count]?.id;
+      if (newId) {
+        setSelectedId(newId);
+        setIsNew(false);
+      }
+      alert(`${count} config${count === 1 ? "" : "s"} imported successfully.`);
+    } catch (err) {
+      alert(`Import failed: ${String(err)}`);
+    }
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
@@ -279,6 +308,22 @@ export function MachineConfigDialog({ onClose }: Props) {
                 className="flex-1 px-2 py-1.5 text-xs bg-red-800 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Del
+              </button>
+            </div>
+            <div className="px-2 pb-2 flex gap-1">
+              <button
+                onClick={handleExport}
+                title="Export all configs to a JSON file"
+                className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                ↑ Export
+              </button>
+              <button
+                onClick={handleImport}
+                title="Import configs from a JSON file"
+                className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                ↓ Import
               </button>
             </div>
           </div>

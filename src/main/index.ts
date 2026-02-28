@@ -161,6 +161,84 @@ ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
   await saveConfigs(configs.filter((c) => c.id !== id));
 });
 
+ipcMain.handle("config:exportConfigs", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Export Machine Configs",
+    defaultPath: "terraforge-machine-configs.json",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  const configs = await loadConfigs();
+  const payload = JSON.stringify(
+    { terraForge: "machine-configs", version: 1, configs },
+    null,
+    2,
+  );
+  await writeFile(result.filePath, payload, "utf-8");
+  return result.filePath;
+});
+
+ipcMain.handle("config:importConfigs", async () => {
+  if (!mainWindow) return 0;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Import Machine Configs",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    properties: ["openFile"],
+  });
+  if (result.canceled || result.filePaths.length === 0) return 0;
+  const raw = await readFile(result.filePaths[0], "utf-8");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Not a valid JSON file.");
+  }
+  // Accept both the wrapped format { terraForge, version, configs } and a raw array.
+  let incoming: MachineConfig[];
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    !Array.isArray(parsed) &&
+    "configs" in (parsed as object)
+  ) {
+    incoming = (parsed as { configs: MachineConfig[] }).configs;
+  } else if (Array.isArray(parsed)) {
+    incoming = parsed as MachineConfig[];
+  } else {
+    throw new Error(
+      "File does not contain a valid terraForge machine config export.",
+    );
+  }
+  if (!incoming.length) return 0;
+  // Validate each entry has the required shape fields
+  const required: (keyof MachineConfig)[] = [
+    "name",
+    "bedWidth",
+    "bedHeight",
+    "connection",
+  ];
+  for (const cfg of incoming) {
+    if (!cfg || typeof cfg !== "object")
+      throw new Error("Invalid config entry in import file.");
+    for (const key of required) {
+      if (!(key in cfg))
+        throw new Error(`Config entry missing required field: "${key}".`);
+    }
+  }
+  const existing = await loadConfigs();
+  const existingIds = new Set(existing.map((c) => c.id));
+  // Assign fresh UUIDs to avoid ID collisions — import is always additive.
+  const { v4: uuid } = await import("uuid");
+  const newConfigs = incoming.map((cfg) => ({
+    ...cfg,
+    id: existingIds.has(cfg.id) ? uuid() : cfg.id,
+    name: existingIds.has(cfg.id) ? `${cfg.name} (imported)` : cfg.name,
+  }));
+  await saveConfigs([...existing, ...newConfigs]);
+  return newConfigs.length;
+});
+
 // ─── IPC Handlers — FluidNC ──────────────────────────────────────────────────
 // All handlers transparently route to either the HTTP client (Wi-Fi) or the
 // serial command layer (USB) depending on which transport is active.
