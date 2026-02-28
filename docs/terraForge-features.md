@@ -23,10 +23,14 @@
 
 - [x] Bed grid based on machine config dimensions
 - [x] 10 mm minor gridlines, 50 mm major gridlines
-- [x] Origin marker (red dot at 0,0)
+- [x] Origin marker (red dot at 0,0 in canvas coordinates, coloured red on ruler and bed)
 - [x] Bed dimension label
 - [x] `vectorEffect="non-scaling-stroke"` — stroke width stays consistent across scales
 - [x] `non-scaling-stroke` on G-code toolpath overlay too
+- [x] Zoom level percentage badge — bottom-left corner of canvas shows current zoom (e.g. `125%`)
+- [x] Space-to-pan mode — hold Space to enter pan mode; cursor changes to grab/grabbing; subtle in-canvas hint shown; release Space to exit
+- [x] Middle-mouse-button drag pans the canvas without entering Space mode
+- [x] Canvas pan state is preserved across resizes; fit-to-view re-centres on resize only when fitted flag is active
 
 ### G-code Generation
 
@@ -80,6 +84,9 @@
 - [x] Reorder configs in config list — drag-and-drop via `@dnd-kit/sortable`; each sidebar row has a grab handle on the left; new order is persisted atomically via `fs.saveConfigs`
 - [x] Should not be able to change machine config while connected — active config form is read-only (fieldset disabled + amber banner) when connected; machine selector dropdown in toolbar is disabled; "Set as Active" and "Del" buttons are blocked; non-active configs remain editable
 - [x] Changing pen type should change commands — selecting a pen type auto-populates defaults (solenoid: `M3S0`/`M3S1`; servo & stepper: `G0Z15`/`G0Z0`); prompts before overwriting custom values; ⇕ Swap button reverses up/down (handles reversed solenoid wiring); ↺ Reset button restores type defaults; commands remain free-text editable; contextual hint shown per type
+- [x] Five origin modes — bottom-left, top-left, bottom-right, top-right, **center**; all five are supported in the canvas coordinate system, G-code toolpath overlay, ruler, and origin marker; center origin places (0,0) at the centre of the bed with ± coordinates on both axes
+- [x] WebSocket port override (`wsPort`) — optional per-config field in the Machine Config dialog; auto-detects from `[ESP800]` firmware version query at connect time; FluidNC 4.x shares the HTTP port (leave blank); older ESP3D-based firmware uses port 81; explicit value overrides auto-detect
+- [x] Export / Import machine configs — "↑ Export" saves all configs to a user-chosen `.json` file; "↓ Import" reads a JSON file and merges configs, skipping duplicates by ID or name; import result reports added/skipped counts
 
 ### File Browser
 
@@ -117,6 +124,7 @@
 - [x] Go-to-origin button (G0 X0 Y0)
 - [x] Jog panel shown/hidden via toolbar toggle
 - [x] Homing cycle button (`$H`) in main toolbar — disabled when not connected
+- [x] Floating draggable jog panel — jog panel opens as a fixed-position overlay; drag handle at the top allows repositioning anywhere on screen; last position preserved within the session
 
 ### Console
 
@@ -125,6 +133,7 @@
 - [x] Clear button
 - [x] Command input (send raw G-code commands)
 - [x] Alarm state badge becomes a clickable button — sends `$X` to clear the alarm
+- [x] Firmware restart button — "⚠ Restart FW" button visible in console header when connected; sends `[ESP444]RESTART` to reboot the ESP32; automatically disconnects the app and shows a reconnect prompt; confirms with the user before firing
 
 ### Background Task UX
 
@@ -143,6 +152,14 @@
 - [x] IPC fallback for main-process tasks (file upload/download) that have no renderer-side callback
 - [x] Task types: `svg-parse`, `gcode-generate`, `file-upload`, `file-download`, `file-delete`, `job-start`, `ws-connect`
 
+### Properties Panel
+
+- [x] Import name editing — double-click the import name in the Properties panel to rename it inline; confirms on Enter or blur; cancels on Escape; name feeds the G-code save dialog default filename
+- [x] Per-import visibility toggle — eye icon on each import row toggles visibility on canvas and excludes it from G-code generation
+- [x] Expandable path list — each import row has a ▸/▾ toggle to show/hide the individual paths it contains, with layer/group names or short IDs
+- [x] Per-path visibility toggle — each path within an import can be shown/hidden independently; hidden paths are excluded from G-code output
+- [x] Remove individual paths — ✕ button per path deletes it from the import without removing the whole import
+
 ### Architecture
 
 - [x] Electron + React 19 + TypeScript throughout
@@ -159,10 +176,10 @@
 ### Canvas
 
 - [ ] **Rotation** — spec calls for rotation handle/input; `rotation` field exists in the data model but is not applied on canvas or in G-code output
-- [x] **Canvas zoom / pan** — bed is fixed-scale; no scroll-to-zoom or middle-mouse pan
+- [x] **Canvas zoom / pan** — scroll-to-zoom (mouse wheel), Space+drag pan, middle-mouse-button drag pan, +/− overlay buttons, keyboard shortcuts (Ctrl+Shift++/−)
 - [ ] **Snap to grid** — no grid snapping when dragging
 - [ ] **Undo / redo** — no history stack
-- [x] **Canvas ruler / dimension overlay**
+- [x] **Canvas ruler / dimension overlay** — screen-space X/Y rulers with adaptive tick density, mm labels, and origin highlighted in red
 - [ ] **Multi-select** — can only select one import at a time
 
 ### SVG Import
@@ -203,13 +220,13 @@
 
 ### UX / Polish
 
-- [ ] **Keyboard shortcut map** — no documented or configurable shortcuts beyond Delete/Escape
+- [ ] **Keyboard shortcut map** — no help panel, but the following shortcuts ARE implemented: Space+drag=pan, middle-mouse=pan, Ctrl+0=fit-to-view, Ctrl+Shift++/−=zoom, Delete/Backspace=remove selection, Escape=deselect
 - [ ] **First-run onboarding wizard** — no guidance for new users to set up a machine config
 - [ ] **Recent files list**
 - [x] **Notifications for completed/cancelled/failed tasks** — toast stack with auto-dismiss for completed/cancelled (8 s) and persistent display for errors
 - [x] **Error detail in task toasts** — errored tasks show the error string as a second line below the label
 - [ ] **Dark / light theme toggle**
-- [ ] **Zoom-to-fit** button to centre the bed in the canvas viewport
+- [x] **Zoom-to-fit** button (⊡) in canvas overlay centres and scales the bed to fill the viewport; Ctrl+0 keyboard shortcut; button highlights red when actively fitted; re-fits automatically on window resize
 - [ ] **Print / export canvas as image**
 
 ### Distribution / Build

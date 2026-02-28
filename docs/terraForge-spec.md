@@ -106,7 +106,8 @@ All methods must be explicitly typed.
    name: string
    bedWidth: number
    bedHeight: number
-   origin: "bottom-left" | "top-left"
+   origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center"
+   penType: "solenoid" | "servo" | "stepper"
    penUpCommand: string
    penDownCommand: string
    feedrate: number
@@ -114,6 +115,7 @@ All methods must be explicitly typed.
    type: "wifi" | "usb"
    host?: string
    port?: number
+   wsPort?: number // optional WS port override; auto-detected from [ESP800] if omitted
    serialPath?: string
    }
    }
