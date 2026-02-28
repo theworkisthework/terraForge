@@ -65,13 +65,11 @@ export class FluidNCClient extends EventEmitter {
     return res;
   }
 
-  private async post(path: string, body?: string): Promise<Response> {
+  private async post(path: string, body: string): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
     const res = await fetch(url, {
       method: "POST",
-      headers: body
-        ? { "Content-Type": "application/x-www-form-urlencoded" }
-        : {},
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
       signal: AbortSignal.timeout(10_000),
     });
@@ -129,9 +127,28 @@ export class FluidNCClient extends EventEmitter {
   // ─── Commands ─────────────────────────────────────────────────────────────
 
   async sendCommand(cmd: string): Promise<string> {
-    const res = await this.post(
-      "/command",
-      `commandText=${encodeURIComponent(cmd)}`,
+    // FluidNC 3.x and 4.x require different HTTP call conventions:
+    //
+    // 4.x: GET /command?plain=CMD  — executes synchronously, returns response
+    //      POST /command commandText=CMD returns HTTP 500 for non-ESP/non-$/ cmds
+    //
+    // 3.x: POST /command commandText=CMD — works for all commands
+    //      GET /command?plain=CMD returns HTTP 500 for jog / G-code commands
+    //
+    // We branch on fwMajor which is set during connectWebSocket. When unknown
+    // (null, e.g. probe failed) we default to 4.x behaviour as that is the
+    // current/modern firmware.
+    if (this.fwMajor !== null && this.fwMajor < 4) {
+      const res = await this.post(
+        "/command",
+        `commandText=${encodeURIComponent(cmd)}`,
+      );
+      return res.text();
+    }
+    // 4.x (or unknown — assume modern)
+    const res = await this.get(
+      `/command?plain=${encodeURIComponent(cmd)}`,
+      10_000,
     );
     return res.text();
   }
@@ -142,17 +159,12 @@ export class FluidNCClient extends EventEmitter {
     remotePath: string,
     filesystem: "sd" | "fs" = "sd",
   ): Promise<void> {
-    // Both FluidNC 3.x and 4.x support GET /command?plain=$SD/Run=<path>.
-    // The `plain=` parameter executes the command as if sent over serial and
-    // returns the response synchronously. Commands starting with "$/" are
-    // handled inline (no websocket deferral). POST /command with commandText=
-    // returns HTTP 500 on 4.x for $SD/Run; the /run?file= endpoint does not
-    // exist. Using plain= GET is the correct approach for all versions.
     const cmd =
       filesystem === "sd"
         ? `$SD/Run=${remotePath}`
         : `$LocalFS/Run=${remotePath}`;
-    await this.get(`/command?plain=${encodeURIComponent(cmd)}`);
+    // Delegate to sendCommand which handles the 3.x / 4.x HTTP convention difference.
+    await this.sendCommand(cmd);
   }
 
   async pauseJob(): Promise<void> {
