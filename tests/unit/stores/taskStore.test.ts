@@ -37,9 +37,15 @@ describe("taskStore", () => {
   });
 
   it("activeTasks returns only running tasks", () => {
-    useTaskStore.getState().upsertTask(createBackgroundTask({ id: "t1", status: "running" }));
-    useTaskStore.getState().upsertTask(createBackgroundTask({ id: "t2", status: "completed" }));
-    useTaskStore.getState().upsertTask(createBackgroundTask({ id: "t3", status: "running" }));
+    useTaskStore
+      .getState()
+      .upsertTask(createBackgroundTask({ id: "t1", status: "running" }));
+    useTaskStore
+      .getState()
+      .upsertTask(createBackgroundTask({ id: "t2", status: "completed" }));
+    useTaskStore
+      .getState()
+      .upsertTask(createBackgroundTask({ id: "t3", status: "running" }));
     const active = useTaskStore.getState().activeTasks();
     expect(active).toHaveLength(2);
     expect(active.map((t) => t.id).sort()).toEqual(["t1", "t3"]);
@@ -49,7 +55,9 @@ describe("taskStore", () => {
     const cb = vi.fn();
     useTaskStore.getState().registerCancelCallback("t1", cb);
     useTaskStore.getState().unregisterCancelCallback("t1");
-    useTaskStore.getState().upsertTask(createBackgroundTask({ id: "t1", status: "running" }));
+    useTaskStore
+      .getState()
+      .upsertTask(createBackgroundTask({ id: "t1", status: "running" }));
     useTaskStore.getState().cancelTask("t1");
     expect(cb).not.toHaveBeenCalled();
     // should fall through to IPC

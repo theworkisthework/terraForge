@@ -63,7 +63,9 @@ describe("JogControls", () => {
   it("sends home command when ⌂ clicked", async () => {
     render(<JogControls />);
     await userEvent.click(screen.getByText("⌂"));
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G0 X0 Y0");
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      "G0 X0 Y0",
+    );
   });
 
   it("renders close button when onClose prop provided", () => {

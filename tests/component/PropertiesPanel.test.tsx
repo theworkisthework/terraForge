@@ -3,7 +3,11 @@ import { render, screen } from "@testing-library/react";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { PropertiesPanel } from "@renderer/components/PropertiesPanel";
-import { createSvgImport, createSvgPath, createMachineConfig } from "../helpers/factories";
+import {
+  createSvgImport,
+  createSvgPath,
+  createMachineConfig,
+} from "../helpers/factories";
 
 beforeEach(() => {
   useCanvasStore.setState({

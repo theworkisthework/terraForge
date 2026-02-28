@@ -26,7 +26,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // App calls getMachineConfigs on mount
-  (window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+  (
+    window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+  ).mockResolvedValue([]);
 });
 
 describe("App", () => {

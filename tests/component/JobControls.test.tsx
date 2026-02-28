@@ -31,7 +31,11 @@ describe("JobControls", () => {
 
   it("shows selected file name when a job file is set", () => {
     useMachineStore.setState({
-      selectedJobFile: { path: "/test.gcode", source: "sd", name: "test.gcode" },
+      selectedJobFile: {
+        path: "/test.gcode",
+        source: "sd",
+        name: "test.gcode",
+      },
     });
     render(<JobControls />);
     expect(screen.getByText(/test\.gcode/)).toBeInTheDocument();
@@ -48,7 +52,11 @@ describe("JobControls", () => {
   it("disables start button when not connected", () => {
     useMachineStore.setState({
       connected: false,
-      selectedJobFile: { path: "/test.gcode", source: "sd", name: "test.gcode" },
+      selectedJobFile: {
+        path: "/test.gcode",
+        source: "sd",
+        name: "test.gcode",
+      },
     });
     render(<JobControls />);
     const btn = screen.getByText("▶ Start job");
@@ -148,7 +156,11 @@ describe("JobControls", () => {
   it("shows local file indicator with upload note", () => {
     useMachineStore.setState({
       connected: true,
-      selectedJobFile: { path: "C:\\files\\art.gcode", source: "local", name: "art.gcode" },
+      selectedJobFile: {
+        path: "C:\\files\\art.gcode",
+        source: "local",
+        name: "art.gcode",
+      },
     });
     render(<JobControls />);
     expect(screen.getByText(/art\.gcode/)).toBeInTheDocument();

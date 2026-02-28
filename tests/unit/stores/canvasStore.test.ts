@@ -112,7 +112,12 @@ describe("canvasStore", () => {
   // ── setGcodeToolpath ────────────────────────────────────────────────────
 
   it("stores and clears gcode toolpath", () => {
-    const tp = { cuts: "M0 0 L10 10", rapids: "", bounds: { minX: 0, maxX: 10, minY: 0, maxY: 10 }, lineCount: 2 };
+    const tp = {
+      cuts: "M0 0 L10 10",
+      rapids: "",
+      bounds: { minX: 0, maxX: 10, minY: 0, maxY: 10 },
+      lineCount: 2,
+    };
     useCanvasStore.getState().setGcodeToolpath(tp);
     expect(useCanvasStore.getState().gcodeToolpath).toEqual(tp);
     useCanvasStore.getState().setGcodeToolpath(null);

@@ -27,7 +27,9 @@ beforeEach(() => {
   });
   vi.clearAllMocks();
   // listPorts is called on mount
-  (window.terraForge.serial.listPorts as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+  (
+    window.terraForge.serial.listPorts as ReturnType<typeof vi.fn>
+  ).mockResolvedValue([]);
 });
 
 describe("MachineConfigDialog", () => {

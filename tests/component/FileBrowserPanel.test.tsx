@@ -41,7 +41,7 @@ describe("FileBrowserPanel", () => {
 
   it("renders upload buttons for both filesystems", () => {
     render(<FileBrowserPanel />);
-    const btns = screen.getAllByText(/Upload to \//);;
+    const btns = screen.getAllByText(/Upload to \//);
     expect(btns).toHaveLength(2);
   });
 });

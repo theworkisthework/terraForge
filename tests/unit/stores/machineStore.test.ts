@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useMachineStore } from "../../../src/renderer/src/store/machineStore";
-import { createMachineConfig, createMachineStatus } from "../../helpers/factories";
+import {
+  createMachineConfig,
+  createMachineStatus,
+} from "../../helpers/factories";
 
 beforeEach(() => {
   useMachineStore.setState({
@@ -63,7 +66,11 @@ describe("machineStore", () => {
   // ── setSelectedJobFile ──────────────────────────────────────────────────
 
   it("sets and clears selected job file", () => {
-    const file = { path: "/sd/test.gcode", source: "sd" as const, name: "test.gcode" };
+    const file = {
+      path: "/sd/test.gcode",
+      source: "sd" as const,
+      name: "test.gcode",
+    };
     useMachineStore.getState().setSelectedJobFile(file);
     expect(useMachineStore.getState().selectedJobFile).toEqual(file);
     useMachineStore.getState().setSelectedJobFile(null);
@@ -109,6 +116,8 @@ describe("machineStore", () => {
     await useMachineStore.getState().deleteConfig("d1");
     expect(useMachineStore.getState().configs).toHaveLength(1);
     expect(useMachineStore.getState().activeConfigId).toBe("d2");
-    expect(window.terraForge.config.deleteMachineConfig).toHaveBeenCalledWith("d1");
+    expect(window.terraForge.config.deleteMachineConfig).toHaveBeenCalledWith(
+      "d1",
+    );
   });
 });

@@ -83,9 +83,7 @@ describe("FluidNCClient", () => {
   });
 
   it("handles empty file list", async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockResponse({ files: [], path: "/" }),
-    );
+    mockFetch.mockResolvedValueOnce(mockResponse({ files: [], path: "/" }));
     const files = await client.listFiles("/");
     expect(files).toEqual([]);
   });

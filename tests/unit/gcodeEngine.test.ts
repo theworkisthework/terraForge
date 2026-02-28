@@ -152,51 +152,93 @@ describe("transformPt", () => {
   });
 
   it("bottom-left origin — flips Y", () => {
-    const cfg = createMachineConfig({ origin: "bottom-left", bedWidth: 200, bedHeight: 200 });
+    const cfg = createMachineConfig({
+      origin: "bottom-left",
+      bedWidth: 200,
+      bedHeight: 200,
+    });
     const pt = transformPt(baseObj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(10);
     expect(pt.y).toBeCloseTo(80); // 0 + 100*1 - 20
   });
 
   it("top-left origin — Y is identity", () => {
-    const cfg = createMachineConfig({ origin: "top-left", bedWidth: 200, bedHeight: 200 });
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 200,
+      bedHeight: 200,
+    });
     const pt = transformPt(baseObj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(10);
     expect(pt.y).toBeCloseTo(20);
   });
 
   it("bottom-right origin — mirrors X and flips Y", () => {
-    const cfg = createMachineConfig({ origin: "bottom-right", bedWidth: 200, bedHeight: 200 });
+    const cfg = createMachineConfig({
+      origin: "bottom-right",
+      bedWidth: 200,
+      bedHeight: 200,
+    });
     const pt = transformPt(baseObj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(190); // 200 - 10
     expect(pt.y).toBeCloseTo(80);
   });
 
   it("top-right origin — mirrors X only", () => {
-    const cfg = createMachineConfig({ origin: "top-right", bedWidth: 200, bedHeight: 200 });
+    const cfg = createMachineConfig({
+      origin: "top-right",
+      bedWidth: 200,
+      bedHeight: 200,
+    });
     const pt = transformPt(baseObj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(190);
     expect(pt.y).toBeCloseTo(20);
   });
 
   it("center origin — shifts to center", () => {
-    const cfg = createMachineConfig({ origin: "center", bedWidth: 200, bedHeight: 200 });
+    const cfg = createMachineConfig({
+      origin: "center",
+      bedWidth: 200,
+      bedHeight: 200,
+    });
     const pt = transformPt(baseObj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(-90); // 10 - 100
-    expect(pt.y).toBeCloseTo(80);  // 100 - 20
+    expect(pt.y).toBeCloseTo(80); // 100 - 20
   });
 
   it("applies scale factor", () => {
-    const obj = createVectorObject({ x: 0, y: 0, scale: 2, rotation: 0, originalWidth: 100, originalHeight: 100 });
-    const cfg = createMachineConfig({ origin: "top-left", bedWidth: 400, bedHeight: 400 });
+    const obj = createVectorObject({
+      x: 0,
+      y: 0,
+      scale: 2,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
     const pt = transformPt(obj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(20);
     expect(pt.y).toBeCloseTo(40);
   });
 
   it("applies 90° rotation", () => {
-    const obj = createVectorObject({ x: 0, y: 0, scale: 1, rotation: 90, originalWidth: 100, originalHeight: 100 });
-    const cfg = createMachineConfig({ origin: "top-left", bedWidth: 400, bedHeight: 400 });
+    const obj = createVectorObject({
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 90,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
     const pt = transformPt(obj, cfg, 10, 0);
     // 90° rotation: x' = x*cos90 - y*sin90 = 0, y' = x*sin90 + y*cos90 = 10
     expect(pt.x).toBeCloseTo(0);
@@ -204,8 +246,19 @@ describe("transformPt", () => {
   });
 
   it("applies position offset", () => {
-    const obj = createVectorObject({ x: 50, y: 30, scale: 1, rotation: 0, originalWidth: 100, originalHeight: 100 });
-    const cfg = createMachineConfig({ origin: "top-left", bedWidth: 400, bedHeight: 400 });
+    const obj = createVectorObject({
+      x: 50,
+      y: 30,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
     const pt = transformPt(obj, cfg, 10, 20);
     expect(pt.x).toBeCloseTo(60);
     expect(pt.y).toBeCloseTo(50);
@@ -276,24 +329,42 @@ describe("nearestNeighbourSort", () => {
   });
 
   it("returns a single subpath unchanged", () => {
-    const sp = [{ x: 10, y: 10 }, { x: 20, y: 20 }];
+    const sp = [
+      { x: 10, y: 10 },
+      { x: 20, y: 20 },
+    ];
     const result = nearestNeighbourSort([sp]);
     expect(result).toHaveLength(1);
     expect(result[0]).toBe(sp);
   });
 
   it("picks the nearest subpath first (from origin 0,0)", () => {
-    const far: Pt[] = [{ x: 100, y: 100 }, { x: 110, y: 110 }];
-    const near: Pt[] = [{ x: 1, y: 1 }, { x: 5, y: 5 }];
+    const far: Pt[] = [
+      { x: 100, y: 100 },
+      { x: 110, y: 110 },
+    ];
+    const near: Pt[] = [
+      { x: 1, y: 1 },
+      { x: 5, y: 5 },
+    ];
     const result = nearestNeighbourSort([far, near]);
     expect(result[0]).toBe(near);
     expect(result[1]).toBe(far);
   });
 
   it("chains closest-end to next-start correctly", () => {
-    const a: Pt[] = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
-    const b: Pt[] = [{ x: 11, y: 0 }, { x: 20, y: 0 }]; // close to end of a
-    const c: Pt[] = [{ x: 50, y: 50 }, { x: 60, y: 60 }]; // far
+    const a: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b: Pt[] = [
+      { x: 11, y: 0 },
+      { x: 20, y: 0 },
+    ]; // close to end of a
+    const c: Pt[] = [
+      { x: 50, y: 50 },
+      { x: 60, y: 60 },
+    ]; // far
     const result = nearestNeighbourSort([c, a, b]);
     expect(result[0]).toBe(a); // nearest to origin
     expect(result[1]).toBe(b); // nearest to end of a
@@ -304,7 +375,11 @@ describe("nearestNeighbourSort", () => {
 // ── flattenToSubpaths ─────────────────────────────────────────────────────────
 
 describe("flattenToSubpaths", () => {
-  const cfg = createMachineConfig({ origin: "top-left", bedWidth: 400, bedHeight: 400 });
+  const cfg = createMachineConfig({
+    origin: "top-left",
+    bedWidth: 400,
+    bedHeight: 400,
+  });
 
   it("converts a simple line path to one subpath with 2 points", () => {
     const obj = createVectorObject({

@@ -97,8 +97,16 @@ describe("TaskBar", () => {
   it("shows multiple tasks", () => {
     useTaskStore.setState({
       tasks: {
-        t1: createBackgroundTask({ id: "t1", label: "Task One", status: "running" }),
-        t2: createBackgroundTask({ id: "t2", label: "Task Two", status: "completed" }),
+        t1: createBackgroundTask({
+          id: "t1",
+          label: "Task One",
+          status: "running",
+        }),
+        t2: createBackgroundTask({
+          id: "t2",
+          label: "Task Two",
+          status: "completed",
+        }),
       },
     });
     render(<TaskBar />);
