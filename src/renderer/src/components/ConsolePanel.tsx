@@ -97,22 +97,24 @@ export function ConsolePanel() {
               </span>
             )}
           </div>
-          <button
-            onClick={clear}
-            className="text-xs text-gray-600 hover:text-gray-300"
-          >
-            Clear
-          </button>
-          {connected && (
+          <div className="flex items-center gap-2">
+            {connected && (
+              <button
+                onClick={handleFirmwareReset}
+                disabled={resetting}
+                title="Restart firmware (ESP32 reboot) — use when controller is stuck"
+                className="text-xs px-2 py-0.5 rounded bg-orange-950 text-orange-400 hover:bg-orange-800 hover:text-white disabled:opacity-50 transition-colors"
+              >
+                {resetting ? "Restarting…" : "⚠ Restart FW"}
+              </button>
+            )}
             <button
-              onClick={handleFirmwareReset}
-              disabled={resetting}
-              title="Restart firmware (ESP32 reboot) — use when controller is stuck"
-              className="text-xs px-2 py-0.5 rounded bg-orange-950 text-orange-400 hover:bg-orange-800 hover:text-white disabled:opacity-50 transition-colors"
+              onClick={clear}
+              className="text-xs text-gray-600 hover:text-gray-300"
             >
-              {resetting ? "Restarting…" : "⚠ Restart FW"}
+              Clear
             </button>
-          )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-[#0d1117] text-green-400">
           {lines.map((line, i) => (
