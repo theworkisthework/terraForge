@@ -255,8 +255,8 @@ export interface ConfigApi {
   deleteMachineConfig: (id: string) => Promise<void>;
   /** Export all configs to a user-chosen .json file. Returns the path written, or null if cancelled. */
   exportConfigs: () => Promise<string | null>;
-  /** Import configs from a .json file chosen by the user. Returns the number of configs added. */
-  importConfigs: () => Promise<number>;
+  /** Import configs from a .json file chosen by the user. Returns counts of added and skipped configs. */
+  importConfigs: () => Promise<{ added: number; skipped: number }>;
 }
 
 export interface TerraForgeAPI {

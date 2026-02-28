@@ -198,18 +198,27 @@ export function MachineConfigDialog({ onClose }: Props) {
 
   const handleImport = async () => {
     try {
-      const count = await window.terraForge.config.importConfigs();
-      if (count === 0) return; // cancelled or empty
+      const result = await window.terraForge.config.importConfigs();
+      if (result.added === 0 && result.skipped === 0) return; // cancelled
       // Reload the full config list from disk into the store
       const updated = await window.terraForge.config.getMachineConfigs();
       setConfigs(updated);
       // Select the first of the newly imported configs (they are appended)
-      const newId = updated[updated.length - count]?.id;
-      if (newId) {
-        setSelectedId(newId);
-        setIsNew(false);
+      if (result.added > 0) {
+        const newId = updated[updated.length - result.added]?.id;
+        if (newId) {
+          setSelectedId(newId);
+          setIsNew(false);
+        }
       }
-      alert(`${count} config${count === 1 ? "" : "s"} imported successfully.`);
+      const parts: string[] = [];
+      if (result.added > 0)
+        parts.push(
+          `${result.added} config${result.added === 1 ? "" : "s"} imported`,
+        );
+      if (result.skipped > 0)
+        parts.push(`${result.skipped} skipped (already exist by ID or name)`);
+      alert(parts.join(" • ") + ".");
     } catch (err) {
       alert(`Import failed: ${String(err)}`);
     }

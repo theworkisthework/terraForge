@@ -132,7 +132,8 @@ const config: TerraForgeAPI["config"] = {
   saveMachineConfig: (cfg) => invoke<void>("config:saveMachineConfig", cfg),
   deleteMachineConfig: (id) => invoke<void>("config:deleteMachineConfig", id),
   exportConfigs: () => invoke<string | null>("config:exportConfigs"),
-  importConfigs: () => invoke<number>("config:importConfigs"),
+  importConfigs: () =>
+    invoke<{ added: number; skipped: number }>("config:importConfigs"),
 };
 
 // ─── Expose to renderer ───────────────────────────────────────────────────────

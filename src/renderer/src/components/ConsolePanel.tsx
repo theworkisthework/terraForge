@@ -9,8 +9,10 @@ export function ConsolePanel() {
   const appendLine = useConsoleStore((s) => s.appendLine);
   const status = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
+  const setConnected = useMachineStore((s) => s.setConnected);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [cmd, setCmd] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,6 +32,31 @@ export function ConsolePanel() {
       await window.terraForge.fluidnc.sendCommand(trimmed);
     } catch (err) {
       appendLine(`[error] ${String(err)}`);
+    }
+  };
+
+  const handleFirmwareReset = async () => {
+    if (
+      !confirm(
+        "Restart firmware?\n\nThis reboots the controller (ESP32 restart). " +
+          "The connection will drop and you will need to reconnect.",
+      )
+    )
+      return;
+    setResetting(true);
+    try {
+      appendLine("[terraForge] Sending firmware restart…");
+      // [ESP444]RESTART reboots the ESP32 — connection will drop immediately.
+      await window.terraForge.fluidnc.sendCommand("[ESP444]RESTART");
+    } catch {
+      // Expected — the machine reboots and drops the connection mid-request.
+    } finally {
+      // Mark the app as disconnected immediately; the WS watchdog would
+      // eventually detect it but this gives instant feedback.
+      await window.terraForge.fluidnc.disconnectWebSocket();
+      setConnected(false);
+      appendLine("[terraForge] Controller restarting — reconnect when ready.");
+      setResetting(false);
     }
   };
 
@@ -76,6 +103,16 @@ export function ConsolePanel() {
           >
             Clear
           </button>
+          {connected && (
+            <button
+              onClick={handleFirmwareReset}
+              disabled={resetting}
+              title="Restart firmware (ESP32 reboot) — use when controller is stuck"
+              className="text-xs px-2 py-0.5 rounded bg-orange-950 text-orange-400 hover:bg-orange-800 hover:text-white disabled:opacity-50 transition-colors"
+            >
+              {resetting ? "Restarting…" : "⚠ Restart FW"}
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-[#0d1117] text-green-400">
           {lines.map((line, i) => (

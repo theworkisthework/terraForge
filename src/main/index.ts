@@ -180,13 +180,14 @@ ipcMain.handle("config:exportConfigs", async () => {
 });
 
 ipcMain.handle("config:importConfigs", async () => {
-  if (!mainWindow) return 0;
+  if (!mainWindow) return { added: 0, skipped: 0 };
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import Machine Configs",
     filters: [{ name: "JSON", extensions: ["json"] }],
     properties: ["openFile"],
   });
-  if (result.canceled || result.filePaths.length === 0) return 0;
+  if (result.canceled || result.filePaths.length === 0)
+    return { added: 0, skipped: 0 };
   const raw = await readFile(result.filePaths[0], "utf-8");
   let parsed: unknown;
   try {
@@ -210,7 +211,7 @@ ipcMain.handle("config:importConfigs", async () => {
       "File does not contain a valid terraForge machine config export.",
     );
   }
-  if (!incoming.length) return 0;
+  if (!incoming.length) return { added: 0, skipped: 0 };
   // Validate each entry has the required shape fields
   const required: (keyof MachineConfig)[] = [
     "name",
@@ -228,15 +229,26 @@ ipcMain.handle("config:importConfigs", async () => {
   }
   const existing = await loadConfigs();
   const existingIds = new Set(existing.map((c) => c.id));
-  // Assign fresh UUIDs to avoid ID collisions — import is always additive.
-  const { v4: uuid } = await import("uuid");
-  const newConfigs = incoming.map((cfg) => ({
-    ...cfg,
-    id: existingIds.has(cfg.id) ? uuid() : cfg.id,
-    name: existingIds.has(cfg.id) ? `${cfg.name} (imported)` : cfg.name,
-  }));
-  await saveConfigs([...existing, ...newConfigs]);
-  return newConfigs.length;
+  const existingNames = new Set(
+    existing.map((c) => c.name.toLowerCase().trim()),
+  );
+  const toAdd: MachineConfig[] = [];
+  let skipped = 0;
+  for (const cfg of incoming) {
+    const nameKey = (cfg.name ?? "").toLowerCase().trim();
+    if (existingIds.has(cfg.id) || existingNames.has(nameKey)) {
+      skipped++;
+    } else {
+      toAdd.push(cfg);
+      // Track names added in this batch so duplicates within the file are also caught
+      existingIds.add(cfg.id);
+      existingNames.add(nameKey);
+    }
+  }
+  if (toAdd.length > 0) {
+    await saveConfigs([...existing, ...toAdd]);
+  }
+  return { added: toAdd.length, skipped };
 });
 
 // ─── IPC Handlers — FluidNC ──────────────────────────────────────────────────
