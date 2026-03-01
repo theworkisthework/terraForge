@@ -11,9 +11,31 @@ permissions:
   contents: write
 
 jobs:
+  # ── Tests (gate) ─────────────────────────────────────────────────────────────
+  test:
+    name: Unit & Component Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
+
   # ── Windows ──────────────────────────────────────────────────────────────────
   build-windows:
     name: Build (Windows)
+    needs: [test]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +68,7 @@ jobs:
   # ── macOS ─────────────────────────────────────────────────────────────────────
   build-mac:
     name: Build (macOS)
+    needs: [test]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +102,7 @@ jobs:
   # ── Linux ─────────────────────────────────────────────────────────────────────
   build-linux:
     name: Build (Linux)
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
