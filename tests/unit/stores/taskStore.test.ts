@@ -14,6 +14,25 @@ describe("taskStore", () => {
     expect(useTaskStore.getState().tasks["t1"].status).toBe("running");
   });
 
+  it("upsertTask updates an existing task", () => {
+    const task = createBackgroundTask({
+      id: "t1",
+      status: "running",
+      progress: 10,
+      label: "Uploading",
+    });
+    useTaskStore.getState().upsertTask(task);
+    expect(useTaskStore.getState().tasks["t1"].progress).toBe(10);
+    // Now update it
+    useTaskStore.getState().upsertTask({
+      ...task,
+      progress: 75,
+      label: "Almost done",
+    });
+    expect(useTaskStore.getState().tasks["t1"].progress).toBe(75);
+    expect(useTaskStore.getState().tasks["t1"].label).toBe("Almost done");
+  });
+
   it("removes a task", () => {
     useTaskStore.getState().upsertTask(createBackgroundTask({ id: "t1" }));
     useTaskStore.getState().removeTask("t1");

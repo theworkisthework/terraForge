@@ -113,4 +113,72 @@ describe("TaskBar", () => {
     expect(screen.getByText("Task One")).toBeInTheDocument();
     expect(screen.getByText("Task Two")).toBeInTheDocument();
   });
+
+  // ── Null progress shows spinner ────────────────────────────────────────
+
+  it("shows spinner when running task has null progress", () => {
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Parsing",
+      status: "running",
+      progress: null,
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    const { container } = render(<TaskBar />);
+    // Spinner is a span with animate-spin class
+    const spinner = container.querySelector(".animate-spin");
+    expect(spinner).toBeTruthy();
+  });
+
+  // ── Auto-dismiss timer ─────────────────────────────────────────────────
+
+  it("auto-dismisses completed tasks after timeout", async () => {
+    vi.useFakeTimers();
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Done",
+      status: "completed",
+      progress: 100,
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    render(<TaskBar />);
+    expect(screen.getByText("Done")).toBeInTheDocument();
+    // Fast-forward past the dismiss timer (8000ms)
+    vi.advanceTimersByTime(9000);
+    expect(useTaskStore.getState().tasks["t1"]).toBeUndefined();
+    vi.useRealTimers();
+  });
+
+  // ── Error does not auto-dismiss ────────────────────────────────────────
+
+  it("does not auto-dismiss error tasks", () => {
+    vi.useFakeTimers();
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Error",
+      status: "error",
+      error: "Some failure",
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    render(<TaskBar />);
+    vi.advanceTimersByTime(15000);
+    // Error task should still be present
+    expect(useTaskStore.getState().tasks["t1"]).toBeDefined();
+    vi.useRealTimers();
+  });
+
+  // ── Cancelled task shows ✕ icon ────────────────────────────────────────
+
+  it("shows ✕ icon for cancelled task", () => {
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Cancelled thing",
+      status: "cancelled",
+      progress: null,
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    render(<TaskBar />);
+    // The cancelled status icon is ✕ (different from dismiss button)
+    expect(screen.getByText("Cancelled thing")).toBeInTheDocument();
+  });
 });

@@ -78,6 +78,38 @@ describe("JogControls", () => {
     render(<JogControls />);
     expect(screen.queryByText("✕")).not.toBeInTheDocument();
   });
+
+  // ── Step selector ───────────────────────────────────────────────────────
+
+  it("changes active step when a step button is clicked", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByText("100"));
+    // Now click X+ — should send 100mm jog
+    await userEvent.click(screen.getByText("X+ ►"));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringContaining("X100"),
+    );
+  });
+
+  it("sends Y- jog command when Y- button clicked", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByText("Y- ▼"));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringContaining("Y-"),
+    );
+  });
+
+  it("updates feedrate when input changes", async () => {
+    render(<JogControls />);
+    const input = screen.getByRole("spinbutton");
+    await userEvent.clear(input);
+    await userEvent.type(input, "6000");
+    // After changing feedrate, a jog should use the new value
+    await userEvent.click(screen.getByText("X+ ►"));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringContaining("F6000"),
+    );
+  });
 });
 
 // Need vi import for vi.fn()

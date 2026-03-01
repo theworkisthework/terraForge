@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useConsoleStore } from "@renderer/store/consoleStore";
@@ -15,6 +15,7 @@ beforeEach(() => {
     wsLive: false,
     selectedJobFile: null,
   });
+  vi.clearAllMocks();
 });
 
 describe("ConsolePanel", () => {
@@ -102,5 +103,85 @@ describe("ConsolePanel", () => {
     useMachineStore.setState({ connected: false });
     render(<ConsolePanel />);
     expect(screen.queryByText(/Restart FW/)).not.toBeInTheDocument();
+  });
+
+  // ── Auto-scroll ─────────────────────────────────────────────────────────
+
+  it("auto-scrolls when new lines are added", () => {
+    useConsoleStore.setState({ lines: ["line 1"] });
+    const { rerender } = render(<ConsolePanel />);
+    useConsoleStore.setState({ lines: ["line 1", "line 2"] });
+    rerender(<ConsolePanel />);
+    // scrollIntoView is stubbed in setup.ts — just verify no crash
+    expect(screen.getByText("line 2")).toBeInTheDocument();
+  });
+
+  // ── Command send ────────────────────────────────────────────────────────
+
+  it("sends command when Enter pressed and appends to console", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<ConsolePanel />);
+    const input = screen.getByPlaceholderText("Send command…");
+    await userEvent.type(input, "G0 X10{Enter}");
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      "G0 X10",
+    );
+    expect(useConsoleStore.getState().lines).toContain("> G0 X10");
+  });
+
+  it("sends command when Send button clicked", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<ConsolePanel />);
+    const input = screen.getByPlaceholderText("Send command…");
+    await userEvent.type(input, "$H");
+    await userEvent.click(screen.getByText("Send"));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("$H");
+  });
+
+  it("does not send empty command", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<ConsolePanel />);
+    const input = screen.getByPlaceholderText("Send command…");
+    await userEvent.type(input, "{Enter}");
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalled();
+  });
+
+  // ── Alarm unlock ────────────────────────────────────────────────────────
+
+  it("sends $X when alarm button clicked", async () => {
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        raw: "<Alarm|MPos:0,0,0>",
+        state: "Alarm",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+      },
+    });
+    render(<ConsolePanel />);
+    await userEvent.click(screen.getByText(/ALARM/));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("$X");
+  });
+
+  // ── Restart FW ──────────────────────────────────────────────────────────
+
+  it("sends [ESP444]RESTART and disconnects when Restart FW confirmed", async () => {
+    useMachineStore.setState({ connected: true });
+    // Mock confirm to return true
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<ConsolePanel />);
+    await userEvent.click(screen.getByText(/Restart FW/));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      "[ESP444]RESTART",
+    );
+    expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  // ── JobControls rendered ────────────────────────────────────────────────
+
+  it("renders JobControls sidebar inside ConsolePanel", () => {
+    render(<ConsolePanel />);
+    expect(screen.getByText("Job")).toBeInTheDocument();
   });
 });

@@ -166,4 +166,43 @@ describe("parseGcode", () => {
     // Second line: X=30, Y inherits 20
     expect(r.cuts).toContain("L 30.000 20.000");
   });
+
+  // ── Mode switch mid-file ──────────────────────────────────────────────
+
+  it("handles mixed absolute/relative mode switch mid-file", () => {
+    const r = parse("G90\nG1 X10 Y10\nG91\nG1 X5 Y5\nG90\nG1 X50 Y50\n");
+    // G90: X10 Y10 → absolute (10,10)
+    // G91: X5 Y5  → relative from (10,10) → (15,15)
+    // G90: X50 Y50 → absolute (50,50)
+    expect(r.cuts).toContain("L 10.000 10.000");
+    expect(r.cuts).toContain("L 15.000 15.000");
+    expect(r.cuts).toContain("L 50.000 50.000");
+  });
+
+  // ── Line number prefix ────────────────────────────────────────────────
+
+  it("ignores N-word line number prefix", () => {
+    const r = parse("N100 G1 X10 Y20\nN200 G0 X30 Y40\n");
+    expect(r.cuts).toContain("L 10.000 20.000");
+    expect(r.rapids).toContain("L 30.000 40.000");
+  });
+
+  // ── Block delete ──────────────────────────────────────────────────────
+
+  it("strips block-delete prefix '/' and still parses the line", () => {
+    const r = parse("/ G1 X5 Y5\n");
+    expect(r.cuts).toContain("L 5.000 5.000");
+  });
+
+  // ── Large file ────────────────────────────────────────────────────────
+
+  it("handles a large file with 1000+ lines", () => {
+    const lines: string[] = ["G1"];
+    for (let i = 0; i < 1001; i++) {
+      lines.push(`X${i} Y${i}`);
+    }
+    const r = parse(lines.join("\n"));
+    expect(r.lineCount).toBeGreaterThanOrEqual(1002);
+    expect(r.cuts).toContain("L 1000.000 1000.000");
+  });
 });

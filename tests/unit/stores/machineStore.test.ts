@@ -120,4 +120,28 @@ describe("machineStore", () => {
       "d1",
     );
   });
+
+  // ── reorderConfigs ──────────────────────────────────────────────────────
+
+  it("reorderConfigs reorders by given id array and persists", async () => {
+    const c1 = createMachineConfig({ id: "r1", name: "First" });
+    const c2 = createMachineConfig({ id: "r2", name: "Second" });
+    const c3 = createMachineConfig({ id: "r3", name: "Third" });
+    useMachineStore.setState({ configs: [c1, c2, c3] });
+    await useMachineStore.getState().reorderConfigs(["r3", "r1", "r2"]);
+    const names = useMachineStore.getState().configs.map((c) => c.name);
+    expect(names).toEqual(["Third", "First", "Second"]);
+    expect(window.terraForge.fs.saveConfigs).toHaveBeenCalled();
+  });
+
+  it("reorderConfigs preserves configs not in the ordered list", async () => {
+    const c1 = createMachineConfig({ id: "r1" });
+    const c2 = createMachineConfig({ id: "r2" });
+    useMachineStore.setState({ configs: [c1, c2] });
+    // Only reorder r1 → r2 is not in list, should be appended
+    await useMachineStore.getState().reorderConfigs(["r1"]);
+    expect(useMachineStore.getState().configs).toHaveLength(2);
+    expect(useMachineStore.getState().configs[0].id).toBe("r1");
+    expect(useMachineStore.getState().configs[1].id).toBe("r2");
+  });
 });

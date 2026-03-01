@@ -1,5 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseFluidNCStatus } from "../../src/machine/serial";
+
+// Import SerialClient for parseListLines / sendAndReceive tests
+// We'll test parseListLines indirectly through the class
+import { SerialClient } from "../../src/machine/serial";
+
+// Mock serialport so we don't need real hardware
+vi.mock("serialport", () => ({
+  SerialPort: class MockSerialPort {
+    static list = vi.fn().mockResolvedValue([]);
+    isOpen = true;
+    write = vi.fn((_data: string, cb?: (err?: Error) => void) => cb?.());
+    open = vi.fn((cb: (err?: Error) => void) => cb());
+    close = vi.fn((cb: (err?: Error) => void) => cb());
+    pipe = vi.fn().mockReturnValue({
+      on: vi.fn(),
+    });
+  },
+  ReadlineParser: class MockReadlineParser {
+    on = vi.fn();
+  },
+}));
 
 describe("parseFluidNCStatus", () => {
   // ── State parsing ───────────────────────────────────────────────────────
@@ -107,3 +128,113 @@ describe("parseFluidNCStatus", () => {
     expect(s.state).toBe(state);
   });
 });
+
+// ── parseListLines (via SerialClient internals) ───────────────────────────────
+
+describe("SerialClient.parseListLines", () => {
+  let client: SerialClient;
+
+  beforeEach(() => {
+    client = new SerialClient();
+  });
+
+  // Access parseListLines via the private method
+  const callParseList = (
+    client: SerialClient,
+    lines: string[],
+    pathPrefix: string,
+    topLevelOnly = false,
+  ) => (client as any).parseListLines(lines, pathPrefix, topLevelOnly);
+
+  it("parses SD FILE lines with single-space indent", () => {
+    const lines = ["[FILE: test.gcode|SIZE:1234]", "[FILE: art.nc|SIZE:5678]"];
+    const result = callParseList(client, lines, "/");
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      name: "test.gcode",
+      size: 1234,
+      isDirectory: false,
+    });
+    expect(result[1]).toMatchObject({ name: "art.nc", size: 5678 });
+  });
+
+  it("parses SD DIR lines", () => {
+    const lines = ["[DIR:subdir]"];
+    const result = callParseList(client, lines, "/");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      name: "subdir",
+      isDirectory: true,
+      size: 0,
+    });
+  });
+
+  it("parses LocalFS FILE lines (colon then leading slash)", () => {
+    const lines = ["[FILE:/config.yaml|SIZE:256]"];
+    const result = callParseList(client, lines, "/");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      name: "config.yaml",
+      size: 256,
+      isDirectory: false,
+    });
+  });
+
+  it("filters nested files when topLevelOnly is true", () => {
+    const lines = [
+      "[FILE: top.gcode|SIZE:100]",
+      "[FILE:  nested.gcode|SIZE:200]", // two-space indent → nested
+    ];
+    const result = callParseList(client, lines, "/", true);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("top.gcode");
+  });
+
+  it("includes nested files when topLevelOnly is false", () => {
+    const lines = [
+      "[FILE: top.gcode|SIZE:100]",
+      "[FILE:  nested.gcode|SIZE:200]",
+    ];
+    const result = callParseList(client, lines, "/", false);
+    expect(result).toHaveLength(2);
+  });
+
+  it("ignores footer lines and empty lines", () => {
+    const lines = [
+      "[FILE: test.gcode|SIZE:100]",
+      "[/sd Used: 1234 Total: 5678]",
+      "",
+      "ok",
+    ];
+    const result = callParseList(client, lines, "/");
+    expect(result).toHaveLength(1);
+  });
+
+  it("builds correct paths with non-root prefix", () => {
+    const lines = ["[FILE: job.gcode|SIZE:100]"];
+    const result = callParseList(client, lines, "/mydir");
+    expect(result[0].path).toBe("/mydir/job.gcode");
+  });
+});
+
+// ── SerialClient high-level methods ───────────────────────────────────────────
+
+describe("SerialClient", () => {
+  it("sendRealtime writes a single character without newline", () => {
+    const client = new SerialClient();
+    // Connect first to set up the port
+    (client as any).port = { isOpen: true, write: vi.fn() };
+    client.sendRealtime("!");
+    expect((client as any).port.write).toHaveBeenCalledWith("!");
+  });
+
+  it("sendRealtime does nothing when port is closed", () => {
+    const client = new SerialClient();
+    (client as any).port = { isOpen: false, write: vi.fn() };
+    client.sendRealtime("?");
+    expect((client as any).port.write).not.toHaveBeenCalled();
+  });
+});
+
+// Need beforeEach import
+import { beforeEach } from "vitest";

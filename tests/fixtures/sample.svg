@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+  <g id="layer1">
+    <path d="M10,10 L90,10 L90,90 L10,90 Z" stroke="black" fill="none"/>
+    <circle cx="50" cy="50" r="30" stroke="black" fill="none"/>
+  </g>
+  <g id="layer2">
+    <rect x="20" y="20" width="60" height="60" stroke="red" fill="none"/>
+    <ellipse cx="50" cy="50" rx="40" ry="20" stroke="blue" fill="none"/>
+  </g>
+  <line x1="0" y1="0" x2="100" y2="100" stroke="green"/>
+  <polyline points="10,80 30,60 50,80 70,60 90,80" stroke="purple" fill="none"/>
+  <polygon points="50,5 61,40 98,40 68,62 79,96 50,75 21,96 32,62 2,40 39,40" stroke="orange" fill="none"/>
+</svg>

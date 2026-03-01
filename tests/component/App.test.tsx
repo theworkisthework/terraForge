@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useTaskStore } from "@renderer/store/taskStore";
 import { useConsoleStore } from "@renderer/store/consoleStore";
 import App from "@renderer/App";
+import { createMachineConfig } from "../helpers/factories";
 
 beforeEach(() => {
   useMachineStore.setState({
@@ -60,5 +61,56 @@ describe("App", () => {
     expect(window.terraForge.serial.onData).toHaveBeenCalled();
     expect(window.terraForge.tasks.onTaskUpdate).toHaveBeenCalled();
     expect(window.terraForge.fluidnc.onPing).toHaveBeenCalled();
+  });
+
+  // ── Configs loaded on mount ────────────────────────────────────────────
+
+  it("populates store with configs loaded on mount", async () => {
+    const cfg = createMachineConfig({ name: "Loaded Plotter" });
+    (
+      window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([cfg]);
+    render(<App />);
+    await waitFor(() => {
+      expect(useMachineStore.getState().configs).toHaveLength(1);
+      expect(useMachineStore.getState().configs[0].name).toBe(
+        "Loaded Plotter",
+      );
+    });
+  });
+
+  // ── Cleanup on unmount ─────────────────────────────────────────────────
+
+  it("calls cleanup callbacks returned by IPC subscriptions on unmount", () => {
+    const unsubStatus = vi.fn();
+    const unsubConsole = vi.fn();
+    const unsubSerial = vi.fn();
+    const unsubTasks = vi.fn();
+    const unsubPing = vi.fn();
+
+    (
+      window.terraForge.fluidnc.onStatusUpdate as ReturnType<typeof vi.fn>
+    ).mockReturnValue(unsubStatus);
+    (
+      window.terraForge.fluidnc.onConsoleMessage as ReturnType<typeof vi.fn>
+    ).mockReturnValue(unsubConsole);
+    (
+      window.terraForge.serial.onData as ReturnType<typeof vi.fn>
+    ).mockReturnValue(unsubSerial);
+    (
+      window.terraForge.tasks.onTaskUpdate as ReturnType<typeof vi.fn>
+    ).mockReturnValue(unsubTasks);
+    (
+      window.terraForge.fluidnc.onPing as ReturnType<typeof vi.fn>
+    ).mockReturnValue(unsubPing);
+
+    const { unmount } = render(<App />);
+    unmount();
+
+    expect(unsubStatus).toHaveBeenCalled();
+    expect(unsubConsole).toHaveBeenCalled();
+    expect(unsubSerial).toHaveBeenCalled();
+    expect(unsubTasks).toHaveBeenCalled();
+    expect(unsubPing).toHaveBeenCalled();
   });
 });

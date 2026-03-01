@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -113,5 +114,176 @@ describe("Toolbar", () => {
     render(<Toolbar />);
     const select = screen.getByRole("combobox");
     expect(select).toBeDisabled();
+  });
+
+  // ── Import SVG interaction ─────────────────────────────────────────────
+
+  it("clicking Import SVG opens file dialog", async () => {
+    (
+      window.terraForge.fs.openSvgDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(null);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Import SVG"));
+    expect(window.terraForge.fs.openSvgDialog).toHaveBeenCalled();
+  });
+
+  it("imports SVG paths on file selection", async () => {
+    const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+      <path d="M0,0 L50,50" />
+    </svg>`;
+    (
+      window.terraForge.fs.openSvgDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("/test.svg");
+    (
+      window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(svgXml);
+
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Import SVG"));
+
+    await waitFor(() => {
+      expect(useCanvasStore.getState().imports.length).toBe(1);
+    });
+  });
+
+  // ── Import G-code interaction ──────────────────────────────────────────
+
+  it("clicking Import G-code opens gcode file dialog", async () => {
+    (
+      window.terraForge.fs.openGcodeDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(null);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Import G-code"));
+    expect(window.terraForge.fs.openGcodeDialog).toHaveBeenCalled();
+  });
+
+  it("parses imported G-code and sets toolpath", async () => {
+    const gcode = "G0 X0 Y0\nG1 X10 Y10 F1000\n";
+    (
+      window.terraForge.fs.openGcodeDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("/test.gcode");
+    (
+      window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(gcode);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Import G-code"));
+    await waitFor(() => {
+      expect(useCanvasStore.getState().gcodeToolpath).not.toBeNull();
+    });
+  });
+
+  // ── Connect / Disconnect ───────────────────────────────────────────────
+
+  it("Connect button calls connectWebSocket for wifi config", async () => {
+    const cfg = createMachineConfig({
+      name: "WiFi Plotter",
+      connection: { type: "wifi", host: "192.168.1.10", port: 80 },
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    (
+      window.terraForge.fluidnc.connectWebSocket as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(undefined);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Connect"));
+    await waitFor(() => {
+      expect(window.terraForge.fluidnc.connectWebSocket).toHaveBeenCalledWith(
+        "192.168.1.10",
+        80,
+        undefined,
+      );
+    });
+  });
+
+  it("Connect button calls serial.connect for usb config", async () => {
+    const cfg = createMachineConfig({
+      name: "USB Plotter",
+      connection: { type: "usb", serialPath: "COM3" },
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    (
+      window.terraForge.serial.connect as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(undefined);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Connect"));
+    await waitFor(() => {
+      expect(window.terraForge.serial.connect).toHaveBeenCalledWith(
+        "COM3",
+        115200,
+      );
+    });
+  });
+
+  it("Disconnect calls disconnectWebSocket for wifi", async () => {
+    const cfg = createMachineConfig({
+      name: "WiFi Plotter",
+      connection: { type: "wifi", host: "192.168.1.10", port: 80 },
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      connected: true,
+    });
+    (
+      window.terraForge.fluidnc.disconnectWebSocket as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(undefined);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Disconnect"));
+    await waitFor(() => {
+      expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
+    });
+  });
+
+  // ── Home button ────────────────────────────────────────────────────────
+
+  it("Home sends $H command when connected", async () => {
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      connected: true,
+    });
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Home"));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("$H");
+  });
+
+  // ── Jog panel toggle ──────────────────────────────────────────────────
+
+  it("Jog button toggles jog panel visibility", async () => {
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      connected: true,
+    });
+    render(<Toolbar />);
+    // Click Jog to show panel
+    await userEvent.click(screen.getByText("Jog"));
+    expect(screen.getByText("Jog Controls")).toBeInTheDocument();
+    // Click again to hide
+    await userEvent.click(screen.getByText("Jog"));
+    expect(screen.queryByText("Jog Controls")).not.toBeInTheDocument();
+  });
+
+  // ── Settings dialog toggle ────────────────────────────────────────────
+
+  it("⚙ button opens Machine Config dialog", async () => {
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("⚙"));
+    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+  });
+
+  // ── Machine selector changes active config ────────────────────────────
+
+  it("machine selector changes active config id", async () => {
+    const c1 = createMachineConfig({ name: "Alpha" });
+    const c2 = createMachineConfig({ name: "Beta" });
+    useMachineStore.setState({ configs: [c1, c2], activeConfigId: c1.id });
+    render(<Toolbar />);
+    const select = screen.getByRole("combobox");
+    await userEvent.selectOptions(select, c2.id);
+    expect(useMachineStore.getState().activeConfigId).toBe(c2.id);
   });
 });

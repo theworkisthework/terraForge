@@ -442,6 +442,56 @@ describe("flattenToSubpaths", () => {
     expect(sp).toHaveLength(1);
     expect(sp[0].length).toBeGreaterThan(2);
   });
+
+  it("flattens a path with quadratic bezier (Q) to multiple points", () => {
+    const obj = createVectorObject({
+      path: "M 0 0 Q 50 100 100 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    expect(sp[0].length).toBeGreaterThan(2);
+    // Endpoint should be approximately (100, 100) in top-left space
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(100, 0);
+  });
+
+  it("flattens a path with arc (A) to multiple points", () => {
+    const obj = createVectorObject({
+      path: "M 0 0 A 50 50 0 0 1 100 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    expect(sp[0].length).toBeGreaterThan(2);
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(100, 0);
+  });
+
+  it("applies H and V commands correctly", () => {
+    const obj = createVectorObject({
+      path: "M 0 0 H 50 V 50",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    expect(sp[0]).toHaveLength(3); // M, H, V
+  });
 });
 
 // ── fmtCoord ──────────────────────────────────────────────────────────────────

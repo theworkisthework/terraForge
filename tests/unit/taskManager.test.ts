@@ -101,4 +101,18 @@ describe("TaskManager", () => {
     expect(all).toHaveLength(2);
     expect(all.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
   });
+
+  // ── Multiple concurrent tasks ──────────────────────────────────────────
+
+  it("tracks multiple concurrent tasks independently", () => {
+    tm.create("t1", "gcode-generate", "Generate");
+    tm.create("t2", "file-upload", "Upload");
+    tm.update("t1", { progress: 50 });
+    tm.update("t2", { progress: 30 });
+    expect(tm.get("t1")!.progress).toBe(50);
+    expect(tm.get("t2")!.progress).toBe(30);
+    tm.complete("t1");
+    expect(tm.get("t1")!.status).toBe("completed");
+    expect(tm.get("t2")!.status).toBe("running");
+  });
 });
