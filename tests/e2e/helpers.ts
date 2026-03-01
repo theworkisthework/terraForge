@@ -44,8 +44,15 @@ export async function launchApp(): Promise<AppHandle> {
   // writes the real user's machine-configs.json or any other persisted state.
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "terraforge-e2e-"));
 
+  // On Linux CI runners the SUID sandbox helper is not configured, so we must
+  // disable the sandbox.  --no-sandbox is safe in ephemeral CI environments.
+  const sandboxArgs =
+    process.platform === "linux"
+      ? ["--no-sandbox", "--disable-setuid-sandbox"]
+      : [];
+
   const electronApp = await electron.launch({
-    args: [`--user-data-dir=${userDataDir}`, mainEntry],
+    args: [...sandboxArgs, `--user-data-dir=${userDataDir}`, mainEntry],
     cwd: ROOT,
     env: {
       ...process.env,
