@@ -65,7 +65,7 @@ jobs:
         run: sudo apt-get install -y libudev-dev xvfb
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm i
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
