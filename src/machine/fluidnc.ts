@@ -195,7 +195,11 @@ export class FluidNCClient extends EventEmitter {
   // ─── File Management ─────────────────────────────────────────────────────
 
   async listFiles(remotePath = "/"): Promise<RemoteFile[]> {
-    const res = await this.get(`/files?path=${encodeURIComponent(remotePath)}`);
+    const encodedPath = remotePath
+      .split("/")
+      .map((seg) => (seg ? encodeURIComponent(seg) : seg))
+      .join("/");
+    const res = await this.get(`/files?path=${encodedPath}`);
     const json = (await res.json()) as {
       files: Array<{ name: string; size: number; dir?: boolean }>;
       path: string;
@@ -215,10 +219,16 @@ export class FluidNCClient extends EventEmitter {
   async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
     // Use a generous 30 s timeout — SD card initialisation can be slow on
     // first access in FluidNC 3.x.
-    const res = await this.get(
-      `/upload?path=${encodeURIComponent(remotePath)}`,
-      30_000,
-    );
+    //
+    // Important: encode only individual path segments, NOT the slash separators.
+    // FluidNC 3.x (ESP3D HTTP stack) resets the connection if it sees %2F in
+    // the path query parameter. FluidNC 4.x accepts both forms, so this is
+    // safe for all versions.
+    const encodedPath = remotePath
+      .split("/")
+      .map((seg) => (seg ? encodeURIComponent(seg) : seg))
+      .join("/");
+    const res = await this.get(`/upload?path=${encodedPath}`, 30_000);
 
     let json: {
       files?: Array<{
@@ -277,18 +287,25 @@ export class FluidNCClient extends EventEmitter {
   ): Promise<void> {
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
     if (this.fwMajor === null || this.fwMajor >= 4) {
-      // FluidNC 4.x: REST endpoints
+      // FluidNC 4.x: WebDAV DELETE — same pattern for both volumes
       if (source === "sd") {
-        await this.get(
-          `/upload?action=delete&filename=${encodeURIComponent(filePath)}`,
-        );
+        await this.get(`/sd${filePath}`, 10_000, "DELETE");
       } else {
         await this.get(`/localfs${filePath}`, 10_000, "DELETE");
       }
     } else {
-      // FluidNC 3.x: command interface
+      // FluidNC 3.x
       if (source === "sd") {
-        await this.sendCommand(`$SD/Delete=${remotePath}`);
+        // Same REST endpoint as 4.x listing: GET /upload?path=<dir>&action=delete&filename=<name>
+        // path = the directory (encodeURIComponent encodes "/" → "%2F" which 3.x expects for the path param)
+        // filename = bare filename only (no leading slash)
+        const parts = filePath.split("/");
+        const name = parts.pop()!;
+        const dir = parts.join("/") || "/";
+        await this.get(
+          `/upload?path=${encodeURIComponent(dir)}&action=delete&filename=${encodeURIComponent(name)}`,
+          10_000,
+        );
       } else {
         await this.sendCommand(`$LocalFS/Delete=${remotePath}`);
       }
