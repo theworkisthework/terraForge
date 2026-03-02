@@ -213,13 +213,13 @@ describe("FluidNCClient", () => {
 
   // ── deleteFile ──────────────────────────────────────────────────────────
 
-  it("sends delete command via sendCommand", async () => {
+  it("sends WebDAV DELETE to /sd/ for SD delete (4.x)", async () => {
     mockFetch.mockResolvedValueOnce(mockResponse("ok"));
     await client.deleteFile("/old.gcode", "sd");
-    const url = mockFetch.mock.calls[0][0] as string;
-    // fw >= 4 uses REST endpoint, not $SD/Delete command
-    expect(url).toContain("/upload?action=delete");
-    expect(url).toContain("old.gcode");
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/sd/old.gcode"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("sends delete via REST DELETE for localFS (4.x)", async () => {
@@ -231,13 +231,17 @@ describe("FluidNCClient", () => {
     );
   });
 
-  it("sends $SD/Delete command for 3.x firmware", async () => {
+  it("sends REST GET /upload?action=delete for SD delete (3.x)", async () => {
     (client as any).fwMajor = 3;
     mockFetch.mockResolvedValueOnce(mockResponse("ok"));
     await client.deleteFile("/job.gcode", "sd");
-    // 3.x uses POST /command with commandText body
-    const body = decodeURIComponent(mockFetch.mock.calls[0][1]?.body as string);
-    expect(body).toContain("$SD/Delete=/job.gcode");
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("/upload?");
+    expect(url).toContain("action=delete");
+    expect(url).toContain("filename=job.gcode");
+    // path param should be the directory (%2F for root)
+    expect(url).toContain("path=%2F");
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ method: "GET" });
   });
 
   it("sends $LocalFS/Delete command for 3.x firmware", async () => {
