@@ -11,9 +11,66 @@ permissions:
   contents: write
 
 jobs:
+  # ── Tests (gate) ─────────────────────────────────────────────────────────────
+  test:
+    name: Unit & Component Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
+
+  # ── E2E gate ──────────────────────────────────────────────────────────────────
+  test-e2e:
+    name: E2E Tests (Playwright / Electron)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install system deps
+        run: sudo apt-get install -y libudev-dev xvfb
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright system libraries
+        run: npx playwright install-deps
+
+      - name: Build app
+        run: npm run build
+
+      - name: Run E2E tests
+        run: xvfb-run --auto-servernum -- npx playwright test --config=tests/e2e/playwright.config.ts
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   # ── Windows ──────────────────────────────────────────────────────────────────
   build-windows:
     name: Build (Windows)
+    needs: [test, test-e2e]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +103,7 @@ jobs:
   # ── macOS ─────────────────────────────────────────────────────────────────────
   build-mac:
     name: Build (macOS)
+    needs: [test, test-e2e]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +137,7 @@ jobs:
   # ── Linux ─────────────────────────────────────────────────────────────────────
   build-linux:
     name: Build (Linux)
+    needs: [test, test-e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
