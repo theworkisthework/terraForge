@@ -53,13 +53,17 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   const optimise = options?.optimisePaths ?? false;
 
-  lines.push("; ── terraForge G-code ──────────────────────────────────────");
+  lines.push(
+    "; -- terraForge G-code ------------------------------------------",
+  );
   lines.push(`; Machine  : ${config.name}`);
   lines.push(`; Bed      : ${config.bedWidth} x ${config.bedHeight} mm`);
   lines.push(`; Origin   : ${config.origin}`);
   lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
-  lines.push("; ────────────────────────────────────────────────────────────");
+  lines.push(
+    "; ---------------------------------------------------------------",
+  );
   lines.push("G90      ; Absolute coordinates");
   lines.push("G21      ; Units: mm");
   lines.push(config.penUpCommand + " ; Pen up");
@@ -93,7 +97,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     const sorted = nearestNeighbourSort(allSubpaths);
 
     lines.push(
-      `; ── Optimised path (${sorted.length} subpaths) ──────────────`,
+      `; -- Optimised path (${sorted.length} subpaths) ---------------`,
     );
     for (let i = 0; i < sorted.length; i++) {
       if (cancelled.has(taskId)) {
