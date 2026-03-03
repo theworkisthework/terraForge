@@ -173,6 +173,9 @@
 
 ## Not Yet Implemented
 
+- [ ] **Pen pressure** Encode pen height into source drawing (3d model with z height). how do we do this? 
+
+
 ### Canvas
 
 - [ ] **Rotation** — spec calls for rotation handle/input; `rotation` field exists in the data model but is not applied on canvas or in G-code output
