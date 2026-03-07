@@ -580,252 +580,243 @@ export function PlotCanvas() {
       onMouseDown={onContainerMouseDown}
       onContextMenu={onContextMenu}
     >
-      {/* ── Transformed content layer ─────────────────────────────────────── */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          transformOrigin: "0 0",
-          transform: `translate(${vp.panX}px, ${vp.panY}px) scale(${vp.zoom})`,
-          willChange: "transform",
+      {/* ── Canvas SVG — fills the container; viewBox drives pan/zoom so the
+           browser renders all paths at native screen resolution instead of
+           rasterising a CSS-scaled compositing layer (which causes blurriness). ── */}
+      <svg
+        ref={svgRef}
+        style={{ position: "absolute", top: 0, left: 0, display: "block" }}
+        width={containerSize.w || canvasW}
+        height={containerSize.h || canvasH}
+        viewBox={
+          containerSize.w > 0
+            ? `${-vp.panX / vp.zoom} ${-vp.panY / vp.zoom} ${containerSize.w / vp.zoom} ${containerSize.h / vp.zoom}`
+            : `0 0 ${canvasW} ${canvasH}`
+        }
+        className="cursor-default"
+        onClick={() => {
+          // Suppress deselect if a drag/scale/rotate/pan gesture just ended;
+          // the browser synthesises a click on mouseup even after a drag.
+          if (justDraggedRef.current) {
+            justDraggedRef.current = false;
+            return;
+          }
+          selectImport(null);
+          setToolpathSelected(false);
         }}
       >
-        <svg
-          ref={svgRef}
-          width={canvasW}
-          height={canvasH}
-          className="cursor-default"
-          onClick={() => {
-            // Suppress deselect if a drag/scale/rotate/pan gesture just ended;
-            // the browser synthesises a click on mouseup even after a drag.
-            if (justDraggedRef.current) {
-              justDraggedRef.current = false;
-              return;
-            }
-            selectImport(null);
-            setToolpathSelected(false);
-          }}
-        >
-          {/* Bed background */}
-          <rect
-            x={PAD}
-            y={PAD}
-            width={bedW * MM_TO_PX}
-            height={bedH * MM_TO_PX}
-            fill="#0d1117"
+        {/* Bed background */}
+        <rect
+          x={PAD}
+          y={PAD}
+          width={bedW * MM_TO_PX}
+          height={bedH * MM_TO_PX}
+          fill="#0d1117"
+          stroke="#0f3460"
+          strokeWidth={1}
+        />
+
+        {/* Grid — 10 mm intervals, major every 50 mm */}
+        {Array.from(
+          { length: Math.floor(bedW / 10) + 1 },
+          (_, i) => i * 10,
+        ).map((mm) => (
+          <line
+            key={`vg-${mm}`}
+            x1={PAD + mm * MM_TO_PX}
+            y1={PAD}
+            x2={PAD + mm * MM_TO_PX}
+            y2={PAD + bedH * MM_TO_PX}
             stroke="#0f3460"
-            strokeWidth={1}
+            strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
           />
+        ))}
+        {Array.from(
+          { length: Math.floor(bedH / 10) + 1 },
+          (_, i) => i * 10,
+        ).map((mm) => (
+          <line
+            key={`hg-${mm}`}
+            x1={PAD}
+            y1={getBedY(mm)}
+            x2={PAD + bedW * MM_TO_PX}
+            y2={getBedY(mm)}
+            stroke="#0f3460"
+            strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
+          />
+        ))}
 
-          {/* Grid — 10 mm intervals, major every 50 mm */}
-          {Array.from(
-            { length: Math.floor(bedW / 10) + 1 },
-            (_, i) => i * 10,
-          ).map((mm) => (
-            <line
-              key={`vg-${mm}`}
-              x1={PAD + mm * MM_TO_PX}
-              y1={PAD}
-              x2={PAD + mm * MM_TO_PX}
-              y2={PAD + bedH * MM_TO_PX}
-              stroke="#0f3460"
-              strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
-            />
-          ))}
-          {Array.from(
-            { length: Math.floor(bedH / 10) + 1 },
-            (_, i) => i * 10,
-          ).map((mm) => (
-            <line
-              key={`hg-${mm}`}
-              x1={PAD}
-              y1={getBedY(mm)}
-              x2={PAD + bedW * MM_TO_PX}
-              y2={getBedY(mm)}
-              stroke="#0f3460"
-              strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
-            />
-          ))}
+        {/* Rulers are rendered as a screen-space overlay — see below */}
 
-          {/* Rulers are rendered as a screen-space overlay — see below */}
-
-          {/* G-code toolpath overlay */}
-          {gcodeToolpath &&
-            (() => {
-              const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
-              const svgLeft = isCenter
-                ? PAD + (bedW / 2 + minX) * MM_TO_PX
-                : isRight
-                  ? PAD + (bedW - maxX) * MM_TO_PX
-                  : PAD + minX * MM_TO_PX;
-              const svgRight = isCenter
-                ? PAD + (bedW / 2 + maxX) * MM_TO_PX
-                : isRight
-                  ? PAD + (bedW - minX) * MM_TO_PX
-                  : PAD + maxX * MM_TO_PX;
-              const svgTop = isCenter
-                ? PAD + (bedH / 2 - maxY) * MM_TO_PX
-                : isBottom
-                  ? PAD + (bedH - maxY) * MM_TO_PX
-                  : PAD + minY * MM_TO_PX;
-              const svgBottom = isCenter
-                ? PAD + (bedH / 2 - minY) * MM_TO_PX
-                : isBottom
-                  ? PAD + (bedH - minY) * MM_TO_PX
-                  : PAD + maxY * MM_TO_PX;
-              const bboxW = svgRight - svgLeft;
-              const bboxH = svgBottom - svgTop;
-              const delCx = svgRight + 14;
-              const delCy = svgTop - 14;
-              return (
-                <>
-                  <g
-                    transform={`translate(${
-                      isCenter
-                        ? PAD + (bedW / 2) * MM_TO_PX
-                        : isRight
-                          ? PAD + bedW * MM_TO_PX
-                          : PAD
-                    }, ${
-                      isCenter
-                        ? PAD + (bedH / 2) * MM_TO_PX
-                        : isBottom
-                          ? PAD + bedH * MM_TO_PX
-                          : PAD
-                    }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isCenter || isBottom ? -MM_TO_PX : MM_TO_PX})`}
-                  >
-                    <clipPath id="bed-clip">
-                      <rect
-                        x={isCenter ? -bedW / 2 : 0}
-                        y={isCenter ? -bedH / 2 : 0}
-                        width={bedW}
-                        height={bedH}
-                      />
-                    </clipPath>
-                    <g clipPath="url(#bed-clip)">
-                      {gcodeToolpath.rapids && (
-                        <path
-                          d={gcodeToolpath.rapids}
-                          stroke="#4a5568"
-                          strokeWidth={0.5}
-                          fill="none"
-                          strokeDasharray="2 1"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      )}
-                      {gcodeToolpath.cuts && (
-                        <path
-                          d={gcodeToolpath.cuts}
-                          stroke={toolpathSelected ? "#38bdf8" : "#0ea5e9"}
-                          strokeWidth={1.5}
-                          fill="none"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      )}
-                      {/* Invisible hit-area for selecting the toolpath */}
-                      <rect
-                        x={minX}
-                        y={minY}
-                        width={maxX - minX}
-                        height={maxY - minY}
-                        fill="transparent"
-                        style={{ cursor: "pointer" }}
-                        vectorEffect="non-scaling-stroke"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectImport(null);
-                          setToolpathSelected(true);
-                        }}
-                      />
-                    </g>
-                  </g>
-
-                  {toolpathSelected && (
-                    <g pointerEvents="none">
-                      <rect
-                        x={svgLeft}
-                        y={svgTop}
-                        width={bboxW}
-                        height={bboxH}
+        {/* G-code toolpath overlay */}
+        {gcodeToolpath &&
+          (() => {
+            const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
+            const svgLeft = isCenter
+              ? PAD + (bedW / 2 + minX) * MM_TO_PX
+              : isRight
+                ? PAD + (bedW - maxX) * MM_TO_PX
+                : PAD + minX * MM_TO_PX;
+            const svgRight = isCenter
+              ? PAD + (bedW / 2 + maxX) * MM_TO_PX
+              : isRight
+                ? PAD + (bedW - minX) * MM_TO_PX
+                : PAD + maxX * MM_TO_PX;
+            const svgTop = isCenter
+              ? PAD + (bedH / 2 - maxY) * MM_TO_PX
+              : isBottom
+                ? PAD + (bedH - maxY) * MM_TO_PX
+                : PAD + minY * MM_TO_PX;
+            const svgBottom = isCenter
+              ? PAD + (bedH / 2 - minY) * MM_TO_PX
+              : isBottom
+                ? PAD + (bedH - minY) * MM_TO_PX
+                : PAD + maxY * MM_TO_PX;
+            const bboxW = svgRight - svgLeft;
+            const bboxH = svgBottom - svgTop;
+            const delCx = svgRight + 14;
+            const delCy = svgTop - 14;
+            return (
+              <>
+                <g
+                  transform={`translate(${
+                    isCenter
+                      ? PAD + (bedW / 2) * MM_TO_PX
+                      : isRight
+                        ? PAD + bedW * MM_TO_PX
+                        : PAD
+                  }, ${
+                    isCenter
+                      ? PAD + (bedH / 2) * MM_TO_PX
+                      : isBottom
+                        ? PAD + bedH * MM_TO_PX
+                        : PAD
+                  }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isCenter || isBottom ? -MM_TO_PX : MM_TO_PX})`}
+                >
+                  <clipPath id="bed-clip">
+                    <rect
+                      x={isCenter ? -bedW / 2 : 0}
+                      y={isCenter ? -bedH / 2 : 0}
+                      width={bedW}
+                      height={bedH}
+                    />
+                  </clipPath>
+                  <g clipPath="url(#bed-clip)">
+                    {gcodeToolpath.rapids && (
+                      <path
+                        d={gcodeToolpath.rapids}
+                        stroke="#4a5568"
+                        strokeWidth={0.5}
                         fill="none"
-                        stroke="#38bdf8"
-                        strokeWidth={1}
-                        strokeDasharray="5 3"
+                        strokeDasharray="2 1"
+                        vectorEffect="non-scaling-stroke"
                       />
-                      {(
-                        [
-                          [svgLeft, svgTop],
-                          [svgRight, svgTop],
-                          [svgLeft, svgBottom],
-                          [svgRight, svgBottom],
-                        ] as [number, number][]
-                      ).map(([cx, cy], i) => (
-                        <circle
-                          key={i}
-                          cx={cx}
-                          cy={cy}
-                          r={2.5}
-                          fill="#38bdf8"
-                        />
-                      ))}
-                    </g>
-                  )}
-                  {toolpathSelected && (
-                    <g
-                      transform={`translate(${delCx}, ${delCy})`}
+                    )}
+                    {gcodeToolpath.cuts && (
+                      <path
+                        d={gcodeToolpath.cuts}
+                        stroke={toolpathSelected ? "#38bdf8" : "#0ea5e9"}
+                        strokeWidth={1.5}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {/* Invisible hit-area for selecting the toolpath */}
+                    <rect
+                      x={minX}
+                      y={minY}
+                      width={maxX - minX}
+                      height={maxY - minY}
+                      fill="transparent"
                       style={{ cursor: "pointer" }}
+                      vectorEffect="non-scaling-stroke"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setGcodeToolpath(null);
+                        selectImport(null);
+                        setToolpathSelected(true);
                       }}
-                    >
-                      <svg
-                        x={-8}
-                        y={-8}
-                        width={16}
-                        height={16}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect
-                          width="18"
-                          height="18"
-                          x="3"
-                          y="3"
-                          rx="2"
-                          ry="2"
-                          fill="#e94560"
-                          stroke="none"
-                        />
-                        <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-                        <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-                      </svg>
-                    </g>
-                  )}
-                </>
-              );
-            })()}
+                    />
+                  </g>
+                </g>
 
-          {/* SVG imports */}
-          {imports
-            .filter((imp) => imp.visible)
-            .map((imp) => (
-              <ImportLayer
-                key={imp.id}
-                imp={imp}
-                selected={selectedImportId === imp.id}
-                onImportMouseDown={onImportMouseDown}
-                onHandleMouseDown={onHandleMouseDown}
-                onRotateHandleMouseDown={onRotateHandleMouseDown}
-                onDelete={() => removeImport(imp.id)}
-                getBedY={getBedY}
-              />
-            ))}
-        </svg>
-      </div>
+                {toolpathSelected && (
+                  <g pointerEvents="none">
+                    <rect
+                      x={svgLeft}
+                      y={svgTop}
+                      width={bboxW}
+                      height={bboxH}
+                      fill="none"
+                      stroke="#38bdf8"
+                      strokeWidth={1}
+                      strokeDasharray="5 3"
+                    />
+                    {(
+                      [
+                        [svgLeft, svgTop],
+                        [svgRight, svgTop],
+                        [svgLeft, svgBottom],
+                        [svgRight, svgBottom],
+                      ] as [number, number][]
+                    ).map(([cx, cy], i) => (
+                      <circle key={i} cx={cx} cy={cy} r={2.5} fill="#38bdf8" />
+                    ))}
+                  </g>
+                )}
+                {toolpathSelected && (
+                  <g
+                    transform={`translate(${delCx}, ${delCy})`}
+                    style={{ cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGcodeToolpath(null);
+                    }}
+                  >
+                    <svg
+                      x={-8}
+                      y={-8}
+                      width={16}
+                      height={16}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect
+                        width="18"
+                        height="18"
+                        x="3"
+                        y="3"
+                        rx="2"
+                        ry="2"
+                        fill="#e94560"
+                        stroke="none"
+                      />
+                      <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+                      <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+                    </svg>
+                  </g>
+                )}
+              </>
+            );
+          })()}
+
+        {/* SVG imports */}
+        {imports
+          .filter((imp) => imp.visible)
+          .map((imp) => (
+            <ImportLayer
+              key={imp.id}
+              imp={imp}
+              selected={selectedImportId === imp.id}
+              onImportMouseDown={onImportMouseDown}
+              onHandleMouseDown={onHandleMouseDown}
+              onRotateHandleMouseDown={onRotateHandleMouseDown}
+              onDelete={() => removeImport(imp.id)}
+              getBedY={getBedY}
+            />
+          ))}
+      </svg>
 
       {/* ── Zoom / pan overlay controls ───────────────────────────────────── */}
       <div
