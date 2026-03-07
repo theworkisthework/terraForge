@@ -76,6 +76,7 @@
 - [x] Real-time machine status pushed from main process to renderer via IPC
 - [x] Real-time position display in status bar (X / Y / Z)
 - [x] Machine state display (Idle, Run, Hold, Alarm, etc.)
+- [ ] Show connected firmware version near online status
 
 ### Machine Configuration
 
@@ -105,6 +106,8 @@
 - [x] G-code preview button on `.gcode`/`.nc` files — loads toolpath overlay on canvas
 - [x] Upload/download progress tracked in task bar
 - [x] Auto-refresh listing after upload
+- [ ] Internal file browser condensed by default
+- [ ] Don't try to fetch file contents until we have a sucessful connection to avoid unfriendly errors
 
 ### Job Control
 
@@ -128,6 +131,7 @@
 - [x] Jog panel shown/hidden via toolbar toggle
 - [x] Homing cycle button (`$H`) in main toolbar — disabled when not connected
 - [x] Floating draggable jog panel — jog panel opens as a fixed-position overlay; drag handle at the top allows repositioning anywhere on screen; last position preserved within the session
+- [ ] Pen specific job controls (up/down if solenoid, slider + buttons if servo or stepper)
 
 ### Console
 
