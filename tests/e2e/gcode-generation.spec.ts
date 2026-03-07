@@ -5,7 +5,7 @@
  * Also tests the G-code import feature (Import G-code button).
  *
  * This spec imports an SVG first (using dialog mocking), then exercises
- * the Generate G-code button and the split-button dropdown.
+ * the Generate G-code button and the options dialog it opens.
  */
 import { test, expect } from "@playwright/test";
 import {
@@ -49,9 +49,10 @@ test("Generate G-code button is disabled with no imports", async () => {
   await expect(btn).toBeDisabled();
 });
 
-test("dropdown trigger (▾) is disabled with no imports", async () => {
+test("no split-button dropdown — single Generate G-code button only", async () => {
+  // UI uses a single button that opens an options dialog; the old ▾ dropdown is gone
   const dropdown = window.locator("button:has-text('▾')");
-  await expect(dropdown).toBeDisabled();
+  await expect(dropdown).toHaveCount(0);
 });
 
 // ─── Import an SVG to enable generation ──────────────────────────────────────
@@ -74,18 +75,34 @@ test("import SVG to enable G-code generation", async () => {
 
 // ─── Generate standard G-code ───────────────────────────────────────────────
 
-test("clicking Generate G-code produces output (disconnected → save dialog)", async () => {
+test("clicking Generate G-code opens dialog; choosing save locally produces output", async () => {
   const savePath = path.join(tempDir, "sample.gcode");
-  await mockSaveDialog(electronApp, savePath);
 
   const btn = window.locator("button:has-text('Generate G-code')");
   await btn.click();
 
-  // Wait for the generation to complete — button shows "Generating…" then reverts
-  // We wait for the button text to return to "Generate G-code"
+  // Options dialog should appear — confirmed by its Cancel button
+  const cancelBtn = window.locator("button:has-text('Cancel')");
+  await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
+
+  // Check "Save to computer" so the save dialog is triggered
+  const saveCheckbox = window.locator(
+    "label:has-text('Save to computer') input[type='checkbox']",
+  );
+  await saveCheckbox.check();
+
+  // Mock the save dialog before confirming generation
+  await mockSaveDialog(electronApp, savePath);
+
+  // Click the dialog's Generate button (exact text "Generate", not "Generate G-code")
+  const dialogGenerateBtn = window
+    .locator("button")
+    .filter({ hasText: /^Generate$/ });
+  await dialogGenerateBtn.click();
+
+  // Wait for the generation to complete — toolbar button reverts to "Generate G-code"
   await expect(btn).toHaveText("Generate G-code", { timeout: 30_000 });
 
-  // The file should have been saved via the mocked dialog
   // Give a moment for the file write to complete
   await window.waitForTimeout(1000);
 
@@ -99,28 +116,57 @@ test("clicking Generate G-code produces output (disconnected → save dialog)", 
   expect(content).toMatch(/M[35]/);
 });
 
-// ─── Generate & optimise dropdown ───────────────────────────────────────────
+// ─── Options dialog ─────────────────────────────────────────────────────────
 
-test("dropdown trigger (▾) opens the optimise menu", async () => {
-  const dropdown = window.locator("button:has-text('▾')");
-  await dropdown.click();
+test("clicking Generate G-code opens the options dialog", async () => {
+  const btn = window.locator("button:has-text('Generate G-code')");
+  await btn.click();
 
-  // The dropdown should show "Generate & optimise"
-  const optimiseBtn = window.locator("text=Generate & optimise");
-  await expect(optimiseBtn).toBeVisible({ timeout: 3000 });
+  // Dialog should show the Optimise paths checkbox
+  await expect(window.locator("text=Optimise paths")).toBeVisible({
+    timeout: 3_000,
+  });
+
+  // Cancel to close without generating
+  await window.locator("button:has-text('Cancel')").click();
+  await expect(window.locator("text=Optimise paths")).not.toBeVisible({
+    timeout: 3_000,
+  });
 });
 
-test("clicking 'Generate & optimise' generates optimised G-code", async () => {
+test("generating with Optimise paths checked produces optimised G-code", async () => {
   const savePath = path.join(tempDir, "sample_opt.gcode");
+
+  const btn = window.locator("button:has-text('Generate G-code')");
+  await btn.click();
+
+  // Wait for the options dialog to appear
+  const cancelBtn = window.locator("button:has-text('Cancel')");
+  await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
+
+  // Ensure Optimise paths is checked
+  const optimiseCheckbox = window.locator(
+    "label:has-text('Optimise paths') input[type='checkbox']",
+  );
+  await optimiseCheckbox.check();
+
+  // Ensure Save to computer is checked so output is written to disk
+  const saveCheckbox = window.locator(
+    "label:has-text('Save to computer') input[type='checkbox']",
+  );
+  await saveCheckbox.check();
+
+  // Mock the save dialog before clicking Generate in the dialog
   await mockSaveDialog(electronApp, savePath);
 
-  // The dropdown should still be open from the previous test
-  const optimiseBtn = window.locator("text=Generate & optimise");
-  await optimiseBtn.click();
+  // Click the dialog's Generate button
+  const dialogGenerateBtn = window
+    .locator("button")
+    .filter({ hasText: /^Generate$/ });
+  await dialogGenerateBtn.click();
 
   // Wait for generation to complete
-  const genBtn = window.locator("button:has-text('Generate G-code')");
-  await expect(genBtn).toHaveText("Generate G-code", { timeout: 30_000 });
+  await expect(btn).toHaveText("Generate G-code", { timeout: 30_000 });
 
   await window.waitForTimeout(1000);
 
