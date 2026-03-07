@@ -287,37 +287,77 @@ describe("Toolbar", () => {
     expect(useMachineStore.getState().activeConfigId).toBe(c2.id);
   });
 
-  // ── Generate & optimise split button ──────────────────────────────────
+  // ── Generate G-code dialog ────────────────────────────────────────────
 
-  describe("Generate & optimise split button", () => {
+  describe("Generate G-code dialog", () => {
     afterEach(() => {
       vi.unstubAllGlobals();
+      localStorage.removeItem("terraforge.gcodePrefs");
     });
 
-    it("▾ dropdown trigger is disabled when no imports", () => {
-      render(<Toolbar />);
-      expect(screen.getByTitle("More options")).toBeDisabled();
-    });
-
-    it("▾ trigger reveals dropdown with 'Generate & optimise' option", async () => {
+    it("clicking Generate G-code opens the options dialog", async () => {
       const imp = createSvgImport({ name: "test" });
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
-      expect(screen.queryByText("Generate & optimise")).not.toBeInTheDocument();
-      await userEvent.click(screen.getByTitle("More options"));
-      expect(screen.getByText("Generate & optimise")).toBeInTheDocument();
+      await userEvent.click(screen.getByText("Generate G-code"));
+      expect(
+        screen.getByRole("heading", { name: "Generate G-code" }),
+      ).toBeInTheDocument();
     });
 
-    it("'Generate & optimise' button has nearest-neighbour tooltip", async () => {
+    it("dialog shows Optimise paths, Upload to SD, and Save to computer checkboxes", async () => {
       const imp = createSvgImport({ name: "test" });
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
-      await userEvent.click(screen.getByTitle("More options"));
-      expect(screen.getByTitle(/nearest-neighbour/i)).toBeInTheDocument();
+      await userEvent.click(screen.getByText("Generate G-code"));
+      expect(screen.getByText("Optimise paths")).toBeInTheDocument();
+      expect(screen.getByText("Upload to SD card")).toBeInTheDocument();
+      expect(screen.getByText("Save to computer")).toBeInTheDocument();
     });
 
-    it("clicking 'Generate & optimise' closes the dropdown and starts an optimised task", async () => {
-      // Worker must be a proper constructor (class or function) for `new Worker(...)` to work.
+    it("dialog defaults: Optimise=checked, Upload=checked, Save=unchecked", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      const checkboxes = screen.getAllByRole("checkbox");
+      // Optimise is first, Upload second, Save third
+      expect(checkboxes[0]).toBeChecked(); // Optimise
+      expect(checkboxes[1]).toBeChecked(); // Upload to SD
+      expect(checkboxes[2]).not.toBeChecked(); // Save to computer
+    });
+
+    it("Cancel button closes the dialog without generating", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      expect(
+        screen.getByRole("heading", { name: "Generate G-code" }),
+      ).toBeInTheDocument();
+      await userEvent.click(screen.getByText("Cancel"));
+      expect(
+        screen.queryByRole("heading", { name: "Generate G-code" }),
+      ).not.toBeInTheDocument();
+      // No gcode-generate task should have been created
+      const tasks = Object.values(useTaskStore.getState().tasks);
+      expect(tasks.some((t) => t.type === "gcode-generate")).toBe(false);
+    });
+
+    it("Generate button is disabled when neither output is selected", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Defaults: Upload=checked, Save=unchecked
+      // Uncheck Upload — now neither is checked
+      const checkboxes = screen.getAllByRole("checkbox");
+      await userEvent.click(checkboxes[1]); // uncheck Upload to SD
+      const generateBtn = screen.getByRole("button", { name: "Generate" });
+      expect(generateBtn).toBeDisabled();
+    });
+
+    it("confirming the dialog starts a gcode-generate task", async () => {
       const workerInstances: {
         postMessage: ReturnType<typeof vi.fn>;
         terminate: ReturnType<typeof vi.fn>;
@@ -340,20 +380,48 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
 
       render(<Toolbar />);
-      await userEvent.click(screen.getByTitle("More options"));
-      expect(screen.getByText("Generate & optimise")).toBeInTheDocument();
-      await userEvent.click(screen.getByText("Generate & optimise"));
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
-      // Dropdown should be closed
-      expect(screen.queryByText("Generate & optimise")).not.toBeInTheDocument();
+      // Dialog closes after confirm
+      expect(
+        screen.queryByRole("heading", { name: "Generate G-code" }),
+      ).not.toBeInTheDocument();
 
       // A gcode-generate task should be registered in the store
       await waitFor(() => {
         const tasks = Object.values(useTaskStore.getState().tasks);
         expect(tasks.some((t) => t.type === "gcode-generate")).toBe(true);
       });
+    });
 
-      // The worker was sent a message with optimisePaths: true
+    it("confirming with optimise=true passes optimisePaths:true to worker", async () => {
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Optimise checkbox is checked by default — confirm immediately
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
       const instance = workerInstances[0];
       expect(instance?.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -361,6 +429,73 @@ describe("Toolbar", () => {
           options: expect.objectContaining({ optimisePaths: true }),
         }),
       );
+    });
+
+    it("confirming with optimise=false passes optimisePaths:false to worker", async () => {
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Uncheck Optimise
+      const checkboxes = screen.getAllByRole("checkbox");
+      await userEvent.click(checkboxes[0]); // uncheck Optimise
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      const instance = workerInstances[0];
+      expect(instance?.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "generate",
+          options: expect.objectContaining({ optimisePaths: false }),
+        }),
+      );
+    });
+
+    it("preferences are persisted to localStorage on confirm", async () => {
+      function MockWorker() {
+        return {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null,
+          onerror: null,
+        };
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Toggle Save to computer on
+      const checkboxes = screen.getAllByRole("checkbox");
+      await userEvent.click(checkboxes[2]); // check Save to computer
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      const stored = JSON.parse(
+        localStorage.getItem("terraforge.gcodePrefs") ?? "{}",
+      );
+      expect(stored.saveLocally).toBe(true);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
@@ -12,6 +12,8 @@ import type {
 } from "../../../types";
 import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
+import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
+import type { GcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
   applyMatrixToPathD,
@@ -204,24 +206,8 @@ export function Toolbar() {
   );
 
   const [showJog, setShowJog] = useState(false);
-  const [showOptMenu, setShowOptMenu] = useState(false);
+  const [showGcodeDialog, setShowGcodeDialog] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const optMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close the optimise dropdown when the user clicks outside it
-  useEffect(() => {
-    if (!showOptMenu) return;
-    const close = (e: MouseEvent) => {
-      if (
-        optMenuRef.current &&
-        !optMenuRef.current.contains(e.target as Node)
-      ) {
-        setShowOptMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [showOptMenu]);
   const [jogPos, setJogPos] = useState(() => ({
     x: Math.max(0, window.innerWidth - 300),
     y: 60,
@@ -504,7 +490,7 @@ export function Toolbar() {
     }
   };
 
-  const handleGenerateGcode = async (optimise = false) => {
+  const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
 
@@ -513,7 +499,7 @@ export function Toolbar() {
     const options: GcodeOptions = {
       arcFitting: false,
       arcTolerance: 0.01,
-      optimisePaths: optimise,
+      optimisePaths: prefs.optimise,
     };
 
     const worker = new Worker(
@@ -532,7 +518,9 @@ export function Toolbar() {
     upsertTask({
       id: taskId,
       type: "gcode-generate",
-      label: optimise ? "Generating G-code (optimised)" : "Generating G-code",
+      label: prefs.optimise
+        ? "Generating G-code (optimised)"
+        : "Generating G-code",
       progress: 0,
       status: "running",
     });
@@ -543,7 +531,7 @@ export function Toolbar() {
         upsertTask({
           id: taskId,
           type: "gcode-generate",
-          label: optimise
+          label: prefs.optimise
             ? "Generating G-code (optimised)"
             : "Generating G-code",
           progress: msg.percent,
@@ -563,21 +551,22 @@ export function Toolbar() {
         const safeName = baseName
           .replace(/\.[^.]+$/, "") // strip any existing extension
           .replace(/[\\/:*?"<>|]/g, "_"); // remove filesystem-illegal chars
-        const defaultFilename = optimise
+        const defaultFilename = prefs.optimise
           ? `${safeName}_opt.gcode`
           : `${safeName}.gcode`;
 
-        // ── Connected: upload directly to SD card root ────────────────────
-        if (useMachineStore.getState().connected) {
+        upsertTask({
+          id: taskId,
+          type: "gcode-generate",
+          label: "G-code ready",
+          progress: 100,
+          status: "completed",
+        });
+
+        // ── Upload to SD card (if opted in and connected) ─────────────────
+        if (prefs.uploadToSd && useMachineStore.getState().connected) {
           const uploadTaskId = uuid();
           const remotePath = "/" + defaultFilename;
-          upsertTask({
-            id: taskId,
-            type: "gcode-generate",
-            label: "G-code ready",
-            progress: 100,
-            status: "completed",
-          });
           try {
             await window.terraForge.fluidnc.uploadGcode(
               uploadTaskId,
@@ -591,17 +580,12 @@ export function Toolbar() {
               name: defaultFilename,
             });
           } catch {
-            // Upload error is already surfaced via the task toast — nothing else needed.
+            // Upload error is already surfaced via the upload task toast
           }
-        } else {
-          // ── Not connected: fall back to save dialog ───────────────────────
-          upsertTask({
-            id: taskId,
-            type: "gcode-generate",
-            label: "G-code ready",
-            progress: 100,
-            status: "completed",
-          });
+        }
+
+        // ── Save to local computer (if opted in) ──────────────────────────
+        if (prefs.saveLocally) {
           const savePath =
             await window.terraForge.fs.saveGcodeDialog(defaultFilename);
           if (savePath) {
@@ -731,48 +715,25 @@ export function Toolbar() {
         Import G-code
       </button>
 
-      {/* Generate G-code — split button */}
-      <div ref={optMenuRef} className="relative flex">
-        <button
-          onClick={() => handleGenerateGcode(false)}
-          disabled={generating || imports.length === 0}
-          className="px-3 py-1 rounded-l text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors"
-        >
-          {generating ? "Generating…" : "Generate G-code"}
-        </button>
-        {/* divider */}
-        <div
-          className={`w-px self-stretch ${
-            generating || imports.length === 0
-              ? "bg-[#e94560]/40"
-              : "bg-[#c73d56]"
-          }`}
-        />
-        <button
-          onClick={() => {
-            if (!generating && imports.length > 0) setShowOptMenu((v) => !v);
+      {/* Generate G-code — opens options dialog */}
+      <button
+        onClick={() => setShowGcodeDialog(true)}
+        disabled={generating || imports.length === 0}
+        className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors"
+        title="Choose generation options then generate G-code"
+      >
+        {generating ? "Generating…" : "Generate G-code"}
+      </button>
+
+      {showGcodeDialog && (
+        <GcodeOptionsDialog
+          onConfirm={(prefs) => {
+            setShowGcodeDialog(false);
+            handleGenerateGcode(prefs);
           }}
-          disabled={generating || imports.length === 0}
-          className="px-1.5 py-1 rounded-r text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors leading-none"
-          title="More options"
-        >
-          ▾
-        </button>
-        {showOptMenu && (
-          <div className="absolute top-full left-0 right-0 mt-0.5 bg-[#e94560] rounded shadow-xl z-50 overflow-hidden">
-            <button
-              className="w-full text-left px-3 py-1 text-sm text-white hover:bg-[#c73d56] transition-colors whitespace-nowrap"
-              title="Reorders all subpaths using a nearest-neighbour algorithm to minimise total rapid travel distance between strokes"
-              onClick={() => {
-                setShowOptMenu(false);
-                handleGenerateGcode(true);
-              }}
-            >
-              Generate &amp; optimise
-            </button>
-          </div>
-        )}
-      </div>
+          onCancel={() => setShowGcodeDialog(false)}
+        />
+      )}
 
       <div className="h-4 w-px bg-[#0f3460]" />
 
