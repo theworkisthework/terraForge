@@ -173,4 +173,29 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     expect(screen.getByText("Scale")).toBeInTheDocument();
   });
+
+  it("shows Rotation input when selected", () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({ paths: [path], name: "rot-test" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Rotation (°)")).toBeInTheDocument();
+  });
+
+  it("updates rotation via input", async () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "rot-update",
+      rotation: 0,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    const rotLabel = screen.getByText("Rotation (°)");
+    // eslint-disable-next-line testing-library/no-node-access
+    const rotInput = rotLabel.parentElement!.querySelector("input")!;
+    await userEvent.clear(rotInput);
+    await userEvent.type(rotInput, "45");
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(45);
+  });
 });

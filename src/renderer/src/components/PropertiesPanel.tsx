@@ -261,6 +261,13 @@ export function PropertiesPanel() {
                             0.05,
                             0.001,
                           )}
+                          {/* Rotation — full width */}
+                          {numField(
+                            "Rotation (°)",
+                            imp.rotation,
+                            (v) => updateImport(imp.id, { rotation: v }),
+                            1,
+                          )}
                         </>
                       );
                     })()}

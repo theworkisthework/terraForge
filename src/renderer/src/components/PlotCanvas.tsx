@@ -201,6 +201,15 @@ export function PlotCanvas() {
     startH: number;
   } | null>(null);
 
+  // ── Rotate-handle state ───────────────────────────────────────────────────────
+  const [rotating, setRotating] = useState<{
+    id: string;
+    cx: number; // centre x in SVG canvas px
+    cy: number; // centre y in SVG canvas px
+    startAngle: number; // atan2 of (mouse → centre) vector at mousedown (rad)
+    startRotation: number; // imp.rotation at mousedown (degrees)
+  } | null>(null);
+
   // ── Toolpath selection ────────────────────────────────────────────────────────
   const [toolpathSelected, setToolpathSelected] = useState(false);
 
@@ -330,6 +339,33 @@ export function PlotCanvas() {
     [],
   );
 
+  const onRotateHandleMouseDown = useCallback(
+    (
+      e: React.MouseEvent<SVGCircleElement>,
+      id: string,
+      cxSvg: number,
+      cySvg: number,
+    ) => {
+      e.stopPropagation();
+      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
+      if (!imp) return;
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const vp = vpRef.current;
+      const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
+      const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
+      setRotating({
+        id,
+        cx: cxSvg,
+        cy: cySvg,
+        startAngle: Math.atan2(my - cySvg, mx - cxSvg),
+        startRotation: imp.rotation,
+      });
+    },
+    [],
+  );
+
   // ── Unified window mousemove / mouseup ────────────────────────────────────────
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -404,10 +440,24 @@ export function PlotCanvas() {
         const newScale = Math.min(rawScale, maxScaleX, maxScaleY);
         updateImport(scaling.id, { scale: Math.max(0.05, newScale) });
       }
+
+      // Rotation-handle drag
+      if (rotating) {
+        const container = containerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const vp = vpRef.current;
+        const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
+        const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
+        const angle = Math.atan2(my - rotating.cy, mx - rotating.cx);
+        const delta = (angle - rotating.startAngle) * (180 / Math.PI);
+        updateImport(rotating.id, { rotation: rotating.startRotation + delta });
+      }
     },
     [
       dragging,
       scaling,
+      rotating,
       bedXMin,
       bedXMax,
       bedYMin,
@@ -421,6 +471,7 @@ export function PlotCanvas() {
   const onMouseUp = useCallback(() => {
     setDragging(null);
     setScaling(null);
+    setRotating(null);
     if (panStartRef.current) {
       panStartRef.current = null;
       setIsPanning(false);
@@ -488,7 +539,9 @@ export function PlotCanvas() {
       : "grab"
     : isPanning
       ? "grabbing"
-      : undefined;
+      : rotating
+        ? "crosshair"
+        : undefined;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -732,6 +785,7 @@ export function PlotCanvas() {
                 selected={selectedImportId === imp.id}
                 onImportMouseDown={onImportMouseDown}
                 onHandleMouseDown={onHandleMouseDown}
+                onRotateHandleMouseDown={onRotateHandleMouseDown}
                 onDelete={() => removeImport(imp.id)}
                 getBedY={getBedY}
               />
@@ -1073,7 +1127,9 @@ function RulerOverlay({
   );
 }
 
-// ─── Per-import SVG layer with scale handles ──────────────────────────────────
+// ─── Per-import SVG layer with scale + rotation handles ──────────────────────
+
+const ROTATE_OFFSET = 24; // SVG px above the top-centre edge of bounding box
 
 interface ImportLayerProps {
   imp: SvgImport;
@@ -1084,6 +1140,12 @@ interface ImportLayerProps {
     id: string,
     h: HandlePos,
   ) => void;
+  onRotateHandleMouseDown: (
+    e: React.MouseEvent<SVGCircleElement>,
+    id: string,
+    cxSvg: number,
+    cySvg: number,
+  ) => void;
   onDelete: () => void;
   getBedY: (mm: number) => number;
 }
@@ -1093,6 +1155,7 @@ function ImportLayer({
   selected,
   onImportMouseDown,
   onHandleMouseDown,
+  onRotateHandleMouseDown,
   onDelete,
   getBedY,
 }: ImportLayerProps) {
@@ -1103,21 +1166,44 @@ function ImportLayer({
   const top = getBedY(imp.y + imp.svgHeight * imp.scale);
   const bboxW = imp.svgWidth * s;
   const bboxH = imp.svgHeight * s;
-  const right = left + bboxW;
-  const bottom = top + bboxH;
 
-  // group transform: maps SVG (vbX, vbY) → canvas (left, top)
-  const groupTransform = `translate(${left - vbX * s}, ${top - vbY * s}) scale(${s})`;
+  // Centre of the (unrotated) bounding box in SVG canvas coords
+  const cxSvg = left + bboxW / 2;
+  const cySvg = top + bboxH / 2;
+  const deg = imp.rotation ?? 0;
+  const hw = bboxW / 2;
+  const hh = bboxH / 2;
 
+  // Rotate an offset (ox, oy) by `deg` degrees around the origin
+  const rotPt = (ox: number, oy: number): [number, number] => {
+    const r = (deg * Math.PI) / 180;
+    const c = Math.cos(r);
+    const ss = Math.sin(r);
+    return [ox * c - oy * ss, ox * ss + oy * c];
+  };
+
+  // group transform: centre → rotate → scale → offset to SVG user-unit centre
+  const groupTransform = [
+    `translate(${cxSvg}, ${cySvg})`,
+    `rotate(${deg})`,
+    `scale(${s})`,
+    `translate(${-(vbX + imp.svgWidth / 2)}, ${-(vbY + imp.svgHeight / 2)})`,
+  ].join(" ");
+
+  // 8 scale handles at rotated positions
+  const mkHandle = (ox: number, oy: number): [number, number] => {
+    const [dx, dy] = rotPt(ox, oy);
+    return [cxSvg + dx, cySvg + dy];
+  };
   const handleCoords: Record<HandlePos, [number, number]> = {
-    tl: [left, top],
-    t: [left + bboxW / 2, top],
-    tr: [right, top],
-    r: [right, top + bboxH / 2],
-    br: [right, bottom],
-    b: [left + bboxW / 2, bottom],
-    bl: [left, bottom],
-    l: [left, top + bboxH / 2],
+    tl: mkHandle(-hw, -hh),
+    t: mkHandle(0, -hh),
+    tr: mkHandle(hw, -hh),
+    r: mkHandle(hw, 0),
+    br: mkHandle(hw, hh),
+    b: mkHandle(0, hh),
+    bl: mkHandle(-hw, hh),
+    l: mkHandle(-hw, 0),
   };
 
   const cursorMap: Record<HandlePos, string> = {
@@ -1131,8 +1217,18 @@ function ImportLayer({
     l: "ew-resize",
   };
 
-  const delCx = right + 18;
-  const delCy = top - 18;
+  // Rotation handle — above the top-centre edge
+  const [rhdx, rhdy] = rotPt(0, -hh - ROTATE_OFFSET);
+  const rotHandleX = cxSvg + rhdx;
+  const rotHandleY = cySvg + rhdy;
+  const [topCdx, topCdy] = rotPt(0, -hh);
+  const topCentreX = cxSvg + topCdx;
+  const topCentreY = cySvg + topCdy;
+
+  // Delete button — offset from rotated top-right corner
+  const [trDx, trDy] = rotPt(hw, -hh);
+  const delCx = cxSvg + trDx + 14;
+  const delCy = cySvg + trDy - 14;
 
   return (
     <g>
@@ -1164,7 +1260,7 @@ function ImportLayer({
         />
       </g>
 
-      {/* Bounding box */}
+      {/* Bounding box — rotated around its centre */}
       {selected && (
         <rect
           x={left}
@@ -1175,11 +1271,12 @@ function ImportLayer({
           stroke="#e94560"
           strokeWidth={1}
           strokeDasharray="4 2"
+          transform={`rotate(${deg}, ${cxSvg}, ${cySvg})`}
           pointerEvents="none"
         />
       )}
 
-      {/* Scale handles */}
+      {/* Scale handles at rotated positions */}
       {selected &&
         ALL_HANDLES.map((h) => {
           const [hx, hy] = handleCoords[h];
@@ -1197,6 +1294,33 @@ function ImportLayer({
             />
           );
         })}
+
+      {/* Rotation handle — stem line + circle above top-centre edge */}
+      {selected && (
+        <>
+          <line
+            x1={topCentreX}
+            y1={topCentreY}
+            x2={rotHandleX}
+            y2={rotHandleY}
+            stroke="#e94560"
+            strokeWidth={1}
+            pointerEvents="none"
+          />
+          <circle
+            cx={rotHandleX}
+            cy={rotHandleY}
+            r={HANDLE_R}
+            fill="#e94560"
+            stroke="#fff"
+            strokeWidth={1.5}
+            style={{ cursor: "crosshair" }}
+            onMouseDown={(e) =>
+              onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)
+            }
+          />
+        </>
+      )}
 
       {/* Delete button */}
       {selected && (

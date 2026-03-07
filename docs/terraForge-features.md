@@ -173,12 +173,11 @@
 
 ## Not Yet Implemented
 
-- [ ] **Pen pressure** Encode pen height into source drawing (3d model with z height). how do we do this? 
-
+- [ ] **Pen pressure** Encode pen height into source drawing (3d model with z height). how do we do this?
 
 ### Canvas
 
-- [ ] **Rotation** — spec calls for rotation handle/input; `rotation` field exists in the data model but is not applied on canvas or in G-code output
+- [x] **Rotation** — rotation handle (filled circle above the top-centre edge of the selection box) supports drag-to-rotate; bounding box and all 8 scale handles track the rotated position; rotation numeric input in the Properties panel; rotation is applied in G-code output via `transformPt` in `gcodeEngine.ts`
 - [x] **Canvas zoom / pan** — scroll-to-zoom (mouse wheel), Space+drag pan, middle-mouse-button drag pan, +/− overlay buttons, keyboard shortcuts (Ctrl+Shift++/−)
 - [ ] **Snap to grid** — no grid snapping when dragging
 - [ ] **Undo / redo** — no history stack
