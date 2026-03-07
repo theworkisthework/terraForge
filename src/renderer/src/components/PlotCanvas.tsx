@@ -1,5 +1,16 @@
-// Portions of SVG icon data (square-x) from Lucide (https://lucide.dev)
-// Copyright (c) 2020, Lucide Contributors — ISC License
+// Portions of SVG icon data (square-x, rotate-cw) from Lucide (https://lucide.dev)
+// ISC License
+// Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of
+// Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
+// Permission to use, copy, modify, and/or distribute this software for any purpose
+// with or without fee is hereby granted, provided that the above copyright notice
+// and this permission notice appear in all copies.
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+// REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+// FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT,
+// OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+// DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+// ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
@@ -11,6 +22,15 @@ const HANDLE_R = 5; // handle radius in SVG pixels
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 20;
 const ZOOM_STEP = 1.25; // per keyboard / button press
+
+// Lucide rotate-cw cursor shown on the rotation handle and while rotating.
+// White stroke, 24×24, encoded as an SVG data URL.
+// Hotspot centred at (12, 12); fallback to ew-resize for browsers that don't support custom cursors.
+const ROTATE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E" +
+  "%3Cpath d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/%3E" +
+  "%3Cpath d='M21 3v5h-5'/%3E" +
+  '%3C/svg%3E") 12 12, ew-resize';
 
 // Handle positions: top-left, top, top-right, right, bottom-right, bottom, bottom-left, left
 type HandlePos = "tl" | "t" | "tr" | "r" | "br" | "b" | "bl" | "l";
@@ -540,7 +560,7 @@ export function PlotCanvas() {
     : isPanning
       ? "grabbing"
       : rotating
-        ? "crosshair"
+        ? ROTATE_CURSOR
         : undefined;
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -1314,7 +1334,7 @@ function ImportLayer({
             fill="#e94560"
             stroke="#fff"
             strokeWidth={1.5}
-            style={{ cursor: "crosshair" }}
+            style={{ cursor: ROTATE_CURSOR }}
             onMouseDown={(e) =>
               onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)
             }
