@@ -408,21 +408,9 @@ export function PlotCanvas() {
         const zoom = vpRef.current.zoom;
         const dx = (e.clientX - dragging.startMouseX) / (MM_TO_PX * zoom);
         const dy = -(e.clientY - dragging.startMouseY) / (MM_TO_PX * zoom);
-        // Look up current dimensions so the far edge can't leave the bed
-        const imp = useCanvasStore
-          .getState()
-          .imports.find((i) => i.id === dragging.id);
-        const objW = imp ? imp.svgWidth * imp.scale : 0;
-        const objH = imp ? imp.svgHeight * imp.scale : 0;
         updateImport(dragging.id, {
-          x: Math.max(
-            bedXMin,
-            Math.min(dragging.startObjX + dx, bedXMax - objW),
-          ),
-          y: Math.max(
-            bedYMin,
-            Math.min(dragging.startObjY + dy, bedYMax - objH),
-          ),
+          x: dragging.startObjX + dx,
+          y: dragging.startObjY + dy,
         });
       }
 
@@ -446,20 +434,7 @@ export function PlotCanvas() {
           0.05,
           scaling.startScale * (1 + delta / dimPx),
         );
-        // Clamp scale so the object's far edge stays within the bed
-        const imp = useCanvasStore
-          .getState()
-          .imports.find((i) => i.id === scaling.id);
-        const maxScaleX =
-          imp && imp.svgWidth > 0
-            ? (bedXMax - scaling.startObjX) / imp.svgWidth
-            : Infinity;
-        const maxScaleY =
-          imp && imp.svgHeight > 0
-            ? (bedYMax - scaling.startObjY) / imp.svgHeight
-            : Infinity;
-        const newScale = Math.min(rawScale, maxScaleX, maxScaleY);
-        updateImport(scaling.id, { scale: Math.max(0.05, newScale) });
+        updateImport(scaling.id, { scale: rawScale });
       }
 
       // Rotation-handle drag
@@ -479,10 +454,6 @@ export function PlotCanvas() {
       dragging,
       scaling,
       rotating,
-      bedXMin,
-      bedXMax,
-      bedYMin,
-      bedYMax,
       updateImport,
       setVp,
       setFitted,

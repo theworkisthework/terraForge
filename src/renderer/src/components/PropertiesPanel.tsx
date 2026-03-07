@@ -7,7 +7,6 @@
 // and this permission notice appear in all copies.
 import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
-import { useMachineStore } from "../store/machineStore";
 
 const ROT_STEPS = [1, 5, 15, 30, 45] as const;
 type RotStep = (typeof ROT_STEPS)[number];
@@ -23,7 +22,6 @@ export function PropertiesPanel() {
   const removePath = useCanvasStore((s) => s.removePath);
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
-  const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingName, setEditingName] = useState<{
@@ -197,39 +195,23 @@ export function PropertiesPanel() {
                 {isSelected && (
                   <div className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30">
                     {(() => {
-                      const cfg = activeConfig();
-                      const bedW = cfg?.bedWidth ?? Infinity;
-                      const bedH = cfg?.bedHeight ?? Infinity;
                       const objW = imp.svgWidth * imp.scale;
                       const objH = imp.svgHeight * imp.scale;
-                      const maxX = Math.max(0, bedW - objW);
-                      const maxY = Math.max(0, bedH - objH);
-                      // Max W/H = remaining bed space from the object's current origin
-                      const maxW = Math.max(0.001, bedW - imp.x);
-                      const maxH = Math.max(0.001, bedH - imp.y);
                       return (
                         <>
-                          {/* X / Y — two columns */}
+                          {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
                           <div className="grid grid-cols-2 gap-2 mb-0">
                             {numField(
                               "X (mm)",
                               imp.x,
-                              (v) =>
-                                updateImport(imp.id, {
-                                  x: Math.max(0, Math.min(v, maxX)),
-                                }),
+                              (v) => updateImport(imp.id, { x: v }),
                               0.5,
-                              0,
                             )}
                             {numField(
                               "Y (mm)",
                               imp.y,
-                              (v) =>
-                                updateImport(imp.id, {
-                                  y: Math.max(0, Math.min(v, maxY)),
-                                }),
+                              (v) => updateImport(imp.id, { y: v }),
                               0.5,
-                              0,
                             )}
                           </div>
                           {/* W / H — two columns, linked to scale */}
@@ -237,30 +219,20 @@ export function PropertiesPanel() {
                             {numField(
                               "W (mm)",
                               objW,
-                              (v) => {
-                                const clamped = Math.max(
-                                  0.001,
-                                  Math.min(v, maxW),
-                                );
+                              (v) =>
                                 updateImport(imp.id, {
-                                  scale: clamped / imp.svgWidth,
-                                });
-                              },
+                                  scale: Math.max(0.001, v) / imp.svgWidth,
+                                }),
                               0.5,
                               0.001,
                             )}
                             {numField(
                               "H (mm)",
                               objH,
-                              (v) => {
-                                const clamped = Math.max(
-                                  0.001,
-                                  Math.min(v, maxH),
-                                );
+                              (v) =>
                                 updateImport(imp.id, {
-                                  scale: clamped / imp.svgHeight,
-                                });
-                              },
+                                  scale: Math.max(0.001, v) / imp.svgHeight,
+                                }),
                               0.5,
                               0.001,
                             )}

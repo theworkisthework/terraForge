@@ -16,6 +16,7 @@
 import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
 import {
   flattenToSubpaths,
+  clipSubpathsToBed,
   nearestNeighbourSort,
   fmtCoord as fmt,
   type Subpath,
@@ -88,8 +89,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
         self.postMessage({ type: "cancelled", taskId });
         return;
       }
-      const subpaths = flattenToSubpaths(visibleObjects[i], config);
-      for (const sp of subpaths) {
+      const raw = flattenToSubpaths(visibleObjects[i], config);
+      for (const sp of clipSubpathsToBed(raw, config)) {
         if (sp.length >= 2) allSubpaths.push(sp);
       }
       self.postMessage({
@@ -144,7 +145,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
         `; ── Object ${i + 1} (${obj.id.slice(0, 8)}) ─────────────────`,
       );
 
-      const subpaths = flattenToSubpaths(obj, config);
+      const subpaths = clipSubpathsToBed(flattenToSubpaths(obj, config), config);
 
       for (const subpath of subpaths) {
         if (subpath.length < 2) continue;
