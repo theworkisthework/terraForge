@@ -9,9 +9,9 @@ import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 
-const ROT_STEPS = [15, 45, 90] as const;
+const ROT_STEPS = [1, 5, 15, 30, 45] as const;
 type RotStep = (typeof ROT_STEPS)[number];
-const ROT_PRESETS = [0, 45, 90, 135, 180] as const;
+const ROT_PRESETS = [0, 45, 90, 135, 180, 225, 270, 315] as const;
 
 export function PropertiesPanel() {
   const imports = useCanvasStore((s) => s.imports);
