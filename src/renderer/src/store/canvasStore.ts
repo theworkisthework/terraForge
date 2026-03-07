@@ -8,16 +8,22 @@ interface CanvasState {
   selectedImportId: string | null;
   selectedPathId: string | null;
   gcodeToolpath: GcodeToolpath | null;
+  showCentreMarker: boolean;
 
   addImport: (imp: SvgImport) => void;
   removeImport: (id: string) => void;
   updateImport: (id: string, patch: Partial<SvgImport>) => void;
-  updatePath: (importId: string, pathId: string, patch: Partial<SvgPath>) => void;
+  updatePath: (
+    importId: string,
+    pathId: string,
+    patch: Partial<SvgPath>,
+  ) => void;
   removePath: (importId: string, pathId: string) => void;
   selectImport: (id: string | null) => void;
   clearImports: () => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
+  toggleCentreMarker: () => void;
   toVectorObjects: () => VectorObject[];
 }
 
@@ -27,9 +33,12 @@ export const useCanvasStore = create<CanvasState>()(
     selectedImportId: null,
     selectedPathId: null,
     gcodeToolpath: null,
+    showCentreMarker: true,
 
     addImport: (imp) =>
-      set((state) => { state.imports.push(imp); }),
+      set((state) => {
+        state.imports.push(imp);
+      }),
 
     removeImport: (id) =>
       set((state) => {
@@ -81,25 +90,36 @@ export const useCanvasStore = create<CanvasState>()(
     },
 
     setGcodeToolpath: (tp) =>
-      set((state) => { state.gcodeToolpath = tp as GcodeToolpath; }),
+      set((state) => {
+        state.gcodeToolpath = tp as GcodeToolpath;
+      }),
+
+    toggleCentreMarker: () =>
+      set((state) => {
+        state.showCentreMarker = !state.showCentreMarker;
+      }),
 
     toVectorObjects: (): VectorObject[] =>
       get()
         .imports.filter((imp) => imp.visible)
         .flatMap((imp) =>
-          imp.paths.filter((p) => p.visible).map((p): VectorObject => ({
-            id: p.id,
-            svgSource: p.svgSource,
-            path: p.d,
-            x: imp.x,
-            y: imp.y,
-            scale: imp.scale,
-            rotation: imp.rotation,
-            visible: true,
-            originalWidth: imp.svgWidth,
-            originalHeight: imp.svgHeight,
-            layer: p.layer,
-          })),
+          imp.paths
+            .filter((p) => p.visible)
+            .map(
+              (p): VectorObject => ({
+                id: p.id,
+                svgSource: p.svgSource,
+                path: p.d,
+                x: imp.x,
+                y: imp.y,
+                scale: imp.scale,
+                rotation: imp.rotation,
+                visible: true,
+                originalWidth: imp.svgWidth,
+                originalHeight: imp.svgHeight,
+                layer: p.layer,
+              }),
+            ),
         ),
   })),
 );

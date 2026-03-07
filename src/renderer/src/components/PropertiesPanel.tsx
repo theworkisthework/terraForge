@@ -21,6 +21,8 @@ export function PropertiesPanel() {
   const updateImport = useCanvasStore((s) => s.updateImport);
   const updatePath = useCanvasStore((s) => s.updatePath);
   const removePath = useCanvasStore((s) => s.removePath);
+  const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
+  const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
   const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -384,6 +386,39 @@ export function PropertiesPanel() {
                             </div>
 
                             <span className="flex-1" />
+
+                            {/* Centre-of-rotation marker toggle */}
+                            <button
+                              className={`p-1.5 transition-colors rounded hover:bg-[#0f3460]/40 ${
+                                showCentreMarker
+                                  ? "text-[#e94560] hover:text-[#e94560]"
+                                  : "text-gray-600 hover:text-gray-300"
+                              }`}
+                              title={
+                                showCentreMarker
+                                  ? "Hide centre marker"
+                                  : "Show centre marker"
+                              }
+                              onClick={toggleCentreMarker}
+                            >
+                              {/* Lucide crosshair icon */}
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="22" y1="12" x2="18" y2="12" />
+                                <line x1="6" y1="12" x2="2" y2="12" />
+                                <line x1="12" y1="6" x2="12" y2="2" />
+                                <line x1="12" y1="22" x2="12" y2="18" />
+                              </svg>
+                            </button>
 
                             {/* Magnet — cycles through angle presets */}
                             <button

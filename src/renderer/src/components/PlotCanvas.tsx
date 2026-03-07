@@ -1325,6 +1325,7 @@ function HandleOverlay({
   onRotateHandleMouseDown,
   onDelete,
 }: HandleOverlayProps) {
+  const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const s = imp.scale * MM_TO_PX;
   const left = PAD + imp.x * MM_TO_PX;
   const top = getBedY(imp.y + imp.svgHeight * imp.scale);
@@ -1429,6 +1430,44 @@ function HandleOverlay({
         strokeDasharray="4 2"
         pointerEvents="none"
       />
+
+      {/* Centre-of-rotation crosshair — toggled from Properties panel */}
+      {showCentreMarker &&
+        (() => {
+          const [cx, cy] = w2s(cxSvg, cySvg);
+          const A = 6; // arm half-length in screen px
+          return (
+            <g pointerEvents="none">
+              <circle
+                cx={cx}
+                cy={cy}
+                r={A}
+                fill="none"
+                stroke="#fff"
+                strokeWidth={1.5}
+                opacity={0.85}
+              />
+              <line
+                x1={cx - A}
+                y1={cy}
+                x2={cx + A}
+                y2={cy}
+                stroke="#fff"
+                strokeWidth={1.5}
+                opacity={0.85}
+              />
+              <line
+                x1={cx}
+                y1={cy - A}
+                x2={cx}
+                y2={cy + A}
+                stroke="#fff"
+                strokeWidth={1.5}
+                opacity={0.85}
+              />
+            </g>
+          );
+        })()}
 
       {/* 8 scale handles */}
       {HANDLE_DEFS.map(({ id, ox, oy }) => {
