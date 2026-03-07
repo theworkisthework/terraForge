@@ -1,6 +1,17 @@
+// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down) from Lucide (https://lucide.dev)
+// ISC License
+// Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of
+// Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
+// Permission to use, copy, modify, and/or distribute this software for any purpose
+// with or without fee is hereby granted, provided that the above copyright notice
+// and this permission notice appear in all copies.
 import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
+
+const ROT_STEPS = [15, 45, 90] as const;
+type RotStep = (typeof ROT_STEPS)[number];
+const ROT_PRESETS = [0, 45, 90, 135, 180] as const;
 
 export function PropertiesPanel() {
   const imports = useCanvasStore((s) => s.imports);
@@ -17,6 +28,8 @@ export function PropertiesPanel() {
     id: string;
     value: string;
   } | null>(null);
+  const [rotStep, setRotStep] = useState<RotStep>(45);
+  const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
 
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => {
@@ -268,6 +281,142 @@ export function PropertiesPanel() {
                             (v) => updateImport(imp.id, { rotation: v }),
                             1,
                           )}
+                          {/* Rotation shortcut row: CCW | CW | step flyout | magnet cycle */}
+                          <div className="flex items-center gap-0.5 mb-2">
+                            {/* CCW — borderless icon button */}
+                            <button
+                              className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                              title={`Rotate ${rotStep}° counter-clockwise`}
+                              onClick={() =>
+                                updateImport(imp.id, {
+                                  rotation: imp.rotation - rotStep,
+                                })
+                              }
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                <path d="M3 3v5h5" />
+                              </svg>
+                            </button>
+
+                            {/* CW — borderless icon button */}
+                            <button
+                              className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                              title={`Rotate ${rotStep}° clockwise`}
+                              onClick={() =>
+                                updateImport(imp.id, {
+                                  rotation: imp.rotation + rotStep,
+                                })
+                              }
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                                <path d="M21 3v5h-5" />
+                              </svg>
+                            </button>
+
+                            {/* Step flyout trigger */}
+                            <div className="relative">
+                              <button
+                                className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-gray-400 hover:text-gray-100 rounded hover:bg-[#0f3460]/40 transition-colors"
+                                title="Change rotation step"
+                                onClick={() => setStepFlyoutOpen((o) => !o)}
+                              >
+                                {rotStep}°
+                                <svg
+                                  width="10"
+                                  height="10"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="m6 9 6 6 6-6" />
+                                </svg>
+                              </button>
+                              {stepFlyoutOpen && (
+                                <>
+                                  {/* Invisible backdrop to close on outside click */}
+                                  <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setStepFlyoutOpen(false)}
+                                  />
+                                  <div className="absolute bottom-full left-0 mb-1 bg-[#16213e] border border-[#0f3460] rounded shadow-xl z-20 py-0.5 min-w-[4rem]">
+                                    {ROT_STEPS.map((s) => (
+                                      <button
+                                        key={s}
+                                        className={`block w-full text-left px-3 py-1 text-[10px] transition-colors ${
+                                          rotStep === s
+                                            ? "text-gray-100 bg-[#0f3460]"
+                                            : "text-gray-400 hover:text-gray-100 hover:bg-[#0f3460]/50"
+                                        }`}
+                                        onClick={() => {
+                                          setRotStep(s);
+                                          setStepFlyoutOpen(false);
+                                        }}
+                                      >
+                                        {s}°
+                                      </button>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            <span className="flex-1" />
+
+                            {/* Magnet — cycles through angle presets */}
+                            <button
+                              className="p-1.5 text-gray-400 hover:text-[#e94560] transition-colors rounded hover:bg-[#0f3460]/40"
+                              title={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
+                              onClick={() => {
+                                const norm = ((imp.rotation % 360) + 360) % 360;
+                                const idx = ROT_PRESETS.findIndex(
+                                  (p) => Math.abs(p - norm) < 1,
+                                );
+                                const next =
+                                  ROT_PRESETS[
+                                    idx < 0 ? 0 : (idx + 1) % ROT_PRESETS.length
+                                  ];
+                                updateImport(imp.id, { rotation: next });
+                              }}
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3Z" />
+                                <path d="m5 8 4 4" />
+                                <path d="m12 15 4 4" />
+                              </svg>
+                            </button>
+                          </div>
                         </>
                       );
                     })()}
