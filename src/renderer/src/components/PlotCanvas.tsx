@@ -185,6 +185,9 @@ export function PlotCanvas() {
     panX: number;
     panY: number;
   } | null>(null);
+  // Set to true at the end of any drag gesture so the SVG's onClick does not
+  // immediately deselect the import that was just moved / scaled / rotated.
+  const justDraggedRef = useRef(false);
   const [spaceDown, setSpaceDown] = useState(false);
   const spaceRef = useRef(false);
   const [isPanning, setIsPanning] = useState(false);
@@ -489,6 +492,11 @@ export function PlotCanvas() {
   );
 
   const onMouseUp = useCallback(() => {
+    // If any gesture was active, mark it so the SVG onClick can ignore the
+    // synthetic click that the browser fires after mouseup.
+    if (dragging || scaling || rotating || panStartRef.current) {
+      justDraggedRef.current = true;
+    }
     setDragging(null);
     setScaling(null);
     setRotating(null);
@@ -496,7 +504,7 @@ export function PlotCanvas() {
       panStartRef.current = null;
       setIsPanning(false);
     }
-  }, []);
+  }, [dragging, scaling, rotating]);
 
   useEffect(() => {
     window.addEventListener("mousemove", onMouseMove);
@@ -589,6 +597,12 @@ export function PlotCanvas() {
           height={canvasH}
           className="cursor-default"
           onClick={() => {
+            // Suppress deselect if a drag/scale/rotate/pan gesture just ended;
+            // the browser synthesises a click on mouseup even after a drag.
+            if (justDraggedRef.current) {
+              justDraggedRef.current = false;
+              return;
+            }
             selectImport(null);
             setToolpathSelected(false);
           }}
