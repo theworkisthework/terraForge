@@ -450,14 +450,7 @@ export function PlotCanvas() {
         updateImport(rotating.id, { rotation: rotating.startRotation + delta });
       }
     },
-    [
-      dragging,
-      scaling,
-      rotating,
-      updateImport,
-      setVp,
-      setFitted,
-    ],
+    [dragging, scaling, rotating, updateImport, setVp, setFitted],
   );
 
   const onMouseUp = useCallback(() => {

@@ -145,7 +145,10 @@ async function generate(msg: GenerateMessage): Promise<void> {
         `; ── Object ${i + 1} (${obj.id.slice(0, 8)}) ─────────────────`,
       );
 
-      const subpaths = clipSubpathsToBed(flattenToSubpaths(obj, config), config);
+      const subpaths = clipSubpathsToBed(
+        flattenToSubpaths(obj, config),
+        config,
+      );
 
       for (const subpath of subpaths) {
         if (subpath.length < 2) continue;

@@ -618,16 +618,7 @@ export function clipSubpathsToBed(
     for (let i = 0; i + 1 < subpath.length; i++) {
       const p0 = subpath[i];
       const p1 = subpath[i + 1];
-      const clip = liangBarsky(
-        p0.x,
-        p0.y,
-        p1.x,
-        p1.y,
-        xMin,
-        xMax,
-        yMin,
-        yMax,
-      );
+      const clip = liangBarsky(p0.x, p0.y, p1.x, p1.y, xMin, xMax, yMin, yMax);
 
       if (clip === null) {
         // Segment fully outside — flush any open run.
