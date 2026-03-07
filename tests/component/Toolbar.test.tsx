@@ -286,4 +286,81 @@ describe("Toolbar", () => {
     await userEvent.selectOptions(select, c2.id);
     expect(useMachineStore.getState().activeConfigId).toBe(c2.id);
   });
+
+  // ── Generate & optimise split button ──────────────────────────────────
+
+  describe("Generate & optimise split button", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("▾ dropdown trigger is disabled when no imports", () => {
+      render(<Toolbar />);
+      expect(screen.getByTitle("More options")).toBeDisabled();
+    });
+
+    it("▾ trigger reveals dropdown with 'Generate & optimise' option", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      expect(screen.queryByText("Generate & optimise")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByTitle("More options"));
+      expect(screen.getByText("Generate & optimise")).toBeInTheDocument();
+    });
+
+    it("'Generate & optimise' button has nearest-neighbour tooltip", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByTitle("More options"));
+      expect(screen.getByTitle(/nearest-neighbour/i)).toBeInTheDocument();
+    });
+
+    it("clicking 'Generate & optimise' closes the dropdown and starts an optimised task", async () => {
+      // Worker must be a proper constructor (class or function) for `new Worker(...)` to work.
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByTitle("More options"));
+      expect(screen.getByText("Generate & optimise")).toBeInTheDocument();
+      await userEvent.click(screen.getByText("Generate & optimise"));
+
+      // Dropdown should be closed
+      expect(screen.queryByText("Generate & optimise")).not.toBeInTheDocument();
+
+      // A gcode-generate task should be registered in the store
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        expect(tasks.some((t) => t.type === "gcode-generate")).toBe(true);
+      });
+
+      // The worker was sent a message with optimisePaths: true
+      const instance = workerInstances[0];
+      expect(instance?.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "generate",
+          options: expect.objectContaining({ optimisePaths: true }),
+        }),
+      );
+    });
+  });
 });

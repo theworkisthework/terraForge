@@ -238,4 +238,68 @@ describe("MachineConfigDialog", () => {
       expect.objectContaining({ name: "Renamed" }),
     );
   });
+
+  // ── Pen type change auto-populates commands ────────────────────────────
+
+  describe("pen type change", () => {
+    it("switching from solenoid to servo auto-populates servo defaults", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      // Initial solenoid commands are visible
+      expect(screen.getByDisplayValue("M3S0")).toBeInTheDocument();
+      // Change pen type — commands match current defaults so no confirm needed
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid"),
+        "servo",
+      );
+      // Should auto-populate servo defaults
+      expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
+    });
+
+    it("switching to stepper populates stepper defaults (G0Z15 / G0Z0)", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid"),
+        "stepper",
+      );
+      expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
+    });
+
+    it("switching with customised commands triggers confirm dialog", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      render(<MachineConfigDialog onClose={onClose} />);
+      // Customise the pen-up command so it no longer matches the solenoid default
+      const upInput = screen.getByDisplayValue("M3S0");
+      await userEvent.clear(upInput);
+      await userEvent.type(upInput, "CUSTOM");
+      // Now change pen type — should trigger confirm
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid"),
+        "servo",
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      // User accepted → servo defaults applied
+      expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
+      confirmSpy.mockRestore();
+    });
+
+    it("declining the confirm preserves custom commands but updates pen type label", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      render(<MachineConfigDialog onClose={onClose} />);
+      // Customise pen-up command
+      const upInput = screen.getByDisplayValue("M3S0");
+      await userEvent.clear(upInput);
+      await userEvent.type(upInput, "CUSTOM");
+      // Change pen type — user declines overwrite
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid"),
+        "servo",
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      // Commands should remain as custom (not overwritten)
+      expect(screen.getByDisplayValue("CUSTOM")).toBeInTheDocument();
+      confirmSpy.mockRestore();
+    });
+  });
 });

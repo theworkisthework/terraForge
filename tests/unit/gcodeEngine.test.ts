@@ -503,3 +503,194 @@ describe("fmtCoord", () => {
     expect(fmtCoord(-3.1)).toBe("-3.100");
   });
 });
+
+// ── toAbsolute — S and T relative variants ────────────────────────────────────
+
+describe("toAbsolute (smooth commands)", () => {
+  it("converts relative s to absolute S", () => {
+    // M 0,0 then C puts current at (50,60) with last cp at (30,40)
+    const abs = toAbsolute([
+      { type: "M", args: [0, 0] },
+      { type: "C", args: [10, 20, 30, 40, 50, 60] },
+      { type: "s", args: [5, 5, 10, 10] }, // relative: cp2=(50+5,60+5), end=(50+10,60+10)
+    ]);
+    expect(abs[2].type).toBe("S");
+    expect(abs[2].args).toEqual([55, 65, 60, 70]);
+  });
+
+  it("converts relative t to absolute T", () => {
+    // M 0,0 then Q: current at (100,0)
+    const abs = toAbsolute([
+      { type: "M", args: [0, 0] },
+      { type: "Q", args: [50, 100, 100, 0] },
+      { type: "t", args: [20, 0] }, // relative: endpoint=(100+20, 0+0)
+    ]);
+    expect(abs[2].type).toBe("T");
+    expect(abs[2].args).toEqual([120, 0]);
+  });
+
+  it("converts multiple relative s args in one token", () => {
+    const abs = toAbsolute([
+      { type: "M", args: [0, 0] },
+      { type: "s", args: [10, 10, 20, 20, 5, 5, 30, 30] }, // two S segments
+    ]);
+    // First S: cp2=(10,10), end=(20,20); second S: cp2=(20+5,20+5)=(25,25), end=(20+30,20+30)=(50,50)
+    expect(abs[1].type).toBe("S");
+    expect(abs[1].args[0]).toBe(10);
+    expect(abs[1].args[1]).toBe(10);
+    expect(abs[1].args[2]).toBe(20);
+    expect(abs[1].args[3]).toBe(20);
+    expect(abs[1].args[4]).toBe(25);
+    expect(abs[1].args[5]).toBe(25);
+    expect(abs[1].args[6]).toBe(50);
+    expect(abs[1].args[7]).toBe(50);
+  });
+});
+
+// ── transformPt — rotation ────────────────────────────────────────────────────
+
+describe("transformPt (rotation)", () => {
+  it("rotates 90° around object origin before applying position", () => {
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    const obj = createVectorObject({
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 90, // 90 degrees
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    // SVG point (10, 0), rotated 90°: cos=0, sin=1
+    // x' = 10*0 - 0*1 = 0, y' = 10*1 + 0*0 = 10
+    // top-left: no flip, so result = (0+0, 10+0) = (0, 10)
+    const pt = transformPt(obj, cfg, 10, 0);
+    expect(pt.x).toBeCloseTo(0, 1);
+    expect(pt.y).toBeCloseTo(10, 1);
+  });
+
+  it("rotates 45° produces correct components", () => {
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    const obj = createVectorObject({
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 45,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    // SVG point (10, 0): rotated 45° → (10*cos45, 10*sin45) ≈ (7.07, 7.07)
+    const pt = transformPt(obj, cfg, 10, 0);
+    expect(pt.x).toBeCloseTo(10 * Math.cos(Math.PI / 4), 1);
+    expect(pt.y).toBeCloseTo(10 * Math.sin(Math.PI / 4), 1);
+  });
+});
+
+// ── flattenToSubpaths — S and T smooth commands ───────────────────────────────
+
+describe("flattenToSubpaths (S and T smooth curves)", () => {
+  const cfg = createMachineConfig({
+    origin: "top-left",
+    bedWidth: 400,
+    bedHeight: 400,
+  });
+
+  it("flattens S (smooth cubic) to multiple points", () => {
+    // C sets lastCpX/Y to the second control point; S reflects it
+    const obj = createVectorObject({
+      path: "M 0 0 C 10 20 30 40 50 60 S 70 80 90 100",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    // Should have more than 2 points (bezier subdivided)
+    expect(sp[0].length).toBeGreaterThan(2);
+    // Endpoint should be near (90,100) in top-left space
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(90, 0);
+    expect(last.y).toBeCloseTo(100, 0);
+  });
+
+  it("S command after M (no preceding C) uses current point as both control points", () => {
+    // Without a preceding C/S, the reflection degenerates to the current point
+    const obj = createVectorObject({
+      path: "M 0 0 S 50 50 100 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(100, 0);
+    expect(last.y).toBeCloseTo(0, 0);
+  });
+
+  it("flattens T (smooth quadratic) to multiple points", () => {
+    // Q sets lastCpX/Y; T reflects it
+    const obj = createVectorObject({
+      path: "M 0 0 Q 25 50 50 0 T 100 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    expect(sp[0].length).toBeGreaterThan(2);
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(100, 0);
+    expect(last.y).toBeCloseTo(0, 0);
+  });
+
+  it("T command after M (no preceding Q) uses current point as control point", () => {
+    const obj = createVectorObject({
+      path: "M 0 0 T 50 50",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(50, 0);
+    expect(last.y).toBeCloseTo(50, 0);
+  });
+
+  it("chained T commands each reflect the previous control point", () => {
+    const obj = createVectorObject({
+      path: "M 0 0 Q 25 50 50 0 T 100 0 T 150 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 300,
+      originalHeight: 200,
+    });
+    const sp = flattenToSubpaths(obj, cfg);
+    expect(sp).toHaveLength(1);
+    const last = sp[0][sp[0].length - 1];
+    expect(last.x).toBeCloseTo(150, 0);
+    expect(last.y).toBeCloseTo(0, 0);
+  });
+});
