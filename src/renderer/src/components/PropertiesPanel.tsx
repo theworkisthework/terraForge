@@ -377,13 +377,16 @@ export function PropertiesPanel() {
                                 <button
                                   className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
                                   title={`Fit to bed (scale ${Math.round(fitScale * 1000) / 1000})`}
-                                  onClick={() =>
+                                  onClick={() => {
+                                    setRatioLocked(true);
                                     updateImport(imp.id, {
                                       scale: fitScale,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
                                       x: 0,
                                       y: 0,
-                                    })
-                                  }
+                                    });
+                                  }}
                                 >
                                   <svg
                                     width="14"
@@ -405,9 +408,14 @@ export function PropertiesPanel() {
                                 <button
                                   className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
                                   title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
-                                  onClick={() =>
-                                    updateImport(imp.id, { scale: 1 })
-                                  }
+                                  onClick={() => {
+                                    setRatioLocked(true);
+                                    updateImport(imp.id, {
+                                      scale: 1,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                    });
+                                  }}
                                 >
                                   <svg
                                     width="14"
