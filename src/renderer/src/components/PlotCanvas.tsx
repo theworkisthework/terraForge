@@ -1288,7 +1288,7 @@ function ImportLayer({
 
 const HANDLE_SCREEN_R = 5; // handle circle radius (screen px)
 const ROTATE_STEM_PX = 24; // rotation-handle stem length (screen px)
-const DEL_OFFSET_PX = 14; // delete button distance from TR corner (screen px)
+const DEL_OFFSET_PX = 26; // delete button distance from TR corner (screen px)
 const DEL_HALF_PX = 9; // half-size of delete icon (screen px)
 
 interface HandleOverlayProps {
@@ -1396,11 +1396,16 @@ function HandleOverlay({
   const rotHx = topCx + Math.sin(degRad) * ROTATE_STEM_PX;
   const rotHy = topCy - Math.cos(degRad) * ROTATE_STEM_PX;
 
-  // Delete button: fixed DEL_OFFSET_PX screen pixels from top-right corner
+  // Delete button: DEL_OFFSET_PX screen pixels from the TR corner along the
+  // rotated outward diagonal (bisects both edges at that corner, so it stays
+  // at 45° from each edge regardless of rotation).
   const [trDx, trDy] = rotPt(hw, -hh);
   const [trSx, trSy] = w2s(cxSvg + trDx, cySvg + trDy);
-  const delSx = trSx + DEL_OFFSET_PX;
-  const delSy = trSy - DEL_OFFSET_PX;
+  // Unit diagonal in local frame: (+1,−1)/√2; rotated → world unit vector;
+  // screen-space travel = worldDir * DEL_OFFSET_PX (zoom cancels in normalisation)
+  const [diagDx, diagDy] = rotPt(Math.SQRT1_2, -Math.SQRT1_2);
+  const delSx = trSx + diagDx * DEL_OFFSET_PX;
+  const delSy = trSy + diagDy * DEL_OFFSET_PX;
 
   return (
     <svg
