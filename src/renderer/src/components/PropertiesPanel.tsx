@@ -1,4 +1,4 @@
-// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down) from Lucide (https://lucide.dev)
+// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down, maximize-2, minimize-2) from Lucide (https://lucide.dev)
 // ISC License
 // Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of
 // Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
@@ -7,6 +7,7 @@
 // and this permission notice appear in all copies.
 import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
+import { useMachineStore } from "../store/machineStore";
 
 const ROT_STEPS = [1, 5, 15, 30, 45] as const;
 type RotStep = (typeof ROT_STEPS)[number];
@@ -22,6 +23,7 @@ export function PropertiesPanel() {
   const removePath = useCanvasStore((s) => s.removePath);
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
+  const activeConfig = useMachineStore((s) => s.activeConfig);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingName, setEditingName] = useState<{
@@ -248,6 +250,72 @@ export function PropertiesPanel() {
                             0.05,
                             0.001,
                           )}
+                          {/* Scale shortcut row: fit to bed | 1:1 reset */}
+                          {(() => {
+                            const cfg = activeConfig();
+                            const bedW = cfg?.bedWidth ?? 220;
+                            const bedH = cfg?.bedHeight ?? 200;
+                            const fitScale = Math.min(
+                              bedW / (imp.svgWidth || 1),
+                              bedH / (imp.svgHeight || 1),
+                            );
+                            return (
+                              <div className="flex items-center gap-0.5 mb-2 -mt-1">
+                                {/* Fit to bed */}
+                                <button
+                                  className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                  title={`Fit to bed (scale ${Math.round(fitScale * 1000) / 1000})`}
+                                  onClick={() =>
+                                    updateImport(imp.id, {
+                                      scale: fitScale,
+                                      x: 0,
+                                      y: 0,
+                                    })
+                                  }
+                                >
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                                    <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+                                    <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                                    <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+                                  </svg>
+                                </button>
+                                {/* Reset to 1:1 */}
+                                <button
+                                  className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                  title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
+                                  onClick={() =>
+                                    updateImport(imp.id, { scale: 1 })
+                                  }
+                                >
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+                                    <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+                                    <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+                                    <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+                                  </svg>
+                                </button>
+                              </div>
+                            );
+                          })()}
                           {/* Rotation — full width */}
                           {numField(
                             "Rotation (°)",
