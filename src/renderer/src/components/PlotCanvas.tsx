@@ -1166,6 +1166,7 @@ function RulerOverlay({
       {/* ── Origin dot ────────────────────────────────────────────────────── */}
       {originVisible && (
         <circle
+          data-testid="origin-marker"
           cx={originSx}
           cy={originSy}
           r={3}
@@ -1387,6 +1388,7 @@ function HandleOverlay({
     >
       {/* Bounding box polygon — 1 px stroke in screen space */}
       <polygon
+        data-testid="selection-bbox"
         points={polyPoints}
         fill="none"
         stroke="#e94560"
@@ -1401,7 +1403,7 @@ function HandleOverlay({
           const [cx, cy] = w2s(cxSvg, cySvg);
           const A = 6; // arm half-length in screen px
           return (
-            <g pointerEvents="none">
+            <g data-testid="handle-centre" pointerEvents="none">
               <circle
                 cx={cx}
                 cy={cy}
@@ -1440,6 +1442,7 @@ function HandleOverlay({
         return (
           <circle
             key={id}
+            data-testid={`handle-scale-${id}`}
             cx={hx}
             cy={hy}
             r={HANDLE_SCREEN_R}
@@ -1465,6 +1468,7 @@ function HandleOverlay({
 
       {/* Rotation handle */}
       <circle
+        data-testid="handle-rotate"
         cx={rotHx}
         cy={rotHy}
         r={HANDLE_SCREEN_R}
@@ -1477,6 +1481,7 @@ function HandleOverlay({
 
       {/* Delete button */}
       <g
+        data-testid="handle-delete"
         transform={`translate(${delSx},${delSy})`}
         style={{ cursor: "pointer", pointerEvents: "all" }}
         onClick={(e) => {

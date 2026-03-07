@@ -69,13 +69,32 @@ describe("PlotCanvas", () => {
   // ── Origin marker ──────────────────────────────────────────────────
 
   it("renders origin crosshair", () => {
+    // RulerOverlay (which contains the origin marker) is gated on
+    // containerSize.w > 0; override ResizeObserver so it fires immediately.
+    const OriginalRO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      _cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this._cb = cb;
+      }
+      observe(el: Element) {
+        this._cb(
+          [{ contentRect: { width: 800, height: 600 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+
     const cfg = createMachineConfig({ name: "Origin" });
     useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
     const { container } = render(<PlotCanvas />);
-    // Origin has colored lines (red/green)
-    const coloredLines = container.querySelectorAll('[stroke="red"], [stroke="green"], [stroke="#e94560"], [stroke="#4ade80"]');
-    // Should have at least some indicator
-    expect(container.querySelector("svg")).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="origin-marker"]'),
+    ).toBeTruthy();
+
+    globalThis.ResizeObserver = OriginalRO;
   });
 
   // ── SVG import rendering ───────────────────────────────────────────
@@ -115,14 +134,44 @@ describe("PlotCanvas", () => {
   // ── Selection / bounding box ───────────────────────────────────────
 
   it("shows selection bounding box for selected import", () => {
+    // HandleOverlay is gated on containerSize.w > 0, which requires
+    // ResizeObserver to fire. Override it to call the callback immediately
+    // with realistic dimensions so the overlay (and its circle handles) render.
+    const OriginalRO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      _cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this._cb = cb;
+      }
+      observe(el: Element) {
+        this._cb(
+          [{ contentRect: { width: 800, height: 600 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+
     const path = createSvgPath({ d: "M0,0 L100,100" });
     const imp = createSvgImport({ name: "selected", paths: [path] });
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     const { container } = render(<PlotCanvas />);
-    // Selection bounding box is rendered as additional rect or circle handles
-    // The presence of handles (circle elements) indicates selection
-    const circles = container.querySelectorAll("circle");
-    expect(circles.length).toBeGreaterThan(0);
+    // HandleOverlay renders a bounding-box polygon and labelled scale handles
+    expect(
+      container.querySelector('[data-testid="selection-bbox"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="handle-scale-tl"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="handle-rotate"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="handle-delete"]'),
+    ).toBeTruthy();
+
+    globalThis.ResizeObserver = OriginalRO;
   });
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────
