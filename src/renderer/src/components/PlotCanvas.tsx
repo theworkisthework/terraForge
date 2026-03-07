@@ -674,8 +674,9 @@ export function PlotCanvas() {
                 : PAD + maxY * MM_TO_PX;
             const bboxW = svgRight - svgLeft;
             const bboxH = svgBottom - svgTop;
-            const delCx = svgRight + 14;
-            const delCy = svgTop - 14;
+            const tpDelOff = 14 / vp.zoom;
+            const delCx = svgRight + tpDelOff;
+            const delCy = svgTop - tpDelOff;
             return (
               <>
                 <g
@@ -748,8 +749,8 @@ export function PlotCanvas() {
                       height={bboxH}
                       fill="none"
                       stroke="#38bdf8"
-                      strokeWidth={1}
-                      strokeDasharray="5 3"
+                      strokeWidth={1 / vp.zoom}
+                      strokeDasharray={`${5 / vp.zoom} ${3 / vp.zoom}`}
                     />
                     {(
                       [
@@ -759,7 +760,13 @@ export function PlotCanvas() {
                         [svgRight, svgBottom],
                       ] as [number, number][]
                     ).map(([cx, cy], i) => (
-                      <circle key={i} cx={cx} cy={cy} r={2.5} fill="#38bdf8" />
+                      <circle
+                        key={i}
+                        cx={cx}
+                        cy={cy}
+                        r={2.5 / vp.zoom}
+                        fill="#38bdf8"
+                      />
                     ))}
                   </g>
                 )}
@@ -773,10 +780,10 @@ export function PlotCanvas() {
                     }}
                   >
                     <svg
-                      x={-8}
-                      y={-8}
-                      width={16}
-                      height={16}
+                      x={-8 / vp.zoom}
+                      y={-8 / vp.zoom}
+                      width={16 / vp.zoom}
+                      height={16 / vp.zoom}
                       viewBox="0 0 24 24"
                       fill="none"
                       strokeLinecap="round"
@@ -809,6 +816,7 @@ export function PlotCanvas() {
               key={imp.id}
               imp={imp}
               selected={selectedImportId === imp.id}
+              zoom={vp.zoom}
               onImportMouseDown={onImportMouseDown}
               onHandleMouseDown={onHandleMouseDown}
               onRotateHandleMouseDown={onRotateHandleMouseDown}
@@ -1159,6 +1167,7 @@ const ROTATE_OFFSET = 24; // SVG px above the top-centre edge of bounding box
 interface ImportLayerProps {
   imp: SvgImport;
   selected: boolean;
+  zoom: number;
   onImportMouseDown: (e: React.MouseEvent, id: string) => void;
   onHandleMouseDown: (
     e: React.MouseEvent<SVGCircleElement>,
@@ -1178,6 +1187,7 @@ interface ImportLayerProps {
 function ImportLayer({
   imp,
   selected,
+  zoom,
   onImportMouseDown,
   onHandleMouseDown,
   onRotateHandleMouseDown,
@@ -1242,8 +1252,15 @@ function ImportLayer({
     l: "ew-resize",
   };
 
+  // Sizes that stay constant in screen pixels regardless of zoom
+  const hr = HANDLE_R / zoom; // handle radius in SVG user units
+  const rotOffset = ROTATE_OFFSET / zoom; // rotate handle stem length
+  const delOff = 14 / zoom; // delete button corner offset
+  const delHalf = 9 / zoom; // half-size of delete icon
+  const delSize = 18 / zoom; // full size of delete icon
+
   // Rotation handle — above the top-centre edge
-  const [rhdx, rhdy] = rotPt(0, -hh - ROTATE_OFFSET);
+  const [rhdx, rhdy] = rotPt(0, -hh - rotOffset);
   const rotHandleX = cxSvg + rhdx;
   const rotHandleY = cySvg + rhdy;
   const [topCdx, topCdy] = rotPt(0, -hh);
@@ -1252,8 +1269,8 @@ function ImportLayer({
 
   // Delete button — offset from rotated top-right corner
   const [trDx, trDy] = rotPt(hw, -hh);
-  const delCx = cxSvg + trDx + 14;
-  const delCy = cySvg + trDy - 14;
+  const delCx = cxSvg + trDx + delOff;
+  const delCy = cySvg + trDy - delOff;
 
   return (
     <g>
@@ -1294,8 +1311,8 @@ function ImportLayer({
           height={bboxH}
           fill="none"
           stroke="#e94560"
-          strokeWidth={1}
-          strokeDasharray="4 2"
+          strokeWidth={1 / zoom}
+          strokeDasharray={`${4 / zoom} ${2 / zoom}`}
           transform={`rotate(${deg}, ${cxSvg}, ${cySvg})`}
           pointerEvents="none"
         />
@@ -1310,10 +1327,10 @@ function ImportLayer({
               key={h}
               cx={hx}
               cy={hy}
-              r={HANDLE_R}
+              r={hr}
               fill="#16213e"
               stroke="#e94560"
-              strokeWidth={1.5}
+              strokeWidth={1.5 / zoom}
               style={{ cursor: cursorMap[h] }}
               onMouseDown={(e) => onHandleMouseDown(e, imp.id, h)}
             />
@@ -1329,16 +1346,16 @@ function ImportLayer({
             x2={rotHandleX}
             y2={rotHandleY}
             stroke="#e94560"
-            strokeWidth={1}
+            strokeWidth={1 / zoom}
             pointerEvents="none"
           />
           <circle
             cx={rotHandleX}
             cy={rotHandleY}
-            r={HANDLE_R}
+            r={hr}
             fill="#e94560"
             stroke="#fff"
-            strokeWidth={1.5}
+            strokeWidth={1.5 / zoom}
             style={{ cursor: ROTATE_CURSOR }}
             onMouseDown={(e) =>
               onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)
@@ -1358,10 +1375,10 @@ function ImportLayer({
           }}
         >
           <svg
-            x={-9}
-            y={-9}
-            width={18}
-            height={18}
+            x={-delHalf}
+            y={-delHalf}
+            width={delSize}
+            height={delSize}
             viewBox="0 0 24 24"
             fill="none"
             strokeLinecap="round"
