@@ -225,7 +225,11 @@ describe("transformPt", () => {
     expect(pt.y).toBeCloseTo(40);
   });
 
-  it("applies 90° rotation", () => {
+  it("applies 90° rotation (around object centre)", () => {
+    // 100×100 object at origin; centre = (50, 50) in SVG user units.
+    // SVG point (10, 0): offset from centre = (-40, -50).
+    // 90° CW rotation: x\'= -(-50)=50,  y\'= -40.
+    // Machine (top-left): x = 50+50 = 100,  y = 0+50+(-40) = 10.
     const obj = createVectorObject({
       x: 0,
       y: 0,
@@ -240,8 +244,7 @@ describe("transformPt", () => {
       bedHeight: 400,
     });
     const pt = transformPt(obj, cfg, 10, 0);
-    // 90° rotation: x' = x*cos90 - y*sin90 = 0, y' = x*sin90 + y*cos90 = 10
-    expect(pt.x).toBeCloseTo(0);
+    expect(pt.x).toBeCloseTo(100);
     expect(pt.y).toBeCloseTo(10);
   });
 
@@ -548,9 +551,17 @@ describe("toAbsolute (smooth commands)", () => {
 });
 
 // ── transformPt — rotation ────────────────────────────────────────────────────
+//
+// The canvas rotates each import around the CENTRE of its bounding box
+// (originalWidth/2, originalHeight/2) in SVG user units.  transformPt must
+// match that exactly.
 
 describe("transformPt (rotation)", () => {
-  it("rotates 90° around object origin before applying position", () => {
+  it("rotates 90° CW around object centre (top-left origin)", () => {
+    // 100×100 object at machine origin.  Centre = SVG (50, 50).
+    // Test point SVG (10, 0): offset from centre = (-40, -50).
+    // 90° CW: x' = -offset_y = 50,  y' = offset_x = -40.
+    // Machine (top-left): x = 50 + 50 = 100,  y = 0 + 50 + (-40) = 10.
     const cfg = createMachineConfig({
       origin: "top-left",
       bedWidth: 400,
@@ -560,21 +571,51 @@ describe("transformPt (rotation)", () => {
       x: 0,
       y: 0,
       scale: 1,
-      rotation: 90, // 90 degrees
+      rotation: 90,
       originalWidth: 100,
       originalHeight: 100,
     });
-    // SVG point (10, 0), rotated 90°: cos=0, sin=1
-    // x' = 10*0 - 0*1 = 0, y' = 10*1 + 0*0 = 10
-    // top-left: no flip, so result = (0+0, 10+0) = (0, 10)
     const pt = transformPt(obj, cfg, 10, 0);
-    expect(pt.x).toBeCloseTo(0, 1);
+    expect(pt.x).toBeCloseTo(100, 1);
     expect(pt.y).toBeCloseTo(10, 1);
   });
 
-  it("rotates 45° produces correct components", () => {
+  it("object centre is invariant under any rotation (top-left origin)", () => {
+    // The SVG midpoint (W/2, H/2) must always map to the same machine
+    // position regardless of rotation angle — it is the rotation pivot.
     const cfg = createMachineConfig({
       origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    const obj = createVectorObject({
+      x: 20,
+      y: 30,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    // Centre must always land at (obj.x + halfW, obj.y + halfH) = (70, 80)
+    const ptNoRot = transformPt(obj, cfg, 50, 50);
+    expect(ptNoRot.x).toBeCloseTo(70);
+    expect(ptNoRot.y).toBeCloseTo(80);
+
+    for (const deg of [45, 90, 135, 180, 270]) {
+      const rotated = transformPt({ ...obj, rotation: deg }, cfg, 50, 50);
+      expect(rotated.x).toBeCloseTo(70, 1);
+      expect(rotated.y).toBeCloseTo(80, 1);
+    }
+  });
+
+  it("rotates 90° CW around object centre (bottom-left origin)", () => {
+    // 100×100 object; obj.y=0 means bottom edge at machine Y=0.
+    // Centre in machine mm = (obj.x + 50, obj.y + 50) = (50, 50).
+    // SVG (10, 0): offset from centre = (-40, -50).
+    // 90° CW: x' = 50, y' = -40.
+    // bottom-left Y-flip: machine Y = centre_Y - y' = 50 - (-40) = 90.
+    const cfg = createMachineConfig({
+      origin: "bottom-left",
       bedWidth: 400,
       bedHeight: 400,
     });
@@ -582,14 +623,35 @@ describe("transformPt (rotation)", () => {
       x: 0,
       y: 0,
       scale: 1,
-      rotation: 45,
+      rotation: 90,
       originalWidth: 100,
       originalHeight: 100,
     });
-    // SVG point (10, 0): rotated 45° → (10*cos45, 10*sin45) ≈ (7.07, 7.07)
     const pt = transformPt(obj, cfg, 10, 0);
-    expect(pt.x).toBeCloseTo(10 * Math.cos(Math.PI / 4), 1);
-    expect(pt.y).toBeCloseTo(10 * Math.sin(Math.PI / 4), 1);
+    expect(pt.x).toBeCloseTo(100, 1);
+    expect(pt.y).toBeCloseTo(90, 1);
+  });
+
+  it("object centre invariant under rotation (bottom-left origin)", () => {
+    const cfg = createMachineConfig({
+      origin: "bottom-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    const obj = createVectorObject({
+      x: 20,
+      y: 30,
+      scale: 1,
+      rotation: 0,
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    // Centre machine-space: (20+50, 30+50) = (70, 80)
+    for (const deg of [0, 45, 90, 180, 270]) {
+      const pt = transformPt({ ...obj, rotation: deg }, cfg, 50, 50);
+      expect(pt.x).toBeCloseTo(70, 1);
+      expect(pt.y).toBeCloseTo(80, 1);
+    }
   });
 });
 

@@ -183,26 +183,50 @@ export function toAbsolute(tokens: PathToken[]): PathToken[] {
 
 // ── Coordinate transform ──────────────────────────────────────────────────────
 
+/**
+ * Maps a single SVG user-unit point to machine mm coordinates.
+ *
+ * The canvas (ImportLayer) rotates around the centre of the bounding box
+ * — (originalWidth/2, originalHeight/2) in SVG user units — so we must
+ * centre the coordinates on that point before applying rotation, then
+ * translate back to the object's machine-space position afterwards.
+ *
+ * obj.x / obj.y always refer to the LEFT and BOTTOM (or TOP, for top-*
+ * origins) edge of the unrotated bounding box in machine mm.
+ */
 export function transformPt(
   obj: VectorObject,
   config: MachineConfig,
   svgX: number,
   svgY: number,
 ): Pt {
-  let x = svgX * obj.scale;
-  let y = svgY * obj.scale;
+  const halfW = (obj.originalWidth / 2) * obj.scale;
+  const halfH = (obj.originalHeight / 2) * obj.scale;
+
+  // Express the point as an offset from the object's centre in scaled SVG
+  // space (SVG Y increases downward).
+  let x = svgX * obj.scale - halfW;
+  let y = svgY * obj.scale - halfH;
+
   if (obj.rotation !== 0) {
     const rad = (obj.rotation * Math.PI) / 180;
     const cos = Math.cos(rad),
       sin = Math.sin(rad);
+    // Clockwise rotation in Y-down SVG space (matches canvas rotate(deg)).
     [x, y] = [x * cos - y * sin, x * sin + y * cos];
   }
-  x += obj.x;
+
+  // Re-anchor from object-centre offset to machine-space absolute position.
+  // obj.x is the left edge, so the object centre X = obj.x + halfW.
+  x += obj.x + halfW;
 
   if (config.origin === "bottom-left" || config.origin === "bottom-right") {
-    y = obj.y + obj.originalHeight * obj.scale - y;
+    // SVG Y increases downward; machine Y increases upward → negate y offset.
+    // Object centre machine-Y = obj.y + halfH  (obj.y is the bottom edge).
+    y = obj.y + halfH - y;
   } else {
-    y += obj.y;
+    // top-* and center: SVG Y and machine Y share the same direction.
+    y += obj.y + halfH;
   }
 
   if (config.origin === "bottom-right" || config.origin === "top-right")
