@@ -18,7 +18,6 @@ import type { SvgImport } from "../../../types";
 
 const MM_TO_PX = 3; // internal SVG scale: 3 px per mm
 const PAD = 30; // margin around bed in SVG pixels
-const HANDLE_R = 5; // handle radius in SVG pixels
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 20;
 const ZOOM_STEP = 1.25; // per keyboard / button press
@@ -32,9 +31,8 @@ const ROTATE_CURSOR =
   "%3Cpath d='M21 3v5h-5'/%3E" +
   '%3C/svg%3E") 12 12, ew-resize';
 
-// Handle positions: top-left, top, top-right, right, bottom-right, bottom, bottom-left, left
+// Handle positions: tl, t, tr, r, br, b, bl, l
 type HandlePos = "tl" | "t" | "tr" | "r" | "br" | "b" | "bl" | "l";
-const ALL_HANDLES: HandlePos[] = ["tl", "t", "tr", "r", "br", "b", "bl", "l"];
 
 // ─── Viewport ─────────────────────────────────────────────────────────────────
 interface Vp {
@@ -672,11 +670,6 @@ export function PlotCanvas() {
               : isBottom
                 ? PAD + (bedH - minY) * MM_TO_PX
                 : PAD + maxY * MM_TO_PX;
-            const bboxW = svgRight - svgLeft;
-            const bboxH = svgBottom - svgTop;
-            const tpDelOff = 14 / vp.zoom;
-            const delCx = svgRight + tpDelOff;
-            const delCy = svgTop - tpDelOff;
             return (
               <>
                 <g
@@ -741,74 +734,13 @@ export function PlotCanvas() {
                 </g>
 
                 {toolpathSelected && (
-                  <g pointerEvents="none">
-                    <rect
-                      x={svgLeft}
-                      y={svgTop}
-                      width={bboxW}
-                      height={bboxH}
-                      fill="none"
-                      stroke="#38bdf8"
-                      strokeWidth={1 / vp.zoom}
-                      strokeDasharray={`${5 / vp.zoom} ${3 / vp.zoom}`}
-                    />
-                    {(
-                      [
-                        [svgLeft, svgTop],
-                        [svgRight, svgTop],
-                        [svgLeft, svgBottom],
-                        [svgRight, svgBottom],
-                      ] as [number, number][]
-                    ).map(([cx, cy], i) => (
-                      <circle
-                        key={i}
-                        cx={cx}
-                        cy={cy}
-                        r={2.5 / vp.zoom}
-                        fill="#38bdf8"
-                      />
-                    ))}
-                  </g>
-                )}
-                {toolpathSelected && (
-                  <g
-                    transform={`translate(${delCx}, ${delCy})`}
-                    style={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setGcodeToolpath(null);
-                    }}
-                  >
-                    <svg
-                      x={-8 / vp.zoom}
-                      y={-8 / vp.zoom}
-                      width={16 / vp.zoom}
-                      height={16 / vp.zoom}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect
-                        width="18"
-                        height="18"
-                        x="3"
-                        y="3"
-                        rx="2"
-                        ry="2"
-                        fill="#e94560"
-                        stroke="none"
-                      />
-                      <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-                      <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-                    </svg>
-                  </g>
+                  <g pointerEvents="none" /> /* selection rendered in overlay SVG */
                 )}
               </>
             );
           })()}
 
-        {/* SVG imports */}
+        {/* SVG imports — paths only; handles rendered in HandleOverlay */}
         {imports
           .filter((imp) => imp.visible)
           .map((imp) => (
@@ -816,15 +748,136 @@ export function PlotCanvas() {
               key={imp.id}
               imp={imp}
               selected={selectedImportId === imp.id}
-              zoom={vp.zoom}
               onImportMouseDown={onImportMouseDown}
-              onHandleMouseDown={onHandleMouseDown}
-              onRotateHandleMouseDown={onRotateHandleMouseDown}
-              onDelete={() => removeImport(imp.id)}
               getBedY={getBedY}
             />
           ))}
       </svg>
+
+      {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
+      {selectedImportId &&
+        containerSize.w > 0 &&
+        (() => {
+          const imp = imports.find((i) => i.id === selectedImportId);
+          return imp ? (
+            <HandleOverlay
+              imp={imp}
+              zoom={vp.zoom}
+              panX={vp.panX}
+              panY={vp.panY}
+              containerW={containerSize.w}
+              containerH={containerSize.h}
+              getBedY={getBedY}
+              onHandleMouseDown={onHandleMouseDown}
+              onRotateHandleMouseDown={onRotateHandleMouseDown}
+              onDelete={() => removeImport(imp.id)}
+            />
+          ) : null;
+        })()}
+
+      {/* ── Toolpath selection overlay — screen-pixel space ─────────────── */}
+      {gcodeToolpath &&
+        toolpathSelected &&
+        containerSize.w > 0 &&
+        (() => {
+          const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
+          const svgL = isCenter
+            ? PAD + (bedW / 2 + minX) * MM_TO_PX
+            : isRight
+              ? PAD + (bedW - maxX) * MM_TO_PX
+              : PAD + minX * MM_TO_PX;
+          const svgR = isCenter
+            ? PAD + (bedW / 2 + maxX) * MM_TO_PX
+            : isRight
+              ? PAD + (bedW - minX) * MM_TO_PX
+              : PAD + maxX * MM_TO_PX;
+          const svgT = isCenter
+            ? PAD + (bedH / 2 - maxY) * MM_TO_PX
+            : isBottom
+              ? PAD + (bedH - maxY) * MM_TO_PX
+              : PAD + minY * MM_TO_PX;
+          const svgB = isCenter
+            ? PAD + (bedH / 2 - minY) * MM_TO_PX
+            : isBottom
+              ? PAD + (bedH - minY) * MM_TO_PX
+              : PAD + maxY * MM_TO_PX;
+          const sl = svgL * vp.zoom + vp.panX;
+          const sr = svgR * vp.zoom + vp.panX;
+          const st = svgT * vp.zoom + vp.panY;
+          const sb = svgB * vp.zoom + vp.panY;
+          const delSx = sr + 14;
+          const delSy = st - 14;
+          const TP_HALF = 8;
+          const TP_PIP = 2.5;
+          return (
+            <svg
+              style={{
+                position: "absolute",
+                inset: 0,
+                overflow: "hidden",
+                pointerEvents: "none",
+                zIndex: 4,
+              }}
+              width={containerSize.w}
+              height={containerSize.h}
+              viewBox={`0 0 ${containerSize.w} ${containerSize.h}`}
+            >
+              <rect
+                x={sl}
+                y={st}
+                width={sr - sl}
+                height={sb - st}
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth={1}
+                strokeDasharray="5 3"
+                pointerEvents="none"
+              />
+              {(
+                [
+                  [sl, st],
+                  [sr, st],
+                  [sl, sb],
+                  [sr, sb],
+                ] as [number, number][]
+              ).map(([cx, cy], i) => (
+                <circle key={i} cx={cx} cy={cy} r={TP_PIP} fill="#38bdf8" />
+              ))}
+              <g
+                transform={`translate(${delSx},${delSy})`}
+                style={{ cursor: "pointer", pointerEvents: "all" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGcodeToolpath(null);
+                }}
+              >
+                <svg
+                  x={-TP_HALF}
+                  y={-TP_HALF}
+                  width={TP_HALF * 2}
+                  height={TP_HALF * 2}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect
+                    width="18"
+                    height="18"
+                    x="3"
+                    y="3"
+                    rx="2"
+                    ry="2"
+                    fill="#e94560"
+                    stroke="none"
+                  />
+                  <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+                  <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+                </svg>
+              </g>
+            </svg>
+          );
+        })()}
 
       {/* ── Zoom / pan overlay controls ───────────────────────────────────── */}
       <div
@@ -1160,38 +1213,19 @@ function RulerOverlay({
   );
 }
 
-// ─── Per-import SVG layer with scale + rotation handles ──────────────────────
-
-const ROTATE_OFFSET = 24; // SVG px above the top-centre edge of bounding box
+// ─── Per-import SVG layer (paths only — handles are in HandleOverlay) ──────────
 
 interface ImportLayerProps {
   imp: SvgImport;
   selected: boolean;
-  zoom: number;
   onImportMouseDown: (e: React.MouseEvent, id: string) => void;
-  onHandleMouseDown: (
-    e: React.MouseEvent<SVGCircleElement>,
-    id: string,
-    h: HandlePos,
-  ) => void;
-  onRotateHandleMouseDown: (
-    e: React.MouseEvent<SVGCircleElement>,
-    id: string,
-    cxSvg: number,
-    cySvg: number,
-  ) => void;
-  onDelete: () => void;
   getBedY: (mm: number) => number;
 }
 
 function ImportLayer({
   imp,
   selected,
-  zoom,
   onImportMouseDown,
-  onHandleMouseDown,
-  onRotateHandleMouseDown,
-  onDelete,
   getBedY,
 }: ImportLayerProps) {
   const s = imp.scale * MM_TO_PX;
@@ -1206,16 +1240,6 @@ function ImportLayer({
   const cxSvg = left + bboxW / 2;
   const cySvg = top + bboxH / 2;
   const deg = imp.rotation ?? 0;
-  const hw = bboxW / 2;
-  const hh = bboxH / 2;
-
-  // Rotate an offset (ox, oy) by `deg` degrees around the origin
-  const rotPt = (ox: number, oy: number): [number, number] => {
-    const r = (deg * Math.PI) / 180;
-    const c = Math.cos(r);
-    const ss = Math.sin(r);
-    return [ox * c - oy * ss, ox * ss + oy * c];
-  };
 
   // group transform: centre → rotate → scale → offset to SVG user-unit centre
   const groupTransform = [
@@ -1225,56 +1249,9 @@ function ImportLayer({
     `translate(${-(vbX + imp.svgWidth / 2)}, ${-(vbY + imp.svgHeight / 2)})`,
   ].join(" ");
 
-  // 8 scale handles at rotated positions
-  const mkHandle = (ox: number, oy: number): [number, number] => {
-    const [dx, dy] = rotPt(ox, oy);
-    return [cxSvg + dx, cySvg + dy];
-  };
-  const handleCoords: Record<HandlePos, [number, number]> = {
-    tl: mkHandle(-hw, -hh),
-    t: mkHandle(0, -hh),
-    tr: mkHandle(hw, -hh),
-    r: mkHandle(hw, 0),
-    br: mkHandle(hw, hh),
-    b: mkHandle(0, hh),
-    bl: mkHandle(-hw, hh),
-    l: mkHandle(-hw, 0),
-  };
-
-  const cursorMap: Record<HandlePos, string> = {
-    tl: "nwse-resize",
-    t: "ns-resize",
-    tr: "nesw-resize",
-    r: "ew-resize",
-    br: "nwse-resize",
-    b: "ns-resize",
-    bl: "nesw-resize",
-    l: "ew-resize",
-  };
-
-  // Sizes that stay constant in screen pixels regardless of zoom
-  const hr = HANDLE_R / zoom; // handle radius in SVG user units
-  const rotOffset = ROTATE_OFFSET / zoom; // rotate handle stem length
-  const delOff = 14 / zoom; // delete button corner offset
-  const delHalf = 9 / zoom; // half-size of delete icon
-  const delSize = 18 / zoom; // full size of delete icon
-
-  // Rotation handle — above the top-centre edge
-  const [rhdx, rhdy] = rotPt(0, -hh - rotOffset);
-  const rotHandleX = cxSvg + rhdx;
-  const rotHandleY = cySvg + rhdy;
-  const [topCdx, topCdy] = rotPt(0, -hh);
-  const topCentreX = cxSvg + topCdx;
-  const topCentreY = cySvg + topCdy;
-
-  // Delete button — offset from rotated top-right corner
-  const [trDx, trDy] = rotPt(hw, -hh);
-  const delCx = cxSvg + trDx + delOff;
-  const delCy = cySvg + trDy - delOff;
-
   return (
     <g>
-      {/* Draggable group */}
+      {/* Draggable group — paths only; handles are rendered in HandleOverlay */}
       <g
         transform={groupTransform}
         onMouseDown={(e) => onImportMouseDown(e, imp.id)}
@@ -1301,104 +1278,228 @@ function ImportLayer({
           fill="transparent"
         />
       </g>
+    </g>
+  );
+}
 
-      {/* Bounding box — rotated around its centre */}
-      {selected && (
-        <rect
-          x={left}
-          y={top}
-          width={bboxW}
-          height={bboxH}
-          fill="none"
-          stroke="#e94560"
-          strokeWidth={1 / zoom}
-          strokeDasharray={`${4 / zoom} ${2 / zoom}`}
-          transform={`rotate(${deg}, ${cxSvg}, ${cySvg})`}
-          pointerEvents="none"
-        />
-      )}
+// ─── Handle overlay ─ renders bounding box + handles in screen-pixel space ───
+// A sibling SVG with viewBox="0 0 W H" maps 1 SVG unit = 1 CSS pixel exactly,
+// so every radius, strokeWidth and dash value is zoom-independent by definition.
 
-      {/* Scale handles at rotated positions */}
-      {selected &&
-        ALL_HANDLES.map((h) => {
-          const [hx, hy] = handleCoords[h];
-          return (
-            <circle
-              key={h}
-              cx={hx}
-              cy={hy}
-              r={hr}
-              fill="#16213e"
-              stroke="#e94560"
-              strokeWidth={1.5 / zoom}
-              style={{ cursor: cursorMap[h] }}
-              onMouseDown={(e) => onHandleMouseDown(e, imp.id, h)}
-            />
-          );
-        })}
+const HANDLE_SCREEN_R = 5; // handle circle radius (screen px)
+const ROTATE_STEM_PX = 24; // rotation-handle stem length (screen px)
+const DEL_OFFSET_PX = 14; // delete button distance from TR corner (screen px)
+const DEL_HALF_PX = 9; // half-size of delete icon (screen px)
 
-      {/* Rotation handle — stem line + circle above top-centre edge */}
-      {selected && (
-        <>
-          <line
-            x1={topCentreX}
-            y1={topCentreY}
-            x2={rotHandleX}
-            y2={rotHandleY}
-            stroke="#e94560"
-            strokeWidth={1 / zoom}
-            pointerEvents="none"
-          />
+interface HandleOverlayProps {
+  imp: SvgImport;
+  zoom: number;
+  panX: number;
+  panY: number;
+  containerW: number;
+  containerH: number;
+  getBedY: (mm: number) => number;
+  onHandleMouseDown: (
+    e: React.MouseEvent<SVGCircleElement>,
+    id: string,
+    h: HandlePos,
+  ) => void;
+  onRotateHandleMouseDown: (
+    e: React.MouseEvent<SVGCircleElement>,
+    id: string,
+    cxSvg: number,
+    cySvg: number,
+  ) => void;
+  onDelete: () => void;
+}
+
+function HandleOverlay({
+  imp,
+  zoom,
+  panX,
+  panY,
+  containerW,
+  containerH,
+  getBedY,
+  onHandleMouseDown,
+  onRotateHandleMouseDown,
+  onDelete,
+}: HandleOverlayProps) {
+  const s = imp.scale * MM_TO_PX;
+  const left = PAD + imp.x * MM_TO_PX;
+  const top = getBedY(imp.y + imp.svgHeight * imp.scale);
+  const bboxW = imp.svgWidth * s;
+  const bboxH = imp.svgHeight * s;
+  const cxSvg = left + bboxW / 2;
+  const cySvg = top + bboxH / 2;
+  const deg = imp.rotation ?? 0;
+  const degRad = (deg * Math.PI) / 180;
+  const hw = bboxW / 2;
+  const hh = bboxH / 2;
+
+  // SVG world coords → screen (CSS) pixels
+  const w2s = (x: number, y: number): [number, number] => [
+    x * zoom + panX,
+    y * zoom + panY,
+  ];
+
+  // Rotate an offset by deg degrees
+  const rotPt = (ox: number, oy: number): [number, number] => {
+    const c = Math.cos(degRad);
+    const ss = Math.sin(degRad);
+    return [ox * c - oy * ss, ox * ss + oy * c];
+  };
+
+  // Bounding box as a screen-space polygon
+  const corners = (
+    [
+      [-hw, -hh],
+      [hw, -hh],
+      [hw, hh],
+      [-hw, hh],
+    ] as [number, number][]
+  ).map(([ox, oy]) => {
+    const [dx, dy] = rotPt(ox, oy);
+    return w2s(cxSvg + dx, cySvg + dy);
+  });
+  const polyPoints = corners.map(([x, y]) => `${x},${y}`).join(" ");
+
+  // 8 scale handle definitions
+  type HInfo = { id: HandlePos; ox: number; oy: number };
+  const HANDLE_DEFS: HInfo[] = [
+    { id: "tl", ox: -hw, oy: -hh },
+    { id: "t", ox: 0, oy: -hh },
+    { id: "tr", ox: hw, oy: -hh },
+    { id: "r", ox: hw, oy: 0 },
+    { id: "br", ox: hw, oy: hh },
+    { id: "b", ox: 0, oy: hh },
+    { id: "bl", ox: -hw, oy: hh },
+    { id: "l", ox: -hw, oy: 0 },
+  ];
+  const cursorMap: Record<HandlePos, string> = {
+    tl: "nwse-resize",
+    t: "ns-resize",
+    tr: "nesw-resize",
+    r: "ew-resize",
+    br: "nwse-resize",
+    b: "ns-resize",
+    bl: "nesw-resize",
+    l: "ew-resize",
+  };
+
+  // Top-centre in screen space
+  const [tcDx, tcDy] = rotPt(0, -hh);
+  const [topCx, topCy] = w2s(cxSvg + tcDx, cySvg + tcDy);
+
+  // Rotation handle: ROTATE_STEM_PX screen pixels above top-centre, along the
+  // rotated outward normal of the top edge — direction (sin θ, −cos θ) in SVG.
+  const rotHx = topCx + Math.sin(degRad) * ROTATE_STEM_PX;
+  const rotHy = topCy - Math.cos(degRad) * ROTATE_STEM_PX;
+
+  // Delete button: fixed DEL_OFFSET_PX screen pixels from top-right corner
+  const [trDx, trDy] = rotPt(hw, -hh);
+  const [trSx, trSy] = w2s(cxSvg + trDx, cySvg + trDy);
+  const delSx = trSx + DEL_OFFSET_PX;
+  const delSy = trSy - DEL_OFFSET_PX;
+
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+        zIndex: 4,
+      }}
+      width={containerW}
+      height={containerH}
+      viewBox={`0 0 ${containerW} ${containerH}`}
+    >
+      {/* Bounding box polygon — 1 px stroke in screen space */}
+      <polygon
+        points={polyPoints}
+        fill="none"
+        stroke="#e94560"
+        strokeWidth={1}
+        strokeDasharray="4 2"
+        pointerEvents="none"
+      />
+
+      {/* 8 scale handles */}
+      {HANDLE_DEFS.map(({ id, ox, oy }) => {
+        const [dx, dy] = rotPt(ox, oy);
+        const [hx, hy] = w2s(cxSvg + dx, cySvg + dy);
+        return (
           <circle
-            cx={rotHandleX}
-            cy={rotHandleY}
-            r={hr}
-            fill="#e94560"
-            stroke="#fff"
-            strokeWidth={1.5 / zoom}
-            style={{ cursor: ROTATE_CURSOR }}
-            onMouseDown={(e) =>
-              onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)
-            }
+            key={id}
+            cx={hx}
+            cy={hy}
+            r={HANDLE_SCREEN_R}
+            fill="#16213e"
+            stroke="#e94560"
+            strokeWidth={1.5}
+            style={{ cursor: cursorMap[id], pointerEvents: "all" }}
+            onMouseDown={(e) => onHandleMouseDown(e, imp.id, id)}
           />
-        </>
-      )}
+        );
+      })}
+
+      {/* Rotation stem */}
+      <line
+        x1={topCx}
+        y1={topCy}
+        x2={rotHx}
+        y2={rotHy}
+        stroke="#e94560"
+        strokeWidth={1}
+        pointerEvents="none"
+      />
+
+      {/* Rotation handle */}
+      <circle
+        cx={rotHx}
+        cy={rotHy}
+        r={HANDLE_SCREEN_R}
+        fill="#e94560"
+        stroke="#fff"
+        strokeWidth={1.5}
+        style={{ cursor: ROTATE_CURSOR, pointerEvents: "all" }}
+        onMouseDown={(e) => onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)}
+      />
 
       {/* Delete button */}
-      {selected && (
-        <g
-          transform={`translate(${delCx}, ${delCy})`}
-          style={{ cursor: "pointer" }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
+      <g
+        transform={`translate(${delSx},${delSy})`}
+        style={{ cursor: "pointer", pointerEvents: "all" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+      >
+        <svg
+          x={-DEL_HALF_PX}
+          y={-DEL_HALF_PX}
+          width={DEL_HALF_PX * 2}
+          height={DEL_HALF_PX * 2}
+          viewBox="0 0 24 24"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <svg
-            x={-delHalf}
-            y={-delHalf}
-            width={delSize}
-            height={delSize}
-            viewBox="0 0 24 24"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect
-              width="18"
-              height="18"
-              x="3"
-              y="3"
-              rx="2"
-              ry="2"
-              fill="#e94560"
-              stroke="none"
-            />
-            <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-            <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-          </svg>
-        </g>
-      )}
-    </g>
+          <rect
+            width="18"
+            height="18"
+            x="3"
+            y="3"
+            rx="2"
+            ry="2"
+            fill="#e94560"
+            stroke="none"
+          />
+          <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+          <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+        </svg>
+      </g>
+    </svg>
   );
 }
