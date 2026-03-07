@@ -345,16 +345,21 @@ export function PlotCanvas() {
       e.stopPropagation();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
       if (!imp) return;
+      const sX = imp.scaleX ?? imp.scale;
+      const sY = imp.scaleY ?? imp.scale;
       setScaling({
         id,
         handle,
         startMouseX: e.clientX,
         startMouseY: e.clientY,
         startScale: imp.scale,
+        startScaleX: sX,
+        startScaleY: sY,
+        ratioLocked: imp.scaleX === undefined, // unlocked when scaleX is set
         startObjX: imp.x,
         startObjY: imp.y,
-        startW: imp.svgWidth * imp.scale * MM_TO_PX,
-        startH: imp.svgHeight * imp.scale * MM_TO_PX,
+        startW: imp.svgWidth * sX * MM_TO_PX,
+        startH: imp.svgHeight * sY * MM_TO_PX,
       });
     },
     [],
@@ -421,20 +426,60 @@ export function PlotCanvas() {
         const dy = (e.clientY - scaling.startMouseY) / zoom;
         const h = scaling.handle;
 
-        let delta = 0;
-        if (h === "tl" || h === "bl") delta = -dx;
-        else if (h === "tr" || h === "br") delta = dx;
-        else if (h === "t") delta = -dy;
-        else if (h === "b") delta = dy;
-        else if (h === "r") delta = dx;
-        else if (h === "l") delta = -dx;
+        if (scaling.ratioLocked) {
+          // ─ Locked: uniform scale ───────────────────────────────────
+          let delta = 0;
+          if (h === "tl" || h === "bl") delta = -dx;
+          else if (h === "tr" || h === "br") delta = dx;
+          else if (h === "t") delta = -dy;
+          else if (h === "b") delta = dy;
+          else if (h === "r") delta = dx;
+          else if (h === "l") delta = -dx;
+          const dimPx =
+            h === "t" || h === "b" ? scaling.startH : scaling.startW;
+          const rawScale = Math.max(
+            0.001,
+            scaling.startScale * (1 + delta / dimPx),
+          );
+          updateImport(scaling.id, {
+            scale: rawScale,
+            scaleX: undefined,
+            scaleY: undefined,
+          });
+        } else {
+          // ─ Unlocked: drive each axis independently ─────────────────
+          // Determine which axes this handle moves.
+          const affectsX =
+            h === "l" ||
+            h === "r" ||
+            h === "tl" ||
+            h === "tr" ||
+            h === "br" ||
+            h === "bl";
+          const affectsY =
+            h === "t" ||
+            h === "b" ||
+            h === "tl" ||
+            h === "tr" ||
+            h === "br" ||
+            h === "bl";
+          // Positive deltaX = object grows in X; positive deltaY = grows in Y.
+          const deltaX = h === "r" || h === "tr" || h === "br" ? dx : -dx;
+          const deltaY = h === "b" || h === "br" || h === "bl" ? dy : -dy;
 
-        const dimPx = h === "t" || h === "b" ? scaling.startH : scaling.startW;
-        const rawScale = Math.max(
-          0.05,
-          scaling.startScale * (1 + delta / dimPx),
-        );
-        updateImport(scaling.id, { scale: rawScale });
+          const patch: { scaleX?: number; scaleY?: number } = {};
+          if (affectsX)
+            patch.scaleX = Math.max(
+              0.001,
+              scaling.startScaleX * (1 + deltaX / scaling.startW),
+            );
+          if (affectsY)
+            patch.scaleY = Math.max(
+              0.001,
+              scaling.startScaleY * (1 + deltaY / scaling.startH),
+            );
+          updateImport(scaling.id, patch);
+        }
       }
 
       // Rotation-handle drag
@@ -1193,24 +1238,25 @@ function ImportLayer({
   onImportMouseDown,
   getBedY,
 }: ImportLayerProps) {
-  const s = imp.scale * MM_TO_PX;
+  const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
+  const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
   const vbX = imp.viewBoxX ?? 0;
   const vbY = imp.viewBoxY ?? 0;
   const left = PAD + imp.x * MM_TO_PX;
-  const top = getBedY(imp.y + imp.svgHeight * imp.scale);
-  const bboxW = imp.svgWidth * s;
-  const bboxH = imp.svgHeight * s;
+  const top = getBedY(imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale));
+  const bboxW = imp.svgWidth * sX;
+  const bboxH = imp.svgHeight * sY;
 
   // Centre of the (unrotated) bounding box in SVG canvas coords
   const cxSvg = left + bboxW / 2;
   const cySvg = top + bboxH / 2;
   const deg = imp.rotation ?? 0;
 
-  // group transform: centre → rotate → scale → offset to SVG user-unit centre
+  // group transform: centre → rotate → scale(sx,sy) → offset to SVG user-unit centre
   const groupTransform = [
     `translate(${cxSvg}, ${cySvg})`,
     `rotate(${deg})`,
-    `scale(${s})`,
+    `scale(${sX}, ${sY})`,
     `translate(${-(vbX + imp.svgWidth / 2)}, ${-(vbY + imp.svgHeight / 2)})`,
   ].join(" ");
 
@@ -1291,11 +1337,12 @@ function HandleOverlay({
   onDelete,
 }: HandleOverlayProps) {
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
-  const s = imp.scale * MM_TO_PX;
+  const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
+  const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
   const left = PAD + imp.x * MM_TO_PX;
-  const top = getBedY(imp.y + imp.svgHeight * imp.scale);
-  const bboxW = imp.svgWidth * s;
-  const bboxH = imp.svgHeight * s;
+  const top = getBedY(imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale));
+  const bboxW = imp.svgWidth * sX;
+  const bboxH = imp.svgHeight * sY;
   const cxSvg = left + bboxW / 2;
   const cySvg = top + bboxH / 2;
   const deg = imp.rotation ?? 0;

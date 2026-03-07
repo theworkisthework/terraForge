@@ -193,6 +193,9 @@ export function toAbsolute(tokens: PathToken[]): PathToken[] {
  *
  * obj.x / obj.y always refer to the LEFT and BOTTOM (or TOP, for top-*
  * origins) edge of the unrotated bounding box in machine mm.
+ *
+ * scaleX / scaleY are optional per-axis overrides (ratio lock off).
+ * When absent both axes use obj.scale.
  */
 export function transformPt(
   obj: VectorObject,
@@ -200,13 +203,15 @@ export function transformPt(
   svgX: number,
   svgY: number,
 ): Pt {
-  const halfW = (obj.originalWidth / 2) * obj.scale;
-  const halfH = (obj.originalHeight / 2) * obj.scale;
+  const sX = obj.scaleX ?? obj.scale;
+  const sY = obj.scaleY ?? obj.scale;
+  const halfW = (obj.originalWidth / 2) * sX;
+  const halfH = (obj.originalHeight / 2) * sY;
 
   // Express the point as an offset from the object's centre in scaled SVG
   // space (SVG Y increases downward).
-  let x = svgX * obj.scale - halfW;
-  let y = svgY * obj.scale - halfH;
+  let x = svgX * sX - halfW;
+  let y = svgY * sY - halfH;
 
   if (obj.rotation !== 0) {
     const rad = (obj.rotation * Math.PI) / 180;

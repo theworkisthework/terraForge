@@ -48,6 +48,12 @@ export interface VectorObject {
   y: number;
   /** Uniform scale factor (1 = 100%) */
   scale: number;
+  /**
+   * Non-uniform scale overrides.  When set (ratio lock off) these take
+   * precedence over `scale` for the relevant axis.  Absent = uniform scale.
+   */
+  scaleX?: number;
+  scaleY?: number;
   /** Rotation in degrees */
   rotation: number;
   visible: boolean;
@@ -81,8 +87,17 @@ export interface SvgImport {
   /** Position of the SVG's bottom-left corner on the bed (mm) */
   x: number;
   y: number;
-  /** SVG user units → mm scale factor */
+  /** Uniform scale factor (SVG user units → mm).  Used for both axes when
+   *  scaleX / scaleY are absent (ratio locked). */
   scale: number;
+  /**
+   * Per-axis scale overrides — only set when ratio lock is OFF.
+   * When present these replace `scale` for the respective axis so that
+   * W and H can be set independently.  Drag-to-resize handles always
+   * restore uniform scale.
+   */
+  scaleX?: number;
+  scaleY?: number;
   rotation: number;
   visible: boolean;
   /** SVG viewBox dimensions in user units */

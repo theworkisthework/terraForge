@@ -1,4 +1,4 @@
-// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down, maximize-2, minimize-2) from Lucide (https://lucide.dev)
+// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down, maximize-2, minimize-2, lock, unlock) from Lucide (https://lucide.dev)
 // ISC License
 // Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of
 // Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
@@ -32,6 +32,7 @@ export function PropertiesPanel() {
   } | null>(null);
   const [rotStep, setRotStep] = useState<RotStep>(45);
   const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
+  const [ratioLocked, setRatioLocked] = useState(true);
 
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => {
@@ -197,8 +198,8 @@ export function PropertiesPanel() {
                 {isSelected && (
                   <div className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30">
                     {(() => {
-                      const objW = imp.svgWidth * imp.scale;
-                      const objH = imp.svgHeight * imp.scale;
+                      const objW = imp.svgWidth * (imp.scaleX ?? imp.scale);
+                      const objH = imp.svgHeight * (imp.scaleY ?? imp.scale);
                       return (
                         <>
                           {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
@@ -216,28 +217,139 @@ export function PropertiesPanel() {
                               0.5,
                             )}
                           </div>
-                          {/* W / H — two columns, linked to scale */}
-                          <div className="grid grid-cols-2 gap-2 mb-0">
-                            {numField(
-                              "W (mm)",
-                              objW,
-                              (v) =>
-                                updateImport(imp.id, {
-                                  scale: Math.max(0.001, v) / imp.svgWidth,
-                                }),
-                              0.5,
-                              0.001,
-                            )}
-                            {numField(
-                              "H (mm)",
-                              objH,
-                              (v) =>
-                                updateImport(imp.id, {
-                                  scale: Math.max(0.001, v) / imp.svgHeight,
-                                }),
-                              0.5,
-                              0.001,
-                            )}
+                          {/* W / H — flex row with lock button between the two inputs */}
+                          <div className="flex items-end gap-1 mb-0">
+                            {/* W */}
+                            <div className="flex-1 min-w-0 mb-2">
+                              <label className="block text-[10px] text-gray-400 mb-0.5">
+                                W (mm)
+                              </label>
+                              <input
+                                type="number"
+                                value={Math.round(objW * 1000) / 1000}
+                                step={0.5}
+                                min={0.001}
+                                onChange={(e) => {
+                                  const v = Math.max(0.001, +e.target.value);
+                                  if (ratioLocked) {
+                                    updateImport(imp.id, {
+                                      scale: v / imp.svgWidth,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                    });
+                                  } else {
+                                    updateImport(imp.id, {
+                                      scaleX: v / imp.svgWidth,
+                                    });
+                                  }
+                                }}
+                                className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                              />
+                            </div>
+                            {/* Ratio lock button */}
+                            <button
+                              className={`mb-2 p-1.5 rounded transition-colors ${
+                                ratioLocked
+                                  ? "text-[#e94560] hover:text-[#e94560] hover:bg-[#0f3460]/40"
+                                  : "text-gray-600 hover:text-gray-300 hover:bg-[#0f3460]/40"
+                              }`}
+                              title={
+                                ratioLocked
+                                  ? "Ratio locked — click to unlock"
+                                  : "Ratio unlocked — click to lock"
+                              }
+                              onClick={() => {
+                                if (ratioLocked) {
+                                  // Unlock: split into independent scaleX/scaleY (currently identical)
+                                  setRatioLocked(false);
+                                  updateImport(imp.id, {
+                                    scaleX: imp.scaleX ?? imp.scale,
+                                    scaleY: imp.scaleY ?? imp.scale,
+                                  });
+                                } else {
+                                  // Lock: snap back to uniform scale based on current W
+                                  setRatioLocked(true);
+                                  updateImport(imp.id, {
+                                    scale: imp.scaleX ?? imp.scale,
+                                    scaleX: undefined,
+                                    scaleY: undefined,
+                                  });
+                                }
+                              }}
+                            >
+                              {ratioLocked ? (
+                                // Lucide lock icon
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    width="18"
+                                    height="11"
+                                    x="3"
+                                    y="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                              ) : (
+                                // Lucide unlock icon
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    width="18"
+                                    height="11"
+                                    x="3"
+                                    y="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                </svg>
+                              )}
+                            </button>
+                            {/* H */}
+                            <div className="flex-1 min-w-0 mb-2">
+                              <label className="block text-[10px] text-gray-400 mb-0.5">
+                                H (mm)
+                              </label>
+                              <input
+                                type="number"
+                                value={Math.round(objH * 1000) / 1000}
+                                step={0.5}
+                                min={0.001}
+                                onChange={(e) => {
+                                  const v = Math.max(0.001, +e.target.value);
+                                  if (ratioLocked) {
+                                    updateImport(imp.id, {
+                                      scale: v / imp.svgHeight,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                    });
+                                  } else {
+                                    updateImport(imp.id, {
+                                      scaleY: v / imp.svgHeight,
+                                    });
+                                  }
+                                }}
+                                className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                              />
+                            </div>
                           </div>
                           {/* Scale — full width */}
                           {numField(

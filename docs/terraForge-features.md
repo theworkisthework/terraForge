@@ -12,7 +12,9 @@
 - [x] Grouped import model: one `SvgImport` per file containing `SvgPath[]`, paths preserve relative positions
 - [x] Per-import x/y position on bed (mm) — clamped so the object's far edge stays within bed bounds
 - [x] Per-import uniform scale
-- [x] Per-import width and height inputs (mm) — back-calculate scale from size; aspect ratio always preserved; clamped to bed boundary from current origin
+- [x] Per-import width and height inputs (mm) — back-calculate scale from size; clamped to bed boundary from current origin
+- [x] **Aspect ratio lock** — padlock icon between W and H fields; locked (default) keeps aspect ratio via shared `scale`; unlocked stores independent `scaleX`/`scaleY` per axis; drag-to-resize handles always restore uniform scale
+- [x] **Scale shortcuts** — "Fit to bed" button (maximize icon) scales and repositions import to fill the bed; "1:1 reset" button (minimize icon) restores scale to 1 SVG unit = 1 mm; both sit below the Scale field matching the rotation shortcut style
 - [x] Drag to move import on canvas — origin clamped so far edge cannot leave bed boundary
 - [x] 8-handle bounding box for scaling (tl, t, tr, r, br, b, bl, l) with correct resize cursors — scale clamped so object cannot grow past bed boundary
 - [x] Delete (×) button on selected import

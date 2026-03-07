@@ -113,6 +113,8 @@ export const useCanvasStore = create<CanvasState>()(
                 x: imp.x,
                 y: imp.y,
                 scale: imp.scale,
+                scaleX: imp.scaleX,
+                scaleY: imp.scaleY,
                 rotation: imp.rotation,
                 visible: true,
                 originalWidth: imp.svgWidth,
