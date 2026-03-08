@@ -1,6 +1,6 @@
 {
   "name": "terraforge",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "FluidNC pen plotter UI — SVG to G-code, job management, machine control",
   "main": "out/main/index.js",
   "scripts": {
