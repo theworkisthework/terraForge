@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useConsoleStore } from "@renderer/store/consoleStore";
 import { useMachineStore } from "@renderer/store/machineStore";
@@ -107,11 +107,13 @@ describe("ConsolePanel", () => {
 
   // ── Auto-scroll ─────────────────────────────────────────────────────────
 
-  it("auto-scrolls when new lines are added", () => {
+  it("auto-scrolls when new lines are added", async () => {
     useConsoleStore.setState({ lines: ["line 1"] });
     const { rerender } = render(<ConsolePanel />);
-    useConsoleStore.setState({ lines: ["line 1", "line 2"] });
-    rerender(<ConsolePanel />);
+    await act(async () => {
+      useConsoleStore.setState({ lines: ["line 1", "line 2"] });
+      rerender(<ConsolePanel />);
+    });
     // scrollIntoView is stubbed in setup.ts — just verify no crash
     expect(screen.getByText("line 2")).toBeInTheDocument();
   });

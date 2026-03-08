@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -33,28 +33,33 @@ beforeEach(() => {
 });
 
 describe("App", () => {
-  it("renders without crashing", () => {
+  it("renders without crashing", async () => {
     const { container } = render(<App />);
+    await act(async () => {});
     expect(container.querySelector("div")).toBeTruthy();
   });
 
-  it("renders the Toolbar brand", () => {
+  it("renders the Toolbar brand", async () => {
     render(<App />);
+    await act(async () => {});
     expect(screen.getByText("terraForge")).toBeInTheDocument();
   });
 
-  it("renders the File Browser panel", () => {
+  it("renders the File Browser panel", async () => {
     render(<App />);
+    await act(async () => {});
     expect(screen.getByText("File Browser")).toBeInTheDocument();
   });
 
-  it("renders the Properties panel", () => {
+  it("renders the Properties panel", async () => {
     render(<App />);
+    await act(async () => {});
     expect(screen.getByText("Properties")).toBeInTheDocument();
   });
 
-  it("subscribes to IPC channels on mount", () => {
+  it("subscribes to IPC channels on mount", async () => {
     render(<App />);
+    await act(async () => {});
     expect(window.terraForge.config.getMachineConfigs).toHaveBeenCalled();
     expect(window.terraForge.fluidnc.onStatusUpdate).toHaveBeenCalled();
     expect(window.terraForge.fluidnc.onConsoleMessage).toHaveBeenCalled();
@@ -73,9 +78,7 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => {
       expect(useMachineStore.getState().configs).toHaveLength(1);
-      expect(useMachineStore.getState().configs[0].name).toBe(
-        "Loaded Plotter",
-      );
+      expect(useMachineStore.getState().configs[0].name).toBe("Loaded Plotter");
     });
   });
 

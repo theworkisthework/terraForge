@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { MachineConfigDialog } from "@renderer/components/MachineConfigDialog";
@@ -35,25 +35,29 @@ beforeEach(() => {
 describe("MachineConfigDialog", () => {
   const onClose = vi.fn();
 
-  it("renders the dialog heading", () => {
+  it("renders the dialog heading", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
   });
 
-  it("shows the existing config in the sidebar", () => {
+  it("shows the existing config in the sidebar", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Test Plotter")).toBeInTheDocument();
   });
 
-  it("renders General, Pen Commands, and Connection sections", () => {
+  it("renders General, Pen Commands, and Connection sections", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("Pen Commands")).toBeInTheDocument();
     expect(screen.getByText("Connection")).toBeInTheDocument();
   });
 
-  it("renders form fields for bed dimensions", () => {
+  it("renders form fields for bed dimensions", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Bed width (mm)")).toBeInTheDocument();
     expect(screen.getByText("Bed height (mm)")).toBeInTheDocument();
   });
@@ -70,49 +74,57 @@ describe("MachineConfigDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("shows Save Changes button as 'Saved' initially", () => {
+  it("shows Save Changes button as 'Saved' initially", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
-  it("shows + New, Copy, Del buttons", () => {
+  it("shows + New, Copy, Del buttons", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("+ New")).toBeInTheDocument();
     expect(screen.getByText("Copy")).toBeInTheDocument();
     expect(screen.getByText("Del")).toBeInTheDocument();
   });
 
-  it("shows Export and Import buttons", () => {
+  it("shows Export and Import buttons", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("↑ Export")).toBeInTheDocument();
     expect(screen.getByText("↓ Import")).toBeInTheDocument();
   });
 
-  it("shows Set as Active button", () => {
+  it("shows Set as Active button", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Set as Active")).toBeInTheDocument();
   });
 
-  it("shows locked banner when connected to active config", () => {
+  it("shows locked banner when connected to active config", async () => {
     useMachineStore.setState({ connected: true });
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText(/disconnect to edit/i)).toBeInTheDocument();
   });
 
-  it("shows pen command fields", () => {
+  it("shows pen command fields", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Pen up command")).toBeInTheDocument();
     expect(screen.getByText("Pen down command")).toBeInTheDocument();
   });
 
-  it("shows swap and reset buttons for pen commands", () => {
+  it("shows swap and reset buttons for pen commands", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("⇕ Swap up / down")).toBeInTheDocument();
     expect(screen.getByText("↺ Reset to defaults")).toBeInTheDocument();
   });
 
-  it("renders wifi/usb radio options", () => {
+  it("renders wifi/usb radio options", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("wifi")).toBeInTheDocument();
     expect(screen.getByText("usb")).toBeInTheDocument();
   });
@@ -127,8 +139,9 @@ describe("MachineConfigDialog", () => {
 
   // ── Delete config ───────────────────────────────────────────────────────
 
-  it("Del button is disabled with only one config", () => {
+  it("Del button is disabled with only one config", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
     expect(screen.getByText("Del")).toBeDisabled();
   });
 

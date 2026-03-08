@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useTaskStore } from "@renderer/store/taskStore";
 import { TaskBar } from "@renderer/components/TaskBar";
@@ -144,7 +144,9 @@ describe("TaskBar", () => {
     render(<TaskBar />);
     expect(screen.getByText("Done")).toBeInTheDocument();
     // Fast-forward past the dismiss timer (8000ms)
-    vi.advanceTimersByTime(9000);
+    act(() => {
+      vi.advanceTimersByTime(9000);
+    });
     expect(useTaskStore.getState().tasks["t1"]).toBeUndefined();
     vi.useRealTimers();
   });
