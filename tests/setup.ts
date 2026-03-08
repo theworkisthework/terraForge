@@ -109,6 +109,7 @@ if (typeof window !== "undefined") {
       onStatusUpdate: vi.fn().mockReturnValue(() => {}),
       onConsoleMessage: vi.fn().mockReturnValue(() => {}),
       onPing: vi.fn().mockReturnValue(() => {}),
+      onFirmwareInfo: vi.fn().mockReturnValue(() => {}),
     },
     serial: {
       listPorts: vi.fn().mockResolvedValue([]),

@@ -307,7 +307,7 @@ describe("FluidNCClient", () => {
     const result = await client.probeFirmwareVersion();
     expect(result).not.toBeNull();
     expect(result!.major).toBe(4);
-    expect(result!.version).toBe("4.0");
+    expect(result!.version).toBe("4.0.1");
     expect(result!.wsPort).toBe(80);
   });
 
