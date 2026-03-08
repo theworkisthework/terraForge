@@ -41,10 +41,12 @@ export function JobControls() {
     onClick: () => void,
     variant: "primary" | "secondary" | "danger" = "secondary",
     disabled = false,
+    title?: string,
   ) => (
     <button
       onClick={onClick}
       disabled={disabled || !connected}
+      title={title}
       className={`w-full py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40 ${
         variant === "primary"
           ? "bg-[#e94560] hover:bg-[#c73d56] text-white"
@@ -160,6 +162,11 @@ export function JobControls() {
           },
           "primary",
           !jobFileValid, // disabled unless a valid G-code file is selected
+          jobFileValid
+            ? selectedJobFile!.source === "local"
+              ? `Upload ${selectedJobFile!.name} to SD card then run`
+              : `Run ${selectedJobFile!.name} on the machine`
+            : "Select a G-code file in the File Browser first",
         )}
 
       {/* Pause — only while running */}
@@ -170,6 +177,8 @@ export function JobControls() {
             await window.terraForge.fluidnc.pauseJob();
           },
           "secondary",
+          false,
+          "Pause the running job (resume with ▶ Resume)",
         )}
 
       {/* Resume — only while held */}
@@ -180,6 +189,8 @@ export function JobControls() {
             await window.terraForge.fluidnc.resumeJob();
           },
           "primary",
+          false,
+          "Resume the paused job",
         )}
 
       {/* Abort — while running or held */}
@@ -192,6 +203,8 @@ export function JobControls() {
             }
           },
           "danger",
+          false,
+          "Immediately stop the job and cancel remaining moves",
         )}
 
       <div className="mt-auto" />

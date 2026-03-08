@@ -128,6 +128,8 @@
 - [x] Step size selector: 0.1 / 1 / 10 / 100 mm
 - [x] Configurable feedrate input
 - [x] Go-to-origin button (G0 X0 Y0)
+- [x] **Run Homing button in Jog panel** — sends `$H` to trigger the FluidNC homing cycle
+- [x] **Set Zero button in Jog panel** — sends `G10 L20 P1 X0 Y0 Z0` to declare current position as work-coordinate zero
 - [x] Jog panel shown/hidden via toolbar toggle
 - [x] Homing cycle button (`$H`) in main toolbar — disabled when not connected
 - [x] Floating draggable jog panel — jog panel opens as a fixed-position overlay; drag handle at the top allows repositioning anywhere on screen; last position preserved within the session

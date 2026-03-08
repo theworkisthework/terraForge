@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { JogControls } from "@renderer/components/JogControls";
@@ -19,52 +19,84 @@ describe("JogControls", () => {
 
   it("renders XY direction buttons", () => {
     render(<JogControls />);
-    expect(screen.getByText("▲ Y+")).toBeInTheDocument();
-    expect(screen.getByText("◄ X-")).toBeInTheDocument();
-    expect(screen.getByText("X+ ►")).toBeInTheDocument();
-    expect(screen.getByText("Y- ▼")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jog Y+" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jog X-" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jog X+" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jog Y-" })).toBeInTheDocument();
   });
 
-  it("renders Z control buttons", () => {
+  it("renders pen up/down and zero-Z buttons", () => {
     render(<JogControls />);
-    expect(screen.getByText("Z+")).toBeInTheDocument();
-    expect(screen.getByText("Z-")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pen down" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pen up" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zero Z" })).toBeInTheDocument();
   });
 
-  it("renders home button", () => {
+  it("renders origin button", () => {
     render(<JogControls />);
-    expect(screen.getByText("⌂")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Go to origin" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders Run Homing button", () => {
+    render(<JogControls />);
+    expect(
+      screen.getByRole("button", { name: /Run Homing/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders Set Zero button", () => {
+    render(<JogControls />);
+    expect(
+      screen.getByRole("button", { name: /Set Zero/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders feedrate input with default value", () => {
     render(<JogControls />);
-    // Label is not linked via htmlFor, so use the text then find the sibling input
     expect(screen.getByText("Feedrate mm/min")).toBeInTheDocument();
     const input = screen.getByRole("spinbutton");
     expect(input).toHaveValue(3000);
   });
 
-  it("sends jog command when direction button clicked", async () => {
+  it("sends jog command when X+ button clicked", async () => {
     render(<JogControls />);
-    await userEvent.click(screen.getByText("X+ ►"));
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("$J=G91 G21 X"),
     );
   });
 
-  it("sends Z jog command", async () => {
+  it("sends go-to-origin command when origin button clicked", async () => {
     render(<JogControls />);
-    await userEvent.click(screen.getByText("Z+"));
+    await userEvent.click(screen.getByRole("button", { name: "Go to origin" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
-      expect.stringContaining("$J=G91 G21 Z"),
+      "G0 X0 Y0",
     );
   });
 
-  it("sends home command when ⌂ clicked", async () => {
+  it("sends zero-Z command when Zero Z button clicked", async () => {
     render(<JogControls />);
-    await userEvent.click(screen.getByText("⌂"));
+    await userEvent.click(screen.getByRole("button", { name: "Zero Z" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
-      "G0 X0 Y0",
+      "G10 L20 P1 Z0",
+    );
+  });
+
+  it("sends homing command when Run Homing clicked", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: /Run Homing/i }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("$H");
+  });
+
+  it("sends set-zero command when Set Zero clicked", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: /Set Zero/i }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      "G10 L20 P1 X0 Y0",
     );
   });
 
@@ -84,8 +116,7 @@ describe("JogControls", () => {
   it("changes active step when a step button is clicked", async () => {
     render(<JogControls />);
     await userEvent.click(screen.getByText("100"));
-    // Now click X+ — should send 100mm jog
-    await userEvent.click(screen.getByText("X+ ►"));
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("X100"),
     );
@@ -93,7 +124,7 @@ describe("JogControls", () => {
 
   it("sends Y- jog command when Y- button clicked", async () => {
     render(<JogControls />);
-    await userEvent.click(screen.getByText("Y- ▼"));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("Y-"),
     );
@@ -104,13 +135,9 @@ describe("JogControls", () => {
     const input = screen.getByRole("spinbutton");
     await userEvent.clear(input);
     await userEvent.type(input, "6000");
-    // After changing feedrate, a jog should use the new value
-    await userEvent.click(screen.getByText("X+ ►"));
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("F6000"),
     );
   });
 });
-
-// Need vi import for vi.fn()
-import { vi } from "vitest";
