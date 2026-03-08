@@ -1,4 +1,4 @@
-// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down, maximize-2, minimize-2, lock, unlock) from Lucide (https://lucide.dev)
+// Portions of SVG icon data (rotate-ccw, rotate-cw, magnet, chevron-down, maximize-2, minimize-2, lock, unlock) and Lucide React icons (align-horizontal-justify-start/center/end, align-vertical-justify-start/center/end) from Lucide (https://lucide.dev)
 // ISC License
 // Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2026 as part of
 // Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2026.
@@ -6,6 +6,14 @@
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
 import { useState } from "react";
+import {
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+} from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 
@@ -200,6 +208,9 @@ export function PropertiesPanel() {
                     {(() => {
                       const objW = imp.svgWidth * (imp.scaleX ?? imp.scale);
                       const objH = imp.svgHeight * (imp.scaleY ?? imp.scale);
+                      const cfg = activeConfig();
+                      const bedW = cfg?.bedWidth ?? 220;
+                      const bedH = cfg?.bedHeight ?? 200;
                       return (
                         <>
                           {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
@@ -217,6 +228,68 @@ export function PropertiesPanel() {
                               0.5,
                             )}
                           </div>
+
+                          {/* Alignment row — between position and size */}
+                          {(() => {
+                            const btnCls =
+                              "p-1 text-gray-500 hover:text-gray-100 rounded hover:bg-[#0f3460]/40 transition-colors";
+                            const alignH = (x: number) =>
+                              updateImport(imp.id, {
+                                x: Math.round(x * 1000) / 1000,
+                              });
+                            const alignV = (y: number) =>
+                              updateImport(imp.id, {
+                                y: Math.round(y * 1000) / 1000,
+                              });
+                            return (
+                              <div className="flex items-center gap-0.5 mb-2">
+                                <button
+                                  className={btnCls}
+                                  title="Align left edge to bed left (X = 0)"
+                                  onClick={() => alignH(0)}
+                                >
+                                  <AlignHorizontalJustifyStart size={13} />
+                                </button>
+                                <button
+                                  className={btnCls}
+                                  title={`Centre horizontally (X = ${Math.round(((bedW - objW) / 2) * 10) / 10} mm)`}
+                                  onClick={() => alignH((bedW - objW) / 2)}
+                                >
+                                  <AlignHorizontalJustifyCenter size={13} />
+                                </button>
+                                <button
+                                  className={btnCls}
+                                  title={`Align right edge to bed right (X = ${Math.round((bedW - objW) * 10) / 10} mm)`}
+                                  onClick={() => alignH(bedW - objW)}
+                                >
+                                  <AlignHorizontalJustifyEnd size={13} />
+                                </button>
+                                <div className="w-px h-3 bg-[#0f3460] mx-0.5" />
+                                <button
+                                  className={btnCls}
+                                  title={`Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`}
+                                  onClick={() => alignV(bedH - objH)}
+                                >
+                                  <AlignVerticalJustifyStart size={13} />
+                                </button>
+                                <button
+                                  className={btnCls}
+                                  title={`Centre vertically (Y = ${Math.round(((bedH - objH) / 2) * 10) / 10} mm)`}
+                                  onClick={() => alignV((bedH - objH) / 2)}
+                                >
+                                  <AlignVerticalJustifyCenter size={13} />
+                                </button>
+                                <button
+                                  className={btnCls}
+                                  title="Align bottom edge to bed bottom (Y = 0)"
+                                  onClick={() => alignV(0)}
+                                >
+                                  <AlignVerticalJustifyEnd size={13} />
+                                </button>
+                              </div>
+                            );
+                          })()}
+
                           {/* W / H — flex row with lock button between the two inputs */}
                           <div className="flex items-end gap-1 mb-0">
                             {/* W */}
@@ -364,9 +437,6 @@ export function PropertiesPanel() {
                           )}
                           {/* Scale shortcut row: fit to bed | 1:1 reset */}
                           {(() => {
-                            const cfg = activeConfig();
-                            const bedW = cfg?.bedWidth ?? 220;
-                            const bedH = cfg?.bedHeight ?? 200;
                             const fitScale = Math.min(
                               bedW / (imp.svgWidth || 1),
                               bedH / (imp.svgHeight || 1),

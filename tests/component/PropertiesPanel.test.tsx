@@ -24,6 +24,7 @@ beforeEach(() => {
     connected: false,
     wsLive: false,
     selectedJobFile: null,
+    fwInfo: null,
   });
 });
 
@@ -197,5 +198,77 @@ describe("PropertiesPanel", () => {
     await userEvent.clear(rotInput);
     await userEvent.type(rotInput, "45");
     expect(useCanvasStore.getState().imports[0].rotation).toBe(45);
+  });
+
+  // ── Alignment buttons ──────────────────────────────────────────────────
+  // Default import: svgWidth=100, svgHeight=100, scale=1 → object is 100×100 mm
+  // Default bed (from createMachineConfig): 220×200 mm
+  // Expected positions: left=0, centreH=60, right=120, bottom=0, centreV=50, top=100
+
+  function setupAlignmentFixture() {
+    const cfg = createMachineConfig(); // bedWidth:220, bedHeight:200
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "align-test",
+      x: 50,
+      y: 50,
+      svgWidth: 100,
+      svgHeight: 100,
+      scale: 1,
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    return imp;
+  }
+
+  it("align left sets x to 0", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Align left edge to bed left (X = 0)"),
+    );
+    expect(useCanvasStore.getState().imports[0].x).toBe(0);
+  });
+
+  it("align centre horizontal sets x to (bedW - objW) / 2", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Centre horizontally (X = 60 mm)"));
+    expect(useCanvasStore.getState().imports[0].x).toBe(60);
+  });
+
+  it("align right sets x to bedW - objW", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Align right edge to bed right (X = 120 mm)"),
+    );
+    expect(useCanvasStore.getState().imports[0].x).toBe(120);
+  });
+
+  it("align top sets y to bedH - objH", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Align top edge to bed top (Y = 100 mm)"),
+    );
+    expect(useCanvasStore.getState().imports[0].y).toBe(100);
+  });
+
+  it("align centre vertical sets y to (bedH - objH) / 2", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Centre vertically (Y = 50 mm)"));
+    expect(useCanvasStore.getState().imports[0].y).toBe(50);
+  });
+
+  it("align bottom sets y to 0", async () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Align bottom edge to bed bottom (Y = 0)"),
+    );
+    expect(useCanvasStore.getState().imports[0].y).toBe(0);
   });
 });
