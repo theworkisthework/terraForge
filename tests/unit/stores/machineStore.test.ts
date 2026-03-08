@@ -13,6 +13,7 @@ beforeEach(() => {
     connected: false,
     wsLive: false,
     selectedJobFile: null,
+    fwInfo: null,
   });
 });
 
@@ -47,6 +48,19 @@ describe("machineStore", () => {
     expect(useMachineStore.getState().status?.state).toBe("Idle");
   });
 
+  // ── setFwInfo ────────────────────────────────────────────────────────────
+
+  it("setFwInfo stores the firmware version string", () => {
+    useMachineStore.getState().setFwInfo("FluidNC v4.0.1");
+    expect(useMachineStore.getState().fwInfo).toBe("FluidNC v4.0.1");
+  });
+
+  it("setFwInfo accepts null to clear the version", () => {
+    useMachineStore.setState({ fwInfo: "FluidNC v4.0.1" });
+    useMachineStore.getState().setFwInfo(null);
+    expect(useMachineStore.getState().fwInfo).toBeNull();
+  });
+
   // ── setConnected ────────────────────────────────────────────────────────
 
   it("sets connected and clears wsLive on disconnect", () => {
@@ -54,6 +68,12 @@ describe("machineStore", () => {
     useMachineStore.getState().setConnected(false);
     expect(useMachineStore.getState().connected).toBe(false);
     expect(useMachineStore.getState().wsLive).toBe(false);
+  });
+
+  it("setConnected(false) clears fwInfo", () => {
+    useMachineStore.setState({ connected: true, fwInfo: "FluidNC v4.0.1" });
+    useMachineStore.getState().setConnected(false);
+    expect(useMachineStore.getState().fwInfo).toBeNull();
   });
 
   // ── setWsLive ───────────────────────────────────────────────────────────

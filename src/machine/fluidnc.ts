@@ -24,6 +24,11 @@ export class FluidNCClient extends EventEmitter {
    * Used to select the correct API surface (4.x REST vs 3.x command interface).
    */
   private fwMajor: number | null = null;
+  /**
+   * Full firmware version string, e.g. "FluidNC v4.0.1".
+   * Emitted as a "firmware" event when first detected and cleared on disconnect.
+   */
+  private fwInfo: string | null = null;
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
@@ -435,21 +440,21 @@ export class FluidNCClient extends EventEmitter {
     } | null => {
       // "FW version: FluidNC v4.0.1" — space after colon, then optional "FluidNC "
       const fwMatch = text.match(
-        /FW\s+version\s*:\s*(?:FluidNC\s+)?v?(\d+)\.(\d+)/i,
+        /FW\s+version\s*:\s*(?:FluidNC\s+)?v?(\d+)\.(\d+)(?:\.(\d+))?/i,
       );
       // "[VER:3.9.7.FluidNC...]" or "[VER:FluidNC v3.9.7:]"
       const verMatch = !fwMatch
-        ? text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)/i)
+        ? text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)(?:\.(\d+))?/i)
         : null;
       // Last resort: bare semver anywhere, e.g. "v3.9.7"
       const semver =
-        !fwMatch && !verMatch ? text.match(/\bv?(\d+)\.(\d+)\.\d+/) : null;
+        !fwMatch && !verMatch ? text.match(/\bv?(\d+)\.(\d+)\.(\d+)/) : null;
 
       const m = fwMatch ?? verMatch ?? semver;
       if (!m) return null;
 
       const major = parseInt(m[1], 10);
-      const version = `${m[1]}.${m[2]}`;
+      const version = `${m[1]}.${m[2]}${m[3] ? `.${m[3]}` : ""}`;
 
       // Parse WS port directly from "webcommunication: Sync: <port>"
       const wsPortMatch = text.match(/webcommunication[^#]*Sync:\s*(\d+)/i);
@@ -548,18 +553,22 @@ export class FluidNCClient extends EventEmitter {
       const probe = await this.probeFirmwareVersion(probeBaseUrl);
       if (probe) {
         this.fwMajor = probe.major;
+        this.fwInfo = `FluidNC v${probe.version}`;
+        this.emit("firmware", this.fwInfo);
         const detectedWsPort = probe.wsPort ?? (probe.major >= 4 ? port : 81);
         this.wsPort = detectedWsPort;
         const src =
           probe.wsPort !== null ? "ESP800 response" : "version heuristic";
         this.emit(
           "console",
-          `[terraForge] Detected FluidNC ${probe.version} — WS port ${detectedWsPort} (from ${src})`,
+          `[terraForge] Detected ${this.fwInfo} — WS port ${detectedWsPort} (from ${src})`,
         );
       } else {
         // Probe failed — default to same-port (FluidNC 4.x / modern behaviour).
         // If on FluidNC 3.x, set a WS port override of 81 in the machine config.
         this.wsPort = port;
+        this.fwInfo = null;
+        this.emit("firmware", null);
         this.emit(
           "console",
           `[terraForge] Firmware probe failed — assuming WS on port ${port} (set WS port override to 81 for FluidNC 3.x)`,
@@ -576,6 +585,8 @@ export class FluidNCClient extends EventEmitter {
 
   disconnectWebSocket(): void {
     this.fwMajor = null;
+    this.fwInfo = null;
+    this.emit("firmware", null);
     this.killWs();
   }
 

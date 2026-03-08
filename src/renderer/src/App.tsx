@@ -13,6 +13,7 @@ export default function App() {
   const setConfigs = useMachineStore((s) => s.setConfigs);
   const setStatus = useMachineStore((s) => s.setStatus);
   const setWsLive = useMachineStore((s) => s.setWsLive);
+  const setFwInfo = useMachineStore((s) => s.setFwInfo);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
 
@@ -40,6 +41,7 @@ export default function App() {
       pingTimer = setTimeout(() => setWsLive(false), 15_000);
     };
     const offPing = window.terraForge.fluidnc.onPing(resetPingTimer);
+    const offFirmware = window.terraForge.fluidnc.onFirmwareInfo(setFwInfo);
 
     return () => {
       offStatus();
@@ -47,9 +49,10 @@ export default function App() {
       offSerialData();
       offTask();
       offPing();
+      offFirmware();
       if (pingTimer) clearTimeout(pingTimer);
     };
-  }, [setConfigs, setStatus, setWsLive, upsertTask, appendLine]);
+  }, [setConfigs, setStatus, setWsLive, setFwInfo, upsertTask, appendLine]);
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] text-gray-200 overflow-hidden">

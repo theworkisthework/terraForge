@@ -189,6 +189,7 @@ export function Toolbar() {
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const connected = useMachineStore((s) => s.connected);
   const wsLive = useMachineStore((s) => s.wsLive);
+  const fwInfo = useMachineStore((s) => s.fwInfo);
   const setConnected = useMachineStore((s) => s.setConnected);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const imports = useCanvasStore((s) => s.imports);
@@ -777,6 +778,16 @@ export function Toolbar() {
 
       {/* Connection status indicator */}
       <div className="ml-auto flex items-center gap-3">
+        {/* Firmware version — shown when connected and version was detected */}
+        {connected && fwInfo && (
+          <span
+            className="text-xs text-gray-500 font-mono"
+            title="Detected firmware version"
+          >
+            {fwInfo}
+          </span>
+        )}
+
         <span
           className={`w-2 h-2 rounded-full transition-colors ${
             !connected

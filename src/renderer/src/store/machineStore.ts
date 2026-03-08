@@ -16,6 +16,8 @@ interface MachineState {
   connected: boolean;
   wsLive: boolean;
   selectedJobFile: SelectedJobFile | null;
+  /** Firmware version string from [ESP800] probe, e.g. "FluidNC v4.0.1". Null when disconnected. */
+  fwInfo: string | null;
 
   setConfigs: (configs: MachineConfig[]) => void;
   setActiveConfigId: (id: string | null) => void;
@@ -23,6 +25,7 @@ interface MachineState {
   setConnected: (connected: boolean) => void;
   setWsLive: (live: boolean) => void;
   setSelectedJobFile: (file: SelectedJobFile | null) => void;
+  setFwInfo: (info: string | null) => void;
   activeConfig: () => MachineConfig | undefined;
 
   // CRUD helpers that also persist via IPC
@@ -44,6 +47,7 @@ export const useMachineStore = create<MachineState>()(
     connected: false,
     wsLive: false,
     selectedJobFile: null,
+    fwInfo: null,
 
     setConfigs: (configs) =>
       set((state) => {
@@ -66,7 +70,15 @@ export const useMachineStore = create<MachineState>()(
     setConnected: (connected) =>
       set((state) => {
         state.connected = connected;
-        if (!connected) state.wsLive = false;
+        if (!connected) {
+          state.wsLive = false;
+          state.fwInfo = null;
+        }
+      }),
+
+    setFwInfo: (info) =>
+      set((state) => {
+        state.fwInfo = info;
       }),
 
     setWsLive: (live) =>

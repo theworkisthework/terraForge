@@ -228,6 +228,7 @@ export interface FluidNCApi {
   onStatusUpdate: (cb: (status: MachineStatus) => void) => () => void;
   onConsoleMessage: (cb: (message: string) => void) => () => void;
   onPing: (cb: () => void) => () => void;
+  onFirmwareInfo: (cb: (info: string | null) => void) => () => void;
 }
 
 export interface SerialApi {

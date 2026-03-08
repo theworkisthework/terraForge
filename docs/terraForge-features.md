@@ -76,7 +76,7 @@
 - [x] Real-time machine status pushed from main process to renderer via IPC
 - [x] Real-time position display in status bar (X / Y / Z)
 - [x] Machine state display (Idle, Run, Hold, Alarm, etc.)
-- [ ] Show connected firmware version near online status
+- [x] Show connected firmware version near online status (detected via [ESP800] probe; displayed as e.g. "FluidNC v4.0.1" to the left of the connection dot)
 
 ### Machine Configuration
 

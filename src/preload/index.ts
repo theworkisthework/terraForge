@@ -68,6 +68,13 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
     ipcRenderer.on("fluidnc:ping", listener);
     return () => ipcRenderer.off("fluidnc:ping", listener);
   },
+
+  onFirmwareInfo: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, info: string | null) =>
+      cb(info);
+    ipcRenderer.on("fluidnc:firmware", listener);
+    return () => ipcRenderer.off("fluidnc:firmware", listener);
+  },
 };
 
 // ─── Serial API ───────────────────────────────────────────────────────────────

@@ -90,6 +90,10 @@ fluidnc.on("ping", () => {
   mainWindow?.webContents.send("fluidnc:ping");
 });
 
+fluidnc.on("firmware", (info: string | null) => {
+  mainWindow?.webContents.send("fluidnc:firmware", info);
+});
+
 // Serial events — status goes to the same channel as Wi-Fi status so the
 // renderer doesn't need to care which transport is active.
 // Also emit a ping so the 15s watchdog timer stays alive over serial.

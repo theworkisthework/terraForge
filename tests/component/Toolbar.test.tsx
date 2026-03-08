@@ -15,6 +15,7 @@ beforeEach(() => {
     connected: false,
     wsLive: false,
     selectedJobFile: null,
+    fwInfo: null,
   });
   useCanvasStore.setState({
     imports: [],
@@ -59,6 +60,33 @@ describe("Toolbar", () => {
     useMachineStore.setState({ connected: true, wsLive: true });
     render(<Toolbar />);
     expect(screen.getByText("Connected")).toBeInTheDocument();
+  });
+
+  // ── Firmware version display ───────────────────────────────────────────
+
+  it("shows firmware version when connected and fwInfo is set", () => {
+    useMachineStore.setState({
+      connected: true,
+      wsLive: true,
+      fwInfo: "FluidNC v4.0.1",
+    });
+    render(<Toolbar />);
+    expect(screen.getByText("FluidNC v4.0.1")).toBeInTheDocument();
+  });
+
+  it("hides firmware version when not connected", () => {
+    useMachineStore.setState({ connected: false, fwInfo: "FluidNC v4.0.1" });
+    render(<Toolbar />);
+    expect(screen.queryByText("FluidNC v4.0.1")).not.toBeInTheDocument();
+  });
+
+  it("hides firmware version when connected but fwInfo is null", () => {
+    useMachineStore.setState({ connected: true, wsLive: true, fwInfo: null });
+    render(<Toolbar />);
+    // No firmware label should appear
+    expect(
+      screen.queryByTitle("Detected firmware version"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders Import SVG button", () => {
