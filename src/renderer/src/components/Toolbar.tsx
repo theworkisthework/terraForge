@@ -501,6 +501,8 @@ export function Toolbar() {
       arcFitting: false,
       arcTolerance: 0.01,
       optimisePaths: prefs.optimise,
+      joinPaths: prefs.joinPaths,
+      joinTolerance: prefs.joinTolerance,
     };
 
     const worker = new Worker(

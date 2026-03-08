@@ -7,6 +7,7 @@ import {
   quadBezier,
   arcToBeziers,
   nearestNeighbourSort,
+  joinSubpaths,
   flattenToSubpaths,
   fmtCoord,
   type Pt,
@@ -754,5 +755,134 @@ describe("flattenToSubpaths (S and T smooth curves)", () => {
     const last = sp[0][sp[0].length - 1];
     expect(last.x).toBeCloseTo(150, 0);
     expect(last.y).toBeCloseTo(0, 0);
+  });
+});
+
+// ── joinSubpaths ────────────────────────────────────────────────────────────────
+
+describe("joinSubpaths", () => {
+  it("returns empty array for empty input", () => {
+    expect(joinSubpaths([], 0.5)).toEqual([]);
+  });
+
+  it("returns a single subpath unchanged", () => {
+    const sp = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const result = joinSubpaths([sp], 0.5);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(sp);
+  });
+
+  it("does not join subpaths further apart than tolerance", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 20, y: 0 },
+      { x: 30, y: 0 },
+    ]; // gap = 10, tol = 0.5
+    const result = joinSubpaths([a, b], 0.5);
+    expect(result).toHaveLength(2);
+  });
+
+  it("joins two subpaths whose end→start gap is within tolerance", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 10.1, y: 0 },
+      { x: 20, y: 0 },
+    ]; // gap = 0.1 < tol 0.2
+    const result = joinSubpaths([a, b], 0.2);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveLength(4); // both subpaths merged
+    expect(result[0][0]).toEqual({ x: 0, y: 0 });
+    expect(result[0][result[0].length - 1]).toEqual({ x: 20, y: 0 });
+  });
+
+  it("joins exactly at the tolerance boundary", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 10.2, y: 0 },
+      { x: 20, y: 0 },
+    ]; // gap = 0.2, tol = 0.2
+    const result = joinSubpaths([a, b], 0.2);
+    expect(result).toHaveLength(1);
+  });
+
+  it("does not join when gap slightly exceeds tolerance", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 10.21, y: 0 },
+      { x: 20, y: 0 },
+    ]; // gap > 0.2
+    const result = joinSubpaths([a, b], 0.2);
+    expect(result).toHaveLength(2);
+  });
+
+  it("chains multiple consecutive joins into a single subpath", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 10.1, y: 0 },
+      { x: 20, y: 0 },
+    ];
+    const c = [
+      { x: 20.05, y: 0 },
+      { x: 30, y: 0 },
+    ];
+    const result = joinSubpaths([a, b, c], 0.2);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveLength(6);
+    expect(result[0][result[0].length - 1]).toEqual({ x: 30, y: 0 });
+  });
+
+  it("handles a mix of joinable and non-joinable pairs", () => {
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const b = [
+      { x: 10.1, y: 0 },
+      { x: 20, y: 0 },
+    ]; // joined with a
+    const c = [
+      { x: 100, y: 0 },
+      { x: 110, y: 0 },
+    ]; // far from b, new group
+    const d = [
+      { x: 110.05, y: 0 },
+      { x: 120, y: 0 },
+    ]; // joined with c
+    const result = joinSubpaths([a, b, c, d], 0.2);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toHaveLength(4); // a+b
+    expect(result[1]).toHaveLength(4); // c+d
+  });
+
+  it("uses Euclidean distance (diagonal gap)", () => {
+    // Diagonal gap of sqrt(0.02^2 + 0.02^2) ≈ 0.028 < tol 0.05
+    const a = [
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    const b = [
+      { x: 10.02, y: 10.02 },
+      { x: 20, y: 20 },
+    ];
+    const result = joinSubpaths([a, b], 0.05);
+    expect(result).toHaveLength(1);
   });
 });

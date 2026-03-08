@@ -21,12 +21,16 @@ export interface GcodePrefs {
   optimise: boolean;
   uploadToSd: boolean;
   saveLocally: boolean;
+  joinPaths: boolean;
+  joinTolerance: number; // mm
 }
 
 const DEFAULTS: GcodePrefs = {
   optimise: true,
   uploadToSd: true,
   saveLocally: false,
+  joinPaths: false,
+  joinTolerance: 0.2,
 };
 
 function loadPrefs(): GcodePrefs {
@@ -64,6 +68,11 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const toggle = (key: keyof GcodePrefs) =>
     setPrefs((p) => ({ ...p, [key]: !p[key] }));
 
+  const setJoinTolerance = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n > 0) setPrefs((p) => ({ ...p, joinTolerance: n }));
+  };
+
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
 
   const handleConfirm = () => {
@@ -98,6 +107,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
           <label className="flex items-start gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
+              aria-label="Optimise paths"
               className="mt-0.5 accent-[#e94560] cursor-pointer"
               checked={prefs.optimise}
               onChange={() => toggle("optimise")}
@@ -113,6 +123,53 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             </div>
           </label>
 
+          {/* ── Join nearby paths ── */}
+          <div className="flex items-start gap-3 select-none">
+            <input
+              type="checkbox"
+              aria-label="Join nearby paths"
+              className="mt-0.5 accent-[#e94560] cursor-pointer flex-shrink-0"
+              checked={prefs.joinPaths}
+              onChange={() => toggle("joinPaths")}
+              id="join-paths-cb"
+            />
+            <div className="flex-1 min-w-0">
+              <label
+                htmlFor="join-paths-cb"
+                className="cursor-pointer flex items-center gap-2 flex-wrap"
+              >
+                <span className="text-sm text-white font-medium">
+                  Join nearby paths
+                </span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
+                  Experimental
+                </span>
+              </label>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Connect path endpoints within the tolerance below, skipping pen
+                up/down between nearly-touching strokes.
+              </div>
+              <div
+                className={`flex items-center gap-2 mt-2 transition-opacity ${prefs.joinPaths ? "opacity-100" : "opacity-30 pointer-events-none"}`}
+              >
+                <label className="text-xs text-gray-400 whitespace-nowrap">
+                  Tolerance
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max="10"
+                  step="0.05"
+                  value={prefs.joinTolerance}
+                  onChange={(e) => setJoinTolerance(e.target.value)}
+                  disabled={!prefs.joinPaths}
+                  className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                />
+                <span className="text-xs text-gray-400">mm</span>
+              </div>
+            </div>
+          </div>
+
           <div className="border-t border-[#0f3460]" />
 
           <div className="text-xs text-gray-500 uppercase tracking-wider -mb-1">
@@ -123,6 +180,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
           <label className="flex items-start gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
+              aria-label="Upload to SD card"
               className="mt-0.5 accent-[#e94560] cursor-pointer"
               checked={prefs.uploadToSd}
               onChange={() => toggle("uploadToSd")}
@@ -147,6 +205,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
           <label className="flex items-start gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
+              aria-label="Save to computer"
               className="mt-0.5 accent-[#e94560] cursor-pointer"
               checked={prefs.saveLocally}
               onChange={() => toggle("saveLocally")}

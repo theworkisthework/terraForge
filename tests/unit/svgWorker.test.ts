@@ -72,7 +72,22 @@ async function waitForMsg(
   );
 }
 
-// ── Shared fixture ────────────────────────────────────────────────────────────
+/** Poll postSpy until a message of `type` with matching `taskId` appears. */
+async function waitForMsgById(
+  type: string,
+  taskId: string,
+  timeout = 5_000,
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const hit = postSpy.mock.calls
+      .map(([m]) => m as Record<string, unknown>)
+      .find((m) => m.type === type && m.taskId === taskId);
+    if (hit) return hit;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error(`Timeout waiting for type="${type}" taskId="${taskId}"`);
+}
 
 function makeSimpleObj() {
   return createVectorObject({
@@ -358,5 +373,115 @@ describe("svgWorker — coordinate output", () => {
     expect(fIdx).toBeGreaterThan(-1);
     expect(penDownIdx).toBeGreaterThan(-1);
     expect(fIdx).toBeLessThan(penDownIdx);
+  });
+});
+
+// ── Join paths mode ───────────────────────────────────────────────────────────
+
+describe("svgWorker — join paths mode", () => {
+  it("marks 'Joined: no' in header when joinPaths=false", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "join-header-off",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ joinPaths: false }),
+    });
+    const msg = await waitForMsg("complete");
+    expect(msg.gcode as string).toContain("Joined   : no");
+  });
+
+  it("marks 'Joined: yes' with tolerance in header when joinPaths=true", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "join-header-on",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ joinPaths: true, joinTolerance: 0.2 }),
+    });
+    const msg = await waitForMsg("complete");
+    expect(msg.gcode as string).toContain("Joined   : yes (tolerance 0.2 mm)");
+  });
+
+  it("produces fewer G0 rapids when adjacent paths are within join tolerance", async () => {
+    // Two objects with paths that share an endpoint — they should merge when
+    // join is enabled, reducing the number of G0 rapid-travel moves.
+    const cfg = makeConfig();
+
+    const objA = createVectorObject({
+      path: "M 0 0 L 10 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+    const objB = createVectorObject({
+      path: "M 10 0 L 20 0",
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      originalWidth: 200,
+      originalHeight: 200,
+    });
+
+    dispatch({
+      type: "generate",
+      taskId: "join-rapids-on",
+      objects: [objA, objB],
+      config: cfg,
+      options: createGcodeOptions({
+        optimisePaths: false,
+        joinPaths: true,
+        joinTolerance: 0.5,
+      }),
+    });
+    const joined = await waitForMsgById("complete", "join-rapids-on");
+
+    dispatch({
+      type: "generate",
+      taskId: "join-rapids-off",
+      objects: [objA, objB],
+      config: cfg,
+      options: createGcodeOptions({ optimisePaths: false, joinPaths: false }),
+    });
+    const unjoined = await waitForMsgById("complete", "join-rapids-off");
+
+    // Count G0 travel moves (excluding the final return-to-origin)
+    const countRapids = (gcode: string) =>
+      gcode
+        .split("\n")
+        .filter((l) => l.startsWith("G0 X") && !l.startsWith("G0 X0 Y0"))
+        .length;
+
+    const rapidsWith = countRapids(joined.gcode as string);
+    const rapidsWithout = countRapids(unjoined.gcode as string);
+    // Unjoined: 2 subpaths → 2 rapids. Joined: endpoints touch → 1 rapid.
+    expect(rapidsWithout).toBe(2);
+    expect(rapidsWith).toBe(1);
+  });
+
+  it("join mode combined with optimise still produces valid G-code", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "join-and-opt",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: true,
+        joinPaths: true,
+        joinTolerance: 0.2,
+      }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("Optimised: yes (nearest-neighbour)");
+    expect(gcode).toContain("Joined   : yes (tolerance 0.2 mm)");
+    expect(gcode).toContain("G0 X");
+    expect(gcode).toContain("G1 X");
   });
 });

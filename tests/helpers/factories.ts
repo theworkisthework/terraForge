@@ -117,6 +117,8 @@ export function createGcodeOptions(
     arcFitting: false,
     arcTolerance: 0.1,
     optimisePaths: false,
+    joinPaths: false,
+    joinTolerance: 0.2,
     ...overrides,
   };
 }

@@ -343,16 +343,23 @@ describe("Toolbar", () => {
       expect(screen.getByText("Save to computer")).toBeInTheDocument();
     });
 
-    it("dialog defaults: Optimise=checked, Upload=checked, Save=unchecked", async () => {
+    it("dialog defaults: Optimise=checked, JoinPaths=unchecked, Upload=checked, Save=unchecked", async () => {
       const imp = createSvgImport({ name: "test" });
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      const checkboxes = screen.getAllByRole("checkbox");
-      // Optimise is first, Upload second, Save third
-      expect(checkboxes[0]).toBeChecked(); // Optimise
-      expect(checkboxes[1]).toBeChecked(); // Upload to SD
-      expect(checkboxes[2]).not.toBeChecked(); // Save to computer
+      expect(
+        screen.getByRole("checkbox", { name: "Optimise paths" }),
+      ).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "Join nearby paths" }),
+      ).not.toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "Upload to SD card" }),
+      ).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "Save to computer" }),
+      ).not.toBeChecked();
     });
 
     it("Cancel button closes the dialog without generating", async () => {
@@ -377,10 +384,9 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      // Defaults: Upload=checked, Save=unchecked
-      // Uncheck Upload — now neither is checked
-      const checkboxes = screen.getAllByRole("checkbox");
-      await userEvent.click(checkboxes[1]); // uncheck Upload to SD
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Upload to SD card" }),
+      );
       const generateBtn = screen.getByRole("button", { name: "Generate" });
       expect(generateBtn).toBeDisabled();
     });
@@ -483,9 +489,9 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      // Uncheck Optimise
-      const checkboxes = screen.getAllByRole("checkbox");
-      await userEvent.click(checkboxes[0]); // uncheck Optimise
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Optimise paths" }),
+      );
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       const instance = workerInstances[0];
@@ -515,15 +521,155 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      // Toggle Save to computer on
-      const checkboxes = screen.getAllByRole("checkbox");
-      await userEvent.click(checkboxes[2]); // check Save to computer
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Save to computer" }),
+      );
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       const stored = JSON.parse(
         localStorage.getItem("terraforge.gcodePrefs") ?? "{}",
       );
       expect(stored.saveLocally).toBe(true);
+    });
+
+    // ── Join nearby paths UI ───────────────────────────────────────────
+
+    it("dialog shows 'Join nearby paths' checkbox with Experimental badge", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      expect(screen.getByText("Join nearby paths")).toBeInTheDocument();
+      expect(screen.getByText("Experimental")).toBeInTheDocument();
+    });
+
+    it("dialog shows tolerance field always (dimmed when join is unchecked)", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Tolerance input is always rendered
+      expect(screen.getByText("Tolerance")).toBeInTheDocument();
+      // The number input should be disabled while join is off
+      const toleranceInput = screen.getByRole("spinbutton");
+      expect(toleranceInput).toBeDisabled();
+    });
+
+    it("tolerance field becomes enabled when Join nearby paths is checked", async () => {
+      const imp = createSvgImport({ name: "test" });
+      useCanvasStore.setState({ imports: [imp] });
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Join nearby paths" }),
+      );
+      const toleranceInput = screen.getByRole("spinbutton");
+      expect(toleranceInput).not.toBeDisabled();
+    });
+
+    it("confirming with joinPaths=true passes joinPaths:true and joinTolerance to worker", async () => {
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Join nearby paths" }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      expect(workerInstances[0]?.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "generate",
+          options: expect.objectContaining({
+            joinPaths: true,
+            joinTolerance: 0.2,
+          }),
+        }),
+      );
+    });
+
+    it("confirming with joinPaths=false passes joinPaths:false to worker", async () => {
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      // Join paths is unchecked by default — confirm without changing it
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      expect(workerInstances[0]?.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "generate",
+          options: expect.objectContaining({ joinPaths: false }),
+        }),
+      );
+    });
+
+    it("join prefs are persisted to localStorage on confirm", async () => {
+      function MockWorker() {
+        return {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null,
+          onerror: null,
+        };
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(
+        screen.getByRole("checkbox", { name: "Join nearby paths" }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      const stored = JSON.parse(
+        localStorage.getItem("terraforge.gcodePrefs") ?? "{}",
+      );
+      expect(stored.joinPaths).toBe(true);
+      expect(stored.joinTolerance).toBe(0.2);
     });
   });
 });

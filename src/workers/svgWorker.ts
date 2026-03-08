@@ -18,6 +18,7 @@ import {
   flattenToSubpaths,
   clipSubpathsToBed,
   nearestNeighbourSort,
+  joinSubpaths,
   fmtCoord as fmt,
   type Subpath,
 } from "./gcodeEngine";
@@ -59,6 +60,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const lines: string[] = [];
 
   const optimise = options?.optimisePaths ?? false;
+  const doJoin = options?.joinPaths ?? false;
+  const joinTol = options?.joinTolerance ?? 0.2;
 
   lines.push(
     "; -- terraForge G-code ------------------------------------------",
@@ -67,6 +70,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Bed      : ${config.bedWidth} x ${config.bedHeight} mm`);
   lines.push(`; Origin   : ${config.origin}`);
   lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
+  lines.push(`; Joined   : ${doJoin ? `yes (tolerance ${joinTol} mm)` : "no"}`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -78,103 +82,66 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   const visibleObjects = objects.filter((o) => o.visible);
 
-  if (optimise) {
-    // ── Optimised mode: collect all subpaths across all objects, then
-    //    reorder globally with nearest-neighbour before emitting. ──────────
-    const allSubpaths: Subpath[] = [];
-
-    for (let i = 0; i < visibleObjects.length; i++) {
-      if (cancelled.has(taskId)) {
-        cancelled.delete(taskId);
-        self.postMessage({ type: "cancelled", taskId });
-        return;
-      }
-      const raw = flattenToSubpaths(visibleObjects[i], config);
-      for (const sp of clipSubpathsToBed(raw, config)) {
-        if (sp.length >= 2) allSubpaths.push(sp);
-      }
-      self.postMessage({
-        type: "progress",
-        taskId,
-        percent: Math.round(((i + 1) / visibleObjects.length) * 50),
-      });
-      await sleep(0);
+  // ── Phase 1: collect all subpaths from all visible objects ────────────────
+  const allSubpaths: Subpath[] = [];
+  for (let i = 0; i < visibleObjects.length; i++) {
+    if (cancelled.has(taskId)) {
+      cancelled.delete(taskId);
+      self.postMessage({ type: "cancelled", taskId });
+      return;
     }
-
-    const sorted = nearestNeighbourSort(allSubpaths);
-
-    lines.push(
-      `; -- Optimised path (${sorted.length} subpaths) ---------------`,
-    );
-    for (let i = 0; i < sorted.length; i++) {
-      if (cancelled.has(taskId)) {
-        cancelled.delete(taskId);
-        self.postMessage({ type: "cancelled", taskId });
-        return;
-      }
-      const subpath = sorted[i];
-      const first = subpath[0];
-      lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
-      lines.push(`F${config.feedrate}`);
-      lines.push(config.penDownCommand + " ; Pen down");
-      for (let s = 1; s < subpath.length; s++) {
-        lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
-      }
-      lines.push(config.penUpCommand + " ; Pen up");
-      lines.push("");
-      self.postMessage({
-        type: "progress",
-        taskId,
-        percent: 50 + Math.round(((i + 1) / sorted.length) * 50),
-      });
-      await sleep(0);
+    const raw = flattenToSubpaths(visibleObjects[i], config);
+    for (const sp of clipSubpathsToBed(raw, config)) {
+      if (sp.length >= 2) allSubpaths.push(sp);
     }
-  } else {
-    // ── Unoptimised mode: emit each object's subpaths in import order. ────
-    const total = visibleObjects.length;
+    self.postMessage({
+      type: "progress",
+      taskId,
+      percent: Math.round(((i + 1) / visibleObjects.length) * 40),
+    });
+    await sleep(0);
+  }
 
-    for (let i = 0; i < total; i++) {
-      if (cancelled.has(taskId)) {
-        cancelled.delete(taskId);
-        self.postMessage({ type: "cancelled", taskId });
-        return;
-      }
+  // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
+  let orderedSubpaths = optimise
+    ? nearestNeighbourSort(allSubpaths)
+    : allSubpaths;
 
-      const obj = visibleObjects[i];
-      lines.push(
-        `; ── Object ${i + 1} (${obj.id.slice(0, 8)}) ─────────────────`,
-      );
+  // ── Phase 3: optional path joining ────────────────────────────────────────
+  // Joining is applied after NN sort so that already-adjacent subpaths
+  // (which NN sort placed next to each other) get merged where possible.
+  if (doJoin) {
+    orderedSubpaths = joinSubpaths(orderedSubpaths, joinTol);
+  }
 
-      const subpaths = clipSubpathsToBed(
-        flattenToSubpaths(obj, config),
-        config,
-      );
+  // ── Phase 4: emit G-code ─────────────────────────────────────────────────
+  const modeLabel = optimise ? "Optimised" : "Sequential";
+  lines.push(
+    `; -- ${modeLabel} path (${orderedSubpaths.length} subpaths) -----------`,
+  );
 
-      for (const subpath of subpaths) {
-        if (subpath.length < 2) continue;
-        const first = subpath[0];
-        lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
-        lines.push(`F${config.feedrate}`);
-        lines.push(config.penDownCommand + " ; Pen down");
-        for (let s = 1; s < subpath.length; s++) {
-          if (cancelled.has(taskId)) {
-            cancelled.delete(taskId);
-            self.postMessage({ type: "cancelled", taskId });
-            return;
-          }
-          lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
-        }
-        lines.push(config.penUpCommand + " ; Pen up");
-      }
-
-      lines.push("");
-      self.postMessage({
-        type: "progress",
-        taskId,
-        percent: Math.round(((i + 1) / total) * 100),
-      });
-      await sleep(0);
+  for (let i = 0; i < orderedSubpaths.length; i++) {
+    if (cancelled.has(taskId)) {
+      cancelled.delete(taskId);
+      self.postMessage({ type: "cancelled", taskId });
+      return;
     }
+    const subpath = orderedSubpaths[i];
+    const first = subpath[0];
+    lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
+    lines.push(`F${config.feedrate}`);
+    lines.push(config.penDownCommand + " ; Pen down");
+    for (let s = 1; s < subpath.length; s++) {
+      lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
+    }
+    lines.push(config.penUpCommand + " ; Pen up");
+    lines.push("");
+    self.postMessage({
+      type: "progress",
+      taskId,
+      percent: 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60),
+    });
+    await sleep(0);
   }
 
   lines.push("; ── End of job ──────────────────────────────────────────────");

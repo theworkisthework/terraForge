@@ -431,6 +431,44 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
   return sorted;
 }
 
+// ── Path joiner ───────────────────────────────────────────────────────────────
+
+/**
+ * Merges consecutive subpaths whose endpoint→startpoint distance is within
+ * `toleranceMm`.  When two subpaths are joined the pen is never lifted —
+ * the start point of the second subpath is included as a G1 continuation of
+ * the first, avoiding a pen-up / rapid-travel / pen-down cycle.
+ *
+ * Should be called AFTER nearestNeighbourSort so that the NN ordering has
+ * already placed nearby subpaths adjacently, maximising merge opportunities.
+ */
+export function joinSubpaths(
+  subpaths: Subpath[],
+  toleranceMm: number,
+): Subpath[] {
+  if (subpaths.length === 0) return [];
+  const tolSq = toleranceMm * toleranceMm;
+  const result: Subpath[] = [];
+  let current = subpaths[0].slice();
+
+  for (let i = 1; i < subpaths.length; i++) {
+    const next = subpaths[i];
+    const tail = current[current.length - 1];
+    const head = next[0];
+    const distSq = (tail.x - head.x) ** 2 + (tail.y - head.y) ** 2;
+    if (distSq <= tolSq) {
+      // Within tolerance — continue drawing; include next's points (head first,
+      // as a tiny G1 to its exact position, then the rest of the subpath).
+      current.push(...next);
+    } else {
+      result.push(current);
+      current = next.slice();
+    }
+  }
+  result.push(current);
+  return result;
+}
+
 // ── Main flattener ────────────────────────────────────────────────────────────
 
 export function flattenToSubpaths(
