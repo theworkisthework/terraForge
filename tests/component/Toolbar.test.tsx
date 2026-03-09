@@ -200,6 +200,22 @@ describe("Toolbar", () => {
     });
   });
 
+  // ── Import PDF interaction ─────────────────────────────────────────────
+
+  it("renders Import PDF button", () => {
+    render(<Toolbar />);
+    expect(screen.getByText("Import PDF")).toBeInTheDocument();
+  });
+
+  it("clicking Import PDF opens pdf file dialog", async () => {
+    (
+      window.terraForge.fs.openPdfDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(null);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByText("Import PDF"));
+    expect(window.terraForge.fs.openPdfDialog).toHaveBeenCalled();
+  });
+
   // ── Connect / Disconnect ───────────────────────────────────────────────
 
   it("Connect button calls connectWebSocket for wifi config", async () => {

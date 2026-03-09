@@ -243,9 +243,12 @@ export interface SerialApi {
 
 export interface FsApi {
   openSvgDialog: () => Promise<string | null>;
+  openPdfDialog: () => Promise<string | null>;
   openFileDialog: () => Promise<string | null>;
   openGcodeDialog: () => Promise<string | null>;
   readFile: (filePath: string) => Promise<string>;
+  /** Read a file as raw bytes — required for binary formats such as PDF. */
+  readFileBinary: (filePath: string) => Promise<Uint8Array>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   saveGcodeDialog: (defaultName: string) => Promise<string | null>;
   saveFileDialog: (defaultName: string) => Promise<string | null>;

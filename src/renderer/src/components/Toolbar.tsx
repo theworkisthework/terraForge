@@ -20,6 +20,7 @@ import {
   computePathsBounds,
 } from "../utils/svgTransform";
 import { parseGcode } from "../utils/gcodeParser";
+import { importPdf } from "../utils/pdfImport";
 
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
@@ -452,6 +453,66 @@ export function Toolbar() {
     }
   };
 
+  const handleImportPdf = async () => {
+    const filePath = await window.terraForge.fs.openPdfDialog();
+    if (!filePath) return;
+
+    const name =
+      filePath
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.pdf$/i, "") ?? "import";
+
+    const taskId = uuid();
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: `Importing ${name}.pdf…`,
+      progress: null,
+      status: "running",
+    });
+
+    try {
+      const data = await window.terraForge.fs.readFileBinary(filePath);
+      const pdfImports = await importPdf(data, name);
+
+      if (pdfImports.length === 0) {
+        upsertTask({
+          id: taskId,
+          type: "svg-parse",
+          label: "No vector paths found in PDF",
+          progress: null,
+          status: "error",
+        });
+        return;
+      }
+
+      for (const imp of pdfImports) {
+        addImport(imp);
+      }
+
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label:
+          pdfImports.length === 1
+            ? `PDF imported: ${pdfImports[0].name}`
+            : `PDF imported: ${pdfImports.length} pages`,
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "PDF import failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
   const handleImportGcode = async () => {
     const filePath = await window.terraForge.fs.openGcodeDialog();
     if (!filePath) return;
@@ -707,6 +768,15 @@ export function Toolbar() {
         className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
       >
         Import SVG
+      </button>
+
+      {/* Import PDF */}
+      <button
+        onClick={handleImportPdf}
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+        title="Import vector paths from a PDF file"
+      >
+        Import PDF
       </button>
 
       {/* Import G-code */}

@@ -120,9 +120,11 @@ if (typeof window !== "undefined") {
     },
     fs: {
       openSvgDialog: vi.fn().mockResolvedValue(null),
+      openPdfDialog: vi.fn().mockResolvedValue(null),
       openFileDialog: vi.fn().mockResolvedValue(null),
       openGcodeDialog: vi.fn().mockResolvedValue(null),
       readFile: vi.fn().mockResolvedValue(""),
+      readFileBinary: vi.fn().mockResolvedValue(new Uint8Array()),
       writeFile: vi.fn().mockResolvedValue(undefined),
       saveGcodeDialog: vi.fn().mockResolvedValue(null),
       saveFileDialog: vi.fn().mockResolvedValue(null),

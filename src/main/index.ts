@@ -464,6 +464,16 @@ ipcMain.handle("fs:openSvgDialog", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("fs:openPdfDialog", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Import PDF",
+    filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle("fs:openFileDialog", async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -500,6 +510,11 @@ ipcMain.handle("fs:openGcodeDialog", async () => {
 
 ipcMain.handle("fs:readFile", (_e, filePath: string) =>
   readFile(filePath, "utf-8"),
+);
+
+// Returns raw bytes as a Buffer, which IPC transfers as Uint8Array in the renderer.
+ipcMain.handle("fs:readFileBinary", (_e, filePath: string) =>
+  readFile(filePath),
 );
 
 ipcMain.handle("fs:writeFile", (_e, filePath: string, content: string) =>
