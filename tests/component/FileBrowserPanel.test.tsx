@@ -47,8 +47,10 @@ describe("FileBrowserPanel", () => {
     expect(msgs.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders upload buttons for both filesystems", () => {
+  it("renders upload buttons for both filesystems", async () => {
     render(<FileBrowserPanel />);
+    // Internal starts collapsed — open it by clicking its section header
+    await userEvent.click(screen.getByText(/internal/i));
     const btns = screen.getAllByText(/Upload to \//);
     expect(btns).toHaveLength(2);
   });
@@ -78,10 +80,15 @@ describe("FileBrowserPanel", () => {
     ]);
     useMachineStore.setState({ connected: true });
     render(<FileBrowserPanel />);
+    // SD card pane (open by default)
+    await waitFor(() => {
+      expect(screen.getByText("test.gcode")).toBeInTheDocument();
+    });
+    // Open the internal pane to see its files
+    await userEvent.click(screen.getByText(/internal/i));
     await waitFor(() => {
       expect(screen.getByText("config.yaml")).toBeInTheDocument();
     });
-    expect(screen.getByText("test.gcode")).toBeInTheDocument();
   });
 
   it("shows directory entries with folder icon", async () => {

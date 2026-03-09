@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
@@ -89,6 +89,9 @@ interface FsPaneProps {
   ) => void;
   upsertTask: ReturnType<typeof useTaskStore>["upsertTask"];
   taskType: "file-upload" | "file-download";
+  /** Controlled open state — parent owns this */
+  open: boolean;
+  onToggle: () => void;
 }
 
 function FsPane({
@@ -102,12 +105,13 @@ function FsPane({
   uploadFn,
   upsertTask,
   taskType,
+  open,
+  onToggle,
 }: FsPaneProps) {
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [path, setPath] = useState("/");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(true);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
@@ -200,11 +204,11 @@ function FsPane({
       : "text-[#c084fc] hover:text-white";
 
   return (
-    <div className={`flex flex-col border-b ${borderAccent}`}>
+    <div className={`flex flex-col h-full border-b ${borderAccent}`}>
       {/* Section header */}
       <div
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none ${bgAccent}`}
-        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}
+        onClick={onToggle}
       >
         <span
           className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}
@@ -227,10 +231,10 @@ function FsPane({
       </div>
 
       {!open ? null : (
-        <>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Breadcrumb + up */}
           <div
-            className={`flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}
+            className={`shrink-0 flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}
           >
             <button
               onClick={() => navigate(parentPath(path))}
@@ -244,7 +248,7 @@ function FsPane({
           </div>
 
           {/* File list */}
-          <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+          <div className="flex-1 overflow-y-auto">
             {!connected ? (
               <p className="text-[10px] text-gray-600 text-center py-4 px-3">
                 Not connected.
@@ -381,7 +385,7 @@ function FsPane({
           </div>
 
           {/* Upload footer */}
-          <div className={`px-2 py-1.5 border-t ${borderAccent}/50`}>
+          <div className={`shrink-0 px-2 py-1.5 border-t ${borderAccent}/50`}>
             <button
               onClick={handleUpload}
               disabled={!connected || serialMode}
@@ -397,7 +401,7 @@ function FsPane({
               ↑ Upload to {path}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -410,6 +414,42 @@ export function FileBrowserPanel() {
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const serialMode = connected && activeConfig()?.connection.type === "usb";
   const upsertTask = useTaskStore((s) => s.upsertTask);
+
+  // Collapsed state — internal starts collapsed, sdcard starts open
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [sdOpen, setSdOpen] = useState(true);
+
+  // Pixel height of the internal pane when both are open
+  const [splitPx, setSplitPx] = useState(200);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startY: number; startPx: number } | null>(null);
+
+  const bothOpen = internalOpen && sdOpen;
+
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startPx: splitPx };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const delta = ev.clientY - dragRef.current.startY;
+      const containerH = containerRef.current?.clientHeight ?? 400;
+      const newPx = Math.max(
+        80,
+        Math.min(dragRef.current.startPx + delta, containerH - 80),
+      );
+      setSplitPx(newPx);
+    };
+
+    const onMouseUp = () => {
+      dragRef.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
 
   const uploadFn = (
     localPath: string,
@@ -429,6 +469,14 @@ export function FileBrowserPanel() {
       .catch(console.error);
   };
 
+  const sharedProps = {
+    connected,
+    serialMode,
+    uploadFn,
+    upsertTask,
+    taskType: "file-upload" as const,
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Title */}
@@ -438,34 +486,61 @@ export function FileBrowserPanel() {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Internal filesystem */}
-        <FsPane
-          label="internal"
-          accentColor="blue"
-          connected={connected}
-          serialMode={serialMode}
-          source="fs"
-          listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
-          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "fs")}
-          uploadFn={uploadFn}
-          upsertTask={upsertTask}
-          taskType="file-upload"
-        />
+      {/* Pane container */}
+      <div
+        ref={containerRef}
+        className="flex-1 flex flex-col overflow-hidden min-h-0"
+      >
+        {/* Internal filesystem pane */}
+        <div
+          className="flex flex-col overflow-hidden"
+          style={
+            bothOpen
+              ? { height: splitPx, flexShrink: 0 }
+              : internalOpen
+                ? { flex: 1, minHeight: 0 }
+                : { flexShrink: 0 }
+          }
+        >
+          <FsPane
+            {...sharedProps}
+            label="internal"
+            accentColor="blue"
+            source="fs"
+            listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
+            deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "fs")}
+            open={internalOpen}
+            onToggle={() => setInternalOpen((v) => !v)}
+          />
+        </div>
 
-        {/* SD card filesystem */}
-        <FsPane
-          label="sdcard"
-          accentColor="purple"
-          connected={connected}
-          serialMode={serialMode}
-          source="sd"
-          listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
-          deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "sd")}
-          uploadFn={uploadFn}
-          upsertTask={upsertTask}
-          taskType="file-upload"
-        />
+        {/* Drag handle — only visible when both panes are open */}
+        {bothOpen && (
+          <div
+            onMouseDown={onDragStart}
+            className="shrink-0 h-2 flex items-center justify-center cursor-row-resize bg-[#0a1020] hover:bg-[#0f3460] group select-none"
+            title="Drag to resize"
+          >
+            <div className="w-10 h-0.5 rounded bg-gray-700 group-hover:bg-[#e94560] transition-colors" />
+          </div>
+        )}
+
+        {/* SD card filesystem pane */}
+        <div
+          className="flex flex-col overflow-hidden"
+          style={sdOpen ? { flex: 1, minHeight: 0 } : { flexShrink: 0 }}
+        >
+          <FsPane
+            {...sharedProps}
+            label="sdcard"
+            accentColor="purple"
+            source="sd"
+            listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
+            deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "sd")}
+            open={sdOpen}
+            onToggle={() => setSdOpen((v) => !v)}
+          />
+        </div>
       </div>
     </div>
   );
