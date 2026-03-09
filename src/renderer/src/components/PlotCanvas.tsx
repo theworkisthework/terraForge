@@ -52,7 +52,10 @@ export function PlotCanvas() {
   const updateImport = useCanvasStore((s) => s.updateImport);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
+  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
   const activeConfig = useMachineStore((s) => s.activeConfig);
+  const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
+  const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
   const config = activeConfig();
   const bedW = config?.bedWidth ?? 220;
@@ -257,6 +260,7 @@ export function PlotCanvas() {
         } else if (toolpathSelected) {
           setGcodeToolpath(null);
           setToolpathSelected(false);
+          if (selectedJobFile?.source === "local") setSelectedJobFile(null);
         }
       }
 
@@ -737,6 +741,13 @@ export function PlotCanvas() {
                         e.stopPropagation();
                         selectImport(null);
                         setToolpathSelected(true);
+                        // Restore the local job file selection so the Job panel
+                        // shows the filename again after a file-browser deselect.
+                        if (gcodeSource)
+                          setSelectedJobFile({
+                            ...gcodeSource,
+                            source: "local",
+                          });
                       }}
                     />
                   </g>
@@ -858,6 +869,8 @@ export function PlotCanvas() {
                 onClick={(e) => {
                   e.stopPropagation();
                   setGcodeToolpath(null);
+                  if (selectedJobFile?.source === "local")
+                    setSelectedJobFile(null);
                 }}
               >
                 <svg

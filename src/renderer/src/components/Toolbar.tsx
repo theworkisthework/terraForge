@@ -196,6 +196,7 @@ export function Toolbar() {
   const imports = useCanvasStore((s) => s.imports);
   const addImport = useCanvasStore((s) => s.addImport);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
+  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -536,6 +537,7 @@ export function Toolbar() {
       const text = await window.terraForge.fs.readFile(filePath);
       const toolpath = parseGcode(text);
       setGcodeToolpath(toolpath);
+      setGcodeSource({ path: filePath, name });
       // Selecting this as the queued job (local source — will upload on Start)
       setSelectedJobFile({ path: filePath, source: "local", name });
       upsertTask({
