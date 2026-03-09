@@ -125,7 +125,7 @@
 ### Jog Controls
 
 - [x] X+, X-, Y+, Y- jog buttons
-- [x] Z+, Z- jog buttons
+- [x] Z+, Z- jog buttons (pen up/down for servo/stepper use `$J=G91 G21 Z±N F<rate>` — same jog protocol as X/Y; solenoid pen type sends configured pen command)
 - [x] Step size selector: 0.1 / 1 / 10 / 100 mm
 - [x] Configurable feedrate input
 - [x] Go-to-origin button (G0 X0 Y0)

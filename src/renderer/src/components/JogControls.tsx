@@ -21,54 +21,43 @@ interface Props {
   onClose?: () => void;
 }
 
-/** Extract the numeric Z value from a command like "G0Z15" or "G0 Z-2.5". Returns null if not found. */
-function parseZFromCmd(cmd: string): number | null {
-  const m = cmd.match(/[Zz]\s*([-\d.]+)/);
-  return m ? parseFloat(m[1]) : null;
-}
-
 export function JogControls({ onClose }: Props) {
   const [step, setStep] = useState<JogStep>(1);
   const [feedrate, setFeedrate] = useState(3000);
   const activeConfig = useMachineStore((s) => s.activeConfig());
-  const status = useMachineStore((s) => s.status);
   const penUp = activeConfig?.penUpCommand ?? "";
   const penDown = activeConfig?.penDownCommand ?? "";
   const penType = activeConfig?.penType ?? "solenoid";
 
-  // For servo/stepper: parse Z bounds from the config commands so we can do
-  // incremental moves clamped within [penDownZ, penUpZ].
-  const penUpZ = parseZFromCmd(penUp);
-  const penDownZ = parseZFromCmd(penDown);
-  const useIncrementalZ =
-    penType !== "solenoid" && penUpZ !== null && penDownZ !== null;
-  const zMin = useIncrementalZ ? Math.min(penUpZ!, penDownZ!) : null;
-  const zMax = useIncrementalZ ? Math.max(penUpZ!, penDownZ!) : null;
-
   const movePen = async (dir: 1 | -1) => {
-    if (useIncrementalZ) {
-      const currentZ = status?.wpos?.z ?? 0;
-      const raw = currentZ + step * dir;
-      const target = Math.min(zMax!, Math.max(zMin!, raw));
-      await window.terraForge.fluidnc.sendCommand(`G0 Z${target.toFixed(3)}`);
+    if (penType !== "solenoid") {
+      // servo / stepper: jog Z incrementally, same as X/Y — $J is cancellable
+      // and works on all FluidNC versions (3.x and 4.x).  G0 Z<abs> was
+      // unreliable on 3.x (motor clunk but no movement without prior homing).
+      const dist = (step * dir).toFixed(3);
+      await window.terraForge.fluidnc.sendCommand(
+        `$J=G91 G21 Z${dist} F${feedrate}`,
+      );
     } else {
-      // Solenoid or no parseable Z — send the full command
+      // Solenoid — send the configured pen up/down command (e.g. M3S0/M3S1)
       const cmd = dir === -1 ? penDown : penUp;
       if (cmd) await window.terraForge.fluidnc.sendCommand(cmd);
     }
   };
 
-  const penDownTitle = useIncrementalZ
-    ? `Pen Down: move Z by -${step} mm (min ${zMin} mm)`
-    : penDown
-      ? `Pen Down: ${penDown}`
-      : "No pen-down command configured";
+  const penDownTitle =
+    penType !== "solenoid"
+      ? `Pen Down: jog Z by -${step} mm`
+      : penDown
+        ? `Pen Down: ${penDown}`
+        : "No pen-down command configured";
 
-  const penUpTitle = useIncrementalZ
-    ? `Pen Up: move Z by +${step} mm (max ${zMax} mm)`
-    : penUp
-      ? `Pen Up: ${penUp}`
-      : "No pen-up command configured";
+  const penUpTitle =
+    penType !== "solenoid"
+      ? `Pen Up: jog Z by +${step} mm`
+      : penUp
+        ? `Pen Up: ${penUp}`
+        : "No pen-up command configured";
 
   const jog = async (axis: string, dir: 1 | -1) => {
     const dist = (step * dir).toFixed(3);
@@ -158,7 +147,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen down"
             onClick={() => movePen(-1)}
-            disabled={!penDown && !useIncrementalZ}
+            disabled={penType === "solenoid" && !penDown}
             className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <PenLine size={15} />
@@ -169,7 +158,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen up"
             onClick={() => movePen(1)}
-            disabled={!penUp && !useIncrementalZ}
+            disabled={penType === "solenoid" && !penUp}
             className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <Pen size={15} />

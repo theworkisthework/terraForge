@@ -1,7 +1,22 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { JogControls } from "@renderer/components/JogControls";
+import { useMachineStore } from "@renderer/store/machineStore";
+import { createMachineConfig } from "../helpers/factories";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Reset store to a clean state with no active config between tests
+  useMachineStore.setState({
+    configs: [],
+    activeConfigId: null,
+    status: null,
+    connected: false,
+    wsLive: false,
+    selectedJobFile: null,
+  });
+});
 
 describe("JogControls", () => {
   it("renders the heading", () => {
@@ -138,6 +153,108 @@ describe("JogControls", () => {
     await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("F6000"),
+    );
+  });
+});
+
+// ── Z axis jog (servo / stepper) ─────────────────────────────────────────────
+
+describe("JogControls — Z jog with servo/stepper pen type", () => {
+  beforeEach(() => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: false,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  it("pen-down sends $J incremental Z- jog (not G0)", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringMatching(/^\$J=G91 G21 Z-[\d.]+/),
+    );
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
+      expect.stringContaining("G0 Z"),
+    );
+  });
+
+  it("pen-up sends $J incremental Z+ jog (not G0)", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringMatching(/^\$J=G91 G21 Z\+?[\d.]+/),
+    );
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
+      expect.stringContaining("G0 Z"),
+    );
+  });
+
+  it("Z jog distance respects selected step size", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByText("10")); // select 10 mm step
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      "$J=G91 G21 Z-10.000 F3000",
+    );
+  });
+
+  it("Z jog includes feedrate in command", async () => {
+    render(<JogControls />);
+    const input = screen.getByRole("spinbutton");
+    await userEvent.clear(input);
+    await userEvent.type(input, "1500");
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringContaining("F1500"),
+    );
+  });
+});
+
+// ── Z controls with solenoid pen type ────────────────────────────────────────
+
+describe("JogControls — pen commands with solenoid pen type", () => {
+  beforeEach(() => {
+    const cfg = createMachineConfig({
+      penType: "solenoid",
+      penUpCommand: "M3S0",
+      penDownCommand: "M3S1",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: false,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  it("pen-down sends configured solenoid command, not a $J jog", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("M3S1");
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
+      expect.stringContaining("$J="),
+    );
+  });
+
+  it("pen-up sends configured solenoid command, not a $J jog", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("M3S0");
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
+      expect.stringContaining("$J="),
     );
   });
 });
