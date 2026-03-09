@@ -61,7 +61,7 @@ test("import SVG to enable G-code generation", async () => {
   const svgPath = fixturePath("sample.svg");
   await mockOpenDialog(electronApp, svgPath);
 
-  await window.locator("button:has-text('Import SVG')").click();
+  await window.locator("button:has-text('Import')").click();
 
   // Wait for import to complete — "sample" appears in Properties
   await expect(window.locator("text=sample").first()).toBeVisible({
@@ -178,8 +178,8 @@ test("generating with Optimise paths checked produces optimised G-code", async (
 
 // ─── Import G-code ──────────────────────────────────────────────────────────
 
-test("Import G-code button is visible", async () => {
-  const btn = window.locator("button:has-text('Import G-code')");
+test("Import button is visible", async () => {
+  const btn = window.locator("button:has-text('Import')");
   await expect(btn).toBeVisible();
   await expect(btn).toBeEnabled();
 });
@@ -188,7 +188,7 @@ test("importing a .gcode file selects it as the queued job", async () => {
   const gcodePath = fixturePath("sample.gcode");
   await mockOpenDialog(electronApp, gcodePath);
 
-  await window.locator("button:has-text('Import G-code')").click();
+  await window.locator("button:has-text('Import')").click();
 
   // The JobControls panel should now show the filename
   const jobFile = window.locator("text=sample.gcode").first();

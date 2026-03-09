@@ -28,8 +28,8 @@ test.afterAll(async () => {
 
 // ─── Import SVG button baseline ──────────────────────────────────────────────
 
-test("Import SVG button is visible and enabled", async () => {
-  const btn = window.locator("button:has-text('Import SVG')");
+test("Import button is visible and enabled", async () => {
+  const btn = window.locator("button:has-text('Import')");
   await expect(btn).toBeVisible();
   await expect(btn).toBeEnabled();
 });
@@ -38,7 +38,7 @@ test("Import SVG button is visible and enabled", async () => {
 
 test("cancelling the SVG dialog keeps the canvas empty", async () => {
   await mockCancelDialog(electronApp);
-  await window.locator("button:has-text('Import SVG')").click();
+  await window.locator("button:has-text('Import')").click();
 
   // Properties panel should still show the empty state
   const emptyMsg = window.locator("text=No objects. Import an SVG.");
@@ -51,7 +51,7 @@ test("importing sample.svg shows it in Properties panel", async () => {
   const svgPath = fixturePath("sample.svg");
   await mockOpenDialog(electronApp, svgPath);
 
-  await window.locator("button:has-text('Import SVG')").click();
+  await window.locator("button:has-text('Import')").click();
 
   // Wait for the import name to appear in the Properties panel
   // The name is derived from the filename without extension → "sample"
@@ -92,7 +92,7 @@ test("importing a second SVG adds another entry in Properties", async () => {
   const svgPath = fixturePath("sample.svg");
   await mockOpenDialog(electronApp, svgPath);
 
-  await window.locator("button:has-text('Import SVG')").click();
+  await window.locator("button:has-text('Import')").click();
 
   // Now there should be two "sample" entries in the Properties panel
   const entries = window.locator("text=sample");
