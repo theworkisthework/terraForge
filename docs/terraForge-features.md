@@ -2,7 +2,10 @@
 
 ## Implemented
 
-### SVG Import & Canvas
+### SVG & PDF Import & Canvas
+
+- [x] Import SVG files via native open dialog (filtered to `.svg`)
+- [x] **Import PDF files** — "Import PDF" button opens a native dialog filtered to `.pdf`; vector paths are extracted from each page using pdfjs-dist's operator list API; moveTo, lineTo, curveTo (all three PDF variants), closePath, and rectangle operators are all converted to SVG path `d` strings; Y-axis is flipped from PDF bottom-left origin to SVG/screen top-left; coordinates are in PDF points and the import scale is set to `25.4/72` (≈ 0.35 mm/pt) so physical dimensions are preserved automatically; multi-page PDFs produce one `SvgImport` per page (named `<file>_p1`, `<file>_p2`, …); pages with no vector content are skipped; raster-only content is silently ignored
 
 - [x] Import SVG files via native open dialog (filtered to `.svg`)
 - [x] Parse all SVG shape types → path `d` strings: `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`
@@ -199,7 +202,7 @@
 - [x] **SVG `transform` attribute resolution** — `transform` attributes on `<path>`, `<g>`, and all ancestor elements are resolved and baked into the path `d` coordinates at import time; handles `translate`, `scale`, `rotate`, `matrix`, and arbitrary compositions including Inkscape layer matrices
 - [ ] **Import multiple SVGs at once** — dialog is single-select
 - [ ] **Layer / group visibility control before import** — no pre-import layer preview
-- [ ] **DXF import** — only SVG supported
+- [ ] **DXF import** — only SVG and PDF are supported
 - [ ] **Paste SVG from clipboard**
 
 ### G-code Generation

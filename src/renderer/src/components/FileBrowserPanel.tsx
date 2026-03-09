@@ -4,6 +4,7 @@ import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { parseGcode } from "../utils/gcodeParser";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { RemoteFile } from "../../../types";
 
 const GCODE_EXTS = [
@@ -113,7 +114,11 @@ function FsPane({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [pendingPreviewFile, setPendingPreviewFile] =
+    useState<RemoteFile | null>(null);
+  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
+  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
@@ -176,7 +181,8 @@ function FsPane({
     setTimeout(() => navigate(path), 1500);
   };
 
-  const handlePreview = async (file: RemoteFile) => {
+  const doPreview = async (file: RemoteFile) => {
+    setPendingPreviewFile(null);
     setPreviewing(file.path);
     try {
       const text = await window.terraForge.fluidnc.fetchFileText(
@@ -185,11 +191,21 @@ function FsPane({
       );
       const toolpath = parseGcode(text);
       setGcodeToolpath(toolpath);
+      // Remote preview is not a local file — clear any stored local source
+      setGcodeSource(null);
     } catch (err) {
       console.error("Preview failed:", err);
     } finally {
       setPreviewing(null);
     }
+  };
+
+  const handlePreview = (file: RemoteFile) => {
+    if (gcodeToolpath) {
+      setPendingPreviewFile(file);
+      return;
+    }
+    doPreview(file);
   };
 
   const atRoot = path === "/";
@@ -205,6 +221,15 @@ function FsPane({
 
   return (
     <div className={`flex flex-col h-full border-b ${borderAccent}`}>
+      {pendingPreviewFile && (
+        <ConfirmDialog
+          title="Replace Toolpath?"
+          message={`Replace the current toolpath with a preview of "${pendingPreviewFile.name}"?`}
+          confirmLabel="Replace"
+          onConfirm={() => doPreview(pendingPreviewFile)}
+          onCancel={() => setPendingPreviewFile(null)}
+        />
+      )}
       {/* Section header */}
       <div
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}

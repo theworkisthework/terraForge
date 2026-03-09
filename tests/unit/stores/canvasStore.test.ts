@@ -9,6 +9,7 @@ beforeEach(() => {
     selectedImportId: null,
     selectedPathId: null,
     gcodeToolpath: null,
+    gcodeSource: null,
   });
 });
 
@@ -122,6 +123,36 @@ describe("canvasStore", () => {
     expect(useCanvasStore.getState().gcodeToolpath).toEqual(tp);
     useCanvasStore.getState().setGcodeToolpath(null);
     expect(useCanvasStore.getState().gcodeToolpath).toBeNull();
+  });
+
+  // ── setGcodeSource ──────────────────────────────────────────────────────
+
+  it("stores and clears gcodeSource", () => {
+    const src = { path: "/home/user/job.gcode", name: "job.gcode" };
+    useCanvasStore.getState().setGcodeSource(src);
+    expect(useCanvasStore.getState().gcodeSource).toEqual(src);
+    useCanvasStore.getState().setGcodeSource(null);
+    expect(useCanvasStore.getState().gcodeSource).toBeNull();
+  });
+
+  it("auto-clears gcodeSource when setGcodeToolpath(null) is called", () => {
+    const tp = { segments: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    useCanvasStore.getState().setGcodeToolpath(tp as any);
+    useCanvasStore
+      .getState()
+      .setGcodeSource({ path: "/job.gcode", name: "job.gcode" });
+    expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
+    useCanvasStore.getState().setGcodeToolpath(null);
+    expect(useCanvasStore.getState().gcodeSource).toBeNull();
+  });
+
+  it("does NOT clear gcodeSource when a new toolpath is set", () => {
+    const tp = { segments: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    useCanvasStore
+      .getState()
+      .setGcodeSource({ path: "/job.gcode", name: "job.gcode" });
+    useCanvasStore.getState().setGcodeToolpath(tp as any);
+    expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
   });
 
   // ── toVectorObjects ─────────────────────────────────────────────────────

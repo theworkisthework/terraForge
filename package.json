@@ -49,6 +49,7 @@
     "form-data": "^4.0.1",
     "immer": "^11.0.0",
     "lucide-react": "^0.575.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "serialport": "^13.0.0",

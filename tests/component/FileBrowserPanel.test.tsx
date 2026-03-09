@@ -25,6 +25,7 @@ beforeEach(() => {
     selectedImportId: null,
     selectedPathId: null,
     gcodeToolpath: null,
+    gcodeSource: null,
   });
   vi.clearAllMocks();
 });
@@ -220,6 +221,106 @@ describe("FileBrowserPanel", () => {
     });
     const dlBtns = screen.getAllByTitle("Download");
     expect(dlBtns.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Preview confirmation guard ──────────────────────────────────────
+
+  it("shows confirm dialog and loads preview when toolpath already exists and user confirms", async () => {
+    const existingTp = {
+      cuts: "M0 0",
+      rapids: "",
+      bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
+      lineCount: 1,
+    };
+    useCanvasStore.setState({ gcodeToolpath: existingTp as any });
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      { name: "new.gcode", path: "/new.gcode", size: 200, isDirectory: false },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fluidnc.fetchFileText as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("G0 X10 Y10\nG1 X20 Y20 F1000\n");
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("new.gcode")).toBeInTheDocument(),
+    );
+    const previewBtns = screen.getAllByTitle("Preview toolpath");
+    await userEvent.click(previewBtns[0]);
+    // Styled confirm dialog should appear
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    expect(screen.getByText(/Replace Toolpath/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Replace" }));
+    await waitFor(() => {
+      expect(useCanvasStore.getState().gcodeToolpath).not.toBeNull();
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not replace toolpath when toolpath already exists and user cancels confirm", async () => {
+    const existingTp = {
+      cuts: "M0 0",
+      rapids: "",
+      bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
+      lineCount: 1,
+    };
+    useCanvasStore.setState({ gcodeToolpath: existingTp as any });
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      { name: "new.gcode", path: "/new.gcode", size: 200, isDirectory: false },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("new.gcode")).toBeInTheDocument(),
+    );
+    const previewBtns = screen.getAllByTitle("Preview toolpath");
+    await userEvent.click(previewBtns[0]);
+    // Styled confirm dialog should appear
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(window.terraForge.fluidnc.fetchFileText).not.toHaveBeenCalled();
+    expect(useCanvasStore.getState().gcodeToolpath).toEqual(existingTp);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("loads preview without confirm dialog when no toolpath is currently loaded", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        name: "first.gcode",
+        path: "/first.gcode",
+        size: 200,
+        isDirectory: false,
+      },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fluidnc.fetchFileText as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("G0 X10 Y10\nG1 X20 Y20 F1000\n");
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("first.gcode")).toBeInTheDocument(),
+    );
+    const previewBtns = screen.getAllByTitle("Preview toolpath");
+    await userEvent.click(previewBtns[0]);
+    await waitFor(() =>
+      expect(useCanvasStore.getState().gcodeToolpath).not.toBeNull(),
+    );
+    // No dialog should have appeared
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   // ── Error display ─────────────────────────────────────────────────────
