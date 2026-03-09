@@ -196,6 +196,7 @@
 - [ ] **Undo / redo** — no history stack
 - [x] **Canvas ruler / dimension overlay** — screen-space X/Y rulers with adaptive tick density, mm labels, and origin highlighted in red
 - [ ] **Multi-select** — can only select one import at a time
+- [ ] **Live plot progress on canvas** - trace the machine position on the canvas during plotting
 
 ### SVG Import
 
