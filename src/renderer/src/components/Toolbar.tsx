@@ -307,10 +307,21 @@ export function Toolbar() {
     setConnected(false);
   };
 
-  const handleImportSvg = async () => {
-    const filePath = await window.terraForge.fs.openSvgDialog();
+  // ── Unified import handler — routes by file extension ─────────────────────
+  const handleImport = async () => {
+    const filePath = await window.terraForge.fs.openImportDialog();
     if (!filePath) return;
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    if (ext === "svg") {
+      await handleImportSvgFile(filePath);
+    } else if (ext === "pdf") {
+      await handleImportPdfFile(filePath);
+    } else {
+      await handleImportGcodeFile(filePath);
+    }
+  };
 
+  const handleImportSvgFile = async (filePath: string) => {
     const taskId = uuid();
     upsertTask({
       id: taskId,
@@ -453,15 +464,12 @@ export function Toolbar() {
     }
   };
 
-  const handleImportPdf = async () => {
-    const filePath = await window.terraForge.fs.openPdfDialog();
-    if (!filePath) return;
-
+  const handleImportPdfFile = async (filePath: string) => {
     const name =
       filePath
         .split(/[\\/]/)
         .pop()
-        ?.replace(/\.pdf$/i, "") ?? "import";
+        ?.replace(/\.[^.]+$/i, "") ?? "import";
 
     const taskId = uuid();
     upsertTask({
@@ -513,10 +521,7 @@ export function Toolbar() {
     }
   };
 
-  const handleImportGcode = async () => {
-    const filePath = await window.terraForge.fs.openGcodeDialog();
-    if (!filePath) return;
-
+  const handleImportGcodeFile = async (filePath: string) => {
     const name = filePath.split(/[\\/]/).pop() ?? "import.gcode";
     const taskId = uuid();
     upsertTask({
@@ -762,30 +767,13 @@ export function Toolbar() {
 
       <div className="h-4 w-px bg-[#0f3460]" />
 
-      {/* Import SVG */}
+      {/* Import — SVG / PDF / G-code, detected from extension */}
       <button
-        onClick={handleImportSvg}
+        onClick={handleImport}
         className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+        title="Import an SVG, PDF, or G-code file"
       >
-        Import SVG
-      </button>
-
-      {/* Import PDF */}
-      <button
-        onClick={handleImportPdf}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
-        title="Import vector paths from a PDF file"
-      >
-        Import PDF
-      </button>
-
-      {/* Import G-code */}
-      <button
-        onClick={handleImportGcode}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
-        title="Import a G-code file from your computer — previews toolpath and queues it for plotting"
-      >
-        Import G-code
+        Import
       </button>
 
       {/* Generate G-code — opens options dialog */}

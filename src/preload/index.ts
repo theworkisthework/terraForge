@@ -100,6 +100,7 @@ const fs: TerraForgeAPI["fs"] = {
   openPdfDialog: () => invoke<string | null>("fs:openPdfDialog"),
   openFileDialog: () => invoke<string | null>("fs:openFileDialog"),
   openGcodeDialog: () => invoke<string | null>("fs:openGcodeDialog"),
+  openImportDialog: () => invoke<string | null>("fs:openImportDialog"),
   readFile: (filePath) => invoke<string>("fs:readFile", filePath),
   readFileBinary: (filePath) =>
     invoke<Uint8Array>("fs:readFileBinary", filePath),

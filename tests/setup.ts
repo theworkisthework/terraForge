@@ -123,6 +123,7 @@ if (typeof window !== "undefined") {
       openPdfDialog: vi.fn().mockResolvedValue(null),
       openFileDialog: vi.fn().mockResolvedValue(null),
       openGcodeDialog: vi.fn().mockResolvedValue(null),
+      openImportDialog: vi.fn().mockResolvedValue(null),
       readFile: vi.fn().mockResolvedValue(""),
       readFileBinary: vi.fn().mockResolvedValue(new Uint8Array()),
       writeFile: vi.fn().mockResolvedValue(undefined),

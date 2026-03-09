@@ -89,14 +89,9 @@ describe("Toolbar", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders Import SVG button", () => {
+  it("renders Import button", () => {
     render(<Toolbar />);
-    expect(screen.getByText("Import SVG")).toBeInTheDocument();
-  });
-
-  it("renders Import G-code button", () => {
-    render(<Toolbar />);
-    expect(screen.getByText("Import G-code")).toBeInTheDocument();
+    expect(screen.getByText("Import")).toBeInTheDocument();
   });
 
   it("renders Generate G-code button", () => {
@@ -144,76 +139,49 @@ describe("Toolbar", () => {
     expect(select).toBeDisabled();
   });
 
-  // ── Import SVG interaction ─────────────────────────────────────────────
+  // ── Import interaction (unified button) ───────────────────────────────
 
-  it("clicking Import SVG opens file dialog", async () => {
+  it("clicking Import opens the unified file dialog", async () => {
     (
-      window.terraForge.fs.openSvgDialog as ReturnType<typeof vi.fn>
+      window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
     ).mockResolvedValue(null);
     render(<Toolbar />);
-    await userEvent.click(screen.getByText("Import SVG"));
-    expect(window.terraForge.fs.openSvgDialog).toHaveBeenCalled();
+    await userEvent.click(screen.getByText("Import"));
+    expect(window.terraForge.fs.openImportDialog).toHaveBeenCalled();
   });
 
-  it("imports SVG paths on file selection", async () => {
+  it("imports SVG paths when an .svg file is selected", async () => {
     const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
       <path d="M0,0 L50,50" />
     </svg>`;
     (
-      window.terraForge.fs.openSvgDialog as ReturnType<typeof vi.fn>
+      window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
     ).mockResolvedValue("/test.svg");
     (
       window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
     ).mockResolvedValue(svgXml);
 
     render(<Toolbar />);
-    await userEvent.click(screen.getByText("Import SVG"));
+    await userEvent.click(screen.getByText("Import"));
 
     await waitFor(() => {
       expect(useCanvasStore.getState().imports.length).toBe(1);
     });
   });
 
-  // ── Import G-code interaction ──────────────────────────────────────────
-
-  it("clicking Import G-code opens gcode file dialog", async () => {
-    (
-      window.terraForge.fs.openGcodeDialog as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(null);
-    render(<Toolbar />);
-    await userEvent.click(screen.getByText("Import G-code"));
-    expect(window.terraForge.fs.openGcodeDialog).toHaveBeenCalled();
-  });
-
-  it("parses imported G-code and sets toolpath", async () => {
+  it("parses imported G-code and sets toolpath when a .gcode file is selected", async () => {
     const gcode = "G0 X0 Y0\nG1 X10 Y10 F1000\n";
     (
-      window.terraForge.fs.openGcodeDialog as ReturnType<typeof vi.fn>
+      window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
     ).mockResolvedValue("/test.gcode");
     (
       window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
     ).mockResolvedValue(gcode);
     render(<Toolbar />);
-    await userEvent.click(screen.getByText("Import G-code"));
+    await userEvent.click(screen.getByText("Import"));
     await waitFor(() => {
       expect(useCanvasStore.getState().gcodeToolpath).not.toBeNull();
     });
-  });
-
-  // ── Import PDF interaction ─────────────────────────────────────────────
-
-  it("renders Import PDF button", () => {
-    render(<Toolbar />);
-    expect(screen.getByText("Import PDF")).toBeInTheDocument();
-  });
-
-  it("clicking Import PDF opens pdf file dialog", async () => {
-    (
-      window.terraForge.fs.openPdfDialog as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(null);
-    render(<Toolbar />);
-    await userEvent.click(screen.getByText("Import PDF"));
-    expect(window.terraForge.fs.openPdfDialog).toHaveBeenCalled();
   });
 
   // ── Connect / Disconnect ───────────────────────────────────────────────

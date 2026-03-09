@@ -483,6 +483,49 @@ ipcMain.handle("fs:openFileDialog", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("fs:openImportDialog", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Import File",
+    filters: [
+      {
+        name: "Supported Files",
+        extensions: [
+          "svg",
+          "pdf",
+          "gcode",
+          "nc",
+          "g",
+          "gc",
+          "gco",
+          "ngc",
+          "ncc",
+          "cnc",
+          "tap",
+        ],
+      },
+      { name: "SVG Files", extensions: ["svg"] },
+      { name: "PDF Files", extensions: ["pdf"] },
+      {
+        name: "G-code Files",
+        extensions: [
+          "gcode",
+          "nc",
+          "g",
+          "gc",
+          "gco",
+          "ngc",
+          "ncc",
+          "cnc",
+          "tap",
+        ],
+      },
+    ],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle("fs:openGcodeDialog", async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {

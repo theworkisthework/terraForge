@@ -246,6 +246,7 @@ export interface FsApi {
   openPdfDialog: () => Promise<string | null>;
   openFileDialog: () => Promise<string | null>;
   openGcodeDialog: () => Promise<string | null>;
+  openImportDialog: () => Promise<string | null>;
   readFile: (filePath: string) => Promise<string>;
   /** Read a file as raw bytes — required for binary formats such as PDF. */
   readFileBinary: (filePath: string) => Promise<Uint8Array>;
