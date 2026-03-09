@@ -8,6 +8,10 @@ interface CanvasState {
   selectedImportId: string | null;
   selectedPathId: string | null;
   gcodeToolpath: GcodeToolpath | null;
+  /** Persists the local file info for a canvas-imported G-code file so it can
+   *  be restored in selectedJobFile whenever the user re-selects the toolpath.
+   *  Automatically cleared when gcodeToolpath is set to null. */
+  gcodeSource: { path: string; name: string } | null;
   showCentreMarker: boolean;
 
   addImport: (imp: SvgImport) => void;
@@ -23,6 +27,7 @@ interface CanvasState {
   clearImports: () => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
+  setGcodeSource: (src: { path: string; name: string } | null) => void;
   toggleCentreMarker: () => void;
   toVectorObjects: () => VectorObject[];
 }
@@ -33,6 +38,7 @@ export const useCanvasStore = create<CanvasState>()(
     selectedImportId: null,
     selectedPathId: null,
     gcodeToolpath: null,
+    gcodeSource: null,
     showCentreMarker: true,
 
     addImport: (imp) =>
@@ -92,6 +98,13 @@ export const useCanvasStore = create<CanvasState>()(
     setGcodeToolpath: (tp) =>
       set((state) => {
         state.gcodeToolpath = tp as GcodeToolpath;
+        // Auto-clear the stored local-file source when the toolpath is removed.
+        if (tp === null) state.gcodeSource = null;
+      }),
+
+    setGcodeSource: (src) =>
+      set((state) => {
+        state.gcodeSource = src;
       }),
 
     toggleCentreMarker: () =>

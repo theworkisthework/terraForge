@@ -64,13 +64,8 @@ test("Connect button is present when disconnected", async () => {
   await expect(btn).toBeVisible();
 });
 
-test("Import SVG button is visible", async () => {
-  const btn = window.locator("button:has-text('Import SVG')");
-  await expect(btn).toBeVisible();
-});
-
-test("Import G-code button is visible", async () => {
-  const btn = window.locator("button:has-text('Import G-code')");
+test("Import button is visible", async () => {
+  const btn = window.locator("button:has-text('Import')");
   await expect(btn).toBeVisible();
 });
 
