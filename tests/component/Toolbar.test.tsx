@@ -313,7 +313,7 @@ describe("Toolbar", () => {
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
       expect(
-        screen.getByRole("heading", { name: "Generate G-code" }),
+        screen.getByRole("heading", { name: "Options" }),
       ).toBeInTheDocument();
     });
 
@@ -352,11 +352,11 @@ describe("Toolbar", () => {
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
       expect(
-        screen.getByRole("heading", { name: "Generate G-code" }),
+        screen.getByRole("heading", { name: "Options" }),
       ).toBeInTheDocument();
       await userEvent.click(screen.getByText("Cancel"));
       expect(
-        screen.queryByRole("heading", { name: "Generate G-code" }),
+        screen.queryByRole("heading", { name: "Options" }),
       ).not.toBeInTheDocument();
       // No gcode-generate task should have been created
       const tasks = Object.values(useTaskStore.getState().tasks);
@@ -403,7 +403,7 @@ describe("Toolbar", () => {
 
       // Dialog closes after confirm
       expect(
-        screen.queryByRole("heading", { name: "Generate G-code" }),
+        screen.queryByRole("heading", { name: "Options" }),
       ).not.toBeInTheDocument();
 
       // A gcode-generate task should be registered in the store

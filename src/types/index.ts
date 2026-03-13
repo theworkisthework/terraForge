@@ -126,6 +126,10 @@ export interface GcodeOptions {
   optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel
   joinPaths: boolean; // [experimental] connect endpoints within joinTolerance to skip pen up/down
   joinTolerance: number; // mm — max gap between path end and next path start to join (default 0.2)
+  liftPenAtEnd: boolean; // send penUpCommand after the last stroke (default true)
+  returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
+  customStartGcode: string; // raw G-code lines inserted after the preamble, before paths
+  customEndGcode: string; // raw G-code lines appended after lift/return, before EOF comment
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
