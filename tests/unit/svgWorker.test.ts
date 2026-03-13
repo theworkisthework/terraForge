@@ -181,12 +181,27 @@ describe("svgWorker — G-code body", () => {
       taskId: "body-end",
       objects: [makeSimpleObj()],
       config: makeConfig(),
-      options: createGcodeOptions(),
+      options: createGcodeOptions({ liftPenAtEnd: true, returnToHome: true }),
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("G0 X0 Y0 ; Return to origin");
     expect(gcode).toContain("M5 ; Pen up — safe");
+    expect(gcode).toContain("; ── End of job");
+  });
+
+  it("omits pen-up and return-to-origin when disabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-end-disabled",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ liftPenAtEnd: false, returnToHome: false }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("M5 ; Pen up — safe");
+    expect(gcode).not.toContain("G0 X0 Y0 ; Return to origin");
     expect(gcode).toContain("; ── End of job");
   });
 
@@ -196,7 +211,7 @@ describe("svgWorker — G-code body", () => {
       taskId: "empty-objs",
       objects: [],
       config: makeConfig(),
-      options: createGcodeOptions(),
+      options: createGcodeOptions({ returnToHome: true }),
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
@@ -204,6 +219,59 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).not.toContain("G1");
     // Still ends with cleanup
     expect(gcode).toContain("G0 X0 Y0");
+  });
+
+  it("injects custom start G-code after preamble and before paths", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "custom-start",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ customStartGcode: "M42 P0 S1 ; custom start" }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("M42 P0 S1 ; custom start");
+    const customIdx = gcode.indexOf("M42 P0 S1 ; custom start");
+    const firstRapidIdx = gcode.indexOf("\nG0 X");
+    expect(customIdx).toBeGreaterThan(-1);
+    expect(customIdx).toBeLessThan(firstRapidIdx);
+  });
+
+  it("injects custom end G-code after lift/return at end of job", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "custom-end",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        liftPenAtEnd: true,
+        returnToHome: true,
+        customEndGcode: "M43 P0 S0 ; custom end",
+      }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("M43 P0 S0 ; custom end");
+    const liftIdx = gcode.indexOf("M5 ; Pen up — safe");
+    const returnIdx = gcode.indexOf("G0 X0 Y0 ; Return to origin");
+    const customIdx = gcode.indexOf("M43 P0 S0 ; custom end");
+    expect(customIdx).toBeGreaterThan(liftIdx);
+    expect(customIdx).toBeGreaterThan(returnIdx);
+  });
+
+  it("omits custom G-code sections when fields are empty", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "custom-empty",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ customStartGcode: "", customEndGcode: "" }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("Custom start G-code");
+    expect(gcode).not.toContain("Custom end G-code");
   });
 
   it("skips hidden objects", async () => {
