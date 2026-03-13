@@ -196,7 +196,7 @@
 - [ ] **Undo / redo** — no history stack
 - [x] **Canvas ruler / dimension overlay** — screen-space X/Y rulers with adaptive tick density, mm labels, and origin highlighted in red
 - [ ] **Multi-select** — can only select one import at a time
-- [ ] **Live plot progress on canvas** - trace the machine position on the canvas during plotting
+- [x] **Live plot progress on canvas** - completed segments coloured red (cuts) and orange (rapids) overlay the toolpath exactly; progress is tracked by projecting the machine's reported WPos onto the nearest G-code segment rather than tracing raw coordinates, so the overlay stays on the path even with sparse position samples; partial segment progress is shown mid-segment; accumulates incrementally; resets on new job start or toolpath change
 
 ### SVG Import
 

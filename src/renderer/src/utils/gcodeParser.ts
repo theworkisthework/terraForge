@@ -15,11 +15,29 @@
 //   N<number>     — line numbers (parsed and counted)
 //   ; ...  ( )    — comments stripped
 
+/** A single linear motion segment extracted from G-code.
+ *  Coordinates are in machine work-coordinate mm, matching the G-code values
+ *  directly — the same space reported by FluidNC's WPos status field. */
+export interface GcodeSegment {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  type: "cut" | "rapid";
+  /** 1-indexed sequential line number of the source G-code line that produced
+   *  this segment.  Matches the line counter FluidNC reports in Ln:N,Total
+   *  status messages, enabling reliable progress tracking without coordinate
+   *  matching. */
+  lineNum: number;
+}
+
 export interface GcodeToolpath {
-  cuts: string;     // SVG path d — feed moves
-  rapids: string;   // SVG path d — rapid moves
+  cuts: string; // SVG path d — feed moves
+  rapids: string; // SVG path d — rapid moves
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   lineCount: number;
+  /** Individual motion segments used for live plot-progress tracking.
+   *  Optional so that hand-crafted test objects without this field still
+   *  satisfy the type (additive addition). */
+  segments?: GcodeSegment[];
 }
 
 export function parseGcode(gcode: string): GcodeToolpath {
@@ -31,6 +49,7 @@ export function parseGcode(gcode: string): GcodeToolpath {
 
   const cutParts: string[] = [];
   const rapidParts: string[] = [];
+  const segments: GcodeSegment[] = [];
 
   let minX = 0,
     maxX = 0,
@@ -97,10 +116,20 @@ export function parseGcode(gcode: string): GcodeToolpath {
     if (xw === undefined && yw === undefined) continue;
 
     const scale = inMillimeters ? 1 : 25.4;
-    const nx = xw !== undefined ? (isAbsolute ? xw * scale : x + xw * scale) : x;
-    const ny = yw !== undefined ? (isAbsolute ? yw * scale : y + yw * scale) : y;
+    const nx =
+      xw !== undefined ? (isAbsolute ? xw * scale : x + xw * scale) : x;
+    const ny =
+      yw !== undefined ? (isAbsolute ? yw * scale : y + yw * scale) : y;
 
     updateBounds(nx, ny);
+
+    // Record the segment for live plot-progress tracking
+    segments.push({
+      from: { x, y },
+      to: { x: nx, y: ny },
+      type: motionMode === 0 ? "rapid" : "cut",
+      lineNum: lineCount,
+    });
 
     if (motionMode === 0) {
       // Rapid — always start a new sub-path segment
@@ -126,5 +155,6 @@ export function parseGcode(gcode: string): GcodeToolpath {
     rapids: rapidParts.join(" "),
     bounds: { minX, maxX, minY, maxY },
     lineCount,
+    segments,
   };
 }

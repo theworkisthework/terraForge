@@ -13,6 +13,11 @@ interface CanvasState {
    *  Automatically cleared when gcodeToolpath is set to null. */
   gcodeSource: { path: string; name: string } | null;
   showCentreMarker: boolean;
+  /** Live plot-progress overlay paths (machine-coord SVG path d strings).
+   *  Built incrementally by usePlotProgress as the machine reports its position.
+   *  Empty strings = nothing to show. */
+  plotProgressCuts: string;
+  plotProgressRapids: string;
 
   addImport: (imp: SvgImport) => void;
   removeImport: (id: string) => void;
@@ -30,6 +35,10 @@ interface CanvasState {
   setGcodeSource: (src: { path: string; name: string } | null) => void;
   toggleCentreMarker: () => void;
   toVectorObjects: () => VectorObject[];
+  /** Update the live plot-progress overlay paths. */
+  setPlotProgress: (cuts: string, rapids: string) => void;
+  /** Reset progress overlay (called when toolpath changes or job clears). */
+  clearPlotProgress: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>()(
@@ -40,6 +49,8 @@ export const useCanvasStore = create<CanvasState>()(
     gcodeToolpath: null,
     gcodeSource: null,
     showCentreMarker: true,
+    plotProgressCuts: "",
+    plotProgressRapids: "",
 
     addImport: (imp) =>
       set((state) => {
@@ -99,7 +110,11 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.gcodeToolpath = tp as GcodeToolpath;
         // Auto-clear the stored local-file source when the toolpath is removed.
-        if (tp === null) state.gcodeSource = null;
+        if (tp === null) {
+          state.gcodeSource = null;
+          state.plotProgressCuts = "";
+          state.plotProgressRapids = "";
+        }
       }),
 
     setGcodeSource: (src) =>
@@ -136,5 +151,17 @@ export const useCanvasStore = create<CanvasState>()(
               }),
             ),
         ),
+
+    setPlotProgress: (cuts, rapids) =>
+      set((state) => {
+        state.plotProgressCuts = cuts;
+        state.plotProgressRapids = rapids;
+      }),
+
+    clearPlotProgress: () =>
+      set((state) => {
+        state.plotProgressCuts = "";
+        state.plotProgressRapids = "";
+      }),
   })),
 );

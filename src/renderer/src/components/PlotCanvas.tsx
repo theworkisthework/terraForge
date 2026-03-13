@@ -14,6 +14,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
+import { usePlotProgress } from "../utils/usePlotProgress";
 import type { SvgImport } from "../../../types";
 
 const MM_TO_PX = 3; // internal SVG scale: 3 px per mm
@@ -53,9 +54,15 @@ export function PlotCanvas() {
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const gcodeSource = useCanvasStore((s) => s.gcodeSource);
+  const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
+  const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
+
+  // Activate live plot-progress tracking whenever a toolpath is loaded
+  // and the machine is running a job.
+  usePlotProgress();
 
   const config = activeConfig();
   const bedW = config?.bedWidth ?? 220;
@@ -726,6 +733,31 @@ export function PlotCanvas() {
                         strokeWidth={1.5}
                         fill="none"
                         vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {/* ── Live plot-progress overlay ─────────────────────────
+                         Completed rapid moves → orange; completed cut moves → red.
+                         Rendered on top of the base toolpath, segment by segment,
+                         matching the path data exactly so no drift from sampling. */}
+                    {plotProgressRapids && (
+                      <path
+                        d={plotProgressRapids}
+                        stroke="#f97316"
+                        strokeWidth={0.5}
+                        fill="none"
+                        strokeDasharray="2 1"
+                        vectorEffect="non-scaling-stroke"
+                        pointerEvents="none"
+                      />
+                    )}
+                    {plotProgressCuts && (
+                      <path
+                        d={plotProgressCuts}
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                        pointerEvents="none"
                       />
                     )}
                     {/* Invisible hit-area for selecting the toolpath */}
