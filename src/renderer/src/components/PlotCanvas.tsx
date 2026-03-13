@@ -56,6 +56,7 @@ export function PlotCanvas() {
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
+  const machineStatus = useMachineStore((s) => s.status);
 
   const config = activeConfig();
   const bedW = config?.bedWidth ?? 220;
@@ -237,6 +238,18 @@ export function PlotCanvas() {
   // ── Toolpath selection ────────────────────────────────────────────────────────
   const [toolpathSelected, setToolpathSelected] = useState(false);
 
+  // ── Pen trace — accumulates SVG path data as the machine draws ───────────────
+  const traceCutsRef = useRef("");
+  const traceRapidsRef = useRef("");
+  const tracePrevRef = useRef<{
+    svgX: number;
+    svgY: number;
+    penDown: boolean;
+  } | null>(null);
+  const tracePrevStateRef = useRef<string | null>(null);
+  const [traceCuts, setTraceCuts] = useState("");
+  const [traceRapids, setTraceRapids] = useState("");
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -316,6 +329,63 @@ export function PlotCanvas() {
   useEffect(() => {
     if (!gcodeToolpath) setToolpathSelected(false);
   }, [gcodeToolpath]);
+
+  // ── Build pen trace from real-time machine position ───────────────────────────
+  useEffect(() => {
+    if (!machineStatus) {
+      // Disconnected — clear trace
+      traceCutsRef.current = "";
+      traceRapidsRef.current = "";
+      tracePrevRef.current = null;
+      tracePrevStateRef.current = null;
+      setTraceCuts("");
+      setTraceRapids("");
+      return;
+    }
+
+    const prevState = tracePrevStateRef.current;
+    tracePrevStateRef.current = machineStatus.state;
+
+    // Clear when a fresh job starts (entering Run from anything other than Hold/Run)
+    if (
+      machineStatus.state === "Run" &&
+      prevState !== "Run" &&
+      prevState !== "Hold"
+    ) {
+      traceCutsRef.current = "";
+      traceRapidsRef.current = "";
+      tracePrevRef.current = null;
+    }
+
+    if (machineStatus.state !== "Run") return;
+
+    // Map wpos (machine mm) → SVG canvas px
+    const { x, y, z } = machineStatus.wpos;
+    const svgX = isCenter
+      ? PAD + (bedW / 2 + x) * MM_TO_PX
+      : isRight
+        ? PAD + (bedW - x) * MM_TO_PX
+        : PAD + x * MM_TO_PX;
+    const svgY = isCenter
+      ? PAD + (bedH / 2 - y) * MM_TO_PX
+      : isBottom
+        ? canvasH - PAD - y * MM_TO_PX
+        : PAD + y * MM_TO_PX;
+    const penDown = z <= 0;
+
+    const prev = tracePrevRef.current;
+    if (penDown) {
+      traceCutsRef.current +=
+        prev?.penDown === true ? `L${svgX},${svgY}` : `M${svgX},${svgY}`;
+    } else {
+      traceRapidsRef.current +=
+        prev?.penDown === false ? `L${svgX},${svgY}` : `M${svgX},${svgY}`;
+    }
+    tracePrevRef.current = { svgX, svgY, penDown };
+
+    setTraceCuts(traceCutsRef.current);
+    setTraceRapids(traceRapidsRef.current);
+  }, [machineStatus, isCenter, isRight, isBottom, bedW, bedH, canvasH]);
 
   // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
   // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
@@ -760,6 +830,29 @@ export function PlotCanvas() {
             );
           })()}
 
+        {/* ── Pen trace — rapid moves (orange dashed) and cut moves (solid red) ── */}
+        {traceRapids && (
+          <path
+            d={traceRapids}
+            stroke="#f97316"
+            strokeWidth={2.5}
+            fill="none"
+            strokeDasharray="3 2"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        {traceCuts && (
+          <path
+            d={traceCuts}
+            stroke="#ef4444"
+            strokeWidth={3.5}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+
         {/* SVG imports — paths only; handles rendered in HandleOverlay */}
         {imports
           .filter((imp) => imp.visible)
@@ -773,6 +866,49 @@ export function PlotCanvas() {
             />
           ))}
       </svg>
+
+      {/* ── Pen position crosshair — Lucide crosshair, fixed screen-space size */}
+      {machineStatus &&
+        containerSize.w > 0 &&
+        (() => {
+          const svgX = getBedX(machineStatus.wpos.x);
+          const svgY = getBedY(machineStatus.wpos.y);
+          const sx = svgX * vp.zoom + vp.panX;
+          const sy = svgY * vp.zoom + vp.panY;
+          const ICON = 24;
+          return (
+            <svg
+              style={{
+                position: "absolute",
+                inset: 0,
+                overflow: "visible",
+                pointerEvents: "none",
+                zIndex: 5,
+              }}
+              width={containerSize.w}
+              height={containerSize.h}
+            >
+              <g transform={`translate(${sx - ICON / 2}, ${sy - ICON / 2})`}>
+                <svg
+                  width={ICON}
+                  height={ICON}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="22" x2="18" y1="12" y2="12" />
+                  <line x1="6" x2="2" y1="12" y2="12" />
+                  <line x1="12" x2="12" y1="6" y2="2" />
+                  <line x1="12" x2="12" y1="22" y2="18" />
+                </svg>
+              </g>
+            </svg>
+          );
+        })()}
 
       {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
       {selectedImportId &&

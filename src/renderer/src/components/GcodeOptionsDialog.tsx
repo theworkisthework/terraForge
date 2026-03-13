@@ -11,6 +11,7 @@
  */
 
 import React, { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useMachineStore } from "../store/machineStore";
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
@@ -23,6 +24,10 @@ export interface GcodePrefs {
   saveLocally: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
+  liftPenAtEnd: boolean;
+  returnToHome: boolean;
+  customStartGcode: string;
+  customEndGcode: string;
 }
 
 const DEFAULTS: GcodePrefs = {
@@ -31,6 +36,10 @@ const DEFAULTS: GcodePrefs = {
   saveLocally: false,
   joinPaths: false,
   joinTolerance: 0.2,
+  liftPenAtEnd: true,
+  returnToHome: false,
+  customStartGcode: "",
+  customEndGcode: "",
 };
 
 function loadPrefs(): GcodePrefs {
@@ -64,9 +73,13 @@ interface Props {
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const [prefs, setPrefs] = useState<GcodePrefs>(loadPrefs);
+  const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
   const toggle = (key: keyof GcodePrefs) =>
     setPrefs((p) => ({ ...p, [key]: !p[key] }));
+
+  const setTextField = (key: keyof GcodePrefs) => (val: string) =>
+    setPrefs((p) => ({ ...p, [key]: val }));
 
   const setJoinTolerance = (val: string) => {
     const n = parseFloat(val);
@@ -95,10 +108,10 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl w-[340px] p-5 flex flex-col gap-4">
+      <div className="bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4">
         {/* Title */}
-        <h2 className="text-white font-semibold text-base tracking-wide">
-          Generate G-code
+        <h2 className="text-white font-semibold text-sm tracking-widest uppercase">
+          Options
         </h2>
 
         {/* Options */}
@@ -169,6 +182,113 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
               </div>
             </div>
           </div>
+
+          <div className="border-t border-[#0f3460]" />
+
+          {/* ── Before & After checkboxes ── */}
+          <div className="text-xs text-gray-500 uppercase tracking-wider -mb-1">
+            Options
+          </div>
+
+          {/* Lift pen at end */}
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="Lift pen at end"
+              className="mt-0.5 accent-[#e94560] cursor-pointer"
+              checked={prefs.liftPenAtEnd}
+              onChange={() => toggle("liftPenAtEnd")}
+            />
+            <div>
+              <div className="text-sm text-white font-medium">
+                Lift pen at end
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Send the pen-up command after the last stroke. Recommended to
+                avoid leaving the pen pressed on the paper.
+              </div>
+            </div>
+          </label>
+
+          {/* Return to home */}
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="Return to home (X0 Y0)"
+              className="mt-0.5 accent-[#e94560] cursor-pointer"
+              checked={prefs.returnToHome}
+              onChange={() => toggle("returnToHome")}
+            />
+            <div>
+              <div className="text-sm text-white font-medium">
+                Return to home (X0 Y0)
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Send the pen to the origin after the job finishes.
+              </div>
+            </div>
+          </label>
+
+          {/* ── Custom G-code collapsible ── */}
+          <button
+            type="button"
+            onClick={() => setCustomGcodeOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors select-none w-fit"
+          >
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-150 ${
+                customGcodeOpen ? "rotate-0" : "-rotate-90"
+              }`}
+            />
+            Custom G-code
+            {(prefs.customStartGcode || prefs.customEndGcode) && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[#e94560] inline-block" />
+            )}
+          </button>
+
+          {customGcodeOpen && (
+            <div className="flex flex-col gap-3 pl-1">
+              {/* Custom start G-code */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400 select-none">
+                  Start G-code
+                  <span className="ml-1 text-gray-600">(after preamble)</span>
+                </label>
+                <textarea
+                  aria-label="Custom start G-code"
+                  rows={3}
+                  value={prefs.customStartGcode}
+                  onChange={(e) =>
+                    setTextField("customStartGcode")(e.target.value)
+                  }
+                  placeholder="; e.g. M3 S0"
+                  spellCheck={false}
+                  className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                />
+              </div>
+              {/* Custom end G-code */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400 select-none">
+                  End G-code
+                  <span className="ml-1 text-gray-600">
+                    (after lift / return)
+                  </span>
+                </label>
+                <textarea
+                  aria-label="Custom end G-code"
+                  rows={3}
+                  value={prefs.customEndGcode}
+                  onChange={(e) =>
+                    setTextField("customEndGcode")(e.target.value)
+                  }
+                  placeholder="; e.g. M5"
+                  spellCheck={false}
+                  className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="border-t border-[#0f3460]" />
 

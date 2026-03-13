@@ -62,6 +62,10 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const optimise = options?.optimisePaths ?? false;
   const doJoin = options?.joinPaths ?? false;
   const joinTol = options?.joinTolerance ?? 0.2;
+  const liftPenAtEnd = options?.liftPenAtEnd ?? true;
+  const returnToHome = options?.returnToHome ?? false;
+  const customStartGcode = (options?.customStartGcode ?? "").trim();
+  const customEndGcode = (options?.customEndGcode ?? "").trim();
 
   lines.push(
     "; -- terraForge G-code ------------------------------------------",
@@ -71,6 +75,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Origin   : ${config.origin}`);
   lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
   lines.push(`; Joined   : ${doJoin ? `yes (tolerance ${joinTol} mm)` : "no"}`);
+  lines.push(`; Lift end : ${liftPenAtEnd ? "yes" : "no"}`);
+  lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -79,6 +85,18 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push("G21      ; Units: mm");
   lines.push(config.penUpCommand + " ; Pen up");
   lines.push("");
+
+  // Inject custom start G-code (if any)
+  if (customStartGcode) {
+    lines.push(
+      "; -- Custom start G-code ----------------------------------------",
+    );
+    lines.push(customStartGcode);
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
+    lines.push("");
+  }
 
   const visibleObjects = objects.filter((o) => o.visible);
 
@@ -145,8 +163,21 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
 
   lines.push("; ── End of job ──────────────────────────────────────────────");
-  lines.push("G0 X0 Y0 ; Return to origin");
-  lines.push(config.penUpCommand + " ; Pen up — safe");
+  if (liftPenAtEnd) {
+    lines.push(config.penUpCommand + " ; Pen up — safe");
+  }
+  if (returnToHome) {
+    lines.push("G0 X0 Y0 ; Return to origin");
+  }
+  if (customEndGcode) {
+    lines.push(
+      "; -- Custom end G-code ------------------------------------------",
+    );
+    lines.push(customEndGcode);
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
+  }
   self.postMessage({ type: "complete", taskId, gcode: lines.join("\n") });
 }
 
