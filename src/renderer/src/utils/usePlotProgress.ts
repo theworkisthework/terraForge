@@ -237,8 +237,13 @@ export function usePlotProgress(): void {
     // ════════════════════════════════════════════════════════════════════════
     const { idx: prevIdx } = frontierRef.current;
     const searchStart = Math.max(0, prevIdx);
-    // On first update search the full list; thereafter limit to LOOKAHEAD.
-    const lookahead = prevIdx < 0 ? segments.length : LOOKAHEAD;
+    // Always use a bounded lookahead, even on the first update.
+    // Streaming jobs always start from the beginning of the file, so there is
+    // never a need to scan the entire segment list on the first tick.  Scanning
+    // all segments was the primary cause of "lots of lines suddenly turn red":
+    // a chance near-match far into the path would jump the frontier by hundreds
+    // of segments in one update, coloring them all red at once.
+    const lookahead = LOOKAHEAD;
 
     const {
       idx: newIdx,
@@ -246,8 +251,10 @@ export function usePlotProgress(): void {
       dist,
     } = findBestSegment(segments, searchStart, wpos.x, wpos.y, lookahead);
 
-    // After the frontier is established, reject implausible matches.
-    if (dist > MAX_DIST_MM && prevIdx >= 0) {
+    // Reject implausible matches — always, including on the first update.
+    // Previously this guard was skipped when prevIdx < 0, which allowed the
+    // frontier to be established at any segment regardless of distance.
+    if (dist > MAX_DIST_MM) {
       prevStateRef.current = state;
       return;
     }

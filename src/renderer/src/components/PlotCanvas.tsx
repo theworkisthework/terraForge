@@ -942,92 +942,118 @@ export function PlotCanvas() {
         })()}
 
       {/* ── Pen position crosshair ─────────────────────────────────────── */}
-      {connected && machineStatus && containerSize.w > 0 && (() => {
-        // Keep WCO up to date (FluidNC sends it periodically, not every packet).
-        const wcoMatch = machineStatus.raw.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
-        if (wcoMatch) {
-          penWcoRef.current = { x: +wcoMatch[1], y: +wcoMatch[2], z: +wcoMatch[3] };
-        }
-        // Prefer WPos: when FluidNC sends it; otherwise derive from MPos − WCO.
-        const hasWPos = /WPos:/.test(machineStatus.raw);
-        const penX = hasWPos ? machineStatus.wpos.x : machineStatus.mpos.x - penWcoRef.current.x;
-        const penY = hasWPos ? machineStatus.wpos.y : machineStatus.mpos.y - penWcoRef.current.y;
-        // Convert machine-mm → canvas SVG px (same transform used by the toolpath g).
-        const svgX = isCenter
-          ? PAD + (bedW / 2 + penX) * MM_TO_PX
-          : isRight
-            ? PAD + (bedW - penX) * MM_TO_PX
-            : PAD + penX * MM_TO_PX;
-        const svgY = isCenter
-          ? PAD + (bedH / 2 - penY) * MM_TO_PX
-          : isBottom
-            ? PAD + (bedH - penY) * MM_TO_PX
-            : PAD + penY * MM_TO_PX;
-        // Map canvas SVG px → screen px via current viewport transform.
-        const sx = vp.panX + svgX * vp.zoom;
-        const sy = vp.panY + svgY * vp.zoom;
-        return (
-          <div
-            style={{
-              position: "absolute",
-              left: sx,
-              top: sy,
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "none",
-              zIndex: 5,
-              color: "#22c55e",
-              opacity: 0.9,
-              filter: "drop-shadow(0 0 3px #15803d)",
-            }}
-          >
-            <Crosshair size={24} strokeWidth={1.5} />
-          </div>
-        );
-      })()}
+      {connected &&
+        machineStatus &&
+        containerSize.w > 0 &&
+        (() => {
+          // Keep WCO up to date (FluidNC sends it periodically, not every packet).
+          const wcoMatch = machineStatus.raw.match(
+            /WCO:([-\d.]+),([-\d.]+),([-\d.]+)/,
+          );
+          if (wcoMatch) {
+            penWcoRef.current = {
+              x: +wcoMatch[1],
+              y: +wcoMatch[2],
+              z: +wcoMatch[3],
+            };
+          }
+          // Prefer WPos: when FluidNC sends it; otherwise derive from MPos − WCO.
+          const hasWPos = /WPos:/.test(machineStatus.raw);
+          const penX = hasWPos
+            ? machineStatus.wpos.x
+            : machineStatus.mpos.x - penWcoRef.current.x;
+          const penY = hasWPos
+            ? machineStatus.wpos.y
+            : machineStatus.mpos.y - penWcoRef.current.y;
+          // Convert machine-mm → canvas SVG px (same transform used by the toolpath g).
+          const svgX = isCenter
+            ? PAD + (bedW / 2 + penX) * MM_TO_PX
+            : isRight
+              ? PAD + (bedW - penX) * MM_TO_PX
+              : PAD + penX * MM_TO_PX;
+          const svgY = isCenter
+            ? PAD + (bedH / 2 - penY) * MM_TO_PX
+            : isBottom
+              ? PAD + (bedH - penY) * MM_TO_PX
+              : PAD + penY * MM_TO_PX;
+          // Map canvas SVG px → screen px via current viewport transform.
+          const sx = vp.panX + svgX * vp.zoom;
+          const sy = vp.panY + svgY * vp.zoom;
+          return (
+            <div
+              style={{
+                position: "absolute",
+                left: sx,
+                top: sy,
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                zIndex: 5,
+                color: "#22c55e",
+                opacity: 0.9,
+                filter: "drop-shadow(0 0 3px #15803d)",
+              }}
+            >
+              <Crosshair size={24} strokeWidth={1.5} />
+            </div>
+          );
+        })()}
 
       {/* ── Pen position crosshair ────────────────────────────────────────── */}
-      {connected && machineStatus && containerSize.w > 0 && (() => {
-        // Keep WCO up to date (FluidNC sends it periodically, not every packet).
-        const wcoMatch = machineStatus.raw.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
-        if (wcoMatch) {
-          penWcoRef.current = { x: +wcoMatch[1], y: +wcoMatch[2], z: +wcoMatch[3] };
-        }
-        // Prefer WPos: when FluidNC reports it; otherwise derive from MPos − WCO.
-        const hasWPos = /WPos:/.test(machineStatus.raw);
-        const penX = hasWPos ? machineStatus.wpos.x : machineStatus.mpos.x - penWcoRef.current.x;
-        const penY = hasWPos ? machineStatus.wpos.y : machineStatus.mpos.y - penWcoRef.current.y;
-        // Convert machine-mm → canvas SVG px (mirrors the toolpath <g> transform).
-        const svgX = isCenter
-          ? PAD + (bedW / 2 + penX) * MM_TO_PX
-          : isRight
-            ? PAD + (bedW - penX) * MM_TO_PX
-            : PAD + penX * MM_TO_PX;
-        const svgY = isCenter
-          ? PAD + (bedH / 2 - penY) * MM_TO_PX
-          : isBottom
-            ? PAD + (bedH - penY) * MM_TO_PX
-            : PAD + penY * MM_TO_PX;
-        // Map canvas SVG px → screen px via current viewport transform.
-        const sx = vp.panX + svgX * vp.zoom;
-        const sy = vp.panY + svgY * vp.zoom;
-        return (
-          <div
-            style={{
-              position: "absolute",
-              left: sx,
-              top: sy,
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "none",
-              zIndex: 5,
-              color: "#22c55e",
-              opacity: 0.9,
-              filter: "drop-shadow(0 0 3px #15803d)",
-            }}
-          >
-            <Crosshair size={24} strokeWidth={1.5} />
-          </div>
-        );
-      })()}
+      {connected &&
+        machineStatus &&
+        containerSize.w > 0 &&
+        (() => {
+          // Keep WCO up to date (FluidNC sends it periodically, not every packet).
+          const wcoMatch = machineStatus.raw.match(
+            /WCO:([-\d.]+),([-\d.]+),([-\d.]+)/,
+          );
+          if (wcoMatch) {
+            penWcoRef.current = {
+              x: +wcoMatch[1],
+              y: +wcoMatch[2],
+              z: +wcoMatch[3],
+            };
+          }
+          // Prefer WPos: when FluidNC reports it; otherwise derive from MPos − WCO.
+          const hasWPos = /WPos:/.test(machineStatus.raw);
+          const penX = hasWPos
+            ? machineStatus.wpos.x
+            : machineStatus.mpos.x - penWcoRef.current.x;
+          const penY = hasWPos
+            ? machineStatus.wpos.y
+            : machineStatus.mpos.y - penWcoRef.current.y;
+          // Convert machine-mm → canvas SVG px (mirrors the toolpath <g> transform).
+          const svgX = isCenter
+            ? PAD + (bedW / 2 + penX) * MM_TO_PX
+            : isRight
+              ? PAD + (bedW - penX) * MM_TO_PX
+              : PAD + penX * MM_TO_PX;
+          const svgY = isCenter
+            ? PAD + (bedH / 2 - penY) * MM_TO_PX
+            : isBottom
+              ? PAD + (bedH - penY) * MM_TO_PX
+              : PAD + penY * MM_TO_PX;
+          // Map canvas SVG px → screen px via current viewport transform.
+          const sx = vp.panX + svgX * vp.zoom;
+          const sy = vp.panY + svgY * vp.zoom;
+          return (
+            <div
+              style={{
+                position: "absolute",
+                left: sx,
+                top: sy,
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                zIndex: 5,
+                color: "#22c55e",
+                opacity: 0.9,
+                filter: "drop-shadow(0 0 3px #15803d)",
+              }}
+            >
+              <Crosshair size={24} strokeWidth={1.5} />
+            </div>
+          );
+        })()}
 
       {/* ── Zoom / pan overlay controls ───────────────────────────────────── */}
       <div
