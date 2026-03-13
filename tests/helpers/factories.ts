@@ -119,10 +119,6 @@ export function createGcodeOptions(
     optimisePaths: false,
     joinPaths: false,
     joinTolerance: 0.2,
-    liftPenAtEnd: true,
-    returnToHome: false,
-    customStartGcode: "",
-    customEndGcode: "",
     ...overrides,
   };
 }

@@ -571,10 +571,6 @@ export function Toolbar() {
       optimisePaths: prefs.optimise,
       joinPaths: prefs.joinPaths,
       joinTolerance: prefs.joinTolerance,
-      liftPenAtEnd: prefs.liftPenAtEnd,
-      returnToHome: prefs.returnToHome,
-      customStartGcode: prefs.customStartGcode,
-      customEndGcode: prefs.customEndGcode,
     };
 
     const worker = new Worker(
