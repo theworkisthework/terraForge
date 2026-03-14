@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
 import { JobControls } from "./JobControls";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export function ConsolePanel() {
   const lines = useConsoleStore((s) => s.lines);
@@ -13,6 +14,7 @@ export function ConsolePanel() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [cmd, setCmd] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,14 +37,10 @@ export function ConsolePanel() {
     }
   };
 
-  const handleFirmwareReset = async () => {
-    if (
-      !confirm(
-        "Restart firmware?\n\nThis reboots the controller (ESP32 restart). " +
-          "The connection will drop and you will need to reconnect.",
-      )
-    )
-      return;
+  const handleFirmwareReset = () => setShowRestartConfirm(true);
+
+  const doFirmwareReset = async () => {
+    setShowRestartConfirm(false);
     setResetting(true);
     try {
       appendLine("[terraForge] Sending firmware restart…");
@@ -62,6 +60,17 @@ export function ConsolePanel() {
 
   return (
     <div className="flex h-full">
+      {showRestartConfirm && (
+        <ConfirmDialog
+          title="Restart Firmware?"
+          message={
+            "Restart firmware?\n\nThis reboots the controller (ESP32 restart). The connection will drop and you will need to reconnect."
+          }
+          confirmLabel="Restart"
+          onConfirm={doFirmwareReset}
+          onCancel={() => setShowRestartConfirm(false)}
+        />
+      )}
       {/* Console log */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-3 py-1 border-b border-[#0f3460] shrink-0">
@@ -101,7 +110,7 @@ export function ConsolePanel() {
             {connected && (
               <button
                 onClick={handleFirmwareReset}
-                disabled={resetting}
+                disabled={resetting || showRestartConfirm}
                 title="Restart firmware (ESP32 reboot) — use when controller is stuck"
                 className="text-xs px-2 py-0.5 rounded bg-orange-950 text-orange-400 hover:bg-orange-800 hover:text-white disabled:opacity-50 transition-colors"
               >

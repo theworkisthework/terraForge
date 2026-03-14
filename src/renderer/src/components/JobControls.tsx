@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { v4 as uuid } from "uuid";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 
@@ -21,6 +23,7 @@ export function JobControls() {
   const status = useMachineStore((s) => s.status);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const upsertTask = useTaskStore((s) => s.upsertTask);
+  const [showAbortConfirm, setShowAbortConfirm] = useState(false);
 
   const jobFileValid =
     selectedJobFile != null && isGcodeFile(selectedJobFile.name);
@@ -197,15 +200,24 @@ export function JobControls() {
       {isActive &&
         btn(
           "✕ Abort",
-          async () => {
-            if (confirm("Abort the current job?")) {
-              await window.terraForge.fluidnc.abortJob();
-            }
-          },
+          () => setShowAbortConfirm(true),
           "danger",
           false,
           "Immediately stop the job and cancel remaining moves",
         )}
+
+      {showAbortConfirm && (
+        <ConfirmDialog
+          title="Abort Job"
+          message="Abort the current job? The machine will stop immediately and remaining moves will be cancelled."
+          confirmLabel="Abort"
+          onConfirm={async () => {
+            setShowAbortConfirm(false);
+            await window.terraForge.fluidnc.abortJob();
+          }}
+          onCancel={() => setShowAbortConfirm(false)}
+        />
+      )}
 
       <div className="mt-auto" />
     </div>
