@@ -95,7 +95,9 @@ export class FluidNCClient extends EventEmitter {
     const stateMatch = raw.match(/<([^|>]+)/);
     const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
     const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
-    const lnMatch = raw.match(/Ln:(\d+),(\d+)/);
+    // FluidNC reports Ln:N,Total during SD-card jobs.  Some firmware versions
+    // omit the total, so the comma and second group are optional.
+    const lnMatch = raw.match(/Ln:(\d+)(?:,(\d+))?/);
 
     const stateStr = stateMatch?.[1] ?? "Unknown";
     // FluidNC appends a substate number for some states: Hold:0, Hold:1, Door:0, etc.
@@ -124,7 +126,8 @@ export class FluidNCClient extends EventEmitter {
       : { ...mpos };
 
     const lineNum = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
-    const lineTotal = lnMatch ? parseInt(lnMatch[2], 10) : undefined;
+    const lineTotal =
+      lnMatch?.[2] !== undefined ? parseInt(lnMatch[2], 10) : undefined;
 
     return { raw, state, mpos, wpos, lineNum, lineTotal };
   }
