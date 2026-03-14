@@ -26,7 +26,17 @@ import type { GcodeSegment } from "./gcodeParser";
 // Segments to scan ahead per coordinate-matching update.
 const LOOKAHEAD = 600;
 // Only accept a coordinate match when perpendicular distance ≤ this (mm).
-const MAX_DIST_MM = 4;
+// Tighter than the old 4 mm to reduce false matches on dense plots.
+const MAX_DIST_MM = 2;
+// Frontier advances within this many segments of the current position are
+// treated as normal drawing progression and confirmed immediately.
+// Larger jumps (e.g. a rapid traversing a dense region) must be confirmed by
+// MIN_CONSECUTIVE_HITS consecutive position reports before the frontier moves.
+const NATURAL_ADVANCE = 5;
+// Consecutive position reports required to confirm a frontier jump larger than
+// NATURAL_ADVANCE.  At least 2 prevents a single fluke sample during a rapid
+// from incorrectly painting distant segments as completed.
+const MIN_CONSECUTIVE_HITS = 2;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
 
@@ -149,11 +159,17 @@ export function usePlotProgress(): void {
   // WPos = MPos − WCO.  Initialised to (0,0,0) — correct when no offset
   // has been set (home position = work origin).
   const wcoRef = useRef({ x: 0, y: 0, z: 0 });
+  // Pending confirmation for large frontier jumps.
+  // A candidate advance that has not yet received enough consecutive reports is
+  // held here rather than immediately accepted, preventing a rapid-travel move
+  // that passes near a distant segment from incorrectly marking it as drawn.
+  const pendingRef = useRef<{ idx: number; hits: number }>({ idx: -1, hits: 0 });
 
   // ── Reset when the toolpath changes (new file previewed / toolpath cleared) ─
   useEffect(() => {
     frontierRef.current = { idx: -1, t: 0 };
     accRef.current = { cuts: "", rapids: "", completedUpTo: -1 };
+    pendingRef.current = { idx: -1, hits: 0 };
     prevStateRef.current = null;
     clearPlotProgress();
   }, [gcodeToolpath, clearPlotProgress]);
@@ -163,6 +179,7 @@ export function usePlotProgress(): void {
     if (!connected) {
       frontierRef.current = { idx: -1, t: 0 };
       accRef.current = { cuts: "", rapids: "", completedUpTo: -1 };
+      pendingRef.current = { idx: -1, hits: 0 };
       prevStateRef.current = null;
       wcoRef.current = { x: 0, y: 0, z: 0 };
       clearPlotProgress();
@@ -198,6 +215,7 @@ export function usePlotProgress(): void {
     if (prevState !== "Run" && state === "Run") {
       frontierRef.current = { idx: -1, t: 0 };
       accRef.current = { cuts: "", rapids: "", completedUpTo: -1 };
+      pendingRef.current = { idx: -1, hits: 0 };
     }
 
     if (state !== "Run" && state !== "Hold") {
@@ -255,6 +273,9 @@ export function usePlotProgress(): void {
     // Previously this guard was skipped when prevIdx < 0, which allowed the
     // frontier to be established at any segment regardless of distance.
     if (dist > MAX_DIST_MM) {
+      // Out-of-tolerance: clear any pending candidate so a stray sample during
+      // a rapid doesn't start accumulating confirmation hits.
+      pendingRef.current = { idx: -1, hits: 0 };
       prevStateRef.current = state;
       return;
     }
@@ -265,6 +286,37 @@ export function usePlotProgress(): void {
     ) {
       prevStateRef.current = state;
       return;
+    }
+
+    // ── Confirmation gating for large frontier jumps ──────────────────────
+    // Advances within NATURAL_ADVANCE segments of the current frontier are
+    // normal drawing progression — confirm immediately.
+    // Larger jumps (e.g. a G0 rapid passing over a dense area) are held in a
+    // pending state until MIN_CONSECUTIVE_HITS consecutive reports all place the
+    // machine near the same region, confirming it's actually being traversed.
+    const jump = newIdx - Math.max(0, prevIdx);
+    if (jump > NATURAL_ADVANCE) {
+      const pending = pendingRef.current;
+      if (newIdx >= pending.idx && newIdx <= pending.idx + NATURAL_ADVANCE) {
+        // This report is within the existing candidate's window — accumulate.
+        pending.hits++;
+        pending.idx = newIdx; // slide window forward with the machine position
+      } else {
+        // The position is far from the existing candidate — start a fresh count.
+        pendingRef.current = { idx: newIdx, hits: 1 };
+        prevStateRef.current = state;
+        return;
+      }
+      if (pending.hits < MIN_CONSECUTIVE_HITS) {
+        // Not yet confirmed — wait for more consecutive reports.
+        prevStateRef.current = state;
+        return;
+      }
+      // Enough consecutive reports — confirmed.  Clear pending and advance.
+      pendingRef.current = { idx: -1, hits: 0 };
+    } else {
+      // Small natural advance — clear any stale pending candidate.
+      pendingRef.current = { idx: -1, hits: 0 };
     }
 
     if (newIdx > acc.completedUpTo + 1) {
