@@ -280,7 +280,11 @@ describe("PropertiesPanel", () => {
     const tp = createGcodeToolpath({ fileSizeBytes: 2048, lineCount: 150 });
     useCanvasStore.setState({
       gcodeToolpath: tp,
-      gcodeSource: { path: "/tmp/test.gcode", name: "test.gcode" },
+      gcodeSource: {
+        path: "/tmp/test.gcode",
+        name: "test.gcode",
+        source: "local" as const,
+      },
     });
     render(<PropertiesPanel />);
     expect(screen.getByText("test.gcode")).toBeInTheDocument();

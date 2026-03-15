@@ -119,6 +119,7 @@ function FsPane({
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
+  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
@@ -191,8 +192,11 @@ function FsPane({
       );
       const toolpath = parseGcode(text);
       setGcodeToolpath(toolpath);
-      // Remote preview is not a local file — clear any stored local source
-      setGcodeSource(null);
+      // Store the source so the canvas toolpath selection can restore it.
+      setGcodeSource({ path: file.path, name: file.name, source });
+      // Select this file as the queued job so Start Job is enabled immediately
+      // and the file is highlighted in the browser.
+      setSelectedJobFile({ path: file.path, source, name: file.name });
     } catch (err) {
       console.error("Preview failed:", err);
     } finally {
@@ -326,6 +330,9 @@ function FsPane({
                           ? null
                           : { path: file.path, source, name: file.name },
                       );
+                      // Deselect canvas toolpath when the file browser takes
+                      // ownership of the job-file selection.
+                      selectToolpath(false);
                     }
                   }}
                 >

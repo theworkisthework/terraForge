@@ -1,6 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
+import { useCanvasStore } from "../store/canvasStore";
 
 const GCODE_EXTS = [
   ".gcode",
@@ -21,9 +22,23 @@ export function JobControls() {
   const status = useMachineStore((s) => s.status);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const upsertTask = useTaskStore((s) => s.upsertTask);
+  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
+  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
+
+  // When the canvas toolpath is selected and has a local file source, use it
+  // as the job file even if nothing is explicitly set in the file browser.
+  const effectiveJobFile =
+    selectedJobFile ??
+    (toolpathSelected && gcodeSource
+      ? {
+          path: gcodeSource.path,
+          source: gcodeSource.source,
+          name: gcodeSource.name,
+        }
+      : null);
 
   const jobFileValid =
-    selectedJobFile != null && isGcodeFile(selectedJobFile.name);
+    effectiveJobFile != null && isGcodeFile(effectiveJobFile.name);
 
   const isRunning = status?.state === "Run";
   const isHeld = status?.state === "Hold";
@@ -94,17 +109,17 @@ export function JobControls() {
       {!isActive && (
         <div
           className="text-[9px] truncate px-0.5 -mt-1 mb-0.5"
-          title={selectedJobFile?.path ?? undefined}
+          title={effectiveJobFile?.path ?? undefined}
         >
-          {!selectedJobFile ? (
+          {!effectiveJobFile ? (
             <span className="italic text-gray-500">
               No file selected — pick one in File Browser
             </span>
           ) : jobFileValid ? (
             <span className="text-gray-300">
-              {selectedJobFile.source === "local" ? "🖥" : "📄"}{" "}
-              {selectedJobFile.name}
-              {selectedJobFile.source === "local" && (
+              {effectiveJobFile.source === "local" ? "🖥" : "📄"}{" "}
+              {effectiveJobFile.name}
+              {effectiveJobFile.source === "local" && (
                 <span className="text-gray-500 ml-1">
                   (local — will upload)
                 </span>
@@ -112,7 +127,7 @@ export function JobControls() {
             </span>
           ) : (
             <span className="text-amber-400">
-              ⚠ {selectedJobFile.name} — not a G-code file
+              ⚠ {effectiveJobFile.name} — not a G-code file
             </span>
           )}
         </div>
@@ -124,9 +139,9 @@ export function JobControls() {
           "▶ Start job",
           async () => {
             if (!jobFileValid) return;
-            if (selectedJobFile!.source === "local") {
+            if (effectiveJobFile!.source === "local") {
               // Local file: upload to SD card root first, then run
-              const { name, path: localPath } = selectedJobFile!;
+              const { name, path: localPath } = effectiveJobFile!;
               const remotePath = "/" + name;
               const taskId = uuid();
               upsertTask({
@@ -155,17 +170,17 @@ export function JobControls() {
               }
             } else {
               await window.terraForge.fluidnc.runFile(
-                selectedJobFile!.path,
-                selectedJobFile!.source as "fs" | "sd",
+                effectiveJobFile!.path,
+                effectiveJobFile!.source as "fs" | "sd",
               );
             }
           },
           "primary",
           !jobFileValid, // disabled unless a valid G-code file is selected
           jobFileValid
-            ? selectedJobFile!.source === "local"
-              ? `Upload ${selectedJobFile!.name} to SD card then run`
-              : `Run ${selectedJobFile!.name} on the machine`
+            ? effectiveJobFile!.source === "local"
+              ? `Upload ${effectiveJobFile!.name} to SD card then run`
+              : `Run ${effectiveJobFile!.name} on the machine`
             : "Select a G-code file in the File Browser first",
         )}
 

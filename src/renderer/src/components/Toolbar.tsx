@@ -537,7 +537,7 @@ export function Toolbar() {
       const text = await window.terraForge.fs.readFile(filePath);
       const toolpath = parseGcode(text);
       setGcodeToolpath(toolpath);
-      setGcodeSource({ path: filePath, name });
+      setGcodeSource({ path: filePath, name, source: "local" });
       // Selecting this as the queued job (local source — will upload on Start)
       setSelectedJobFile({ path: filePath, source: "local", name });
       upsertTask({

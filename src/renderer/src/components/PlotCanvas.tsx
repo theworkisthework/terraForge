@@ -332,6 +332,29 @@ export function PlotCanvas() {
 
   // Clear toolpath selection when toolpath is removed — handled by the store.
 
+  // ── Sync toolpathSelected ↔ selectedJobFile ───────────────────────────────────
+  // One central effect keeps the file browser and job panel in lock-step with
+  // the canvas toolpath selection (and vice versa).
+  //   selecting   → restore selectedJobFile from gcodeSource
+  //   deselecting → clear selectedJobFile only if it was pointing at gcodeSource
+  useEffect(() => {
+    if (toolpathSelected && gcodeSource) {
+      setSelectedJobFile({
+        path: gcodeSource.path,
+        name: gcodeSource.name,
+        source: gcodeSource.source,
+      });
+    } else if (!toolpathSelected && gcodeSource) {
+      const current = useMachineStore.getState().selectedJobFile;
+      if (current?.path === gcodeSource.path) {
+        setSelectedJobFile(null);
+      }
+    }
+    // Intentionally only re-run when toolpathSelected changes; gcodeSource
+    // changing means a new toolpath was loaded which resets toolpathSelected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolpathSelected]);
+
   // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
   // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
   const getBedY = (mmY: number) =>
@@ -781,13 +804,7 @@ export function PlotCanvas() {
                         e.stopPropagation();
                         selectImport(null);
                         selectToolpath(true);
-                        // Restore the local job file selection so the Job panel
-                        // shows the filename again after a file-browser deselect.
-                        if (gcodeSource)
-                          setSelectedJobFile({
-                            ...gcodeSource,
-                            source: "local",
-                          });
+                        // selectedJobFile is synced by the toolpathSelected effect below.
                       }}
                     />
                   </g>

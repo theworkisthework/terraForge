@@ -8,10 +8,15 @@ interface CanvasState {
   selectedImportId: string | null;
   selectedPathId: string | null;
   gcodeToolpath: GcodeToolpath | null;
-  /** Persists the local file info for a canvas-imported G-code file so it can
-   *  be restored in selectedJobFile whenever the user re-selects the toolpath.
+  /** Persists the file info for the currently loaded G-code toolpath so it
+   *  can be restored into selectedJobFile when the user re-selects the toolpath
+   *  on the canvas.  source mirrors SelectedJobFile.source.
    *  Automatically cleared when gcodeToolpath is set to null. */
-  gcodeSource: { path: string; name: string } | null;
+  gcodeSource: {
+    path: string;
+    name: string;
+    source: "local" | "fs" | "sd";
+  } | null;
   showCentreMarker: boolean;
   /** Live plot-progress overlay paths (machine-coord SVG path d strings).
    *  Built incrementally by usePlotProgress as the machine reports its position.
@@ -36,7 +41,9 @@ interface CanvasState {
   clearImports: () => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
-  setGcodeSource: (src: { path: string; name: string } | null) => void;
+  setGcodeSource: (
+    src: { path: string; name: string; source: "local" | "fs" | "sd" } | null,
+  ) => void;
   toggleCentreMarker: () => void;
   toVectorObjects: () => VectorObject[];
   /** Update the live plot-progress overlay paths. */
