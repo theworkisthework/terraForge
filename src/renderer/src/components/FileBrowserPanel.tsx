@@ -195,6 +195,9 @@ function FsPane({
       setGcodeToolpath(toolpath);
       // Store the source so the canvas toolpath selection can restore it.
       setGcodeSource({ path: file.path, name: file.name, source });
+      // Auto-select the toolpath so the canvas, Properties panel, and
+      // Job panel are all in sync from the moment of preview.
+      selectToolpath(true);
       // Select this file as the queued job so Start Job is enabled immediately
       // and the file is highlighted in the browser.
       setSelectedJobFile({ path: file.path, source, name: file.name });

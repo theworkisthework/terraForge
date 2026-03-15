@@ -277,7 +277,7 @@ export function PlotCanvas() {
           removeImport(selectedImportId);
         } else if (toolpathSelected) {
           setGcodeToolpath(null);
-          if (selectedJobFile?.source === "local") setSelectedJobFile(null);
+          // selectedJobFile is cleared by the gcodeToolpath→null effect below.
         }
       }
 
@@ -330,7 +330,17 @@ export function PlotCanvas() {
     fitToView,
   ]);
 
-  // Clear toolpath selection when toolpath is removed — handled by the store.
+  // ── Clear selectedJobFile when the toolpath is removed ─────────────────────
+  // Detects the non-null → null transition so clearing the toolpath (via the
+  // ✕ button, Delete key, or any other path) always resets the job panel.
+  const prevGcodeToolpathRef = useRef(gcodeToolpath);
+  useEffect(() => {
+    const prev = prevGcodeToolpathRef.current;
+    prevGcodeToolpathRef.current = gcodeToolpath;
+    if (prev !== null && gcodeToolpath === null) {
+      setSelectedJobFile(null);
+    }
+  }, [gcodeToolpath, setSelectedJobFile]);
 
   // ── Sync toolpathSelected ↔ selectedJobFile ───────────────────────────────────
   // One central effect keeps the file browser and job panel in lock-step with
