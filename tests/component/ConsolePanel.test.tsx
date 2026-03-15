@@ -169,15 +169,15 @@ describe("ConsolePanel", () => {
 
   it("sends [ESP444]RESTART and disconnects when Restart FW confirmed", async () => {
     useMachineStore.setState({ connected: true });
-    // Mock confirm to return true
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ConsolePanel />);
     await userEvent.click(screen.getByText(/Restart FW/));
+    // Themed confirm dialog should appear
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Restart" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       "[ESP444]RESTART",
     );
     expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   // ── JobControls rendered ────────────────────────────────────────────────

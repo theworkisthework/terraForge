@@ -116,6 +116,7 @@ function FsPane({
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [pendingPreviewFile, setPendingPreviewFile] =
     useState<RemoteFile | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
@@ -232,6 +233,18 @@ function FsPane({
           confirmLabel="Replace"
           onConfirm={() => doPreview(pendingPreviewFile)}
           onCancel={() => setPendingPreviewFile(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete File"
+          message={`Delete ${deleteTarget.name}?`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            deleteFn(deleteTarget.path).then(() => navigate(path));
+            setDeleteTarget(null);
+          }}
+          onCancel={() => setDeleteTarget(null)}
         />
       )}
       {/* Section header */}
@@ -401,8 +414,7 @@ function FsPane({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Delete ${file.name}?`))
-                            deleteFn(file.path).then(() => navigate(path));
+                          setDeleteTarget(file);
                         }}
                         title="Delete"
                         className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020]"

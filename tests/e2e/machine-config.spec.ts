@@ -16,14 +16,7 @@
  * machine-selector `<select>`.
  */
 import { test, expect } from "@playwright/test";
-import {
-  launchApp,
-  closeApp,
-  mockSaveDialog,
-  mockOpenDialog,
-  mockConfirm,
-  restoreConfirm,
-} from "./helpers";
+import { launchApp, closeApp, mockSaveDialog, mockOpenDialog } from "./helpers";
 import type { ElectronApplication, Page } from "playwright";
 import * as path from "path";
 import * as os from "os";
@@ -148,18 +141,20 @@ test("clicking Del removes the selected config (after confirm)", async () => {
   // Select the copy in the sidebar
   await sidebarEntry(window, "Copy of Test Machine E2E").click();
 
-  // Mock confirm to return true
-  await mockConfirm(window, true);
-
   const delBtn = window.locator("button:has-text('Del')");
   await delBtn.click();
+
+  // The app uses a custom ConfirmDialog (not window.confirm) — click the Delete button
+  const confirmDeleteBtn = window.locator(
+    '[role="dialog"] button:has-text("Delete")',
+  );
+  await expect(confirmDeleteBtn).toBeVisible({ timeout: 5000 });
+  await confirmDeleteBtn.click();
 
   // The copy should be gone from the sidebar
   await expect(
     window.locator(".w-52 :text('Copy of Test Machine E2E')"),
   ).not.toBeVisible({ timeout: 5000 });
-
-  await restoreConfirm(window);
 });
 
 // ─── Pen type changes ───────────────────────────────────────────────────────
@@ -169,14 +164,20 @@ test("changing pen type updates pen command defaults", async () => {
   await sidebarEntry(window, "Test Machine E2E").click();
   await window.waitForTimeout(300);
 
-  // Mock confirm to accept the "reset pen commands" dialog
-  await mockConfirm(window, true);
-
   // Find the pen type select in the dialog form area
   const penSelects = window.locator(".overflow-y-auto select");
   // Origin is the first select, pen type is the second
   const penTypeSelect = penSelects.nth(1);
   await penTypeSelect.selectOption("servo");
+
+  // The app may show a custom ConfirmDialog (not window.confirm) if commands were customised.
+  // Accept it if it appears, otherwise proceed.
+  const confirmResetBtn = window.locator(
+    '[role="dialog"] button:has-text("Reset")',
+  );
+  if (await confirmResetBtn.isVisible({ timeout: 800 })) {
+    await confirmResetBtn.click();
+  }
 
   // Wait for re-render
   await window.waitForTimeout(500);
@@ -188,8 +189,6 @@ test("changing pen type updates pen command defaults", async () => {
   );
   // Should contain G0Z15 (pen up) and G0Z0 (pen down)
   expect(values.some((v) => v.includes("G0Z"))).toBe(true);
-
-  await restoreConfirm(window);
 });
 
 // ─── Connection type toggle ──────────────────────────────────────────────────
@@ -233,15 +232,17 @@ test("Export button triggers save dialog and writes JSON", async () => {
   const exportPath = path.join(tempDir, "exported-configs.json");
   await mockSaveDialog(electronApp, exportPath);
 
-  // Register the dialog handler BEFORE clicking export, so the alert()
-  // call that follows a successful export doesn't block the test.
-  window.on("dialog", (d) => d.accept());
-
   const exportBtn = window.locator("button:has-text('↑ Export')");
   await exportBtn.click();
 
   // Allow time for the IPC round-trip + file write
   await window.waitForTimeout(3000);
+
+  // The app shows a custom ConfirmDialog alert ("Configs Exported") — dismiss it.
+  const okBtn = window.locator('[role="dialog"] button:has-text("OK")');
+  if (await okBtn.isVisible({ timeout: 1000 })) {
+    await okBtn.click();
+  }
 
   // Check the exported file exists and contains valid JSON
   if (fs.existsSync(exportPath)) {

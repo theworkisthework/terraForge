@@ -152,13 +152,14 @@ describe("MachineConfigDialog", () => {
       configs: [c1, c2],
       activeConfigId: c1.id,
     });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<MachineConfigDialog onClose={onClose} />);
     // Select Second then delete
     await userEvent.click(screen.getByText("Second"));
     await userEvent.click(screen.getByText("Del"));
+    // Themed confirm dialog should appear
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(window.terraForge.config.deleteMachineConfig).toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   // ── Duplicate ───────────────────────────────────────────────────────────
@@ -280,39 +281,37 @@ describe("MachineConfigDialog", () => {
     });
 
     it("switching with customised commands triggers confirm dialog", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
       render(<MachineConfigDialog onClose={onClose} />);
       // Customise the pen-up command so it no longer matches the solenoid default
       const upInput = screen.getByDisplayValue("M3S0");
       await userEvent.clear(upInput);
       await userEvent.type(upInput, "CUSTOM");
-      // Now change pen type — should trigger confirm
+      // Now change pen type — should open the themed confirm dialog
       await userEvent.selectOptions(
         screen.getByDisplayValue("Solenoid"),
         "servo",
       );
-      expect(confirmSpy).toHaveBeenCalled();
-      // User accepted → servo defaults applied
+      await screen.findByRole("dialog");
+      // User accepts → servo defaults applied
+      await userEvent.click(screen.getByRole("button", { name: "Reset" }));
       expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
-      confirmSpy.mockRestore();
     });
 
     it("declining the confirm preserves custom commands but updates pen type label", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
       render(<MachineConfigDialog onClose={onClose} />);
       // Customise pen-up command
       const upInput = screen.getByDisplayValue("M3S0");
       await userEvent.clear(upInput);
       await userEvent.type(upInput, "CUSTOM");
-      // Change pen type — user declines overwrite
+      // Change pen type — themed confirm dialog appears
       await userEvent.selectOptions(
         screen.getByDisplayValue("Solenoid"),
         "servo",
       );
-      expect(confirmSpy).toHaveBeenCalled();
-      // Commands should remain as custom (not overwritten)
+      await screen.findByRole("dialog");
+      // User declines → commands stay as custom, penType label updates
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.getByDisplayValue("CUSTOM")).toBeInTheDocument();
-      confirmSpy.mockRestore();
     });
   });
 });

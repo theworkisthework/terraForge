@@ -23,7 +23,8 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
-  onCancel: () => void;
+  /** When omitted the Cancel button is hidden — dialog acts as a single-button alert. */
+  onCancel?: () => void;
 }
 
 export function ConfirmDialog({
@@ -35,7 +36,7 @@ export function ConfirmDialog({
   onCancel,
 }: Props) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onCancel();
+    if (e.key === "Escape") (onCancel ?? onConfirm)();
     if (e.key === "Enter") onConfirm();
   };
 
@@ -46,7 +47,7 @@ export function ConfirmDialog({
       aria-labelledby="confirm-dialog-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
+        if (e.target === e.currentTarget) (onCancel ?? onConfirm)();
       }}
       onKeyDown={handleKeyDown}
       tabIndex={-1}
@@ -59,15 +60,19 @@ export function ConfirmDialog({
           {title}
         </h2>
 
-        <p className="text-sm text-gray-300 leading-relaxed">{message}</p>
+        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+          {message}
+        </p>
 
         <div className="flex gap-2 justify-end mt-1">
-          <button
-            onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
-          >
-            {cancelLabel}
-          </button>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="px-3 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             className="px-3 py-1.5 text-sm rounded bg-[#e94560] hover:bg-[#c73d56] transition-colors text-white"

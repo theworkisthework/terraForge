@@ -227,11 +227,12 @@ describe("JobControls", () => {
         raw: "<Run|MPos:0,0,0>",
       },
     });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<JobControls />);
     await userEvent.click(screen.getByText("✕ Abort"));
+    // Themed confirm dialog should appear
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Abort" }));
     expect(window.terraForge.fluidnc.abortJob).toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   it("does not abort when confirm is cancelled", async () => {
@@ -244,11 +245,12 @@ describe("JobControls", () => {
         raw: "<Run|MPos:0,0,0>",
       },
     });
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<JobControls />);
     await userEvent.click(screen.getByText("✕ Abort"));
+    // Themed confirm dialog should appear
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(window.terraForge.fluidnc.abortJob).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   // ── Indeterminate progress ──────────────────────────────────────────────
