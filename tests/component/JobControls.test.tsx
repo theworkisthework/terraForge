@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
+import { useCanvasStore } from "@renderer/store/canvasStore";
 import { JobControls } from "@renderer/components/JobControls";
 
 beforeEach(() => {
@@ -13,6 +14,11 @@ beforeEach(() => {
     connected: false,
     wsLive: false,
     selectedJobFile: null,
+  });
+  useCanvasStore.setState({
+    gcodeToolpath: null,
+    gcodeSource: null,
+    toolpathSelected: false,
   });
   useTaskStore.setState({ tasks: {} });
   vi.clearAllMocks();
@@ -276,5 +282,72 @@ describe("JobControls", () => {
     });
     render(<JobControls />);
     expect(screen.getByText("▶ Start job")).toBeDisabled();
+  });
+
+  // ── Canvas toolpath selection ───────────────────────────────────────────
+
+  it("enables Start Job when toolpath is selected on canvas with a local gcodeSource", () => {
+    useMachineStore.setState({ connected: true, selectedJobFile: null });
+    useCanvasStore.setState({
+      toolpathSelected: true,
+      gcodeSource: {
+        path: "C:\\files\\art.gcode",
+        name: "art.gcode",
+        source: "local" as const,
+      },
+    });
+    render(<JobControls />);
+    expect(screen.getByText("▶ Start job")).not.toBeDisabled();
+  });
+
+  it("shows canvas toolpath file name in indicator when toolpath selected with no explicit job file", () => {
+    useMachineStore.setState({ connected: true, selectedJobFile: null });
+    useCanvasStore.setState({
+      toolpathSelected: true,
+      gcodeSource: {
+        path: "C:\\files\\art.gcode",
+        name: "art.gcode",
+        source: "local" as const,
+      },
+    });
+    render(<JobControls />);
+    expect(screen.getByText(/art\.gcode/)).toBeInTheDocument();
+    expect(screen.getByText(/will upload/)).toBeInTheDocument();
+  });
+
+  it("Start Job remains disabled when toolpath not selected and no job file set", () => {
+    useMachineStore.setState({ connected: true, selectedJobFile: null });
+    useCanvasStore.setState({
+      toolpathSelected: false,
+      gcodeSource: {
+        path: "C:\\files\\art.gcode",
+        name: "art.gcode",
+        source: "local" as const,
+      },
+    });
+    render(<JobControls />);
+    expect(screen.getByText("▶ Start job")).toBeDisabled();
+  });
+
+  it("uploads then runs canvas-selected local toolpath when Start clicked", async () => {
+    useMachineStore.setState({ connected: true, selectedJobFile: null });
+    useCanvasStore.setState({
+      toolpathSelected: true,
+      gcodeSource: {
+        path: "C:\\files\\art.gcode",
+        name: "art.gcode",
+        source: "local" as const,
+      },
+    });
+    (
+      window.terraForge.fluidnc.uploadFile as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(undefined);
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("▶ Start job"));
+    expect(window.terraForge.fluidnc.uploadFile).toHaveBeenCalled();
+    expect(window.terraForge.fluidnc.runFile).toHaveBeenCalledWith(
+      "/art.gcode",
+      "sd",
+    );
   });
 });

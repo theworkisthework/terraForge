@@ -55,6 +55,8 @@ export function PlotCanvas() {
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const gcodeSource = useCanvasStore((s) => s.gcodeSource);
+  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
+  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
   const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
   const activeConfig = useMachineStore((s) => s.activeConfig);
@@ -250,7 +252,8 @@ export function PlotCanvas() {
   } | null>(null);
 
   // ── Toolpath selection ────────────────────────────────────────────────────────
-  const [toolpathSelected, setToolpathSelected] = useState(false);
+  // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
+  // can react to canvas selection changes (and vice versa).
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -274,15 +277,14 @@ export function PlotCanvas() {
           removeImport(selectedImportId);
         } else if (toolpathSelected) {
           setGcodeToolpath(null);
-          setToolpathSelected(false);
-          if (selectedJobFile?.source === "local") setSelectedJobFile(null);
+          // selectedJobFile is cleared by the gcodeToolpath→null effect below.
         }
       }
 
       // Escape → deselect
       if (e.key === "Escape") {
         selectImport(null);
-        setToolpathSelected(false);
+        selectToolpath(false);
       }
 
       // Ctrl/Cmd + Shift + + / - → keyboard zoom
@@ -322,15 +324,46 @@ export function PlotCanvas() {
     toolpathSelected,
     removeImport,
     selectImport,
+    selectToolpath,
     setGcodeToolpath,
     zoomBy,
     fitToView,
   ]);
 
-  // Clear toolpath selection when toolpath is removed
+  // ── Clear selectedJobFile when the toolpath is removed ─────────────────────
+  // Detects the non-null → null transition so clearing the toolpath (via the
+  // ✕ button, Delete key, or any other path) always resets the job panel.
+  const prevGcodeToolpathRef = useRef(gcodeToolpath);
   useEffect(() => {
-    if (!gcodeToolpath) setToolpathSelected(false);
-  }, [gcodeToolpath]);
+    const prev = prevGcodeToolpathRef.current;
+    prevGcodeToolpathRef.current = gcodeToolpath;
+    if (prev !== null && gcodeToolpath === null) {
+      setSelectedJobFile(null);
+    }
+  }, [gcodeToolpath, setSelectedJobFile]);
+
+  // ── Sync toolpathSelected ↔ selectedJobFile ───────────────────────────────────
+  // One central effect keeps the file browser and job panel in lock-step with
+  // the canvas toolpath selection (and vice versa).
+  //   selecting   → restore selectedJobFile from gcodeSource
+  //   deselecting → clear selectedJobFile only if it was pointing at gcodeSource
+  useEffect(() => {
+    if (toolpathSelected && gcodeSource) {
+      setSelectedJobFile({
+        path: gcodeSource.path,
+        name: gcodeSource.name,
+        source: gcodeSource.source,
+      });
+    } else if (!toolpathSelected && gcodeSource) {
+      const current = useMachineStore.getState().selectedJobFile;
+      if (current?.path === gcodeSource.path) {
+        setSelectedJobFile(null);
+      }
+    }
+    // Intentionally only re-run when toolpathSelected changes; gcodeSource
+    // changing means a new toolpath was loaded which resets toolpathSelected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolpathSelected]);
 
   // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
   // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
@@ -628,7 +661,7 @@ export function PlotCanvas() {
             return;
           }
           selectImport(null);
-          setToolpathSelected(false);
+          selectToolpath(false);
         }}
       >
         {/* Bed background */}
@@ -780,14 +813,8 @@ export function PlotCanvas() {
                       onClick={(e) => {
                         e.stopPropagation();
                         selectImport(null);
-                        setToolpathSelected(true);
-                        // Restore the local job file selection so the Job panel
-                        // shows the filename again after a file-browser deselect.
-                        if (gcodeSource)
-                          setSelectedJobFile({
-                            ...gcodeSource,
-                            source: "local",
-                          });
+                        selectToolpath(true);
+                        // selectedJobFile is synced by the toolpathSelected effect below.
                       }}
                     />
                   </g>

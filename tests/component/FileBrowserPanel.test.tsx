@@ -321,6 +321,39 @@ describe("FileBrowserPanel", () => {
     );
     // No dialog should have appeared
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Preview should also select the file as the queued job
+    const jobFile = useMachineStore.getState().selectedJobFile;
+    expect(jobFile).not.toBeNull();
+    expect(jobFile!.name).toBe("first.gcode");
+    expect(jobFile!.path).toBe("/first.gcode");
+    expect(jobFile!.source).toBe("sd");
+  });
+
+  it("sets selectedJobFile when a remote file is previewed (enables Start Job)", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      { name: "job.gcode", path: "/job.gcode", size: 512, isDirectory: false },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fluidnc.fetchFileText as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("G1 X50 Y50 F2000\n");
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("job.gcode")).toBeInTheDocument(),
+    );
+    expect(useMachineStore.getState().selectedJobFile).toBeNull();
+    const previewBtns = screen.getAllByTitle("Preview toolpath");
+    await userEvent.click(previewBtns[0]);
+    await waitFor(() => {
+      const jf = useMachineStore.getState().selectedJobFile;
+      expect(jf).not.toBeNull();
+      expect(jf!.name).toBe("job.gcode");
+    });
   });
 
   // ── Error display ─────────────────────────────────────────────────────

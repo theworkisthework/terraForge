@@ -197,6 +197,7 @@ export function Toolbar() {
   const addImport = useCanvasStore((s) => s.addImport);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
+  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -537,7 +538,10 @@ export function Toolbar() {
       const text = await window.terraForge.fs.readFile(filePath);
       const toolpath = parseGcode(text);
       setGcodeToolpath(toolpath);
-      setGcodeSource({ path: filePath, name });
+      setGcodeSource({ path: filePath, name, source: "local" });
+      // Auto-select the toolpath so the canvas, Properties panel, and
+      // Job panel are all in sync from the moment of import.
+      selectToolpath(true);
       // Selecting this as the queued job (local source — will upload on Start)
       setSelectedJobFile({ path: filePath, source: "local", name });
       upsertTask({

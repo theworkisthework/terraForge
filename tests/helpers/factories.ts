@@ -11,6 +11,7 @@ import type {
   MachineStatus,
   GcodeOptions,
 } from "../../src/types";
+import type { GcodeToolpath } from "../../src/renderer/src/utils/gcodeParser";
 
 let _idCounter = 0;
 function testId(): string {
@@ -123,6 +124,22 @@ export function createGcodeOptions(
     returnToHome: false,
     customStartGcode: "",
     customEndGcode: "",
+    ...overrides,
+  };
+}
+
+export function createGcodeToolpath(
+  overrides?: Partial<GcodeToolpath>,
+): GcodeToolpath {
+  return {
+    cuts: "M 0.000 0.000 L 100.000 100.000",
+    rapids: "M 0.000 0.000 L 50.000 50.000",
+    bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 },
+    lineCount: 10,
+    fileSizeBytes: 128,
+    totalCutDistance: 141.421,
+    totalRapidDistance: 70.711,
+    feedrate: 3000,
     ...overrides,
   };
 }

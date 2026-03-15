@@ -128,7 +128,11 @@ describe("canvasStore", () => {
   // ── setGcodeSource ──────────────────────────────────────────────────────
 
   it("stores and clears gcodeSource", () => {
-    const src = { path: "/home/user/job.gcode", name: "job.gcode" };
+    const src = {
+      path: "/home/user/job.gcode",
+      name: "job.gcode",
+      source: "local" as const,
+    };
     useCanvasStore.getState().setGcodeSource(src);
     expect(useCanvasStore.getState().gcodeSource).toEqual(src);
     useCanvasStore.getState().setGcodeSource(null);
@@ -140,7 +144,11 @@ describe("canvasStore", () => {
     useCanvasStore.getState().setGcodeToolpath(tp as any);
     useCanvasStore
       .getState()
-      .setGcodeSource({ path: "/job.gcode", name: "job.gcode" });
+      .setGcodeSource({
+        path: "/job.gcode",
+        name: "job.gcode",
+        source: "sd" as const,
+      });
     expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
     useCanvasStore.getState().setGcodeToolpath(null);
     expect(useCanvasStore.getState().gcodeSource).toBeNull();
@@ -150,7 +158,11 @@ describe("canvasStore", () => {
     const tp = { segments: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
     useCanvasStore
       .getState()
-      .setGcodeSource({ path: "/job.gcode", name: "job.gcode" });
+      .setGcodeSource({
+        path: "/job.gcode",
+        name: "job.gcode",
+        source: "sd" as const,
+      });
     useCanvasStore.getState().setGcodeToolpath(tp as any);
     expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
   });
