@@ -28,7 +28,11 @@ interface CanvasState {
     patch: Partial<SvgPath>,
   ) => void;
   removePath: (importId: string, pathId: string) => void;
+  /** Whether the G-code toolpath is currently selected on the canvas. */
+  toolpathSelected: boolean;
   selectImport: (id: string | null) => void;
+  /** Select or deselect the G-code toolpath.  Deselects any SVG import. */
+  selectToolpath: (selected: boolean) => void;
   clearImports: () => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
@@ -48,6 +52,7 @@ export const useCanvasStore = create<CanvasState>()(
     selectedPathId: null,
     gcodeToolpath: null,
     gcodeSource: null,
+    toolpathSelected: false,
     showCentreMarker: true,
     plotProgressCuts: "",
     plotProgressRapids: "",
@@ -92,6 +97,18 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.selectedImportId = id;
         state.selectedPathId = null;
+        // Selecting an SVG import clears toolpath selection (and vice-versa).
+        if (id !== null) state.toolpathSelected = false;
+      }),
+
+    selectToolpath: (selected) =>
+      set((state) => {
+        state.toolpathSelected = selected;
+        // Selecting the toolpath clears any SVG import selection.
+        if (selected) {
+          state.selectedImportId = null;
+          state.selectedPathId = null;
+        }
       }),
 
     clearImports: () =>
@@ -112,6 +129,7 @@ export const useCanvasStore = create<CanvasState>()(
         // Auto-clear the stored local-file source when the toolpath is removed.
         if (tp === null) {
           state.gcodeSource = null;
+          state.toolpathSelected = false;
           state.plotProgressCuts = "";
           state.plotProgressRapids = "";
         }

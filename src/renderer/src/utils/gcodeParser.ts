@@ -38,6 +38,14 @@ export interface GcodeToolpath {
    *  Optional so that hand-crafted test objects without this field still
    *  satisfy the type (additive addition). */
   segments?: GcodeSegment[];
+  /** Approximate file size in bytes (gcode string byte length). */
+  fileSizeBytes: number;
+  /** Total length of all feed (G1/G2/G3) move segments in mm. */
+  totalCutDistance: number;
+  /** Total length of all rapid (G0) move segments in mm. */
+  totalRapidDistance: number;
+  /** Last F-word feedrate seen in the file, in mm/min. 0 if none specified. */
+  feedrate: number;
 }
 
 export function parseGcode(gcode: string): GcodeToolpath {
@@ -58,6 +66,9 @@ export function parseGcode(gcode: string): GcodeToolpath {
   let boundsInit = false;
   let lineCount = 0;
   let lastWasCut = false;
+  let feedrate = 0;
+  let totalCutDistance = 0;
+  let totalRapidDistance = 0;
 
   const updateBounds = (nx: number, ny: number) => {
     if (!boundsInit) {
@@ -111,17 +122,22 @@ export function parseGcode(gcode: string): GcodeToolpath {
     const getW = (l: string) => words.find(([wl]) => wl === l)?.[1];
     const xw = getW("X");
     const yw = getW("Y");
+    const fw = getW("F");
 
     // Skip lines with no X/Y motion
     if (xw === undefined && yw === undefined) continue;
 
     const scale = inMillimeters ? 1 : 25.4;
+    // Update feedrate if an F word is present (convert in/min → mm/min when G20)
+    if (fw !== undefined) feedrate = fw * scale;
     const nx =
       xw !== undefined ? (isAbsolute ? xw * scale : x + xw * scale) : x;
     const ny =
       yw !== undefined ? (isAbsolute ? yw * scale : y + yw * scale) : y;
 
     updateBounds(nx, ny);
+
+    const segDist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
 
     // Record the segment for live plot-progress tracking
     segments.push({
@@ -133,12 +149,14 @@ export function parseGcode(gcode: string): GcodeToolpath {
 
     if (motionMode === 0) {
       // Rapid — always start a new sub-path segment
+      totalRapidDistance += segDist;
       rapidParts.push(
         `M ${x.toFixed(3)} ${y.toFixed(3)} L ${nx.toFixed(3)} ${ny.toFixed(3)}`,
       );
       lastWasCut = false;
     } else {
       // Feed (G1) or arc (G2/G3 approximated as straight line)
+      totalCutDistance += segDist;
       if (!lastWasCut) {
         cutParts.push(`M ${x.toFixed(3)} ${y.toFixed(3)}`);
       }
@@ -156,5 +174,9 @@ export function parseGcode(gcode: string): GcodeToolpath {
     bounds: { minX, maxX, minY, maxY },
     lineCount,
     segments,
+    fileSizeBytes: gcode.length,
+    totalCutDistance,
+    totalRapidDistance,
+    feedrate,
   };
 }

@@ -55,6 +55,8 @@ export function PlotCanvas() {
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const gcodeSource = useCanvasStore((s) => s.gcodeSource);
+  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
+  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
   const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
   const activeConfig = useMachineStore((s) => s.activeConfig);
@@ -250,7 +252,8 @@ export function PlotCanvas() {
   } | null>(null);
 
   // ── Toolpath selection ────────────────────────────────────────────────────────
-  const [toolpathSelected, setToolpathSelected] = useState(false);
+  // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
+  // can react to canvas selection changes (and vice versa).
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -274,7 +277,6 @@ export function PlotCanvas() {
           removeImport(selectedImportId);
         } else if (toolpathSelected) {
           setGcodeToolpath(null);
-          setToolpathSelected(false);
           if (selectedJobFile?.source === "local") setSelectedJobFile(null);
         }
       }
@@ -282,7 +284,7 @@ export function PlotCanvas() {
       // Escape → deselect
       if (e.key === "Escape") {
         selectImport(null);
-        setToolpathSelected(false);
+        selectToolpath(false);
       }
 
       // Ctrl/Cmd + Shift + + / - → keyboard zoom
@@ -322,15 +324,13 @@ export function PlotCanvas() {
     toolpathSelected,
     removeImport,
     selectImport,
+    selectToolpath,
     setGcodeToolpath,
     zoomBy,
     fitToView,
   ]);
 
-  // Clear toolpath selection when toolpath is removed
-  useEffect(() => {
-    if (!gcodeToolpath) setToolpathSelected(false);
-  }, [gcodeToolpath]);
+  // Clear toolpath selection when toolpath is removed — handled by the store.
 
   // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
   // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
@@ -628,7 +628,7 @@ export function PlotCanvas() {
             return;
           }
           selectImport(null);
-          setToolpathSelected(false);
+          selectToolpath(false);
         }}
       >
         {/* Bed background */}
@@ -780,7 +780,7 @@ export function PlotCanvas() {
                       onClick={(e) => {
                         e.stopPropagation();
                         selectImport(null);
-                        setToolpathSelected(true);
+                        selectToolpath(true);
                         // Restore the local job file selection so the Job panel
                         // shows the filename again after a file-browser deselect.
                         if (gcodeSource)

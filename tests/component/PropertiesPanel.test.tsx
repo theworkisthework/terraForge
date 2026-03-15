@@ -8,6 +8,7 @@ import {
   createSvgImport,
   createSvgPath,
   createMachineConfig,
+  createGcodeToolpath,
 } from "../helpers/factories";
 
 beforeEach(() => {
@@ -16,6 +17,7 @@ beforeEach(() => {
     selectedImportId: null,
     selectedPathId: null,
     gcodeToolpath: null,
+    toolpathSelected: false,
   });
   useMachineStore.setState({
     configs: [],
@@ -270,5 +272,134 @@ describe("PropertiesPanel", () => {
       screen.getByTitle("Align bottom edge to bed bottom (Y = 0)"),
     );
     expect(useCanvasStore.getState().imports[0].y).toBe(0);
+  });
+
+  // ── G-code toolpath panel ──────────────────────────────────────────────────
+
+  it("shows gcode entry when a toolpath is loaded", () => {
+    const tp = createGcodeToolpath({ fileSizeBytes: 2048, lineCount: 150 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: { path: "/tmp/test.gcode", name: "test.gcode" },
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("test.gcode")).toBeInTheDocument();
+  });
+
+  it("shows gcode properties expanded by default", () => {
+    const tp = createGcodeToolpath({ fileSizeBytes: 1024, lineCount: 80 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: false,
+    });
+    render(<PropertiesPanel />);
+    // Collapsed when not selected — stats hidden
+    expect(screen.queryByText("Lines")).not.toBeInTheDocument();
+    useCanvasStore.setState({ toolpathSelected: true });
+  });
+
+  it("shows file size formatted in KB", () => {
+    const tp = createGcodeToolpath({ fileSizeBytes: 2048 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("2.0 KB")).toBeInTheDocument();
+  });
+
+  it("shows estimated duration based on feedrate and distances", () => {
+    // 3000 mm at 3000 mm/min = 1 min cut; rapid negligible
+    const tp = createGcodeToolpath({
+      totalCutDistance: 3000,
+      totalRapidDistance: 0,
+      feedrate: 3000,
+    });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Est. duration")).toBeInTheDocument();
+    expect(screen.getByText("1m 0s")).toBeInTheDocument();
+  });
+
+  it("shows feedrate row when feedrate is non-zero", () => {
+    const tp = createGcodeToolpath({ feedrate: 2500 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Feedrate")).toBeInTheDocument();
+    expect(screen.getByText("2500 mm/min")).toBeInTheDocument();
+  });
+
+  it("hides feedrate row when feedrate is 0", () => {
+    const tp = createGcodeToolpath({ feedrate: 0 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.queryByText("Feedrate")).not.toBeInTheDocument();
+  });
+
+  it("expands gcode properties when header clicked (sets toolpathSelected)", async () => {
+    const tp = createGcodeToolpath();
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: false,
+    });
+    render(<PropertiesPanel />);
+    // Stats are initially hidden (not selected)
+    expect(screen.queryByText("Lines")).not.toBeInTheDocument();
+    // Click the collapse toggle button (▸ = collapsed)
+    await userEvent.click(screen.getByText("▸"));
+    expect(useCanvasStore.getState().toolpathSelected).toBe(true);
+    expect(screen.getByText("Lines")).toBeInTheDocument();
+  });
+
+  it("collapses gcode properties when header clicked while selected", async () => {
+    const tp = createGcodeToolpath();
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    // Stats are visible while selected
+    expect(screen.getByText("Lines")).toBeInTheDocument();
+    // Click the expand toggle button (▾ = expanded/selected)
+    await userEvent.click(screen.getByText("▾"));
+    expect(useCanvasStore.getState().toolpathSelected).toBe(false);
+    expect(screen.queryByText("Lines")).not.toBeInTheDocument();
+  });
+
+  it("clears the toolpath when the ✕ button is clicked", async () => {
+    const tp = createGcodeToolpath();
+    useCanvasStore.setState({ gcodeToolpath: tp, gcodeSource: null });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Clear toolpath"));
+    expect(useCanvasStore.getState().gcodeToolpath).toBeNull();
+  });
+
+  it("shows 'no objects' placeholder only when no imports AND no toolpath", () => {
+    useCanvasStore.setState({ imports: [], gcodeToolpath: null });
+    render(<PropertiesPanel />);
+    expect(screen.getByText(/No objects/i)).toBeInTheDocument();
+  });
+
+  it("hides 'no objects' placeholder when a toolpath is loaded with no imports", () => {
+    const tp = createGcodeToolpath();
+    useCanvasStore.setState({ imports: [], gcodeToolpath: tp });
+    render(<PropertiesPanel />);
+    expect(screen.queryByText(/No objects/i)).not.toBeInTheDocument();
   });
 });

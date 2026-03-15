@@ -205,4 +205,69 @@ describe("parseGcode", () => {
     expect(r.lineCount).toBeGreaterThanOrEqual(1002);
     expect(r.cuts).toContain("L 1000.000 1000.000");
   });
+
+  // ── fileSizeBytes ─────────────────────────────────────────────────────────
+
+  it("reports fileSizeBytes equal to gcode string length", () => {
+    const gcode = "G1 X10 Y10\n";
+    const r = parse(gcode);
+    expect(r.fileSizeBytes).toBe(gcode.length);
+  });
+
+  it("reports fileSizeBytes of 0 for empty input", () => {
+    const r = parse("");
+    expect(r.fileSizeBytes).toBe(0);
+  });
+
+  // ── totalCutDistance / totalRapidDistance ─────────────────────────────────
+
+  it("accumulates totalCutDistance for G1 moves", () => {
+    // 3-4-5 right triangle: move from (0,0) to (3,4) → distance = 5
+    const r = parse("G1 X3 Y4\n");
+    expect(r.totalCutDistance).toBeCloseTo(5, 3);
+    expect(r.totalRapidDistance).toBe(0);
+  });
+
+  it("accumulates totalRapidDistance for G0 moves", () => {
+    const r = parse("G0 X3 Y4\n");
+    expect(r.totalRapidDistance).toBeCloseTo(5, 3);
+    expect(r.totalCutDistance).toBe(0);
+  });
+
+  it("accumulates distances across multiple moves", () => {
+    // G0 from (0,0) to (10,0) = 10 mm rapid
+    // G1 from (10,0) to (10,10) = 10 mm cut
+    const r = parse("G0 X10 Y0\nG1 X10 Y10\n");
+    expect(r.totalRapidDistance).toBeCloseTo(10, 3);
+    expect(r.totalCutDistance).toBeCloseTo(10, 3);
+  });
+
+  it("converts inch distances to mm for totalCutDistance", () => {
+    // G20: 1 inch = 25.4 mm
+    const r = parse("G20\nG1 X1 Y0\n");
+    expect(r.totalCutDistance).toBeCloseTo(25.4, 3);
+  });
+
+  // ── feedrate ──────────────────────────────────────────────────────────────
+
+  it("returns feedrate 0 when no F word is present", () => {
+    const r = parse("G1 X10 Y10\n");
+    expect(r.feedrate).toBe(0);
+  });
+
+  it("captures feedrate from F word in mm/min", () => {
+    const r = parse("G1 F3000 X10 Y10\n");
+    expect(r.feedrate).toBe(3000);
+  });
+
+  it("converts inch feedrate to mm/min when G20 active", () => {
+    // 100 in/min = 2540 mm/min
+    const r = parse("G20\nG1 F100 X1 Y0\n");
+    expect(r.feedrate).toBeCloseTo(2540, 1);
+  });
+
+  it("captures the last seen feedrate value", () => {
+    const r = parse("G1 F1000 X5 Y5\nG1 F2000 X10 Y10\n");
+    expect(r.feedrate).toBe(2000);
+  });
 });
