@@ -84,6 +84,8 @@ function flattenPathToSegments(d: string): Seg[] {
         if (cx !== startX || cy !== startY) addLine(startX, startY);
         cx = startX;
         cy = startY;
+        lastCpX = cx;
+        lastCpY = cy;
         break;
       case "C":
         for (let i = 0; i < a.length; i += 6) {
