@@ -829,7 +829,10 @@ export function PropertiesPanel() {
                               return (
                                 <div className="mt-2 pt-2 border-t border-[#0f3460]/30">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider flex-1">
+                                    <span
+                                      id={`hatch-label-${imp.id}`}
+                                      className="text-[10px] text-gray-400 uppercase tracking-wider flex-1"
+                                    >
                                       Hatch fill
                                     </span>
                                     <button
@@ -840,6 +843,7 @@ export function PropertiesPanel() {
                                       }`}
                                       role="switch"
                                       aria-checked={imp.hatchEnabled}
+                                      aria-labelledby={`hatch-label-${imp.id}`}
                                       onClick={() =>
                                         applyHatch(
                                           imp.id,
