@@ -217,21 +217,34 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         const imp = state.imports.find((i) => i.id === importId);
         if (!imp) return;
+
+        // Persist user configuration
         imp.hatchEnabled = enabled;
         imp.hatchSpacingMM = spacingMM;
         imp.hatchAngleDeg = angleDeg;
-        const spacingUnits = imp.scale > 0 ? spacingMM / imp.scale : spacingMM;
+
+        // Defense in depth: only generate hatch lines when configuration is valid.
+        const spacingIsValid =
+          Number.isFinite(spacingMM) && spacingMM > 0 && imp.scale > 0 && enabled;
+
+        if (!spacingIsValid) {
+          // Invalid spacing/scale or hatching disabled: clear any existing hatch lines.
+          for (const p of imp.paths) {
+            p.hatchLines = undefined;
+          }
+          return;
+        }
+
+        const spacingUnits = spacingMM / imp.scale;
+
         for (const p of imp.paths) {
           if (!p.hasFill) {
             p.hatchLines = undefined;
             continue;
           }
-          if (!enabled) {
-            p.hatchLines = undefined;
-          } else {
-            const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
-            p.hatchLines = lines.length ? lines : undefined;
-          }
+
+          const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
+          p.hatchLines = lines.length ? lines : undefined;
         }
       }),
   })),
