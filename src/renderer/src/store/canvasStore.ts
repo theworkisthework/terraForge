@@ -74,7 +74,12 @@ export const useCanvasStore = create<CanvasState>()(
 
     addImport: (imp) =>
       set((state) => {
-        state.imports.push(imp);
+        state.imports.push({
+          hatchEnabled: false,
+          hatchSpacingMM: 2,
+          hatchAngleDeg: 45,
+          ...imp,
+        });
       }),
 
     removeImport: (id) =>

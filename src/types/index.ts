@@ -117,10 +117,11 @@ export interface SvgImport {
   /** ViewBox origin (for SVGs with non-zero viewBox x/y offset) */
   viewBoxX: number;
   viewBoxY: number;
-  /** Per-import hatch fill settings (override the global GcodePrefs defaults) */
-  hatchEnabled: boolean;
-  hatchSpacingMM: number;
-  hatchAngleDeg: number;
+  /** Per-import hatch fill settings (override the global GcodePrefs defaults).
+   *  Optional at creation — `addImport` fills in defaults if absent. */
+  hatchEnabled?: boolean;
+  hatchSpacingMM?: number;
+  hatchAngleDeg?: number;
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
