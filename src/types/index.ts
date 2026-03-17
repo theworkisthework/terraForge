@@ -89,6 +89,11 @@ export interface SvgPath {
   hatchLines?: string[];
 }
 
+/** Default hatch spacing in mm — used on import and as the UI default. */
+export const DEFAULT_HATCH_SPACING_MM = 2;
+/** Default hatch angle in degrees — used on import and as the UI default. */
+export const DEFAULT_HATCH_ANGLE_DEG = 45;
+
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {
   id: string;

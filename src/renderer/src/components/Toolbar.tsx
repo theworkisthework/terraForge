@@ -3,12 +3,14 @@ import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { useTaskStore } from "../store/taskStore";
-import type {
-  VectorObject,
-  MachineConfig,
-  GcodeOptions,
-  SvgImport,
-  SvgPath,
+import {
+  type VectorObject,
+  type MachineConfig,
+  type GcodeOptions,
+  type SvgImport,
+  type SvgPath,
+  DEFAULT_HATCH_SPACING_MM,
+  DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
 import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
@@ -23,7 +25,7 @@ import { generateHatchPaths } from "../utils/hatchFill";
 import { parseGcode } from "../utils/gcodeParser";
 import { importPdf } from "../utils/pdfImport";
 
-// ─── Effective fill detection ─────────────────────────────────────────────────
+// ─── Effective fill/stroke detection ─────────────────────────────────────────
 // Helper: extract a single CSS property value from an inline style string.
 // Splits on ";" to avoid a substring of one property name matching another
 // (e.g. "opacity" must not accidentally match "fill-opacity").
@@ -36,12 +38,28 @@ function getStyleDecl(style: string, property: string): string {
   return "";
 }
 
+/**
+ * Resolve an SVG presentation property by walking up the ancestor chain.
+ * Returns the first explicit (non-"inherit") value found, or "" if none.
+ * SVG fill, stroke, and opacity are all inheritable, so shapes styled via
+ * a parent <g> (common in Inkscape/Illustrator exports) are handled correctly.
+ */
+function resolveInheritedProp(el: Element, property: string): string {
+  let current: Element | null = el;
+  while (current && current.tagName.toLowerCase() !== "svg") {
+    const style = current.getAttribute("style") ?? "";
+    const styleVal = getStyleDecl(style, property);
+    if (styleVal && styleVal !== "inherit") return styleVal;
+    const attrVal = current.getAttribute(property) ?? "";
+    if (attrVal && attrVal !== "inherit") return attrVal;
+    current = current.parentElement;
+  }
+  return "";
+}
+
 function getEffectiveFill(el: Element): string | null {
-  const style = el.getAttribute("style") ?? "";
-  const styleMatch = /fill\s*:\s*([^;]+)/.exec(style);
-  const fill = styleMatch
-    ? styleMatch[1].trim()
-    : (el.getAttribute("fill") ?? "");
+  // Resolve fill via ancestor chain: SVG fill is inheritable so parent <g> fills count.
+  const fill = resolveInheritedProp(el, "fill");
   if (
     !fill ||
     fill === "none" ||
@@ -51,11 +69,8 @@ function getEffectiveFill(el: Element): string | null {
     return null;
   // Treat fully transparent fills as invisible (fill-opacity or overall opacity <= 0;
   // CSS clamps negative values to 0).
-  const fillOpacityVal =
-    getStyleDecl(style, "fill-opacity") ||
-    (el.getAttribute("fill-opacity") ?? "");
-  const opacityVal =
-    getStyleDecl(style, "opacity") || (el.getAttribute("opacity") ?? "");
+  const fillOpacityVal = resolveInheritedProp(el, "fill-opacity");
+  const opacityVal = resolveInheritedProp(el, "opacity");
   if (
     (fillOpacityVal && parseFloat(fillOpacityVal) <= 0) ||
     (opacityVal && parseFloat(opacityVal) <= 0)
@@ -65,25 +80,16 @@ function getEffectiveFill(el: Element): string | null {
 }
 
 function hasVisibleStroke(el: Element): boolean {
-  const style = el.getAttribute("style") ?? "";
-  const styleMatch = /stroke\s*:\s*([^;]+)/.exec(style);
-  const stroke = styleMatch
-    ? styleMatch[1].trim()
-    : (el.getAttribute("stroke") ?? "");
+  // Resolve stroke via ancestor chain: SVG stroke is inheritable so parent <g> strokes count.
+  const stroke = resolveInheritedProp(el, "stroke");
   if (!stroke || stroke === "none" || stroke === "transparent") return false;
   // Also treat stroke-width of 0 as invisible
-  const widthMatch = /stroke-width\s*:\s*([^;]+)/.exec(style);
-  const widthAttr = widthMatch
-    ? widthMatch[1].trim()
-    : (el.getAttribute("stroke-width") ?? "");
-  if (widthAttr && parseFloat(widthAttr) === 0) return false;
+  const widthVal = resolveInheritedProp(el, "stroke-width");
+  if (widthVal && parseFloat(widthVal) === 0) return false;
   // Treat fully transparent strokes as invisible (stroke-opacity or overall opacity <= 0;
   // CSS clamps negative values to 0).
-  const strokeOpacityVal =
-    getStyleDecl(style, "stroke-opacity") ||
-    (el.getAttribute("stroke-opacity") ?? "");
-  const opacityVal =
-    getStyleDecl(style, "opacity") || (el.getAttribute("opacity") ?? "");
+  const strokeOpacityVal = resolveInheritedProp(el, "stroke-opacity");
+  const opacityVal = resolveInheritedProp(el, "opacity");
   if (
     (strokeOpacityVal && parseFloat(strokeOpacityVal) <= 0) ||
     (opacityVal && parseFloat(opacityVal) <= 0)
@@ -539,8 +545,6 @@ export function Toolbar() {
       // Generate hatch-fill lines for shapes that had a visible fill and embed
       // them on their parent SvgPath so they toggle as a unit.
       // Spacing is converted from mm to SVG user units using initScale.
-      const DEFAULT_HATCH_SPACING_MM = 2;
-      const DEFAULT_HATCH_ANGLE_DEG = 45;
       let finalPaths = normalizedPaths;
       if (initScale > 0) {
         const spacingUnits = DEFAULT_HATCH_SPACING_MM / initScale;
