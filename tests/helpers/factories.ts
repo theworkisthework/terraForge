@@ -2,14 +2,16 @@
  * Test data factories for terraForge domain types.
  * Each factory creates a valid default object that can be overridden.
  */
-import type {
-  MachineConfig,
-  VectorObject,
-  SvgImport,
-  SvgPath,
-  BackgroundTask,
-  MachineStatus,
-  GcodeOptions,
+import {
+  type MachineConfig,
+  type VectorObject,
+  type SvgImport,
+  type SvgPath,
+  type BackgroundTask,
+  type MachineStatus,
+  type GcodeOptions,
+  DEFAULT_HATCH_SPACING_MM,
+  DEFAULT_HATCH_ANGLE_DEG,
 } from "../../src/types";
 import type { GcodeToolpath } from "../../src/renderer/src/utils/gcodeParser";
 
@@ -82,6 +84,9 @@ export function createSvgImport(overrides?: Partial<SvgImport>): SvgImport {
     svgHeight: 100,
     viewBoxX: 0,
     viewBoxY: 0,
+    hatchEnabled: false,
+    hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
+    hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
     ...overrides,
   };
 }

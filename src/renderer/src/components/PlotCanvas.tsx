@@ -1465,14 +1465,27 @@ function ImportLayer({
         {imp.paths
           .filter((p) => p.visible)
           .map((p) => (
-            <path
-              key={p.id}
-              d={p.d}
-              fill="none"
-              stroke={selected ? "#60a0ff" : "#3a6aaa"}
-              strokeWidth={1.5}
-              vectorEffect="non-scaling-stroke"
-            />
+            <g key={p.id}>
+              {p.outlineVisible !== false && (
+                <path
+                  d={p.d}
+                  fill="none"
+                  stroke={selected ? "#60a0ff" : "#3a6aaa"}
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {p.hatchLines?.map((hl, i) => (
+                <path
+                  key={i}
+                  d={hl}
+                  fill="none"
+                  stroke={selected ? "#4a88cc" : "#2a5a8a"}
+                  strokeWidth={0.8}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
           ))}
         {/* Hit-test rect covering the whole viewBox */}
         <rect

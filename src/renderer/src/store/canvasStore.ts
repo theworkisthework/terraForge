@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { SvgImport, SvgPath, VectorObject } from "../../../types";
+import {
+  type SvgImport,
+  type SvgPath,
+  type VectorObject,
+  DEFAULT_HATCH_SPACING_MM,
+  DEFAULT_HATCH_ANGLE_DEG,
+} from "../../../types";
 import type { GcodeToolpath } from "../utils/gcodeParser";
+import { generateHatchPaths } from "../utils/hatchFill";
 
 interface CanvasState {
   imports: SvgImport[];
@@ -50,6 +57,13 @@ interface CanvasState {
   setPlotProgress: (cuts: string, rapids: string) => void;
   /** Reset progress overlay (called when toolpath changes or job clears). */
   clearPlotProgress: () => void;
+  /** Regenerate hatch lines for all filled paths in an import using the given settings. */
+  applyHatch: (
+    importId: string,
+    spacingMM: number,
+    angleDeg: number,
+    enabled: boolean,
+  ) => void;
 }
 
 export const useCanvasStore = create<CanvasState>()(
@@ -66,7 +80,12 @@ export const useCanvasStore = create<CanvasState>()(
 
     addImport: (imp) =>
       set((state) => {
-        state.imports.push(imp);
+        state.imports.push({
+          hatchEnabled: false,
+          hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
+          hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+          ...imp,
+        });
       }),
 
     removeImport: (id) =>
@@ -81,7 +100,36 @@ export const useCanvasStore = create<CanvasState>()(
     updateImport: (id, patch) =>
       set((state) => {
         const imp = state.imports.find((i) => i.id === id);
-        if (imp) Object.assign(imp, patch);
+        if (!imp) return;
+        Object.assign(imp, patch);
+        // If scale/scaleX/scaleY changed while hatch is enabled, regenerate hatch lines
+        // so the physical spacing (in mm) stays correct after resize.
+        if (
+          imp.hatchEnabled &&
+          ("scale" in patch || "scaleX" in patch || "scaleY" in patch)
+        ) {
+          const effectiveScale = Math.sqrt(
+            (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
+          );
+          const spacingMM = imp.hatchSpacingMM ?? DEFAULT_HATCH_SPACING_MM;
+          const angleDeg = imp.hatchAngleDeg ?? DEFAULT_HATCH_ANGLE_DEG;
+          if (
+            effectiveScale > 0 &&
+            Number.isFinite(effectiveScale) &&
+            spacingMM > 0 &&
+            Number.isFinite(angleDeg)
+          ) {
+            const spacingUnits = spacingMM / effectiveScale;
+            for (const p of imp.paths) {
+              if (!p.hasFill) {
+                p.hatchLines = undefined;
+                continue;
+              }
+              const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
+              p.hatchLines = lines.length ? lines : undefined;
+            }
+          }
+        }
       }),
 
     updatePath: (importId, pathId, patch) =>
@@ -158,8 +206,8 @@ export const useCanvasStore = create<CanvasState>()(
         .flatMap((imp) =>
           imp.paths
             .filter((p) => p.visible)
-            .map(
-              (p): VectorObject => ({
+            .flatMap((p): VectorObject[] => {
+              const base: VectorObject = {
                 id: p.id,
                 svgSource: p.svgSource,
                 path: p.d,
@@ -173,8 +221,19 @@ export const useCanvasStore = create<CanvasState>()(
                 originalWidth: imp.svgWidth,
                 originalHeight: imp.svgHeight,
                 layer: p.layer,
-              }),
-            ),
+              };
+              const outlineVOs: VectorObject[] =
+                p.outlineVisible !== false ? [base] : [];
+              const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
+                (hl, i): VectorObject => ({
+                  ...base,
+                  id: `${p.id}-h${i}`,
+                  svgSource: "",
+                  path: hl,
+                }),
+              );
+              return [...outlineVOs, ...hatchVOs];
+            }),
         ),
 
     setPlotProgress: (cuts, rapids) =>
@@ -187,6 +246,63 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.plotProgressCuts = "";
         state.plotProgressRapids = "";
+      }),
+
+    applyHatch: (importId, spacingMM, angleDeg, enabled) =>
+      set((state) => {
+        const imp = state.imports.find((i) => i.id === importId);
+        if (!imp) return;
+
+        // Sanitize incoming values before persisting to avoid storing NaN/Infinity
+        // (which can arrive transiently from <input type="number"> while editing).
+        const safeSpacing =
+          Number.isFinite(spacingMM) && spacingMM > 0
+            ? spacingMM
+            : imp.hatchSpacingMM;
+        const safeAngle = Number.isFinite(angleDeg)
+          ? angleDeg
+          : imp.hatchAngleDeg;
+
+        // Persist user configuration
+        imp.hatchEnabled = enabled;
+        imp.hatchSpacingMM = safeSpacing;
+        imp.hatchAngleDeg = safeAngle;
+
+        // When non-uniform scaling is active (scaleX/scaleY set independently),
+        // use the geometric mean of the two axis scales so mm spacing is consistent
+        // regardless of which axis the user adjusted.
+        const effectiveScale = Math.sqrt(
+          (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
+        );
+
+        // Defense in depth: only generate hatch lines when configuration is valid.
+        const spacingIsValid =
+          Number.isFinite(safeSpacing) &&
+          safeSpacing > 0 &&
+          Number.isFinite(safeAngle) &&
+          effectiveScale > 0 &&
+          Number.isFinite(effectiveScale) &&
+          enabled;
+
+        if (!spacingIsValid) {
+          // Invalid spacing/scale or hatching disabled: clear any existing hatch lines.
+          for (const p of imp.paths) {
+            p.hatchLines = undefined;
+          }
+          return;
+        }
+
+        const spacingUnits = safeSpacing / effectiveScale;
+
+        for (const p of imp.paths) {
+          if (!p.hasFill) {
+            p.hatchLines = undefined;
+            continue;
+          }
+
+          const lines = generateHatchPaths(p.d, spacingUnits, safeAngle);
+          p.hatchLines = lines.length ? lines : undefined;
+        }
       }),
   })),
 );
