@@ -82,6 +82,9 @@ export function createSvgImport(overrides?: Partial<SvgImport>): SvgImport {
     svgHeight: 100,
     viewBoxX: 0,
     viewBoxY: 0,
+    hatchEnabled: false,
+    hatchSpacingMM: 2,
+    hatchAngleDeg: 45,
     ...overrides,
   };
 }

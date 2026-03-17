@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useMachineStore } from "@renderer/store/machineStore";
@@ -405,5 +405,119 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [], gcodeToolpath: tp });
     render(<PropertiesPanel />);
     expect(screen.queryByText(/No objects/i)).not.toBeInTheDocument();
+  });
+
+  // ── Hatch fill section ─────────────────────────────────────────────────────
+
+  it("does not show hatch section when no paths have hasFill", () => {
+    const path = createSvgPath({ hasFill: false });
+    const imp = createSvgImport({ paths: [path], name: "no-fill" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.queryByText("Hatch fill")).not.toBeInTheDocument();
+  });
+
+  it("shows hatch section when at least one path has hasFill", () => {
+    const path = createSvgPath({ hasFill: true });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "has-fill",
+      hatchEnabled: false,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Hatch fill")).toBeInTheDocument();
+  });
+
+  it("toggle switch calls applyHatch to flip hatchEnabled", async () => {
+    const path = createSvgPath({ hasFill: true });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "toggle-test",
+      hatchEnabled: false,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 45,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    const toggle = screen.getByRole("switch");
+    await userEvent.click(toggle);
+    expect(useCanvasStore.getState().imports[0].hatchEnabled).toBe(true);
+  });
+
+  it("hides spacing and angle inputs when hatch is disabled", () => {
+    const path = createSvgPath({ hasFill: true });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "hatch-off",
+      hatchEnabled: false,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.queryByText("Spacing (mm)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Angle (°)")).not.toBeInTheDocument();
+  });
+
+  it("shows spacing and angle inputs when hatch is enabled", () => {
+    const path = createSvgPath({ hasFill: true });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "hatch-on",
+      hatchEnabled: true,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 45,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Spacing (mm)")).toBeInTheDocument();
+    expect(screen.getByText("Angle (°)")).toBeInTheDocument();
+  });
+
+  it("spacing input change calls applyHatch with new spacing", async () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "spacing-test",
+      hatchEnabled: true,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 45,
+      scale: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    const spacingLabel = screen.getByText("Spacing (mm)");
+    // eslint-disable-next-line testing-library/no-node-access
+    const spacingInput = spacingLabel.parentElement!.querySelector("input")!;
+    fireEvent.change(spacingInput, { target: { value: "3" } });
+    expect(useCanvasStore.getState().imports[0].hatchSpacingMM).toBe(3);
+  });
+
+  it("angle input change calls applyHatch with new angle", async () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "angle-test",
+      hatchEnabled: true,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 45,
+      scale: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    const angleLabel = screen.getByText("Angle (°)");
+    // eslint-disable-next-line testing-library/no-node-access
+    const angleInput = angleLabel.parentElement!.querySelector("input")!;
+    await userEvent.clear(angleInput);
+    await userEvent.type(angleInput, "90");
+    expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(90);
   });
 });

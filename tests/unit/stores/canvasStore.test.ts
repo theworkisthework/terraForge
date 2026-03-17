@@ -142,13 +142,11 @@ describe("canvasStore", () => {
   it("auto-clears gcodeSource when setGcodeToolpath(null) is called", () => {
     const tp = { segments: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
     useCanvasStore.getState().setGcodeToolpath(tp as any);
-    useCanvasStore
-      .getState()
-      .setGcodeSource({
-        path: "/job.gcode",
-        name: "job.gcode",
-        source: "sd" as const,
-      });
+    useCanvasStore.getState().setGcodeSource({
+      path: "/job.gcode",
+      name: "job.gcode",
+      source: "sd" as const,
+    });
     expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
     useCanvasStore.getState().setGcodeToolpath(null);
     expect(useCanvasStore.getState().gcodeSource).toBeNull();
@@ -156,13 +154,11 @@ describe("canvasStore", () => {
 
   it("does NOT clear gcodeSource when a new toolpath is set", () => {
     const tp = { segments: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
-    useCanvasStore
-      .getState()
-      .setGcodeSource({
-        path: "/job.gcode",
-        name: "job.gcode",
-        source: "sd" as const,
-      });
+    useCanvasStore.getState().setGcodeSource({
+      path: "/job.gcode",
+      name: "job.gcode",
+      source: "sd" as const,
+    });
     useCanvasStore.getState().setGcodeToolpath(tp as any);
     expect(useCanvasStore.getState().gcodeSource).not.toBeNull();
   });
@@ -204,5 +200,88 @@ describe("canvasStore", () => {
     const imp = createSvgImport({ paths: [path], visible: true });
     useCanvasStore.getState().addImport(imp);
     expect(useCanvasStore.getState().toVectorObjects()).toHaveLength(0);
+  });
+
+  it("excludes outline VectorObject when outlineVisible is false", () => {
+    const path = createSvgPath({ visible: true, outlineVisible: false });
+    const imp = createSvgImport({ paths: [path], visible: true });
+    useCanvasStore.getState().addImport(imp);
+    const vos = useCanvasStore.getState().toVectorObjects();
+    expect(vos).toHaveLength(0);
+  });
+
+  it("emits hatch VectorObjects for paths that have hatchLines", () => {
+    const path = createSvgPath({
+      visible: true,
+      hatchLines: ["M0,0 L10,5", "M0,2 L10,7"],
+    });
+    const imp = createSvgImport({ paths: [path], visible: true });
+    useCanvasStore.getState().addImport(imp);
+    const vos = useCanvasStore.getState().toVectorObjects();
+    // 1 outline + 2 hatch lines
+    expect(vos).toHaveLength(3);
+  });
+
+  // ── applyHatch ──────────────────────────────────────────────────────────────
+
+  it("applyHatch enables hatch and generates lines for filled paths", () => {
+    // A filled square path (10×10 in SVG units, scale 1 → 1 unit = 1 mm)
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: false,
+    });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
+
+    const updated = useCanvasStore.getState().imports[0];
+    expect(updated.hatchEnabled).toBe(true);
+    expect(updated.hatchSpacingMM).toBe(2);
+    expect(updated.hatchAngleDeg).toBe(0);
+    expect(updated.paths[0].hatchLines).toBeDefined();
+    expect(updated.paths[0].hatchLines!.length).toBeGreaterThan(0);
+  });
+
+  it("applyHatch with enabled=false clears hatch lines", () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+      hatchLines: ["M0,1 L10,1"],
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: true,
+    });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, 2, 0, false);
+
+    const updated = useCanvasStore.getState().imports[0];
+    expect(updated.hatchEnabled).toBe(false);
+    expect(updated.paths[0].hatchLines).toBeUndefined();
+  });
+
+  it("applyHatch does not generate hatch for paths without hasFill", () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: false,
+    });
+    const imp = createSvgImport({ paths: [path], scale: 1 });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
+
+    expect(
+      useCanvasStore.getState().imports[0].paths[0].hatchLines,
+    ).toBeUndefined();
+  });
+
+  it("applyHatch is a no-op for unknown importId", () => {
+    useCanvasStore.getState().applyHatch("nonexistent", 2, 0, true);
+    // Should not throw and imports remain empty
+    expect(useCanvasStore.getState().imports).toHaveLength(0);
   });
 });
