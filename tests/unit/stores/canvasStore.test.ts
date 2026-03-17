@@ -308,4 +308,96 @@ describe("canvasStore", () => {
     useCanvasStore.getState().applyHatch(imp.id, 2, Infinity, true);
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(30);
   });
+
+  // ── updateImport scale → hatch regeneration ──────────────────────────────────
+
+  it("updateImport regenerates hatch lines when scale changes and hatch is enabled", () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: true,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 0,
+    });
+    useCanvasStore.getState().addImport(imp);
+    // Apply hatch at scale 1 to get initial lines
+    useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
+    const linesBefore = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+
+    // Change scale → should regenerate lines
+    useCanvasStore.getState().updateImport(imp.id, { scale: 0.5 });
+    const linesAfter = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+
+    // At half scale the spacing in SVG units doubles → half as many lines
+    expect(linesAfter.length).toBeLessThan(linesBefore.length);
+  });
+
+  it("updateImport does not regenerate hatch when hatch is disabled", () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+      hatchLines: ["M0,2 L10,2"],
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: false,
+    });
+    useCanvasStore.getState().addImport(imp);
+    // Changing scale while hatch is off should NOT touch hatchLines
+    useCanvasStore.getState().updateImport(imp.id, { scale: 2 });
+    // hatchLines unchanged (still the one we seeded)
+    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual(["M0,2 L10,2"]);
+  });
+
+  it("updateImport does not regenerate hatch when non-scale properties change", () => {
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+      hatchLines: ["M0,2 L10,2"],
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: true,
+    });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().updateImport(imp.id, { x: 50, rotation: 90 });
+    // hatchLines unchanged — position/rotation don't affect spacing
+    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual(["M0,2 L10,2"]);
+  });
+
+  it("applyHatch uses geometric mean of scaleX/scaleY for spacing when ratio is unlocked", () => {
+    // Non-uniform scaling: scaleX=0.5, scaleY=2 → geometric mean = 1
+    // so spacing in SVG units = 2 / 1 = 2 (same as scale=1 uniform)
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      scaleX: 0.5,
+      scaleY: 2,
+      hatchEnabled: false,
+    });
+    const impUniform = createSvgImport({
+      paths: [createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true })],
+      scale: 1,
+      hatchEnabled: false,
+    });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().addImport(impUniform);
+    useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
+    useCanvasStore.getState().applyHatch(impUniform.id, 2, 0, true);
+
+    const linesNonUniform = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+    const linesUniform = useCanvasStore.getState().imports[1].paths[0].hatchLines ?? [];
+    // Geometric mean of 0.5*2=1 → same spacing as scale=1 → same number of lines
+    expect(linesNonUniform.length).toBe(linesUniform.length);
+  });
 });

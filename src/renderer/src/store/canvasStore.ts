@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { SvgImport, SvgPath, VectorObject } from "../../../types";
+import {
+  type SvgImport,
+  type SvgPath,
+  type VectorObject,
+  DEFAULT_HATCH_SPACING_MM,
+  DEFAULT_HATCH_ANGLE_DEG,
+} from "../../../types";
 import type { GcodeToolpath } from "../utils/gcodeParser";
 import { generateHatchPaths } from "../utils/hatchFill";
 
@@ -76,8 +82,8 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.imports.push({
           hatchEnabled: false,
-          hatchSpacingMM: 2,
-          hatchAngleDeg: 45,
+          hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
+          hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
           ...imp,
         });
       }),
@@ -94,7 +100,36 @@ export const useCanvasStore = create<CanvasState>()(
     updateImport: (id, patch) =>
       set((state) => {
         const imp = state.imports.find((i) => i.id === id);
-        if (imp) Object.assign(imp, patch);
+        if (!imp) return;
+        Object.assign(imp, patch);
+        // If scale/scaleX/scaleY changed while hatch is enabled, regenerate hatch lines
+        // so the physical spacing (in mm) stays correct after resize.
+        if (
+          imp.hatchEnabled &&
+          ("scale" in patch || "scaleX" in patch || "scaleY" in patch)
+        ) {
+          const effectiveScale = Math.sqrt(
+            (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
+          );
+          const spacingMM = imp.hatchSpacingMM ?? DEFAULT_HATCH_SPACING_MM;
+          const angleDeg = imp.hatchAngleDeg ?? DEFAULT_HATCH_ANGLE_DEG;
+          if (
+            effectiveScale > 0 &&
+            Number.isFinite(effectiveScale) &&
+            spacingMM > 0 &&
+            Number.isFinite(angleDeg)
+          ) {
+            const spacingUnits = spacingMM / effectiveScale;
+            for (const p of imp.paths) {
+              if (!p.hasFill) {
+                p.hatchLines = undefined;
+                continue;
+              }
+              const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
+              p.hatchLines = lines.length ? lines : undefined;
+            }
+          }
+        }
       }),
 
     updatePath: (importId, pathId, patch) =>
@@ -233,12 +268,20 @@ export const useCanvasStore = create<CanvasState>()(
         imp.hatchSpacingMM = safeSpacing;
         imp.hatchAngleDeg = safeAngle;
 
+        // When non-uniform scaling is active (scaleX/scaleY set independently),
+        // use the geometric mean of the two axis scales so mm spacing is consistent
+        // regardless of which axis the user adjusted.
+        const effectiveScale = Math.sqrt(
+          (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
+        );
+
         // Defense in depth: only generate hatch lines when configuration is valid.
         const spacingIsValid =
           Number.isFinite(safeSpacing) &&
           safeSpacing > 0 &&
           Number.isFinite(safeAngle) &&
-          imp.scale > 0 &&
+          effectiveScale > 0 &&
+          Number.isFinite(effectiveScale) &&
           enabled;
 
         if (!spacingIsValid) {
@@ -249,7 +292,7 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
 
-        const spacingUnits = safeSpacing / imp.scale;
+        const spacingUnits = safeSpacing / effectiveScale;
 
         for (const p of imp.paths) {
           if (!p.hasFill) {
