@@ -24,6 +24,18 @@ import { parseGcode } from "../utils/gcodeParser";
 import { importPdf } from "../utils/pdfImport";
 
 // ─── Effective fill detection ─────────────────────────────────────────────────
+// Helper: extract a single CSS property value from an inline style string.
+// Splits on ";" to avoid a substring of one property name matching another
+// (e.g. "opacity" must not accidentally match "fill-opacity").
+function getStyleDecl(style: string, property: string): string {
+  for (const decl of style.split(";").filter(Boolean)) {
+    const colon = decl.indexOf(":");
+    if (colon !== -1 && decl.slice(0, colon).trim() === property)
+      return decl.slice(colon + 1).trim();
+  }
+  return "";
+}
+
 function getEffectiveFill(el: Element): string | null {
   const style = el.getAttribute("style") ?? "";
   const styleMatch = /fill\s*:\s*([^;]+)/.exec(style);
@@ -35,6 +47,18 @@ function getEffectiveFill(el: Element): string | null {
     fill === "none" ||
     fill === "transparent" ||
     fill.startsWith("url(")
+  )
+    return null;
+  // Treat fully transparent fills as invisible (fill-opacity or overall opacity <= 0;
+  // CSS clamps negative values to 0).
+  const fillOpacityVal =
+    getStyleDecl(style, "fill-opacity") ||
+    (el.getAttribute("fill-opacity") ?? "");
+  const opacityVal =
+    getStyleDecl(style, "opacity") || (el.getAttribute("opacity") ?? "");
+  if (
+    (fillOpacityVal && parseFloat(fillOpacityVal) <= 0) ||
+    (opacityVal && parseFloat(opacityVal) <= 0)
   )
     return null;
   return fill;
@@ -53,6 +77,18 @@ function hasVisibleStroke(el: Element): boolean {
     ? widthMatch[1].trim()
     : (el.getAttribute("stroke-width") ?? "");
   if (widthAttr && parseFloat(widthAttr) === 0) return false;
+  // Treat fully transparent strokes as invisible (stroke-opacity or overall opacity <= 0;
+  // CSS clamps negative values to 0).
+  const strokeOpacityVal =
+    getStyleDecl(style, "stroke-opacity") ||
+    (el.getAttribute("stroke-opacity") ?? "");
+  const opacityVal =
+    getStyleDecl(style, "opacity") || (el.getAttribute("opacity") ?? "");
+  if (
+    (strokeOpacityVal && parseFloat(strokeOpacityVal) <= 0) ||
+    (opacityVal && parseFloat(opacityVal) <= 0)
+  )
+    return false;
   return true;
 }
 

@@ -867,26 +867,30 @@ export function PropertiesPanel() {
                                       {numField(
                                         "Spacing (mm)",
                                         imp.hatchSpacingMM,
-                                        (v) =>
-                                          applyHatch(
-                                            imp.id,
-                                            Math.max(0.1, v),
-                                            imp.hatchAngleDeg,
-                                            true,
-                                          ),
+                                        (v) => {
+                                          if (Number.isFinite(v))
+                                            applyHatch(
+                                              imp.id,
+                                              Math.max(0.1, v),
+                                              imp.hatchAngleDeg,
+                                              true,
+                                            );
+                                        },
                                         0.1,
                                         0.1,
                                       )}
                                       {numField(
                                         "Angle (°)",
                                         imp.hatchAngleDeg,
-                                        (v) =>
-                                          applyHatch(
-                                            imp.id,
-                                            imp.hatchSpacingMM,
-                                            ((v % 180) + 180) % 180,
-                                            true,
-                                          ),
+                                        (v) => {
+                                          if (Number.isFinite(v))
+                                            applyHatch(
+                                              imp.id,
+                                              imp.hatchSpacingMM,
+                                              ((v % 180) + 180) % 180,
+                                              true,
+                                            );
+                                        },
                                         5,
                                       )}
                                     </div>

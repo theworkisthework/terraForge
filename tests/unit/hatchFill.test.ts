@@ -72,6 +72,14 @@ describe("generateHatchPaths", () => {
     expect(generateHatchPaths(SQUARE, NaN, 0)).toEqual([]);
   });
 
+  it("returns empty array for NaN angle", () => {
+    expect(generateHatchPaths(SQUARE, 2, NaN)).toEqual([]);
+  });
+
+  it("returns empty array for Infinity angle", () => {
+    expect(generateHatchPaths(SQUARE, 2, Infinity)).toEqual([]);
+  });
+
   // ── Angle variants ──────────────────────────────────────────────────────────
 
   it("handles angle 0 (horizontal lines)", () => {

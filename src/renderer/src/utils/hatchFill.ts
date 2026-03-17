@@ -201,6 +201,9 @@ export function generateHatchPaths(
   const segs = flattenPathToSegments(d);
   if (segs.length === 0) return [];
 
+  // Guard against non-finite angleDeg (e.g. NaN/Infinity from a cleared input).
+  if (!Number.isFinite(angleDeg)) return [];
+
   // Rotate all segments by -angle so that the hatch lines become horizontal
   const rad = (angleDeg * Math.PI) / 180;
   const cosN = Math.cos(-rad),
