@@ -56,6 +56,22 @@ describe("generateHatchPaths", () => {
     expect(result).toEqual([]);
   });
 
+  it("returns empty array for spacing of 0 (would infinite-loop)", () => {
+    expect(generateHatchPaths(SQUARE, 0, 0)).toEqual([]);
+  });
+
+  it("returns empty array for negative spacing", () => {
+    expect(generateHatchPaths(SQUARE, -1, 0)).toEqual([]);
+  });
+
+  it("returns empty array for Infinity spacing", () => {
+    expect(generateHatchPaths(SQUARE, Infinity, 0)).toEqual([]);
+  });
+
+  it("returns empty array for NaN spacing", () => {
+    expect(generateHatchPaths(SQUARE, NaN, 0)).toEqual([]);
+  });
+
   // ── Angle variants ──────────────────────────────────────────────────────────
 
   it("handles angle 0 (horizontal lines)", () => {

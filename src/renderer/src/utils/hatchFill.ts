@@ -219,6 +219,13 @@ export function generateHatchPaths(
 
   const paths: string[] = [];
 
+  // Guard against non-finite or non-positive spacing, which would cause
+  // the scanline loop below to become infinite (scanY would never advance
+  // toward the termination condition).
+  if (!Number.isFinite(spacingUnits) || spacingUnits <= 0) {
+    return paths;
+  }
+
   // Start half a spacing in from the top edge so we don't land exactly on a
   // boundary (which can cause degenerate double-intersections at vertices).
   for (
