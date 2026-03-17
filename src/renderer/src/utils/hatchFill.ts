@@ -162,6 +162,11 @@ function flattenPathToSegments(d: string): Seg[] {
             a[i + 6],
           ))
             addLine(p.x, p.y);
+          // After an arc, smooth curve commands (S/T) should reflect from the
+          // current point, not from a stale control point. Mirror behavior of
+          // flattenToSubpaths in gcodeEngine by resetting last control point.
+          lastCpX = cx;
+          lastCpY = cy;
         }
         break;
     }
