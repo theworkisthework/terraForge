@@ -78,6 +78,8 @@ export interface SvgPath {
   label?: string;
   /** Layer/group name derived from closest ancestor with an id */
   layer?: string;
+  /** Whether the original shape had a visible fill colour (used to regenerate hatch) */
+  hasFill?: boolean;
   /** Whether the outline should be plotted. False for shapes with no visible stroke.
    *  The path geometry is still retained for hatch-fill computation. */
   outlineVisible?: boolean;
@@ -115,6 +117,10 @@ export interface SvgImport {
   /** ViewBox origin (for SVGs with non-zero viewBox x/y offset) */
   viewBoxX: number;
   viewBoxY: number;
+  /** Per-import hatch fill settings (override the global GcodePrefs defaults) */
+  hatchEnabled: boolean;
+  hatchSpacingMM: number;
+  hatchAngleDeg: number;
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────

@@ -429,6 +429,7 @@ export function Toolbar() {
         const matrix = getAccumulatedTransform(el);
         const d = applyMatrixToPathD(rawD, matrix);
         fillFlags.push(getEffectiveFill(el) !== null);
+        const hasFill = fillFlags[fillFlags.length - 1];
         const outlineVisible = hasVisibleStroke(el);
         const tag = el.tagName.toLowerCase();
         const pathIndex = fillFlags.length; // 1-based after push
@@ -455,6 +456,7 @@ export function Toolbar() {
             d,
             svgSource: el.outerHTML,
             visible: true,
+            hasFill,
             outlineVisible,
             label,
             layer:
@@ -530,6 +532,9 @@ export function Toolbar() {
         svgHeight: effH,
         viewBoxX: 0,
         viewBoxY: 0,
+        hatchEnabled: hatchPrefs.hatchFill,
+        hatchSpacingMM: hatchPrefs.hatchSpacingMM,
+        hatchAngleDeg: hatchPrefs.hatchAngleDeg,
       };
 
       addImport(imp);

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { SvgImport, SvgPath, VectorObject } from "../../../types";
 import type { GcodeToolpath } from "../utils/gcodeParser";
+import { generateHatchPaths } from "../utils/hatchFill";
 
 interface CanvasState {
   imports: SvgImport[];
@@ -50,6 +51,13 @@ interface CanvasState {
   setPlotProgress: (cuts: string, rapids: string) => void;
   /** Reset progress overlay (called when toolpath changes or job clears). */
   clearPlotProgress: () => void;
+  /** Regenerate hatch lines for all filled paths in an import using the given settings. */
+  applyHatch: (
+    importId: string,
+    spacingMM: number,
+    angleDeg: number,
+    enabled: boolean,
+  ) => void;
 }
 
 export const useCanvasStore = create<CanvasState>()(
@@ -198,6 +206,28 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.plotProgressCuts = "";
         state.plotProgressRapids = "";
+      }),
+
+    applyHatch: (importId, spacingMM, angleDeg, enabled) =>
+      set((state) => {
+        const imp = state.imports.find((i) => i.id === importId);
+        if (!imp) return;
+        imp.hatchEnabled = enabled;
+        imp.hatchSpacingMM = spacingMM;
+        imp.hatchAngleDeg = angleDeg;
+        const spacingUnits = imp.scale > 0 ? spacingMM / imp.scale : spacingMM;
+        for (const p of imp.paths) {
+          if (!p.hasFill) {
+            p.hatchLines = undefined;
+            continue;
+          }
+          if (!enabled) {
+            p.hatchLines = undefined;
+          } else {
+            const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
+            p.hatchLines = lines.length ? lines : undefined;
+          }
+        }
       }),
   })),
 );
