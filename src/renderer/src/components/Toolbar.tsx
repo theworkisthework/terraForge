@@ -14,7 +14,6 @@ import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
-import { loadGcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
   applyMatrixToPathD,
@@ -504,16 +503,17 @@ export function Toolbar() {
       // Generate hatch-fill lines for shapes that had a visible fill and embed
       // them on their parent SvgPath so they toggle as a unit.
       // Spacing is converted from mm to SVG user units using initScale.
-      const hatchPrefs = loadGcodePrefs();
+      const DEFAULT_HATCH_SPACING_MM = 2;
+      const DEFAULT_HATCH_ANGLE_DEG = 45;
       let finalPaths = normalizedPaths;
-      if (hatchPrefs.hatchFill && initScale > 0) {
-        const spacingUnits = hatchPrefs.hatchSpacingMM / initScale;
+      if (initScale > 0) {
+        const spacingUnits = DEFAULT_HATCH_SPACING_MM / initScale;
         finalPaths = normalizedPaths.map((np, i) => {
           if (!fillFlags[i]) return np;
           const hatchLines = generateHatchPaths(
             np.d,
             spacingUnits,
-            hatchPrefs.hatchAngleDeg,
+            DEFAULT_HATCH_ANGLE_DEG,
           );
           return hatchLines.length ? { ...np, hatchLines } : np;
         });
@@ -532,9 +532,9 @@ export function Toolbar() {
         svgHeight: effH,
         viewBoxX: 0,
         viewBoxY: 0,
-        hatchEnabled: hatchPrefs.hatchFill,
-        hatchSpacingMM: hatchPrefs.hatchSpacingMM,
-        hatchAngleDeg: hatchPrefs.hatchAngleDeg,
+        hatchEnabled: true,
+        hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
+        hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
       };
 
       addImport(imp);
