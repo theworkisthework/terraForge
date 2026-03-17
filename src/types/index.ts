@@ -74,8 +74,17 @@ export interface SvgPath {
   /** Original element outerHTML (preserved for G-code worker) */
   svgSource: string;
   visible: boolean;
+  /** Human-readable display name for this path */
+  label?: string;
   /** Layer/group name derived from closest ancestor with an id */
   layer?: string;
+  /** Whether the outline should be plotted. False for shapes with no visible stroke.
+   *  The path geometry is still retained for hatch-fill computation. */
+  outlineVisible?: boolean;
+  /** Hatch-fill line d-strings synthesised from this path's fill at import time.
+   *  Rendered and emitted for G-code alongside the outline.  Toggled as a unit
+   *  with the parent path's `visible` flag. */
+  hatchLines?: string[];
 }
 
 /** One imported SVG file, treated as a positioned group on the bed */

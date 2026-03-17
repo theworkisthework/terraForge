@@ -28,6 +28,10 @@ export interface GcodePrefs {
   returnToHome: boolean;
   customStartGcode: string;
   customEndGcode: string;
+  /** Hatch-fill settings — applied at SVG import time, not at G-code generation */
+  hatchFill: boolean;
+  hatchSpacingMM: number;
+  hatchAngleDeg: number;
 }
 
 const DEFAULTS: GcodePrefs = {
@@ -40,7 +44,14 @@ const DEFAULTS: GcodePrefs = {
   returnToHome: false,
   customStartGcode: "",
   customEndGcode: "",
+  hatchFill: true,
+  hatchSpacingMM: 2,
+  hatchAngleDeg: 45,
 };
+
+export function loadGcodePrefs(): GcodePrefs {
+  return loadPrefs();
+}
 
 function loadPrefs(): GcodePrefs {
   try {
@@ -84,6 +95,17 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const setJoinTolerance = (val: string) => {
     const n = parseFloat(val);
     if (!isNaN(n) && n > 0) setPrefs((p) => ({ ...p, joinTolerance: n }));
+  };
+
+  const setHatchSpacing = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n > 0) setPrefs((p) => ({ ...p, hatchSpacingMM: n }));
+  };
+
+  const setHatchAngle = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n))
+      setPrefs((p) => ({ ...p, hatchAngleDeg: ((n % 180) + 180) % 180 }));
   };
 
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
@@ -183,6 +205,70 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             </div>
           </div>
 
+          {/* ── Hatch fill ── */}
+          <div className="flex items-start gap-3 select-none">
+            <input
+              type="checkbox"
+              aria-label="Hatch filled shapes"
+              className="mt-0.5 accent-[#e94560] cursor-pointer flex-shrink-0"
+              checked={prefs.hatchFill}
+              onChange={() => toggle("hatchFill")}
+              id="hatch-fill-cb"
+            />
+            <div className="flex-1 min-w-0">
+              <label
+                htmlFor="hatch-fill-cb"
+                className="cursor-pointer text-sm text-white font-medium"
+              >
+                Hatch filled shapes
+              </label>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Generate hatch-fill lines inside SVG shapes that have a fill
+                colour. Applied at import time — re-import to update.
+              </div>
+              <div
+                className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 transition-opacity ${
+                  prefs.hatchFill
+                    ? "opacity-100"
+                    : "opacity-30 pointer-events-none"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400 whitespace-nowrap">
+                    Spacing
+                  </label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="50"
+                    step="0.5"
+                    value={prefs.hatchSpacingMM}
+                    onChange={(e) => setHatchSpacing(e.target.value)}
+                    disabled={!prefs.hatchFill}
+                    className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                  />
+                  <span className="text-xs text-gray-400">mm</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400 whitespace-nowrap">
+                    Angle
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="179"
+                    step="5"
+                    value={prefs.hatchAngleDeg}
+                    onChange={(e) => setHatchAngle(e.target.value)}
+                    disabled={!prefs.hatchFill}
+                    className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                  />
+                  <span className="text-xs text-gray-400">°</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="border-t border-[#0f3460]" />
 
           {/* ── Options (lift / return) ── */}
@@ -200,7 +286,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
               onChange={() => toggle("liftPenAtEnd")}
             />
             <div>
-              <div className="text-sm text-white font-medium">Lift pen at end</div>
+              <div className="text-sm text-white font-medium">
+                Lift pen at end
+              </div>
               <div className="text-xs text-gray-400 mt-0.5">
                 Send the pen-up command after the last stroke. Recommended to
                 avoid leaving the pen pressed on the paper.
@@ -218,7 +306,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
               onChange={() => toggle("returnToHome")}
             />
             <div>
-              <div className="text-sm text-white font-medium">Return to home (X0 Y0)</div>
+              <div className="text-sm text-white font-medium">
+                Return to home (X0 Y0)
+              </div>
               <div className="text-xs text-gray-400 mt-0.5">
                 Send the pen to the origin after the job finishes.
               </div>
@@ -255,7 +345,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   aria-label="Custom start G-code"
                   rows={3}
                   value={prefs.customStartGcode}
-                  onChange={(e) => setTextField("customStartGcode")(e.target.value)}
+                  onChange={(e) =>
+                    setTextField("customStartGcode")(e.target.value)
+                  }
                   placeholder="; e.g. M3 S0"
                   spellCheck={false}
                   className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
@@ -265,13 +357,17 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400 select-none">
                   End G-code
-                  <span className="ml-1 text-gray-600">(after lift / return)</span>
+                  <span className="ml-1 text-gray-600">
+                    (after lift / return)
+                  </span>
                 </label>
                 <textarea
                   aria-label="Custom end G-code"
                   rows={3}
                   value={prefs.customEndGcode}
-                  onChange={(e) => setTextField("customEndGcode")(e.target.value)}
+                  onChange={(e) =>
+                    setTextField("customEndGcode")(e.target.value)
+                  }
                   placeholder="; e.g. M5"
                   spellCheck={false}
                   className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"

@@ -320,7 +320,7 @@ export function PropertiesPanel() {
                             {p.visible ? "👁" : "○"}
                           </span>
                           <span className="flex-1 min-w-0 text-gray-500 truncate">
-                            {p.layer ?? `path ${p.id.slice(0, 6)}`}
+                            {p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`}
                           </span>
                           <button
                             className="text-gray-600 hover:text-[#e94560]"

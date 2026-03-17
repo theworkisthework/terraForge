@@ -14,13 +14,48 @@ import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
+import { loadGcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
   applyMatrixToPathD,
   computePathsBounds,
 } from "../utils/svgTransform";
+import { generateHatchPaths } from "../utils/hatchFill";
 import { parseGcode } from "../utils/gcodeParser";
 import { importPdf } from "../utils/pdfImport";
+
+// ─── Effective fill detection ─────────────────────────────────────────────────
+function getEffectiveFill(el: Element): string | null {
+  const style = el.getAttribute("style") ?? "";
+  const styleMatch = /fill\s*:\s*([^;]+)/.exec(style);
+  const fill = styleMatch
+    ? styleMatch[1].trim()
+    : (el.getAttribute("fill") ?? "");
+  if (
+    !fill ||
+    fill === "none" ||
+    fill === "transparent" ||
+    fill.startsWith("url(")
+  )
+    return null;
+  return fill;
+}
+
+function hasVisibleStroke(el: Element): boolean {
+  const style = el.getAttribute("style") ?? "";
+  const styleMatch = /stroke\s*:\s*([^;]+)/.exec(style);
+  const stroke = styleMatch
+    ? styleMatch[1].trim()
+    : (el.getAttribute("stroke") ?? "");
+  if (!stroke || stroke === "none" || stroke === "transparent") return false;
+  // Also treat stroke-width of 0 as invisible
+  const widthMatch = /stroke-width\s*:\s*([^;]+)/.exec(style);
+  const widthAttr = widthMatch
+    ? widthMatch[1].trim()
+    : (el.getAttribute("stroke-width") ?? "");
+  if (widthAttr && parseFloat(widthAttr) === 0) return false;
+  return true;
+}
 
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
@@ -358,13 +393,15 @@ export function Toolbar() {
       // If they're in mm the result is exact; px/unitless uses 96 DPI.
       const physW = parseSvgLengthMM(svgEl?.getAttribute("width"));
       const physH = parseSvgLengthMM(svgEl?.getAttribute("height"));
-      // Prefer width-based scale; fall back to height, then to 1 (1 unit = 1 mm).
+      // Prefer width-based scale; fall back to height, then to the SVG/CSS default
+      // of 1 user unit = 1 CSS pixel at 96dpi (25.4/96 mm/px).  Using 1 mm/unit
+      // here is wrong for percentage-dimensioned SVGs and makes content invisible.
       const initScale =
         physW != null
           ? physW / svgWidth
           : physH != null
             ? physH / svgHeight
-            : 1;
+            : 25.4 / 96;
 
       // Default name = filename without extension
       const name =
@@ -379,27 +416,54 @@ export function Toolbar() {
         ),
       );
 
-      const paths: SvgPath[] = els
-        .map((el): SvgPath | null => {
-          const rawD = shapeToPathD(el);
-          if (!rawD) return null;
-          // Resolve all ancestor transform attributes and bake them into the
-          // path coordinates so the canvas and G-code worker see pre-transformed
-          // positions (fixes Inkscape layer/group transforms).
-          const matrix = getAccumulatedTransform(el);
-          const d = applyMatrixToPathD(rawD, matrix);
-          return {
+      // Track which elements have a visible fill so we can generate hatch lines
+      // for them after coordinates are normalized.
+      const fillFlags: boolean[] = [];
+
+      const paths: SvgPath[] = els.flatMap((el): SvgPath[] => {
+        const rawD = shapeToPathD(el);
+        if (!rawD) return [];
+        // Resolve all ancestor transform attributes and bake them into the
+        // path coordinates so the canvas and G-code worker see pre-transformed
+        // positions (fixes Inkscape layer/group transforms).
+        const matrix = getAccumulatedTransform(el);
+        const d = applyMatrixToPathD(rawD, matrix);
+        fillFlags.push(getEffectiveFill(el) !== null);
+        const outlineVisible = hasVisibleStroke(el);
+        const tag = el.tagName.toLowerCase();
+        const pathIndex = fillFlags.length; // 1-based after push
+
+        // Best-effort display name: Inkscape label > <title> child > element id >
+        // tagname_N fallback.
+        const inkLabel =
+          el.getAttribute("inkscape:label") ??
+          el.getAttributeNS(
+            "http://www.inkscape.org/namespaces/inkscape",
+            "label",
+          );
+        const titleText = el
+          .querySelector(":scope > title")
+          ?.textContent?.trim();
+        const ownId =
+          el.id && !/^[a-f0-9-]{36}$/.test(el.id) ? el.id : undefined;
+        const label =
+          inkLabel?.trim() || titleText || ownId || `${tag}_${pathIndex}`;
+
+        return [
+          {
             id: uuid(),
             d,
             svgSource: el.outerHTML,
             visible: true,
+            outlineVisible,
+            label,
             layer:
               (el.closest("[id]:not(svg)") as Element | null)?.id ??
               el.id ??
               undefined,
-          };
-        })
-        .filter((p): p is SvgPath => p !== null);
+          },
+        ];
+      });
 
       if (paths.length === 0) {
         upsertTask({
@@ -435,10 +499,28 @@ export function Toolbar() {
           }))
         : paths;
 
+      // Generate hatch-fill lines for shapes that had a visible fill and embed
+      // them on their parent SvgPath so they toggle as a unit.
+      // Spacing is converted from mm to SVG user units using initScale.
+      const hatchPrefs = loadGcodePrefs();
+      let finalPaths = normalizedPaths;
+      if (hatchPrefs.hatchFill && initScale > 0) {
+        const spacingUnits = hatchPrefs.hatchSpacingMM / initScale;
+        finalPaths = normalizedPaths.map((np, i) => {
+          if (!fillFlags[i]) return np;
+          const hatchLines = generateHatchPaths(
+            np.d,
+            spacingUnits,
+            hatchPrefs.hatchAngleDeg,
+          );
+          return hatchLines.length ? { ...np, hatchLines } : np;
+        });
+      }
+
       const imp: SvgImport = {
         id: uuid(),
         name,
-        paths: normalizedPaths,
+        paths: finalPaths,
         x: 0,
         y: 0,
         scale: initScale,

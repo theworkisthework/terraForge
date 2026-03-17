@@ -158,8 +158,8 @@ export const useCanvasStore = create<CanvasState>()(
         .flatMap((imp) =>
           imp.paths
             .filter((p) => p.visible)
-            .map(
-              (p): VectorObject => ({
+            .flatMap((p): VectorObject[] => {
+              const base: VectorObject = {
                 id: p.id,
                 svgSource: p.svgSource,
                 path: p.d,
@@ -173,8 +173,19 @@ export const useCanvasStore = create<CanvasState>()(
                 originalWidth: imp.svgWidth,
                 originalHeight: imp.svgHeight,
                 layer: p.layer,
-              }),
-            ),
+              };
+              const outlineVOs: VectorObject[] =
+                p.outlineVisible !== false ? [base] : [];
+              const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
+                (hl, i): VectorObject => ({
+                  ...base,
+                  id: `${p.id}-h${i}`,
+                  svgSource: "",
+                  path: hl,
+                }),
+              );
+              return [...outlineVOs, ...hatchVOs];
+            }),
         ),
 
     setPlotProgress: (cuts, rapids) =>
