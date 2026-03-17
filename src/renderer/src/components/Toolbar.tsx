@@ -26,6 +26,10 @@ import { importPdf } from "../utils/pdfImport";
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
 function parseSvgLengthMM(val: string | null | undefined): number | null {
   if (!val) return null;
+  // Percentage values cannot be resolved to an absolute size without a viewport
+  // (e.g. width="100%" height="100%") — treat as unknown so the caller falls
+  // back to the viewBox dimensions instead of misinterpreting "100" as pixels.
+  if (val.includes("%")) return null;
   const num = parseFloat(val);
   if (isNaN(num)) return null;
   if (val.endsWith("mm")) return num;
