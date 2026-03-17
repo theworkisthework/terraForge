@@ -218,14 +218,28 @@ export const useCanvasStore = create<CanvasState>()(
         const imp = state.imports.find((i) => i.id === importId);
         if (!imp) return;
 
+        // Sanitize incoming values before persisting to avoid storing NaN/Infinity
+        // (which can arrive transiently from <input type="number"> while editing).
+        const safeSpacing =
+          Number.isFinite(spacingMM) && spacingMM > 0
+            ? spacingMM
+            : imp.hatchSpacingMM;
+        const safeAngle = Number.isFinite(angleDeg)
+          ? angleDeg
+          : imp.hatchAngleDeg;
+
         // Persist user configuration
         imp.hatchEnabled = enabled;
-        imp.hatchSpacingMM = spacingMM;
-        imp.hatchAngleDeg = angleDeg;
+        imp.hatchSpacingMM = safeSpacing;
+        imp.hatchAngleDeg = safeAngle;
 
         // Defense in depth: only generate hatch lines when configuration is valid.
         const spacingIsValid =
-          Number.isFinite(spacingMM) && spacingMM > 0 && imp.scale > 0 && enabled;
+          Number.isFinite(safeSpacing) &&
+          safeSpacing > 0 &&
+          Number.isFinite(safeAngle) &&
+          imp.scale > 0 &&
+          enabled;
 
         if (!spacingIsValid) {
           // Invalid spacing/scale or hatching disabled: clear any existing hatch lines.
@@ -235,7 +249,7 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
 
-        const spacingUnits = spacingMM / imp.scale;
+        const spacingUnits = safeSpacing / imp.scale;
 
         for (const p of imp.paths) {
           if (!p.hasFill) {
@@ -243,7 +257,7 @@ export const useCanvasStore = create<CanvasState>()(
             continue;
           }
 
-          const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
+          const lines = generateHatchPaths(p.d, spacingUnits, safeAngle);
           p.hatchLines = lines.length ? lines : undefined;
         }
       }),

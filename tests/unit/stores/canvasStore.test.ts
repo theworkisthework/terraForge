@@ -284,4 +284,28 @@ describe("canvasStore", () => {
     // Should not throw and imports remain empty
     expect(useCanvasStore.getState().imports).toHaveLength(0);
   });
+
+  it("applyHatch ignores NaN spacingMM and keeps existing value", () => {
+    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
+    const imp = createSvgImport({ paths: [path], scale: 1, hatchSpacingMM: 2, hatchEnabled: true });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, NaN, 0, true);
+    expect(useCanvasStore.getState().imports[0].hatchSpacingMM).toBe(2);
+  });
+
+  it("applyHatch ignores NaN angleDeg and keeps existing value", () => {
+    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
+    const imp = createSvgImport({ paths: [path], scale: 1, hatchAngleDeg: 45, hatchEnabled: true });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, 2, NaN, true);
+    expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(45);
+  });
+
+  it("applyHatch with Infinity angleDeg keeps existing angle", () => {
+    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
+    const imp = createSvgImport({ paths: [path], scale: 1, hatchAngleDeg: 30, hatchEnabled: true });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.getState().applyHatch(imp.id, 2, Infinity, true);
+    expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(30);
+  });
 });
