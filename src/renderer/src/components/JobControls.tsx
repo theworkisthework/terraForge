@@ -43,6 +43,10 @@ export function JobControls() {
           name: gcodeSource.name,
         }
       : null);
+  const gcodePreviewLoading = useCanvasStore((s) => s.gcodePreviewLoading);
+  const setGcodePreviewLoading = useCanvasStore(
+    (s) => s.setGcodePreviewLoading,
+  );
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
 
   const jobFileValid =
@@ -87,6 +91,16 @@ export function JobControls() {
       <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
         Job
       </span>
+
+      {/* Preview-loading bar — visible while fetching toolpath before start */}
+      {!isActive && gcodePreviewLoading && (
+        <div className="flex flex-col gap-1 mb-1">
+          <div className="w-full h-2 bg-[#0f3460] rounded-full overflow-hidden">
+            <div className="h-full w-1/3 bg-[#e94560] animate-pulse" />
+          </div>
+          <div className="text-[9px] text-gray-500">Loading preview…</div>
+        </div>
+      )}
 
       {/* Progress bar — visible while active */}
       {isActive && (
@@ -184,6 +198,16 @@ export function JobControls() {
                 gcodeSource?.path !== effectiveJobFile!.path ||
                 !gcodeToolpath
               ) {
+                const previewTaskId = uuid();
+                const name = effectiveJobFile!.name;
+                upsertTask({
+                  id: previewTaskId,
+                  type: "gcode-preview",
+                  label: `Loading preview for ${name}…`,
+                  progress: null,
+                  status: "running",
+                });
+                setGcodePreviewLoading(true);
                 try {
                   const text = await window.terraForge.fluidnc.fetchFileText(
                     effectiveJobFile!.path,
@@ -197,8 +221,24 @@ export function JobControls() {
                     source: effectiveJobFile!.source as "fs" | "sd",
                   });
                   selectToolpath(true);
+                  upsertTask({
+                    id: previewTaskId,
+                    type: "gcode-preview",
+                    label: `Preview loaded`,
+                    progress: 100,
+                    status: "completed",
+                  });
                 } catch {
                   // Toolpath load failed — run anyway, just without tracing
+                  upsertTask({
+                    id: previewTaskId,
+                    type: "gcode-preview",
+                    label: `Preview load failed`,
+                    progress: null,
+                    status: "error",
+                  });
+                } finally {
+                  setGcodePreviewLoading(false);
                 }
               }
               await window.terraForge.fluidnc.runFile(
@@ -208,7 +248,7 @@ export function JobControls() {
             }
           },
           "primary",
-          !jobFileValid, // disabled unless a valid G-code file is selected
+          !jobFileValid || gcodePreviewLoading,
           jobFileValid
             ? effectiveJobFile!.source === "local"
               ? `Upload ${effectiveJobFile!.name} to SD card then run`
