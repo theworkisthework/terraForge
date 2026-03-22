@@ -118,6 +118,7 @@ function FsPane({
     useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
+  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
@@ -214,6 +215,26 @@ function FsPane({
       return;
     }
     doPreview(file);
+  };
+
+  // Run the file on the machine, loading its toolpath first if not already
+  // loaded — so that plot-progress tracing works from the moment it starts.
+  const handleRun = async (file: RemoteFile) => {
+    if (gcodeSource?.path !== file.path || !gcodeToolpath) {
+      try {
+        const text = await window.terraForge.fluidnc.fetchFileText(
+          file.path,
+          label === "sdcard" ? "sdcard" : "internal",
+        );
+        const toolpath = parseGcode(text);
+        setGcodeToolpath(toolpath);
+        setGcodeSource({ path: file.path, name: file.name, source });
+        selectToolpath(true);
+      } catch {
+        // Toolpath load failed — run anyway, just without tracing
+      }
+    }
+    window.terraForge.fluidnc.runFile(file.path, source);
   };
 
   const atRoot = path === "/";
@@ -392,7 +413,7 @@ function FsPane({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.terraForge.fluidnc.runFile(file.path, source);
+                          handleRun(file);
                         }}
                         title="Run job now"
                         className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"

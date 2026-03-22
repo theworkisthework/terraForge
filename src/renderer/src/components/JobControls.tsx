@@ -4,6 +4,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { parseGcode } from "../utils/gcodeParser";
 
 const GCODE_EXTS = [
   ".gcode",
@@ -26,6 +27,10 @@ export function JobControls() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
   const gcodeSource = useCanvasStore((s) => s.gcodeSource);
+  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
+  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
+  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
+  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
 
   // When the canvas toolpath is selected and has a local file source, use it
   // as the job file even if nothing is explicitly set in the file browser.
@@ -172,6 +177,30 @@ export function JobControls() {
                 });
               }
             } else {
+              // Load the toolpath before running so plot-progress tracing works
+              // from the start — especially if the SVG layer was deleted after
+              // generation or the file was never explicitly previewed.
+              if (
+                gcodeSource?.path !== effectiveJobFile!.path ||
+                !gcodeToolpath
+              ) {
+                try {
+                  const text = await window.terraForge.fluidnc.fetchFileText(
+                    effectiveJobFile!.path,
+                    effectiveJobFile!.source === "sd" ? "sdcard" : "internal",
+                  );
+                  const toolpath = parseGcode(text);
+                  setGcodeToolpath(toolpath);
+                  setGcodeSource({
+                    path: effectiveJobFile!.path,
+                    name: effectiveJobFile!.name,
+                    source: effectiveJobFile!.source as "fs" | "sd",
+                  });
+                  selectToolpath(true);
+                } catch {
+                  // Toolpath load failed — run anyway, just without tracing
+                }
+              }
               await window.terraForge.fluidnc.runFile(
                 effectiveJobFile!.path,
                 effectiveJobFile!.source as "fs" | "sd",

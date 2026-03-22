@@ -773,6 +773,11 @@ export function Toolbar() {
           status: "completed",
         });
 
+        // ── Load toolpath preview into canvas (enables tracing during job) ──
+        const toolpath = parseGcode(msg.gcode);
+        setGcodeToolpath(toolpath);
+        selectToolpath(true);
+
         // ── Upload to SD card (if opted in and connected) ─────────────────
         if (prefs.uploadToSd && useMachineStore.getState().connected) {
           const uploadTaskId = uuid();
@@ -789,6 +794,11 @@ export function Toolbar() {
               source: "sd",
               name: defaultFilename,
             });
+            setGcodeSource({
+              path: remotePath,
+              name: defaultFilename,
+              source: "sd",
+            });
           } catch {
             // Upload error is already surfaced via the upload task toast
           }
@@ -800,6 +810,11 @@ export function Toolbar() {
             await window.terraForge.fs.saveGcodeDialog(defaultFilename);
           if (savePath) {
             await window.terraForge.fs.writeFile(savePath, msg.gcode);
+            setGcodeSource({
+              path: savePath,
+              name: defaultFilename,
+              source: "local",
+            });
           }
         }
       } else if (msg.type === "cancelled") {
