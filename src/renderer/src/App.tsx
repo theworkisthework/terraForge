@@ -18,29 +18,43 @@ export default function App() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
 
-  const [showJog, setShowJog] = useState(false);
-  const [jogDelta, setJogDelta] = useState({ dx: 0, dy: 0 });
+  const [showJog, setShowJog] = useState(true);
+  // null = use CSS default (aligned with right panel + 16px gap); set when user first drags
+  const [jogPos, setJogPos] = useState<{ x: number; y: number } | null>(null);
+  const jogPanelRef = useRef<HTMLDivElement>(null);
   const jogDragRef = useRef<{
     mouseX: number;
     mouseY: number;
-    startDx: number;
-    startDy: number;
+    startX: number;
+    startY: number;
   } | null>(null);
 
   const startJogDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    // Resolve current pixel position from either state or the element's bounding rect
+    const panel = jogPanelRef.current;
+    const rect = panel?.getBoundingClientRect();
     jogDragRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
-      startDx: jogDelta.dx,
-      startDy: jogDelta.dy,
+      startX: rect?.left ?? window.innerWidth - 270,
+      startY: rect?.top ?? 48,
     };
+    // Anchor position state so subsequent moves work correctly
+    if (!jogPos && rect) {
+      setJogPos({ x: rect.left, y: rect.top });
+    }
   };
   const onJogDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!jogDragRef.current) return;
-    setJogDelta({
-      dx: jogDragRef.current.startDx + e.clientX - jogDragRef.current.mouseX,
-      dy: jogDragRef.current.startDy + e.clientY - jogDragRef.current.mouseY,
+    if (!jogDragRef.current || !jogPanelRef.current) return;
+    const { offsetWidth: w, offsetHeight: h } = jogPanelRef.current;
+    const newX =
+      jogDragRef.current.startX + e.clientX - jogDragRef.current.mouseX;
+    const newY =
+      jogDragRef.current.startY + e.clientY - jogDragRef.current.mouseY;
+    setJogPos({
+      x: Math.max(0, Math.min(window.innerWidth - w, newX)),
+      y: Math.max(0, Math.min(window.innerHeight - h, newY)),
     });
   };
   const onJogDragEnd = () => {
@@ -101,27 +115,6 @@ export default function App() {
           <PlotCanvas />
           {/* Toast stack — absolute within canvas area, clear of side panels */}
           <TaskBar />
-          {/* Jog panel — absolute right-4 top-4 matches zoom controls */}
-          {showJog && (
-            <div
-              className="absolute z-50 right-4 top-4 bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
-              style={{
-                transform: `translate(${jogDelta.dx}px, ${jogDelta.dy}px)`,
-              }}
-              onPointerMove={onJogDragMove}
-              onPointerUp={onJogDragEnd}
-              onPointerCancel={onJogDragEnd}
-            >
-              <div
-                className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-[#0f3460]/50 hover:bg-[#0f3460] transition-colors"
-                title="Drag to move"
-                onPointerDown={startJogDrag}
-              />
-              <div className="p-4">
-                <JogControls onClose={() => setShowJog(false)} />
-              </div>
-            </div>
-          )}
         </main>
 
         {/* Right panel — object properties */}
@@ -134,6 +127,29 @@ export default function App() {
       <div className="h-40 bg-[#16213e] border-t border-[#0f3460] shrink-0">
         <ConsolePanel />
       </div>
+
+      {/* Jog panel — fixed to viewport so it floats above all panels */}
+      {showJog && (
+        <div
+          ref={jogPanelRef}
+          className="fixed z-[100] bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
+          style={
+            jogPos ? { left: jogPos.x, top: jogPos.y } : { right: 240, top: 58 }
+          }
+          onPointerMove={onJogDragMove}
+          onPointerUp={onJogDragEnd}
+          onPointerCancel={onJogDragEnd}
+        >
+          <div
+            className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-[#0f3460]/50 hover:bg-[#0f3460] transition-colors"
+            title="Drag to move"
+            onPointerDown={startJogDrag}
+          />
+          <div className="p-4">
+            <JogControls onClose={() => setShowJog(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

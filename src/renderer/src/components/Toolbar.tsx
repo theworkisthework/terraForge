@@ -263,11 +263,14 @@ function getBBox(el: Element): {
 }
 
 interface ToolbarProps {
-  showJog: boolean;
-  onToggleJog: () => void;
+  showJog?: boolean;
+  onToggleJog?: () => void;
 }
 
-export function Toolbar({ showJog, onToggleJog }: ToolbarProps) {
+export function Toolbar({
+  showJog = false,
+  onToggleJog = () => {},
+}: ToolbarProps = {}) {
   const configs = useMachineStore((s) => s.configs);
   const activeConfigId = useMachineStore((s) => s.activeConfigId);
   const setActiveConfigId = useMachineStore((s) => s.setActiveConfigId);
