@@ -115,6 +115,10 @@ function FsPane({
   const [error, setError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [runningFile, setRunningFile] = useState<string | null>(null);
+  // Path of the file that was actually dispatched to the machine via runFile.
+  // Separate from selectedJobFile so that clicking another file in the browser
+  // while a job is active doesn't make that file show pause/resume controls.
+  const [activeJobPath, setActiveJobPath] = useState<string | null>(null);
   const [pendingPreviewFile, setPendingPreviewFile] =
     useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
@@ -167,6 +171,13 @@ function FsPane({
       }
     });
   }, [connected, navigate, path]);
+
+  // Clear activeJobPath when the machine is no longer running or held.
+  useEffect(() => {
+    if (status?.state !== "Run" && status?.state !== "Hold") {
+      setActiveJobPath(null);
+    }
+  }, [status?.state]);
 
   const handleDownload = async (file: RemoteFile) => {
     const localPath = isGcodeFile(file.name)
@@ -287,6 +298,7 @@ function FsPane({
     // Brief pause so the user can read the preview-loaded toast
     // before the job begins (cosmetic only).
     await new Promise((r) => setTimeout(r, 1000));
+    setActiveJobPath(file.path);
     try {
       await window.terraForge.fluidnc.runFile(file.path, source);
       upsertTask({
@@ -297,6 +309,7 @@ function FsPane({
         status: "completed",
       });
     } catch (err) {
+      setActiveJobPath(null);
       upsertTask({
         id: jobTaskId,
         type: "job-start",
@@ -423,7 +436,7 @@ function FsPane({
 
               const anyJobActive =
                 (status?.state === "Run" || status?.state === "Hold") &&
-                selectedJobFile?.source === source;
+                activeJobPath !== null;
 
               return (
                 <div
@@ -474,12 +487,10 @@ function FsPane({
                   ) : (
                     (() => {
                       const isThisRunning =
-                        selectedJobFile?.path === file.path &&
-                        selectedJobFile?.source === source &&
+                        activeJobPath === file.path &&
                         status?.state === "Run";
                       const isThisHeld =
-                        selectedJobFile?.path === file.path &&
-                        selectedJobFile?.source === source &&
+                        activeJobPath === file.path &&
                         status?.state === "Hold";
                       const isActiveJob = isThisRunning || isThisHeld;
                       const isLoadingThis = runningFile === file.path;
