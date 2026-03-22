@@ -487,11 +487,9 @@ function FsPane({
                   ) : (
                     (() => {
                       const isThisRunning =
-                        activeJobPath === file.path &&
-                        status?.state === "Run";
+                        activeJobPath === file.path && status?.state === "Run";
                       const isThisHeld =
-                        activeJobPath === file.path &&
-                        status?.state === "Hold";
+                        activeJobPath === file.path && status?.state === "Hold";
                       const isActiveJob = isThisRunning || isThisHeld;
                       const isLoadingThis = runningFile === file.path;
                       return (
