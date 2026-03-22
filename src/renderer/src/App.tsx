@@ -18,7 +18,7 @@ export default function App() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
 
-  const [showJog, setShowJog] = useState(true);
+  const [showJog, setShowJog] = useState(false);
   const [jogDelta, setJogDelta] = useState({ dx: 0, dy: 0 });
   const jogDragRef = useRef<{
     mouseX: number;
