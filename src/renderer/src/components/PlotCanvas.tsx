@@ -64,6 +64,8 @@ export function PlotCanvas() {
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const machineStatus = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
+  const isJobActive =
+    machineStatus?.state === "Run" || machineStatus?.state === "Hold";
 
   // Activate live plot-progress tracking whenever a toolpath is loaded
   // and the machine is running a job.
@@ -275,7 +277,7 @@ export function PlotCanvas() {
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedImportId) {
           removeImport(selectedImportId);
-        } else if (toolpathSelected) {
+        } else if (toolpathSelected && !isJobActive) {
           setGcodeToolpath(null);
           // selectedJobFile is cleared by the gcodeToolpath→null effect below.
         }
@@ -322,6 +324,7 @@ export function PlotCanvas() {
   }, [
     selectedImportId,
     toolpathSelected,
+    isJobActive,
     removeImport,
     selectImport,
     selectToolpath,
@@ -936,40 +939,42 @@ export function PlotCanvas() {
               ).map(([cx, cy], i) => (
                 <circle key={i} cx={cx} cy={cy} r={TP_PIP} fill="#38bdf8" />
               ))}
-              <g
-                transform={`translate(${delSx},${delSy})`}
-                style={{ cursor: "pointer", pointerEvents: "all" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setGcodeToolpath(null);
-                  if (selectedJobFile?.source === "local")
-                    setSelectedJobFile(null);
-                }}
-              >
-                <svg
-                  x={-TP_HALF}
-                  y={-TP_HALF}
-                  width={TP_HALF * 2}
-                  height={TP_HALF * 2}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {!isJobActive && (
+                <g
+                  transform={`translate(${delSx},${delSy})`}
+                  style={{ cursor: "pointer", pointerEvents: "all" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGcodeToolpath(null);
+                    if (selectedJobFile?.source === "local")
+                      setSelectedJobFile(null);
+                  }}
                 >
-                  <rect
-                    width="18"
-                    height="18"
-                    x="3"
-                    y="3"
-                    rx="2"
-                    ry="2"
-                    fill="#e94560"
-                    stroke="none"
-                  />
-                  <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-                  <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-                </svg>
-              </g>
+                  <svg
+                    x={-TP_HALF}
+                    y={-TP_HALF}
+                    width={TP_HALF * 2}
+                    height={TP_HALF * 2}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect
+                      width="18"
+                      height="18"
+                      x="3"
+                      y="3"
+                      rx="2"
+                      ry="2"
+                      fill="#e94560"
+                      stroke="none"
+                    />
+                    <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+                    <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+                  </svg>
+                </g>
+              )}
             </svg>
           );
         })()}
