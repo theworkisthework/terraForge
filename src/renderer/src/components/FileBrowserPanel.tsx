@@ -173,12 +173,27 @@ function FsPane({
     });
   }, [connected, navigate, path]);
 
-  // Clear activeJobPath when the machine is no longer running or held.
+  // Keep a ref so the status-change effect can read selectedJobFile without
+  // adding it to the dependency array (which would cause it to fire — and
+  // potentially overwrite activeJobPath — whenever the user selects a row).
+  const selectedJobFileRef = useRef(selectedJobFile);
+  selectedJobFileRef.current = selectedJobFile;
+
+  // Track which file path is actively running on the machine.
+  // Only fires on status state transitions so clicking a different row while
+  // a job is running cannot overwrite the already-set activeJobPath.
   useEffect(() => {
-    if (status?.state !== "Run" && status?.state !== "Hold") {
+    if (status?.state === "Run" || status?.state === "Hold") {
+      setActiveJobPath((prev) => {
+        if (prev !== null) return prev; // already set — keep it
+        const jf = selectedJobFileRef.current;
+        return jf?.source === source ? jf.path : null;
+      });
+    } else {
       setActiveJobPath(null);
     }
-  }, [status?.state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.state, source]);
 
   const handleDownload = async (file: RemoteFile) => {
     const localPath = isGcodeFile(file.name)
@@ -472,14 +487,18 @@ function FsPane({
             )}
 
             {files.map((file) => {
-              const isSelectedForJob =
-                !file.isDirectory &&
-                selectedJobFile?.path === file.path &&
-                selectedJobFile?.source === source;
-
               const anyJobActive =
                 (status?.state === "Run" || status?.state === "Hold") &&
                 activeJobPath !== null;
+
+              // While a job is running, keep the highlight on the active file
+              // regardless of what selectedJobFile the user may have clicked.
+              const isSelectedForJob =
+                !file.isDirectory &&
+                (anyJobActive
+                  ? activeJobPath === file.path
+                  : selectedJobFile?.path === file.path &&
+                    selectedJobFile?.source === source);
 
               return (
                 <div
