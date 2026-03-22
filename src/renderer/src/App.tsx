@@ -134,7 +134,9 @@ export default function App() {
           ref={jogPanelRef}
           className="fixed z-[100] bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
           style={
-            jogPos ? { left: jogPos.x, top: jogPos.y } : { right: 240, top: 58 }
+            jogPos
+              ? { left: jogPos.x, top: jogPos.y }
+              : { right: 240, top: 124 }
           }
           onPointerMove={onJogDragMove}
           onPointerUp={onJogDragEnd}
