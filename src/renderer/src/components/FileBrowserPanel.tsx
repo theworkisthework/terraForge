@@ -235,6 +235,14 @@ function FsPane({
   // Run the file on the machine, loading its toolpath first if not already
   // loaded — so that plot-progress tracing works from the moment it starts.
   const handleRun = async (file: RemoteFile) => {
+    const jobTaskId = uuid();
+    upsertTask({
+      id: jobTaskId,
+      type: "job-start",
+      label: `Starting ${file.name}…`,
+      progress: null,
+      status: "running",
+    });
     if (gcodeSource?.path !== file.path || !gcodeToolpath) {
       setRunningFile(file.path);
       const previewTaskId = uuid();
@@ -276,7 +284,25 @@ function FsPane({
         setGcodePreviewLoading(false);
       }
     }
-    window.terraForge.fluidnc.runFile(file.path, source);
+    try {
+      await window.terraForge.fluidnc.runFile(file.path, source);
+      upsertTask({
+        id: jobTaskId,
+        type: "job-start",
+        label: `${file.name} started`,
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: jobTaskId,
+        type: "job-start",
+        label: `Failed to start ${file.name}`,
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
   };
 
   const atRoot = path === "/";

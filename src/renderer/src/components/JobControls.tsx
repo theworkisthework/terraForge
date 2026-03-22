@@ -180,6 +180,13 @@ export function JobControls() {
                   remotePath,
                 );
                 await window.terraForge.fluidnc.runFile(remotePath, "sd");
+                upsertTask({
+                  id: uuid(),
+                  type: "job-start",
+                  label: `${name} started`,
+                  progress: 100,
+                  status: "completed",
+                });
               } catch (err) {
                 upsertTask({
                   id: taskId,
@@ -191,60 +198,86 @@ export function JobControls() {
                 });
               }
             } else {
-              // Load the toolpath before running so plot-progress tracing works
-              // from the start — especially if the SVG layer was deleted after
-              // generation or the file was never explicitly previewed.
-              if (
-                gcodeSource?.path !== effectiveJobFile!.path ||
-                !gcodeToolpath
-              ) {
-                const previewTaskId = uuid();
-                const name = effectiveJobFile!.name;
-                upsertTask({
-                  id: previewTaskId,
-                  type: "gcode-preview",
-                  label: `Loading preview for ${name}…`,
-                  progress: null,
-                  status: "running",
-                });
-                setGcodePreviewLoading(true);
-                try {
-                  const text = await window.terraForge.fluidnc.fetchFileText(
-                    effectiveJobFile!.path,
-                    effectiveJobFile!.source === "sd" ? "sdcard" : "internal",
-                  );
-                  const toolpath = parseGcode(text);
-                  setGcodeToolpath(toolpath);
-                  setGcodeSource({
-                    path: effectiveJobFile!.path,
-                    name: effectiveJobFile!.name,
-                    source: effectiveJobFile!.source as "fs" | "sd",
-                  });
-                  selectToolpath(true);
+              const jobTaskId = uuid();
+              upsertTask({
+                id: jobTaskId,
+                type: "job-start",
+                label: `Starting ${effectiveJobFile!.name}…`,
+                progress: null,
+                status: "running",
+              });
+              try {
+                // Load the toolpath before running so plot-progress tracing works
+                // from the start — especially if the SVG layer was deleted after
+                // generation or the file was never explicitly previewed.
+                if (
+                  gcodeSource?.path !== effectiveJobFile!.path ||
+                  !gcodeToolpath
+                ) {
+                  const previewTaskId = uuid();
+                  const name = effectiveJobFile!.name;
                   upsertTask({
                     id: previewTaskId,
                     type: "gcode-preview",
-                    label: `Preview loaded`,
-                    progress: 100,
-                    status: "completed",
-                  });
-                } catch {
-                  // Toolpath load failed — run anyway, just without tracing
-                  upsertTask({
-                    id: previewTaskId,
-                    type: "gcode-preview",
-                    label: `Preview load failed`,
+                    label: `Loading preview for ${name}…`,
                     progress: null,
-                    status: "error",
+                    status: "running",
                   });
-                } finally {
-                  setGcodePreviewLoading(false);
+                  setGcodePreviewLoading(true);
+                  try {
+                    const text = await window.terraForge.fluidnc.fetchFileText(
+                      effectiveJobFile!.path,
+                      effectiveJobFile!.source === "sd" ? "sdcard" : "internal",
+                    );
+                    const toolpath = parseGcode(text);
+                    setGcodeToolpath(toolpath);
+                    setGcodeSource({
+                      path: effectiveJobFile!.path,
+                      name: effectiveJobFile!.name,
+                      source: effectiveJobFile!.source as "fs" | "sd",
+                    });
+                    selectToolpath(true);
+                    upsertTask({
+                      id: previewTaskId,
+                      type: "gcode-preview",
+                      label: `Preview loaded`,
+                      progress: 100,
+                      status: "completed",
+                    });
+                  } catch {
+                    // Toolpath load failed — run anyway, just without tracing
+                    upsertTask({
+                      id: previewTaskId,
+                      type: "gcode-preview",
+                      label: `Preview load failed`,
+                      progress: null,
+                      status: "error",
+                    });
+                  } finally {
+                    setGcodePreviewLoading(false);
+                  }
                 }
+                await window.terraForge.fluidnc.runFile(
+                  effectiveJobFile!.path,
+                  effectiveJobFile!.source as "fs" | "sd",
+                );
+                upsertTask({
+                  id: jobTaskId,
+                  type: "job-start",
+                  label: `${effectiveJobFile!.name} started`,
+                  progress: 100,
+                  status: "completed",
+                });
+              } catch (err) {
+                upsertTask({
+                  id: jobTaskId,
+                  type: "job-start",
+                  label: `Failed to start ${effectiveJobFile!.name}`,
+                  progress: null,
+                  status: "error",
+                  error: String(err),
+                });
               }
-              await window.terraForge.fluidnc.runFile(
-                effectiveJobFile!.path,
-                effectiveJobFile!.source as "fs" | "sd",
-              );
             }
           },
           "primary",
