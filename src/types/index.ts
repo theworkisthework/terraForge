@@ -158,6 +158,7 @@ export interface GcodeOptions {
 export type TaskType =
   | "svg-parse"
   | "gcode-generate"
+  | "gcode-preview"
   | "file-upload"
   | "file-download"
   | "file-delete"

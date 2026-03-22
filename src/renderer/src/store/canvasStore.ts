@@ -53,6 +53,9 @@ interface CanvasState {
   ) => void;
   toggleCentreMarker: () => void;
   toVectorObjects: () => VectorObject[];
+  /** True while a G-code preview is being fetched/parsed before a job starts. */
+  gcodePreviewLoading: boolean;
+  setGcodePreviewLoading: (loading: boolean) => void;
   /** Update the live plot-progress overlay paths. */
   setPlotProgress: (cuts: string, rapids: string) => void;
   /** Reset progress overlay (called when toolpath changes or job clears). */
@@ -77,6 +80,11 @@ export const useCanvasStore = create<CanvasState>()(
     showCentreMarker: true,
     plotProgressCuts: "",
     plotProgressRapids: "",
+    gcodePreviewLoading: false,
+    setGcodePreviewLoading: (loading) =>
+      set((state) => {
+        state.gcodePreviewLoading = loading;
+      }),
 
     addImport: (imp) =>
       set((state) => {

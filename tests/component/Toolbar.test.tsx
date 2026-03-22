@@ -268,13 +268,10 @@ describe("Toolbar", () => {
       activeConfigId: cfg.id,
       connected: true,
     });
-    render(<Toolbar />);
-    // Click Jog to show panel
+    const onToggleJog = vi.fn();
+    render(<Toolbar showJog={false} onToggleJog={onToggleJog} />);
     await userEvent.click(screen.getByText("Jog"));
-    expect(screen.getByText("Jog Controls")).toBeInTheDocument();
-    // Click again to hide
-    await userEvent.click(screen.getByText("Jog"));
-    expect(screen.queryByText("Jog Controls")).not.toBeInTheDocument();
+    expect(onToggleJog).toHaveBeenCalledTimes(1);
   });
 
   // ── Settings dialog toggle ────────────────────────────────────────────

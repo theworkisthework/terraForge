@@ -62,6 +62,14 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+// Gracefully close the FluidNC WebSocket before the process exits so the
+// machine receives a proper WS close frame instead of a TCP RST.  A TCP RST
+// (from os-level socket teardown on process kill) can wedge the ESP32's WS
+// server slot, requiring a power cycle to recover.
+app.on("before-quit", () => {
+  fluidnc.disconnectWebSocket();
+});
+
 // ─── Singletons ───────────────────────────────────────────────────────────────
 
 const fluidnc = new FluidNCClient();
@@ -71,39 +79,51 @@ const taskManager = new TaskManager();
 // Tracks which transport is currently active so IPC handlers can route correctly.
 let connectionType: "wifi" | "serial" | null = null;
 
+// Guard against sending to a webContents that has been destroyed (e.g. the
+// window closed during the before-quit flush of FluidNC events).
+function safeSend(channel: string, ...args: unknown[]): void {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    mainWindow.webContents.isDestroyed()
+  )
+    return;
+  mainWindow.webContents.send(channel, ...args);
+}
+
 // ─── Push events to renderer ──────────────────────────────────────────────────
 
 taskManager.on("task-update", (task: BackgroundTask) => {
-  mainWindow?.webContents.send("task:update", task);
+  safeSend("task:update", task);
 });
 
 // Wi-Fi events
 fluidnc.on("status", (status: MachineStatus) => {
-  mainWindow?.webContents.send("fluidnc:status", status);
+  safeSend("fluidnc:status", status);
 });
 
 fluidnc.on("console", (message: string) => {
-  mainWindow?.webContents.send("fluidnc:console", message);
+  safeSend("fluidnc:console", message);
 });
 
 fluidnc.on("ping", () => {
-  mainWindow?.webContents.send("fluidnc:ping");
+  safeSend("fluidnc:ping");
 });
 
 fluidnc.on("firmware", (info: string | null) => {
-  mainWindow?.webContents.send("fluidnc:firmware", info);
+  safeSend("fluidnc:firmware", info);
 });
 
 // Serial events — status goes to the same channel as Wi-Fi status so the
 // renderer doesn't need to care which transport is active.
 // Also emit a ping so the 15s watchdog timer stays alive over serial.
 serial.on("status", (status: MachineStatus) => {
-  mainWindow?.webContents.send("fluidnc:status", status);
-  mainWindow?.webContents.send("fluidnc:ping");
+  safeSend("fluidnc:status", status);
+  safeSend("fluidnc:ping");
 });
 
 serial.on("data", (data: string) => {
-  mainWindow?.webContents.send("serial:data", data);
+  safeSend("serial:data", data);
 });
 
 // ─── Machine Config Persistence ───────────────────────────────────────────────
@@ -359,15 +379,15 @@ ipcMain.handle(
         remotePath,
         (progress) => {
           taskManager.update(taskId, { progress });
-          mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+          safeSend("task:update", taskManager.get(taskId));
         },
         remoteFilename, // ← override multipart filename so SD card gets the right name
       );
       taskManager.complete(taskId);
-      mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+      safeSend("task:update", taskManager.get(taskId));
     } catch (err: unknown) {
       taskManager.fail(taskId, String(err));
-      mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+      safeSend("task:update", taskManager.get(taskId));
       throw err;
     } finally {
       await unlink(tempPath).catch(() => {});
@@ -386,7 +406,7 @@ ipcMain.handle(
     try {
       await fluidnc.uploadFile(localPath, remotePath, (progress) => {
         taskManager.update(taskId, { progress });
-        mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+        safeSend("task:update", taskManager.get(taskId));
       });
       taskManager.complete(taskId);
     } catch (err: unknown) {
@@ -416,7 +436,7 @@ ipcMain.handle(
         filesystem,
         (progress) => {
           taskManager.update(taskId, { progress });
-          mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+          safeSend("task:update", taskManager.get(taskId));
         },
       );
       taskManager.complete(taskId);
@@ -437,7 +457,7 @@ ipcMain.handle(
     connectionType = "serial";
     // Start polling `?` for status reports (same cadence as WS $RI=500).
     serial.startStatusPolling(500);
-    mainWindow?.webContents.send(
+    safeSend(
       "serial:data",
       `[terraForge] Serial connected to ${path} @ ${baudRate ?? 115200} baud`,
     );
@@ -617,16 +637,16 @@ ipcMain.on(
   "jobs:gcodeProgress",
   (_e, taskId: string, progress: number | null) => {
     taskManager.update(taskId, { progress });
-    mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+    safeSend("task:update", taskManager.get(taskId));
   },
 );
 
 ipcMain.on("jobs:gcodeComplete", (_e, taskId: string) => {
   taskManager.complete(taskId);
-  mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+  safeSend("task:update", taskManager.get(taskId));
 });
 
 ipcMain.on("jobs:gcodeFailed", (_e, taskId: string, error: string) => {
   taskManager.fail(taskId, error);
-  mainWindow?.webContents.send("task:update", taskManager.get(taskId));
+  safeSend("task:update", taskManager.get(taskId));
 });

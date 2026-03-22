@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -186,9 +186,14 @@ describe("JobControls", () => {
     });
     render(<JobControls />);
     await userEvent.click(screen.getByText("▶ Start job"));
-    expect(window.terraForge.fluidnc.runFile).toHaveBeenCalledWith(
-      "/test.gcode",
-      "sd",
+    // fetchFileText + 600ms cosmetic pause precede runFile — wait for it
+    await waitFor(
+      () =>
+        expect(window.terraForge.fluidnc.runFile).toHaveBeenCalledWith(
+          "/test.gcode",
+          "sd",
+        ),
+      { timeout: 2000 },
     );
   });
 

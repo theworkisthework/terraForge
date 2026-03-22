@@ -12,7 +12,6 @@ import {
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
-import { JogControls } from "./JogControls";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
@@ -263,7 +262,15 @@ function getBBox(el: Element): {
   };
 }
 
-export function Toolbar() {
+interface ToolbarProps {
+  showJog?: boolean;
+  onToggleJog?: () => void;
+}
+
+export function Toolbar({
+  showJog = false,
+  onToggleJog = () => {},
+}: ToolbarProps = {}) {
   const configs = useMachineStore((s) => s.configs);
   const activeConfigId = useMachineStore((s) => s.activeConfigId);
   const setActiveConfigId = useMachineStore((s) => s.setActiveConfigId);
@@ -289,42 +296,10 @@ export function Toolbar() {
     null,
   );
 
-  const [showJog, setShowJog] = useState(false);
   const [showGcodeDialog, setShowGcodeDialog] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [jogPos, setJogPos] = useState(() => ({
-    x: Math.max(0, window.innerWidth - 300),
-    y: 60,
-  }));
-  const jogDragRef = useRef<{
-    startX: number;
-    startY: number;
-    panelX: number;
-    panelY: number;
-  } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-
-  const startJogDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    jogDragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      panelX: jogPos.x,
-      panelY: jogPos.y,
-    };
-  };
-  const onJogPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!jogDragRef.current) return;
-    const { startX, startY, panelX, panelY } = jogDragRef.current;
-    setJogPos({
-      x: panelX + e.clientX - startX,
-      y: panelY + e.clientY - startY,
-    });
-  };
-  const onJogPointerUp = () => {
-    jogDragRef.current = null;
-  };
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -773,6 +748,11 @@ export function Toolbar() {
           status: "completed",
         });
 
+        // ── Load toolpath preview into canvas (enables tracing during job) ──
+        const toolpath = parseGcode(msg.gcode);
+        setGcodeToolpath(toolpath);
+        selectToolpath(true);
+
         // ── Upload to SD card (if opted in and connected) ─────────────────
         if (prefs.uploadToSd && useMachineStore.getState().connected) {
           const uploadTaskId = uuid();
@@ -789,6 +769,11 @@ export function Toolbar() {
               source: "sd",
               name: defaultFilename,
             });
+            setGcodeSource({
+              path: remotePath,
+              name: defaultFilename,
+              source: "sd",
+            });
           } catch {
             // Upload error is already surfaced via the upload task toast
           }
@@ -800,6 +785,11 @@ export function Toolbar() {
             await window.terraForge.fs.saveGcodeDialog(defaultFilename);
           if (savePath) {
             await window.terraForge.fs.writeFile(savePath, msg.gcode);
+            setGcodeSource({
+              path: savePath,
+              name: defaultFilename,
+              source: "local",
+            });
           }
         }
       } else if (msg.type === "cancelled") {
@@ -951,31 +941,11 @@ export function Toolbar() {
 
       {/* Jog toggle */}
       <button
-        onClick={() => setShowJog((v) => !v)}
+        onClick={onToggleJog}
         className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-[#e94560]" : "bg-[#0f3460] hover:bg-[#1a4a8a]"}`}
       >
         Jog
       </button>
-
-      {showJog && (
-        <div
-          className="fixed z-50 bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
-          style={{ left: jogPos.x, top: jogPos.y }}
-          onPointerMove={onJogPointerMove}
-          onPointerUp={onJogPointerUp}
-          onPointerCancel={onJogPointerUp}
-        >
-          {/* Drag handle */}
-          <div
-            className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-[#0f3460]/50 hover:bg-[#0f3460] transition-colors"
-            title="Drag to move"
-            onPointerDown={startJogDrag}
-          />
-          <div className="p-4">
-            <JogControls onClose={() => setShowJog(false)} />
-          </div>
-        </div>
-      )}
 
       {/* Connection status indicator */}
       <div className="ml-auto flex items-center gap-3">

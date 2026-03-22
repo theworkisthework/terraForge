@@ -589,8 +589,24 @@ export class FluidNCClient extends EventEmitter {
   disconnectWebSocket(): void {
     this.fwMajor = null;
     this.fwInfo = null;
+    this.wsEnabled = false;
+    this.wsGeneration++; // invalidate in-flight reconnect timers
+    if (this.wsReconnectTimer) {
+      clearTimeout(this.wsReconnectTimer);
+      this.wsReconnectTimer = null;
+    }
+    if (this.ws) {
+      // Use ws.close() (graceful WS close frame) rather than ws.terminate()
+      // (TCP RST).  An abrupt RST on process exit can wedge the ESP32's WS
+      // server slot so it refuses new connections until power-cycled.
+      try {
+        this.ws.close(1000);
+      } catch {
+        /* already dead */
+      }
+      this.ws = null;
+    }
     this.emit("firmware", null);
-    this.killWs();
   }
 
   /** Hard-stop: cancel reconnect timer, terminate socket, bump generation. */

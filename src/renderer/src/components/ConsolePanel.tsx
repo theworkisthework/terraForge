@@ -99,7 +99,7 @@ export function ConsolePanel() {
                   {status.state}
                 </span>
               ))}
-            {status && (
+            {status?.wpos && (
               <span className="text-xs text-gray-500">
                 X:{status.wpos.x.toFixed(2)} Y:{status.wpos.y.toFixed(2)} Z:
                 {status.wpos.z.toFixed(2)}

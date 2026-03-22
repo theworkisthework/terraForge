@@ -65,6 +65,9 @@ export function PropertiesPanel() {
   const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const activeConfig = useMachineStore((s) => s.activeConfig);
+  const machineStatus = useMachineStore((s) => s.status);
+  const isJobActive =
+    machineStatus?.state === "Run" || machineStatus?.state === "Hold";
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingName, setEditingName] = useState<{
@@ -168,8 +171,17 @@ export function PropertiesPanel() {
                         {fileName}
                       </span>
                       <button
-                        className="ml-1 text-gray-600 hover:text-[#e94560] shrink-0"
-                        title="Clear toolpath"
+                        className={`ml-1 shrink-0 ${
+                          isJobActive
+                            ? "text-gray-700 opacity-30 cursor-not-allowed"
+                            : "text-gray-600 hover:text-[#e94560]"
+                        }`}
+                        title={
+                          isJobActive
+                            ? "Cannot clear toolpath while job is running"
+                            : "Clear toolpath"
+                        }
+                        disabled={isJobActive}
                         onClick={(e) => {
                           e.stopPropagation();
                           setGcodeToolpath(null);

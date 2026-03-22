@@ -147,13 +147,16 @@ test("SVG canvas element is present", async () => {
 
 test("clicking Jog shows the jog controls panel, clicking again hides it", async () => {
   const jogBtn = window.locator("button:has-text('Jog')");
-
-  // Open
-  await jogBtn.click();
   const jogPanel = window.locator("text=Jog Controls").first();
+
+  // Panel is open by default
   await expect(jogPanel).toBeVisible({ timeout: 3000 });
 
   // Close
   await jogBtn.click();
   await expect(jogPanel).not.toBeVisible({ timeout: 3000 });
+
+  // Re-open
+  await jogBtn.click();
+  await expect(jogPanel).toBeVisible({ timeout: 3000 });
 });

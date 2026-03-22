@@ -114,15 +114,26 @@ function FsPane({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [runningFile, setRunningFile] = useState<string | null>(null);
+  // Path of the file that was actually dispatched to the machine via runFile.
+  // Separate from selectedJobFile so that clicking another file in the browser
+  // while a job is active doesn't make that file show pause/resume controls.
+  const [activeJobPath, setActiveJobPath] = useState<string | null>(null);
   const [pendingPreviewFile, setPendingPreviewFile] =
     useState<RemoteFile | null>(null);
+  const [pendingRunFile, setPendingRunFile] = useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
+  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
+  const setGcodePreviewLoading = useCanvasStore(
+    (s) => s.setGcodePreviewLoading,
+  );
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
+  const status = useMachineStore((s) => s.status);
 
   const navigate = useCallback(
     async (target: string) => {
@@ -151,6 +162,38 @@ function FsPane({
       setError(null);
     }
   }, [connected]);
+
+  // Refresh the current directory whenever FluidNC reports a file-system change.
+  useEffect(() => {
+    if (!connected) return;
+    return window.terraForge.fluidnc.onConsoleMessage((msg) => {
+      if (msg.includes("[MSG:Files changed]")) {
+        navigate(path);
+      }
+    });
+  }, [connected, navigate, path]);
+
+  // Keep a ref so the status-change effect can read selectedJobFile without
+  // adding it to the dependency array (which would cause it to fire — and
+  // potentially overwrite activeJobPath — whenever the user selects a row).
+  const selectedJobFileRef = useRef(selectedJobFile);
+  selectedJobFileRef.current = selectedJobFile;
+
+  // Track which file path is actively running on the machine.
+  // Only fires on status state transitions so clicking a different row while
+  // a job is running cannot overwrite the already-set activeJobPath.
+  useEffect(() => {
+    if (status?.state === "Run" || status?.state === "Hold") {
+      setActiveJobPath((prev) => {
+        if (prev !== null) return prev; // already set — keep it
+        const jf = selectedJobFileRef.current;
+        return jf?.source === source ? jf.path : null;
+      });
+    } else {
+      setActiveJobPath(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.state, source]);
 
   const handleDownload = async (file: RemoteFile) => {
     const localPath = isGcodeFile(file.name)
@@ -186,6 +229,14 @@ function FsPane({
   const doPreview = async (file: RemoteFile) => {
     setPendingPreviewFile(null);
     setPreviewing(file.path);
+    const previewTaskId = uuid();
+    upsertTask({
+      id: previewTaskId,
+      type: "gcode-preview",
+      label: `Loading preview for ${file.name}…`,
+      progress: null,
+      status: "running",
+    });
     try {
       const text = await window.terraForge.fluidnc.fetchFileText(
         file.path,
@@ -201,8 +252,23 @@ function FsPane({
       // Select this file as the queued job so Start Job is enabled immediately
       // and the file is highlighted in the browser.
       setSelectedJobFile({ path: file.path, source, name: file.name });
+      upsertTask({
+        id: previewTaskId,
+        type: "gcode-preview",
+        label: `Preview loaded`,
+        progress: 100,
+        status: "completed",
+      });
     } catch (err) {
       console.error("Preview failed:", err);
+      upsertTask({
+        id: previewTaskId,
+        type: "gcode-preview",
+        label: `Preview failed`,
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
     } finally {
       setPreviewing(null);
     }
@@ -214,6 +280,94 @@ function FsPane({
       return;
     }
     doPreview(file);
+  };
+
+  // Run the file on the machine, loading its toolpath first if not already
+  // loaded — so that plot-progress tracing works from the moment it starts.
+  const doRun = async (file: RemoteFile) => {
+    setPendingRunFile(null);
+    const jobTaskId = uuid();
+    upsertTask({
+      id: jobTaskId,
+      type: "job-start",
+      label: `Starting ${file.name}…`,
+      progress: null,
+      status: "running",
+    });
+    if (gcodeSource?.path !== file.path || !gcodeToolpath) {
+      setRunningFile(file.path);
+      const previewTaskId = uuid();
+      upsertTask({
+        id: previewTaskId,
+        type: "gcode-preview",
+        label: `Loading preview for ${file.name}…`,
+        progress: null,
+        status: "running",
+      });
+      setGcodePreviewLoading(true);
+      try {
+        const text = await window.terraForge.fluidnc.fetchFileText(
+          file.path,
+          label === "sdcard" ? "sdcard" : "internal",
+        );
+        const toolpath = parseGcode(text);
+        setGcodeToolpath(toolpath);
+        setGcodeSource({ path: file.path, name: file.name, source });
+        selectToolpath(true);
+        upsertTask({
+          id: previewTaskId,
+          type: "gcode-preview",
+          label: `Preview loaded`,
+          progress: 100,
+          status: "completed",
+        });
+      } catch {
+        // Toolpath load failed — run anyway, just without tracing
+        upsertTask({
+          id: previewTaskId,
+          type: "gcode-preview",
+          label: `Preview load failed`,
+          progress: null,
+          status: "error",
+        });
+      } finally {
+        setRunningFile(null);
+        setGcodePreviewLoading(false);
+      }
+    }
+    // Brief pause so the user can read the preview-loaded toast
+    // before the job begins (cosmetic only).
+    await new Promise((r) => setTimeout(r, 1000));
+    setActiveJobPath(file.path);
+    try {
+      await window.terraForge.fluidnc.runFile(file.path, source);
+      upsertTask({
+        id: jobTaskId,
+        type: "job-start",
+        label: `${file.name} started`,
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      setActiveJobPath(null);
+      upsertTask({
+        id: jobTaskId,
+        type: "job-start",
+        label: `Failed to start ${file.name}`,
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
+  const handleRun = (file: RemoteFile) => {
+    // If a different toolpath is already loaded, warn before replacing it.
+    if (gcodeToolpath && gcodeSource?.path !== file.path) {
+      setPendingRunFile(file);
+      return;
+    }
+    doRun(file);
   };
 
   const atRoot = path === "/";
@@ -229,6 +383,15 @@ function FsPane({
 
   return (
     <div className={`flex flex-col h-full border-b ${borderAccent}`}>
+      {pendingRunFile && (
+        <ConfirmDialog
+          title="Replace Toolpath & Run?"
+          message={`This will replace the current toolpath with "${pendingRunFile.name}" and start the job immediately.`}
+          confirmLabel="Run"
+          onConfirm={() => doRun(pendingRunFile)}
+          onCancel={() => setPendingRunFile(null)}
+        />
+      )}
       {pendingPreviewFile && (
         <ConfirmDialog
           title="Replace Toolpath?"
@@ -324,14 +487,23 @@ function FsPane({
             )}
 
             {files.map((file) => {
+              const anyJobActive =
+                (status?.state === "Run" || status?.state === "Hold") &&
+                activeJobPath !== null;
+
+              // While a job is running, keep the highlight on the active file
+              // regardless of what selectedJobFile the user may have clicked.
               const isSelectedForJob =
                 !file.isDirectory &&
-                selectedJobFile?.path === file.path &&
-                selectedJobFile?.source === source;
+                (anyJobActive
+                  ? activeJobPath === file.path
+                  : selectedJobFile?.path === file.path &&
+                    selectedJobFile?.source === source);
 
               return (
                 <div
                   key={file.path}
+                  data-testid={`file-row-${file.name}`}
                   className={`flex items-center group px-3 py-1 cursor-pointer border-b border-[#0f3460]/20 transition-colors ${
                     isSelectedForJob
                       ? "bg-[#1a3a6e] hover:bg-[#1f4480]"
@@ -375,56 +547,107 @@ function FsPane({
                       ›
                     </span>
                   ) : (
-                    <div className="hidden group-hover:flex gap-0.5 shrink-0">
-                      {isGcodeFile(file.name) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePreview(file);
-                          }}
-                          title="Preview toolpath"
-                          disabled={previewing === file.path}
-                          className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
+                    (() => {
+                      const isThisRunning =
+                        activeJobPath === file.path && status?.state === "Run";
+                      const isThisHeld =
+                        activeJobPath === file.path && status?.state === "Hold";
+                      const isActiveJob = isThisRunning || isThisHeld;
+                      const isLoadingThis = runningFile === file.path;
+                      return (
+                        <div
+                          data-testid={`file-actions-${file.name}`}
+                          className={`gap-0.5 shrink-0 ${isActiveJob || isLoadingThis ? "flex" : "hidden group-hover:flex"}`}
                         >
-                          {previewing === file.path ? "…" : "👁"}
-                        </button>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.terraForge.fluidnc.runFile(file.path, source);
-                        }}
-                        title="Run job now"
-                        className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
-                      >
-                        ▶
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownload(file);
-                        }}
-                        disabled={serialMode}
-                        title={
-                          serialMode
-                            ? "File download not available over serial"
-                            : "Download"
-                        }
-                        className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(file);
-                        }}
-                        title="Delete"
-                        className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020]"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                          {isGcodeFile(file.name) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePreview(file);
+                              }}
+                              title="Preview toolpath"
+                              disabled={
+                                previewing === file.path || anyJobActive
+                              }
+                              className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
+                            >
+                              {previewing === file.path ? "…" : "👁"}
+                            </button>
+                          )}
+                          {isThisRunning ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.terraForge.fluidnc.pauseJob();
+                              }}
+                              title="Pause job"
+                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
+                            >
+                              ⏸
+                            </button>
+                          ) : isThisHeld ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.terraForge.fluidnc.resumeJob();
+                              }}
+                              title="Resume job"
+                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
+                            >
+                              ▶
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRun(file);
+                              }}
+                              title={
+                                anyJobActive
+                                  ? "A job is already running"
+                                  : "Run job now"
+                              }
+                              disabled={isLoadingThis || anyJobActive}
+                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-50 text-white"
+                            >
+                              ▶
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(file);
+                            }}
+                            disabled={serialMode || anyJobActive}
+                            title={
+                              anyJobActive
+                                ? "Unavailable while a job is running"
+                                : serialMode
+                                  ? "File download not available over serial"
+                                  : "Download"
+                            }
+                            className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(file);
+                            }}
+                            disabled={anyJobActive}
+                            title={
+                              anyJobActive
+                                ? "Unavailable while a job is running"
+                                : "Delete"
+                            }
+                            className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020] disabled:opacity-40"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               );
