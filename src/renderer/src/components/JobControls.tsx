@@ -257,6 +257,9 @@ export function JobControls() {
                     setGcodePreviewLoading(false);
                   }
                 }
+                // Brief pause so the user can read the preview-loaded toast
+                // before the job begins (cosmetic only).
+                await new Promise((r) => setTimeout(r, 1000));
                 await window.terraForge.fluidnc.runFile(
                   effectiveJobFile!.path,
                   effectiveJobFile!.source as "fs" | "sd",

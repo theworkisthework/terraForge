@@ -284,6 +284,9 @@ function FsPane({
         setGcodePreviewLoading(false);
       }
     }
+    // Brief pause so the user can read the preview-loaded toast
+    // before the job begins (cosmetic only).
+    await new Promise((r) => setTimeout(r, 1000));
     try {
       await window.terraForge.fluidnc.runFile(file.path, source);
       upsertTask({
