@@ -121,6 +121,7 @@ function FsPane({
   const [activeJobPath, setActiveJobPath] = useState<string | null>(null);
   const [pendingPreviewFile, setPendingPreviewFile] =
     useState<RemoteFile | null>(null);
+  const [pendingRunFile, setPendingRunFile] = useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const gcodeSource = useCanvasStore((s) => s.gcodeSource);
@@ -245,7 +246,8 @@ function FsPane({
 
   // Run the file on the machine, loading its toolpath first if not already
   // loaded — so that plot-progress tracing works from the moment it starts.
-  const handleRun = async (file: RemoteFile) => {
+  const doRun = async (file: RemoteFile) => {
+    setPendingRunFile(null);
     const jobTaskId = uuid();
     upsertTask({
       id: jobTaskId,
@@ -321,6 +323,15 @@ function FsPane({
     }
   };
 
+  const handleRun = (file: RemoteFile) => {
+    // If a different toolpath is already loaded, warn before replacing it.
+    if (gcodeToolpath && gcodeSource?.path !== file.path) {
+      setPendingRunFile(file);
+      return;
+    }
+    doRun(file);
+  };
+
   const atRoot = path === "/";
   const bgAccent = accentColor === "blue" ? "bg-[#0a1628]" : "bg-[#1a0d1a]";
   const borderAccent =
@@ -334,6 +345,15 @@ function FsPane({
 
   return (
     <div className={`flex flex-col h-full border-b ${borderAccent}`}>
+      {pendingRunFile && (
+        <ConfirmDialog
+          title="Replace Toolpath & Run?"
+          message={`This will replace the current toolpath with "${pendingRunFile.name}" and start the job immediately.`}
+          confirmLabel="Run"
+          onConfirm={() => doRun(pendingRunFile)}
+          onCancel={() => setPendingRunFile(null)}
+        />
+      )}
       {pendingPreviewFile && (
         <ConfirmDialog
           title="Replace Toolpath?"
