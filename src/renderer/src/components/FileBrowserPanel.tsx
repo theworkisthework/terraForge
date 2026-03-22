@@ -428,6 +428,7 @@ function FsPane({
               return (
                 <div
                   key={file.path}
+                  data-testid={`file-row-${file.name}`}
                   className={`flex items-center group px-3 py-1 cursor-pointer border-b border-[#0f3460]/20 transition-colors ${
                     isSelectedForJob
                       ? "bg-[#1a3a6e] hover:bg-[#1f4480]"
@@ -484,6 +485,7 @@ function FsPane({
                       const isLoadingThis = runningFile === file.path;
                       return (
                         <div
+                          data-testid={`file-actions-${file.name}`}
                           className={`gap-0.5 shrink-0 ${isActiveJob || isLoadingThis ? "flex" : "hidden group-hover:flex"}`}
                         >
                           {isGcodeFile(file.name) && (

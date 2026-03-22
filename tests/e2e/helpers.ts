@@ -173,3 +173,42 @@ export async function screenshot(window: Page, name: string): Promise<Buffer> {
     path: path.join(ROOT, "test-results", `${name}.png`),
   });
 }
+
+/**
+ * Mock an IPC `invoke` handler in the Electron main process so that the next
+ * (and all subsequent) calls to `ipcRenderer.invoke(channel)` return
+ * `returnValue` without reaching the real handler.
+ *
+ * The value must be JSON-serializable.
+ */
+export async function mockIpcInvoke(
+  electronApp: ElectronApplication,
+  channel: string,
+  returnValue: unknown,
+): Promise<void> {
+  await electronApp.evaluate(
+    ({ ipcMain }, { ch, val }) => {
+      ipcMain.removeHandler(ch);
+      ipcMain.handle(ch, async () => val);
+    },
+    { ch: channel, val: returnValue },
+  );
+}
+
+/**
+ * Push an IPC event from the main process to the renderer, simulating a live
+ * data push (e.g. machine status updates, console messages).
+ */
+export async function pushRendererEvent(
+  electronApp: ElectronApplication,
+  channel: string,
+  payload: unknown,
+): Promise<void> {
+  await electronApp.evaluate(
+    ({ BrowserWindow }, { ch, p }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      win?.webContents.send(ch, p);
+    },
+    { ch: channel, p: payload },
+  );
+}

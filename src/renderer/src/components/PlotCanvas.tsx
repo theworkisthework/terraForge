@@ -356,7 +356,13 @@ export function PlotCanvas() {
       });
     } else if (!toolpathSelected && gcodeSource) {
       const current = useMachineStore.getState().selectedJobFile;
-      if (current?.path === gcodeSource.path) {
+      // Only clear selectedJobFile when the toolpath came from a local file.
+      // Remote-file selections (sd/fs) from the file browser should persist
+      // independently of canvas toolpath selection state.
+      if (
+        current?.path === gcodeSource.path &&
+        gcodeSource.source === "local"
+      ) {
         setSelectedJobFile(null);
       }
     }
@@ -974,7 +980,7 @@ export function PlotCanvas() {
         containerSize.w > 0 &&
         (() => {
           // Keep WCO up to date (FluidNC sends it periodically, not every packet).
-          const wcoMatch = machineStatus.raw.match(
+          const wcoMatch = machineStatus.raw?.match(
             /WCO:([-\d.]+),([-\d.]+),([-\d.]+)/,
           );
           if (wcoMatch) {
@@ -985,12 +991,13 @@ export function PlotCanvas() {
             };
           }
           // Prefer WPos: when FluidNC sends it; otherwise derive from MPos − WCO.
-          const hasWPos = /WPos:/.test(machineStatus.raw);
+          const hasWPos =
+            /WPos:/.test(machineStatus.raw ?? "") && machineStatus.wpos != null;
           const penX = hasWPos
-            ? machineStatus.wpos.x
+            ? machineStatus.wpos!.x
             : machineStatus.mpos.x - penWcoRef.current.x;
           const penY = hasWPos
-            ? machineStatus.wpos.y
+            ? machineStatus.wpos!.y
             : machineStatus.mpos.y - penWcoRef.current.y;
           // Convert machine-mm → canvas SVG px (same transform used by the toolpath g).
           const svgX = isCenter
@@ -1031,7 +1038,7 @@ export function PlotCanvas() {
         containerSize.w > 0 &&
         (() => {
           // Keep WCO up to date (FluidNC sends it periodically, not every packet).
-          const wcoMatch = machineStatus.raw.match(
+          const wcoMatch = machineStatus.raw?.match(
             /WCO:([-\d.]+),([-\d.]+),([-\d.]+)/,
           );
           if (wcoMatch) {
@@ -1042,12 +1049,13 @@ export function PlotCanvas() {
             };
           }
           // Prefer WPos: when FluidNC reports it; otherwise derive from MPos − WCO.
-          const hasWPos = /WPos:/.test(machineStatus.raw);
+          const hasWPos =
+            /WPos:/.test(machineStatus.raw ?? "") && machineStatus.wpos != null;
           const penX = hasWPos
-            ? machineStatus.wpos.x
+            ? machineStatus.wpos!.x
             : machineStatus.mpos.x - penWcoRef.current.x;
           const penY = hasWPos
-            ? machineStatus.wpos.y
+            ? machineStatus.wpos!.y
             : machineStatus.mpos.y - penWcoRef.current.y;
           // Convert machine-mm → canvas SVG px (mirrors the toolpath <g> transform).
           const svgX = isCenter

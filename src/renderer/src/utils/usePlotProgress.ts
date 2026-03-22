@@ -248,7 +248,7 @@ export function usePlotProgress(): void {
     const prevState = prevStateRef.current;
 
     // ── Keep WCO up to date (sent periodically by FluidNC, not every packet) ─
-    const wcoMatch = raw.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
+    const wcoMatch = raw?.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
     if (wcoMatch) {
       wcoRef.current = { x: +wcoMatch[1], y: +wcoMatch[2], z: +wcoMatch[3] };
     }
@@ -256,7 +256,7 @@ export function usePlotProgress(): void {
     // ── Compute true work position ─────────────────────────────────────────
     // Prefer WPos: if FluidNC sends it (controlled by $10 bitmask).
     // Otherwise derive from MPos − WCO (correct after "Set Zero").
-    const wposRaw = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
+    const wposRaw = raw?.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
     const wpos = wposRaw
       ? { x: +wposRaw[1], y: +wposRaw[2] }
       : { x: mpos.x - wcoRef.current.x, y: mpos.y - wcoRef.current.y };

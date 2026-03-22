@@ -62,6 +62,14 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+// Gracefully close the FluidNC WebSocket before the process exits so the
+// machine receives a proper WS close frame instead of a TCP RST.  A TCP RST
+// (from os-level socket teardown on process kill) can wedge the ESP32's WS
+// server slot, requiring a power cycle to recover.
+app.on("before-quit", () => {
+  fluidnc.disconnectWebSocket();
+});
+
 // ─── Singletons ───────────────────────────────────────────────────────────────
 
 const fluidnc = new FluidNCClient();
