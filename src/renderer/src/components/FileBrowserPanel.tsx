@@ -214,6 +214,14 @@ function FsPane({
   const doPreview = async (file: RemoteFile) => {
     setPendingPreviewFile(null);
     setPreviewing(file.path);
+    const previewTaskId = uuid();
+    upsertTask({
+      id: previewTaskId,
+      type: "gcode-preview",
+      label: `Loading preview for ${file.name}…`,
+      progress: null,
+      status: "running",
+    });
     try {
       const text = await window.terraForge.fluidnc.fetchFileText(
         file.path,
@@ -229,8 +237,23 @@ function FsPane({
       // Select this file as the queued job so Start Job is enabled immediately
       // and the file is highlighted in the browser.
       setSelectedJobFile({ path: file.path, source, name: file.name });
+      upsertTask({
+        id: previewTaskId,
+        type: "gcode-preview",
+        label: `Preview loaded`,
+        progress: 100,
+        status: "completed",
+      });
     } catch (err) {
       console.error("Preview failed:", err);
+      upsertTask({
+        id: previewTaskId,
+        type: "gcode-preview",
+        label: `Preview failed`,
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
     } finally {
       setPreviewing(null);
     }
