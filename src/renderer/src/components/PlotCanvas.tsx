@@ -670,18 +670,20 @@ export function PlotCanvas() {
       if (!ctx) return;
 
       // Resize backing store for current container dimensions + DPR.
+      // Cap at 8192 px to avoid allocating beyond typical GPU texture limits.
       const dpr = window.devicePixelRatio || 1;
-      const physW = Math.round(containerSize.w * dpr);
-      const physH = Math.round(containerSize.h * dpr);
+      const physW = Math.min(Math.round(containerSize.w * dpr), 8192);
+      const physH = Math.min(Math.round(containerSize.h * dpr), 8192);
       if (canvas.width !== physW || canvas.height !== physH) {
         canvas.width = physW;
         canvas.height = physH;
       }
       ctx.clearRect(0, 0, physW, physH);
-      if (!gcodeToolpath) return;
 
       // ── Transform: G-code mm → physical canvas pixels ──────────────────────
-      // Matches the coordinate system of the SVG <g transform> on the toolpath.
+      // Computed before the toolpath guard so the bed background is always
+      // painted. The SVG bed <rect> uses fill="none", allowing the canvas layer
+      // to show through and provide the dark bed background.
       const tx = isCenter
         ? PAD + (bedW / 2) * MM_TO_PX
         : isRight
@@ -701,6 +703,21 @@ export function PlotCanvas() {
       const e = (tx * vp.zoom + vp.panX) * dpr;
       const f = (ty * vp.zoom + vp.panY) * dpr;
 
+      // Always paint the bed background — visible with or without a toolpath.
+      ctx.save();
+      ctx.setTransform(a, 0, 0, d, e, f);
+      ctx.fillStyle = "#0d1117";
+      ctx.fillRect(bedXMin, bedYMin, bedXMax - bedXMin, bedYMax - bedYMin);
+      ctx.restore();
+
+      if (!gcodeToolpath) return;
+
+      // Per-frame draw-call budgets: cuts and rapids have independent caps
+      // so rapid moves can never crowd out the more important cut paths.
+      // 150 k cut + 50 k rapid keeps a single frame well under GPU timeout limits.
+      const MAX_CUT_CALLS = 150_000;
+      const MAX_RAPID_CALLS = 50_000;
+
       ctx.save();
       ctx.setTransform(a, 0, 0, d, e, f);
 
@@ -716,6 +733,36 @@ export function PlotCanvas() {
       const lodMm = LOD_PX / pxPerMm;
       const lodMm2 = lodMm * lodMm;
 
+      // ── Cut moves first (pen-down strokes, solid blue) ────────────────────
+      // Drawn before rapids so the cut budget is never consumed by rapid moves.
+      if (gcodeToolpath.cutPaths.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = toolpathSelected ? "#38bdf8" : "#0ea5e9";
+        ctx.lineWidth = 1.5 / pxPerMm;
+        ctx.setLineDash([]);
+        let cutCalls = 0;
+        for (const path of gcodeToolpath.cutPaths) {
+          if (cutCalls >= MAX_CUT_CALLS) break;
+          if (path.length < 4) continue;
+          ctx.moveTo(path[0], path[1]);
+          let lastX = path[0],
+            lastY = path[1];
+          for (let i = 2; i < path.length && cutCalls < MAX_CUT_CALLS; i += 2) {
+            const nx = path[i],
+              ny = path[i + 1];
+            const dx = nx - lastX,
+              dy = ny - lastY;
+            if (dx * dx + dy * dy >= lodMm2) {
+              ctx.lineTo(nx, ny);
+              lastX = nx;
+              lastY = ny;
+              cutCalls++;
+            }
+          }
+        }
+        ctx.stroke();
+      }
+
       // ── Rapid moves (pen-up travel, grey dashed) ──────────────────────────
       const rp = gcodeToolpath.rapidPaths;
       if (rp.length >= 4) {
@@ -723,7 +770,8 @@ export function PlotCanvas() {
         ctx.strokeStyle = "#4a5568";
         ctx.lineWidth = 0.5 / pxPerMm;
         ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
-        for (let i = 0; i < rp.length; i += 4) {
+        let rapidCalls = 0;
+        for (let i = 0; i < rp.length && rapidCalls < MAX_RAPID_CALLS; i += 4) {
           const x0 = rp[i],
             y0 = rp[i + 1],
             x1 = rp[i + 2],
@@ -733,32 +781,7 @@ export function PlotCanvas() {
           if (dx * dx + dy * dy >= lodMm2) {
             ctx.moveTo(x0, y0);
             ctx.lineTo(x1, y1);
-          }
-        }
-        ctx.stroke();
-      }
-
-      // ── Cut moves (pen-down strokes, solid blue) ──────────────────────────
-      if (gcodeToolpath.cutPaths.length > 0) {
-        ctx.beginPath();
-        ctx.strokeStyle = toolpathSelected ? "#38bdf8" : "#0ea5e9";
-        ctx.lineWidth = 1.5 / pxPerMm;
-        ctx.setLineDash([]);
-        for (const path of gcodeToolpath.cutPaths) {
-          if (path.length < 4) continue;
-          ctx.moveTo(path[0], path[1]);
-          let lastX = path[0],
-            lastY = path[1];
-          for (let i = 2; i < path.length; i += 2) {
-            const nx = path[i],
-              ny = path[i + 1];
-            const dx = nx - lastX,
-              dy = ny - lastY;
-            if (dx * dx + dy * dy >= lodMm2) {
-              ctx.lineTo(nx, ny);
-              lastX = nx;
-              lastY = ny;
-            }
+            rapidCalls++;
           }
         }
         ctx.stroke();
@@ -895,13 +918,14 @@ export function PlotCanvas() {
           selectToolpath(false);
         }}
       >
-        {/* Bed background */}
+        {/* Bed background — filled by the canvas layer behind this SVG.
+             fill="none" here so the canvas #0d1117 rect shows through. */}
         <rect
           x={PAD}
           y={PAD}
           width={bedW * MM_TO_PX}
           height={bedH * MM_TO_PX}
-          fill="#0d1117"
+          fill="none"
           stroke="#0f3460"
           strokeWidth={1}
         />
