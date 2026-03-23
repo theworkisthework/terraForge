@@ -796,11 +796,11 @@ export function PlotCanvas() {
 
       if (!gcodeToolpath) return;
 
-      // Per-frame draw-call budgets: cuts and rapids have independent caps
-      // so rapid moves can never crowd out the more important cut paths.
-      // 150 k cut + 50 k rapid keeps a single frame well under GPU timeout limits.
-      const MAX_CUT_CALLS = 150_000;
-      const MAX_RAPID_CALLS = 50_000;
+      // Safety draw-call budgets — viewport culling below means these are
+      // only reached if an extraordinary number of paths land inside the
+      // visible area simultaneously (i.e. fully zoomed-out on a dense file).
+      const MAX_CUT_CALLS = 500_000;
+      const MAX_RAPID_CALLS = 150_000;
 
       ctx.save();
       ctx.setTransform(a, 0, 0, d, e, f);
@@ -817,6 +817,17 @@ export function PlotCanvas() {
       const lodMm = LOD_PX / pxPerMm;
       const lodMm2 = lodMm * lodMm;
 
+      // ── Viewport bounds in G-code mm ────────────────────────────────────────
+      // Invert the canvas transform (buffer px → G-code mm) so we can cull
+      // paths that are entirely outside the visible area.  A 20 mm padding
+      // ensures paths whose first point is off-screen but whose stroke enters
+      // the viewport are not incorrectly discarded.
+      const VP_PAD_MM = 20;
+      const vpL = Math.min((0 - e) / a, (physW - e) / a) - VP_PAD_MM;
+      const vpR = Math.max((0 - e) / a, (physW - e) / a) + VP_PAD_MM;
+      const vpT = Math.min((0 - f) / d, (physH - f) / d) - VP_PAD_MM;
+      const vpB = Math.max((0 - f) / d, (physH - f) / d) + VP_PAD_MM;
+
       // ── Cut moves first (pen-down strokes, solid blue) ────────────────────
       // Drawn before rapids so the cut budget is never consumed by rapid moves.
       if (gcodeToolpath.cutPaths.length > 0) {
@@ -828,6 +839,22 @@ export function PlotCanvas() {
         for (const path of gcodeToolpath.cutPaths) {
           if (cutCalls >= MAX_CUT_CALLS) break;
           if (path.length < 4) continue;
+
+          // Viewport cull: compute path bounding box and skip if entirely
+          // outside the visible area.  O(n) per path but cheaper than drawing.
+          let pMinX = path[0],
+            pMaxX = path[0],
+            pMinY = path[1],
+            pMaxY = path[1];
+          for (let i = 2; i < path.length; i += 2) {
+            if (path[i] < pMinX) pMinX = path[i];
+            else if (path[i] > pMaxX) pMaxX = path[i];
+            if (path[i + 1] < pMinY) pMinY = path[i + 1];
+            else if (path[i + 1] > pMaxY) pMaxY = path[i + 1];
+          }
+          if (pMaxX < vpL || pMinX > vpR || pMaxY < vpT || pMinY > vpB)
+            continue;
+
           ctx.moveTo(path[0], path[1]);
           let lastX = path[0],
             lastY = path[1];
@@ -860,6 +887,13 @@ export function PlotCanvas() {
             y0 = rp[i + 1],
             x1 = rp[i + 2],
             y1 = rp[i + 3];
+          // Viewport cull for rapid segments.
+          const rMinX = x0 < x1 ? x0 : x1,
+            rMaxX = x0 > x1 ? x0 : x1;
+          const rMinY = y0 < y1 ? y0 : y1,
+            rMaxY = y0 > y1 ? y0 : y1;
+          if (rMaxX < vpL || rMinX > vpR || rMaxY < vpT || rMinY > vpB)
+            continue;
           const dx = x1 - x0,
             dy = y1 - y0;
           if (dx * dx + dy * dy >= lodMm2) {
