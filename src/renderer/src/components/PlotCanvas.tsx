@@ -644,6 +644,16 @@ export function PlotCanvas() {
   // every viewport update).
   const toolpathCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Cache of combined Path2D geometry per import, keyed by import ID.
+  // Invalidated when imp.paths reference changes (immer creates a new array on
+  // any mutation). Two entries per import: outline strokes + hatch lines.
+  const importPath2DCacheRef = useRef(
+    new Map<
+      string,
+      { pathsRef: SvgImport["paths"]; outline: Path2D; hatch: Path2D }
+    >(),
+  );
+
   // Lazy Path2D cache for the two live plot-progress overlay strings.
   // Using a ref-held object avoids stale-closure issues while still preventing
   // Path2D reconstruction on every viewport change (only on string change).
@@ -709,6 +719,80 @@ export function PlotCanvas() {
       ctx.fillStyle = "#0d1117";
       ctx.fillRect(bedXMin, bedYMin, bedXMax - bedXMin, bedYMax - bedYMin);
       ctx.restore();
+
+      // ── SVG imports (canvas-rendered to avoid SVG DOM layout cost) ────────────
+      // Paths are rendered here; invisible hit-area rects remain in the SVG
+      // for drag/click interaction.  Combined Path2D per import is built once
+      // and cached; rebuilt only when imp.paths reference changes.
+      {
+        const vpA = vp.zoom * dpr;
+        const vpE = vp.panX * dpr;
+        const vpF = vp.panY * dpr;
+        // Prune cache entries for imports that no longer exist.
+        for (const id of importPath2DCacheRef.current.keys()) {
+          if (!imports.some((imp) => imp.id === id))
+            importPath2DCacheRef.current.delete(id);
+        }
+        for (const imp of imports) {
+          if (!imp.visible) continue;
+          // Build or retrieve combined Path2D objects for this import.
+          let impCache = importPath2DCacheRef.current.get(imp.id);
+          if (!impCache || impCache.pathsRef !== imp.paths) {
+            const outlineD = imp.paths
+              .filter((p) => p.visible && p.outlineVisible !== false)
+              .map((p) => p.d)
+              .join(" ");
+            const hatchD = imp.paths
+              .filter((p) => p.visible && (p.hatchLines?.length ?? 0) > 0)
+              .flatMap((p) => p.hatchLines!)
+              .join(" ");
+            impCache = {
+              pathsRef: imp.paths,
+              outline: new Path2D(outlineD),
+              hatch: new Path2D(hatchD),
+            };
+            importPath2DCacheRef.current.set(imp.id, impCache);
+          }
+
+          const impSX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
+          const impSY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
+          const vbX = imp.viewBoxX ?? 0;
+          const vbY = imp.viewBoxY ?? 0;
+          const left = PAD + imp.x * MM_TO_PX;
+          const impTop = isBottom
+            ? canvasH -
+              PAD -
+              (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX
+            : PAD +
+              (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX;
+          const bboxW = imp.svgWidth * impSX;
+          const bboxH = imp.svgHeight * impSY;
+          const cxSvg = left + bboxW / 2;
+          const cySvg = impTop + bboxH / 2;
+          const deg = imp.rotation ?? 0;
+          // Effective pixels-per-user-unit: used to emulate non-scaling-stroke.
+          const avgImpScale =
+            Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
+          const isImpSelected = imp.id === selectedImportId;
+
+          ctx.save();
+          ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
+          ctx.translate(cxSvg, cySvg);
+          if (deg !== 0) ctx.rotate((deg * Math.PI) / 180);
+          ctx.scale(impSX, impSY);
+          ctx.translate(-(vbX + imp.svgWidth / 2), -(vbY + imp.svgHeight / 2));
+          ctx.setLineDash([]);
+          // Outline paths
+          ctx.strokeStyle = isImpSelected ? "#60a0ff" : "#3a6aaa";
+          ctx.lineWidth = 1.5 / avgImpScale;
+          ctx.stroke(impCache.outline);
+          // Hatch fill lines
+          ctx.strokeStyle = isImpSelected ? "#4a88cc" : "#2a5a8a";
+          ctx.lineWidth = 0.8 / avgImpScale;
+          ctx.stroke(impCache.hatch);
+          ctx.restore();
+        }
+      }
 
       if (!gcodeToolpath) return;
 
@@ -855,6 +939,9 @@ export function PlotCanvas() {
     bedYMin,
     bedXMax,
     bedYMax,
+    imports,
+    selectedImportId,
+    canvasH,
   ]);
 
   // ── Cursor ────────────────────────────────────────────────────────────────────
@@ -1647,31 +1734,7 @@ function ImportLayer({
         onMouseDown={(e) => onImportMouseDown(e, imp.id)}
         style={{ cursor: "grab" }}
       >
-        {imp.paths
-          .filter((p) => p.visible)
-          .map((p) => (
-            <g key={p.id}>
-              {p.outlineVisible !== false && (
-                <path
-                  d={p.d}
-                  fill="none"
-                  stroke={selected ? "#60a0ff" : "#3a6aaa"}
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-              {p.hatchLines?.map((hl, i) => (
-                <path
-                  key={i}
-                  d={hl}
-                  fill="none"
-                  stroke={selected ? "#4a88cc" : "#2a5a8a"}
-                  strokeWidth={0.8}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </g>
-          ))}
+        {/* Paths rendered on canvas overlay — no SVG <path> elements here */}
         {/* Hit-test rect covering the whole viewBox */}
         <rect
           x={vbX}
