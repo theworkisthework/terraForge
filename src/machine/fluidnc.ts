@@ -64,7 +64,7 @@ export class FluidNCClient extends EventEmitter {
     const url = `${this.baseUrl}${path}`;
     const res = await fetch(url, {
       method,
-      signal: AbortSignal.timeout(timeoutMs),
+      ...(timeoutMs > 0 && { signal: AbortSignal.timeout(timeoutMs) }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${method} ${url}`);
     return res;
@@ -285,7 +285,8 @@ export class FluidNCClient extends EventEmitter {
     //   LocalFS:  GET /localfs/filename  (or just /filename)
     const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
-    const res = await this.get(`${prefix}${filePath}`);
+    // Pass 0 (no timeout) — large G-code files can take arbitrarily long to transfer.
+    const res = await this.get(`${prefix}${filePath}`, 0);
     return res.text();
   }
 
