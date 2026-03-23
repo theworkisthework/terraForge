@@ -415,7 +415,10 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
   if (n === 1) return [subpaths[0]];
 
   // ── Build bounding box of all start points ──────────────────────────────
-  let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+  let xMin = Infinity,
+    yMin = Infinity,
+    xMax = -Infinity,
+    yMax = -Infinity;
   for (const sp of subpaths) {
     const { x, y } = sp[0];
     if (x < xMin) xMin = x;
@@ -423,7 +426,8 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
     if (x > xMax) xMax = x;
     if (y > yMax) yMax = y;
   }
-  xMax += 1e-9; yMax += 1e-9; // guard band so max-coord points land inside a cell
+  xMax += 1e-9;
+  yMax += 1e-9; // guard band so max-coord points land inside a cell
 
   // ── Build spatial grid (~1 start point per cell on average) ────────────
   const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
@@ -444,7 +448,8 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
   // ── Greedy nearest-neighbour traversal ──────────────────────────────────
   const visited = new Uint8Array(n);
   const sorted: Subpath[] = new Array(n);
-  let curX = 0, curY = 0;
+  let curX = 0,
+    curY = 0;
 
   for (let s = 0; s < n; s++) {
     let bestIdx = -1;
@@ -462,18 +467,24 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
         if (minPossible * minPossible > bestDist) break;
       }
 
-      const rLo = Math.max(0, cr - ring), rHi = Math.min(rows - 1, cr + ring);
-      const cLo = Math.max(0, cc - ring), cHi = Math.min(cols - 1, cc + ring);
+      const rLo = Math.max(0, cr - ring),
+        rHi = Math.min(rows - 1, cr + ring);
+      const cLo = Math.max(0, cc - ring),
+        cHi = Math.min(cols - 1, cc + ring);
 
       for (let gr = rLo; gr <= rHi; gr++) {
         for (let gc = cLo; gc <= cHi; gc++) {
           // Only examine perimeter cells of the ring, not the interior
-          if (ring > 0 && gr > rLo && gr < rHi && gc > cLo && gc < cHi) continue;
+          if (ring > 0 && gr > rLo && gr < rHi && gc > cLo && gc < cHi)
+            continue;
           for (const idx of cells[gr * cols + gc]) {
             if (visited[idx]) continue;
             const { x, y } = subpaths[idx][0];
             const d = (x - curX) ** 2 + (y - curY) ** 2;
-            if (d < bestDist) { bestDist = d; bestIdx = idx; }
+            if (d < bestDist) {
+              bestDist = d;
+              bestIdx = idx;
+            }
           }
         }
       }
@@ -481,13 +492,18 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
 
     if (bestIdx === -1) {
       // Fallback: linear scan for any unvisited entry (should never be reached)
-      for (let i = 0; i < n; i++) if (!visited[i]) { bestIdx = i; break; }
+      for (let i = 0; i < n; i++)
+        if (!visited[i]) {
+          bestIdx = i;
+          break;
+        }
     }
 
     visited[bestIdx] = 1;
     sorted[s] = subpaths[bestIdx];
     const last = subpaths[bestIdx][subpaths[bestIdx].length - 1];
-    curX = last.x; curY = last.y;
+    curX = last.x;
+    curY = last.y;
   }
 
   return sorted;

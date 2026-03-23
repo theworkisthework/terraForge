@@ -88,9 +88,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // Inject custom start G-code (if any)
   if (customStartGcode) {
-    lines.push("; -- Custom start G-code ----------------------------------------");
+    lines.push(
+      "; -- Custom start G-code ----------------------------------------",
+    );
     lines.push(customStartGcode);
-    lines.push("; ---------------------------------------------------------------");
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
     lines.push("");
   }
 
@@ -185,9 +189,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lines.push("G0 X0 Y0 ; Return to origin");
   }
   if (customEndGcode) {
-    lines.push("; -- Custom end G-code ------------------------------------------");
+    lines.push(
+      "; -- Custom end G-code ------------------------------------------",
+    );
     lines.push(customEndGcode);
-    lines.push("; ---------------------------------------------------------------");
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
   }
   self.postMessage({ type: "complete", taskId, gcode: lines.join("\n") });
 }
