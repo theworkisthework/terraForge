@@ -137,8 +137,8 @@ export function createGcodeToolpath(
   overrides?: Partial<GcodeToolpath>,
 ): GcodeToolpath {
   return {
-    cuts: "M 0.000 0.000 L 100.000 100.000",
-    rapids: "M 0.000 0.000 L 50.000 50.000",
+    cutPaths: [new Float32Array([0, 0, 100, 100])],
+    rapidPaths: new Float32Array([0, 0, 50, 50]),
     bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 },
     lineCount: 10,
     fileSizeBytes: 128,

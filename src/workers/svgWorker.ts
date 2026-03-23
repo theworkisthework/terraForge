@@ -88,16 +88,37 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // Inject custom start G-code (if any)
   if (customStartGcode) {
-    lines.push("; -- Custom start G-code ----------------------------------------");
+    lines.push(
+      "; -- Custom start G-code ----------------------------------------",
+    );
     lines.push(customStartGcode);
-    lines.push("; ---------------------------------------------------------------");
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
     lines.push("");
   }
 
   const visibleObjects = objects.filter((o) => o.visible);
 
+  // Time-based yield helper — only surrenders to the event loop after a full
+  // frame's worth of work (~16 ms), instead of yielding on every iteration.
+  // This keeps the worker responsive to cancel messages while eliminating the
+  // massive overhead of hundreds-of-thousands of individual setTimeout callbacks.
+  const makeYielder = () => {
+    let last = Date.now();
+    return async () => {
+      const now = Date.now();
+      if (now - last >= 16) {
+        last = now;
+        await sleep(0);
+      }
+    };
+  };
+
   // ── Phase 1: collect all subpaths from all visible objects ────────────────
   const allSubpaths: Subpath[] = [];
+  const yieldPh1 = makeYielder();
+  let lastPct1 = -1;
   for (let i = 0; i < visibleObjects.length; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
@@ -108,12 +129,12 @@ async function generate(msg: GenerateMessage): Promise<void> {
     for (const sp of clipSubpathsToBed(raw, config)) {
       if (sp.length >= 2) allSubpaths.push(sp);
     }
-    self.postMessage({
-      type: "progress",
-      taskId,
-      percent: Math.round(((i + 1) / visibleObjects.length) * 40),
-    });
-    await sleep(0);
+    const pct = Math.round(((i + 1) / visibleObjects.length) * 40);
+    if (pct !== lastPct1) {
+      lastPct1 = pct;
+      self.postMessage({ type: "progress", taskId, percent: pct });
+    }
+    await yieldPh1();
   }
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
@@ -134,6 +155,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
     `; -- ${modeLabel} path (${orderedSubpaths.length} subpaths) -----------`,
   );
 
+  const yieldPh4 = makeYielder();
+  let lastPct4 = -1;
   for (let i = 0; i < orderedSubpaths.length; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
@@ -150,12 +173,12 @@ async function generate(msg: GenerateMessage): Promise<void> {
     }
     lines.push(config.penUpCommand + " ; Pen up");
     lines.push("");
-    self.postMessage({
-      type: "progress",
-      taskId,
-      percent: 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60),
-    });
-    await sleep(0);
+    const pct = 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60);
+    if (pct !== lastPct4) {
+      lastPct4 = pct;
+      self.postMessage({ type: "progress", taskId, percent: pct });
+    }
+    await yieldPh4();
   }
 
   lines.push("; ── End of job ──────────────────────────────────────────────");
@@ -166,9 +189,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lines.push("G0 X0 Y0 ; Return to origin");
   }
   if (customEndGcode) {
-    lines.push("; -- Custom end G-code ------------------------------------------");
+    lines.push(
+      "; -- Custom end G-code ------------------------------------------",
+    );
     lines.push(customEndGcode);
-    lines.push("; ---------------------------------------------------------------");
+    lines.push(
+      "; ---------------------------------------------------------------",
+    );
   }
   self.postMessage({ type: "complete", taskId, gcode: lines.join("\n") });
 }

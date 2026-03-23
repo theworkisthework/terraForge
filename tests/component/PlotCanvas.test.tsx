@@ -99,7 +99,7 @@ describe("PlotCanvas", () => {
 
   // ── SVG import rendering ───────────────────────────────────────────
 
-  it("renders SVG import paths on canvas", () => {
+  it("renders SVG import hit-area rect on canvas", () => {
     const path = createSvgPath({ d: "M0,0 L100,100", visible: true });
     const imp = createSvgImport({
       name: "test-import",
@@ -108,9 +108,10 @@ describe("PlotCanvas", () => {
     });
     useCanvasStore.setState({ imports: [imp] });
     const { container } = render(<PlotCanvas />);
-    // The import paths should be rendered as SVG path elements
-    const svgPaths = container.querySelectorAll("path");
-    expect(svgPaths.length).toBeGreaterThan(0);
+    // Import paths are rendered on the canvas overlay (not as SVG <path> elements).
+    // A transparent hit-area <rect> is still placed in the SVG for drag/click.
+    const hitRect = container.querySelector("rect[fill='transparent']");
+    expect(hitRect).toBeTruthy();
   });
 
   it("does not render hidden imports", () => {

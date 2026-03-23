@@ -1,11 +1,14 @@
 // ── G-code toolpath parser ────────────────────────────────────────────────────
 //
-// Converts a G-code text file into two SVG path `d` strings:
-//   cuts   — G1/G2/G3 feed moves (pen down / drawing)
-//   rapids — G0 rapid moves (pen up / travel)
+// Converts a G-code text file into compact typed-array geometry:
+//   cutPaths   — array of Float32Array sub-paths for G1/G2/G3 feed moves
+//   rapidPaths — single flat Float32Array of [x0,y0,x1,y1,...] quad pairs for G0 rapids
 //
-// Coordinates are output in millimetres in the G-code work coordinate space
-// so they can be rendered directly on the bed canvas via a matching transform.
+// Coordinates are in millimetres in the G-code work coordinate space.
+// Using typed arrays instead of SVG path strings:
+//   - eliminates multi-megabyte string allocations for large files
+//   - enables O(n) LOD filtering at canvas render time (skip sub-pixel segments)
+//   - reduces memory by ~3× vs equivalent UTF-16 path strings
 //
 // Supported:
 //   G0, G1        — linear rapid / feed
@@ -30,8 +33,14 @@ export interface GcodeSegment {
 }
 
 export interface GcodeToolpath {
-  cuts: string; // SVG path d — feed moves
-  rapids: string; // SVG path d — rapid moves
+  /** Feed-move sub-paths (pen down).  Each Float32Array is one continuous
+   *  stroke: [x0,y0, x1,y1, x2,y2, ...].  A new array begins wherever the
+   *  pen lifted between cuts (i.e. a G0 rapid or initial pen-up gap). */
+  cutPaths: Float32Array[];
+  /** Rapid-move segments (pen up), packed as flat quads:
+   *  [x_from, y_from, x_to, y_to,  x_from, y_from, x_to, y_to, ...].
+   *  Stride = 4 (one segment per group of four values). */
+  rapidPaths: Float32Array;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   lineCount: number;
   /** Individual motion segments used for live plot-progress tracking.
@@ -55,8 +64,14 @@ export function parseGcode(gcode: string): GcodeToolpath {
   let inMillimeters = true;
   let motionMode = 0; // 0=G0, 1=G1, 2=G2, 3=G3
 
-  const cutParts: string[] = [];
-  const rapidParts: string[] = [];
+  // Cut sub-paths: each number[] becomes one Float32Array in cutPaths.
+  // currentCutPath is the active (open) sub-path being built.
+  const cutSubPaths: number[][] = [];
+  let currentCutPath: number[] | null = null;
+
+  // Rapid segments: flat [x_from, y_from, x_to, y_to, ...] buffer.
+  const rapidData: number[] = [];
+
   const segments: GcodeSegment[] = [];
 
   let minX = 0,
@@ -148,19 +163,21 @@ export function parseGcode(gcode: string): GcodeToolpath {
     });
 
     if (motionMode === 0) {
-      // Rapid — always start a new sub-path segment
+      // Rapid — record as a flat quad [x_from, y_from, x_to, y_to]
       totalRapidDistance += segDist;
-      rapidParts.push(
-        `M ${x.toFixed(3)} ${y.toFixed(3)} L ${nx.toFixed(3)} ${ny.toFixed(3)}`,
-      );
+      rapidData.push(x, y, nx, ny);
+      // A rapid lifts the pen, so the next cut must start a new sub-path.
+      currentCutPath = null;
       lastWasCut = false;
     } else {
       // Feed (G1) or arc (G2/G3 approximated as straight line)
       totalCutDistance += segDist;
-      if (!lastWasCut) {
-        cutParts.push(`M ${x.toFixed(3)} ${y.toFixed(3)}`);
+      if (!lastWasCut || currentCutPath === null) {
+        // Start a new cut sub-path beginning at the current position.
+        currentCutPath = [x, y];
+        cutSubPaths.push(currentCutPath);
       }
-      cutParts.push(`L ${nx.toFixed(3)} ${ny.toFixed(3)}`);
+      currentCutPath.push(nx, ny);
       lastWasCut = true;
     }
 
@@ -169,8 +186,8 @@ export function parseGcode(gcode: string): GcodeToolpath {
   }
 
   return {
-    cuts: cutParts.join(" "),
-    rapids: rapidParts.join(" "),
+    cutPaths: cutSubPaths.map((pts) => new Float32Array(pts)),
+    rapidPaths: new Float32Array(rapidData),
     bounds: { minX, maxX, minY, maxY },
     lineCount,
     segments,
