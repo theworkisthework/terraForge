@@ -628,6 +628,212 @@ export function PlotCanvas() {
     [fitToView],
   );
 
+  // ── Toolpath canvas overlay ───────────────────────────────────────────────────
+  // G-code toolpath (potentially hundreds of thousands of segments) is rendered
+  // onto a separate <canvas> element instead of as SVG <path> elements.
+  //
+  // Why canvas beats SVG for dense paths:
+  //   • No per-element DOM layout or style-cascade overhead
+  //   • No vectorEffect="non-scaling-stroke" re-computation on every zoom/pan
+  //   • Level-of-detail (LOD): sub-pixel segments are skipped based on current
+  //     zoom level, dramatically reducing GPU work for dense G-code files
+  //   • RAF debouncing: rapid pan/zoom events collapse into one repaint per frame
+  //
+  // Plot-progress overlays are rendered on the same canvas via cached Path2D
+  // objects (rebuilt only when the overlay string actually changes, not on
+  // every viewport update).
+  const toolpathCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Lazy Path2D cache for the two live plot-progress overlay strings.
+  // Using a ref-held object avoids stale-closure issues while still preventing
+  // Path2D reconstruction on every viewport change (only on string change).
+  const ppCutsPath2DRef = useRef<{ text: string; path: Path2D | null }>({
+    text: "",
+    path: null,
+  });
+  const ppRapidsPath2DRef = useRef<{ text: string; path: Path2D | null }>({
+    text: "",
+    path: null,
+  });
+
+  // Minimum segment screen-length (CSS px) below which a segment is skipped.
+  const LOD_PX = 0.4;
+
+  useEffect(() => {
+    let rafId: number | null = null;
+
+    const draw = () => {
+      rafId = null;
+      const canvas = toolpathCanvasRef.current;
+      if (!canvas || containerSize.w === 0 || containerSize.h === 0) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Resize backing store for current container dimensions + DPR.
+      const dpr = window.devicePixelRatio || 1;
+      const physW = Math.round(containerSize.w * dpr);
+      const physH = Math.round(containerSize.h * dpr);
+      if (canvas.width !== physW || canvas.height !== physH) {
+        canvas.width = physW;
+        canvas.height = physH;
+      }
+      ctx.clearRect(0, 0, physW, physH);
+      if (!gcodeToolpath) return;
+
+      // ── Transform: G-code mm → physical canvas pixels ──────────────────────
+      // Matches the coordinate system of the SVG <g transform> on the toolpath.
+      const tx = isCenter
+        ? PAD + (bedW / 2) * MM_TO_PX
+        : isRight
+          ? PAD + bedW * MM_TO_PX
+          : PAD;
+      const ty = isCenter
+        ? PAD + (bedH / 2) * MM_TO_PX
+        : isBottom
+          ? PAD + bedH * MM_TO_PX
+          : PAD;
+      const sx = isRight ? -MM_TO_PX : MM_TO_PX;
+      const sy = isCenter || isBottom ? -MM_TO_PX : MM_TO_PX;
+
+      // Canvas CTM (G-code mm → buffer pixels).
+      const a = sx * vp.zoom * dpr;
+      const d = sy * vp.zoom * dpr;
+      const e = (tx * vp.zoom + vp.panX) * dpr;
+      const f = (ty * vp.zoom + vp.panY) * dpr;
+
+      ctx.save();
+      ctx.setTransform(a, 0, 0, d, e, f);
+
+      // Clip to bed bounds (G-code mm coordinates after setTransform).
+      ctx.beginPath();
+      ctx.rect(bedXMin, bedYMin, bedXMax - bedXMin, bedYMax - bedYMin);
+      ctx.clip();
+
+      // CSS pixels per G-code mm — used to scale lineWidth and the LOD threshold.
+      const pxPerMm = Math.abs(sx * vp.zoom);
+
+      // LOD: skip segments whose length in G-code mm is below this threshold.
+      const lodMm = LOD_PX / pxPerMm;
+      const lodMm2 = lodMm * lodMm;
+
+      // ── Rapid moves (pen-up travel, grey dashed) ──────────────────────────
+      const rp = gcodeToolpath.rapidPaths;
+      if (rp.length >= 4) {
+        ctx.beginPath();
+        ctx.strokeStyle = "#4a5568";
+        ctx.lineWidth = 0.5 / pxPerMm;
+        ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
+        for (let i = 0; i < rp.length; i += 4) {
+          const x0 = rp[i],
+            y0 = rp[i + 1],
+            x1 = rp[i + 2],
+            y1 = rp[i + 3];
+          const dx = x1 - x0,
+            dy = y1 - y0;
+          if (dx * dx + dy * dy >= lodMm2) {
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+          }
+        }
+        ctx.stroke();
+      }
+
+      // ── Cut moves (pen-down strokes, solid blue) ──────────────────────────
+      if (gcodeToolpath.cutPaths.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = toolpathSelected ? "#38bdf8" : "#0ea5e9";
+        ctx.lineWidth = 1.5 / pxPerMm;
+        ctx.setLineDash([]);
+        for (const path of gcodeToolpath.cutPaths) {
+          if (path.length < 4) continue;
+          ctx.moveTo(path[0], path[1]);
+          let lastX = path[0],
+            lastY = path[1];
+          for (let i = 2; i < path.length; i += 2) {
+            const nx = path[i],
+              ny = path[i + 1];
+            const dx = nx - lastX,
+              dy = ny - lastY;
+            if (dx * dx + dy * dy >= lodMm2) {
+              ctx.lineTo(nx, ny);
+              lastX = nx;
+              lastY = ny;
+            }
+          }
+        }
+        ctx.stroke();
+      }
+
+      // ── Plot-progress overlays via cached Path2D ─────────────────────────
+      // Path2D is only rebuilt when the string content changes, so rapid
+      // pan/zoom while a job is running does not retrigger string parsing.
+      if (plotProgressRapids) {
+        if (ppRapidsPath2DRef.current.text !== plotProgressRapids) {
+          try {
+            ppRapidsPath2DRef.current = {
+              text: plotProgressRapids,
+              path: new Path2D(plotProgressRapids),
+            };
+          } catch {
+            ppRapidsPath2DRef.current = {
+              text: plotProgressRapids,
+              path: null,
+            };
+          }
+        }
+        const p2d = ppRapidsPath2DRef.current.path;
+        if (p2d) {
+          ctx.strokeStyle = "#f97316";
+          ctx.lineWidth = 0.5 / pxPerMm;
+          ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
+          ctx.stroke(p2d);
+        }
+      }
+      if (plotProgressCuts) {
+        if (ppCutsPath2DRef.current.text !== plotProgressCuts) {
+          try {
+            ppCutsPath2DRef.current = {
+              text: plotProgressCuts,
+              path: new Path2D(plotProgressCuts),
+            };
+          } catch {
+            ppCutsPath2DRef.current = { text: plotProgressCuts, path: null };
+          }
+        }
+        const p2d = ppCutsPath2DRef.current.path;
+        if (p2d) {
+          ctx.strokeStyle = "#ef4444";
+          ctx.lineWidth = 2 / pxPerMm;
+          ctx.setLineDash([]);
+          ctx.stroke(p2d);
+        }
+      }
+
+      ctx.restore();
+    };
+
+    rafId = requestAnimationFrame(draw);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [
+    gcodeToolpath,
+    toolpathSelected,
+    vp,
+    plotProgressCuts,
+    plotProgressRapids,
+    containerSize,
+    bedW,
+    bedH,
+    isCenter,
+    isBottom,
+    isRight,
+    bedXMin,
+    bedYMin,
+    bedXMax,
+    bedYMax,
+  ]);
+
   // ── Cursor ────────────────────────────────────────────────────────────────────
   const cursor = spaceDown
     ? isPanning
@@ -648,6 +854,22 @@ export function PlotCanvas() {
       onMouseDown={onContainerMouseDown}
       onContextMenu={onContextMenu}
     >
+      {/* ── Toolpath canvas — renders G-code paths with per-frame LOD.
+           Positioned below the main SVG so SVG imports appear on top.
+           pointerEvents:none keeps all click/drag handling on the SVG layer. ── */}
+      <canvas
+        ref={toolpathCanvasRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          display: "block",
+          width: containerSize.w || canvasW,
+          height: containerSize.h || canvasH,
+          pointerEvents: "none",
+        }}
+      />
+
       {/* ── Canvas SVG — fills the container; viewBox drives pan/zoom so the
            browser renders all paths at native screen resolution instead of
            rasterising a CSS-scaled compositing layer (which causes blurriness). ── */}
@@ -716,30 +938,10 @@ export function PlotCanvas() {
 
         {/* Rulers are rendered as a screen-space overlay — see below */}
 
-        {/* G-code toolpath overlay */}
+        {/* G-code toolpath hit-area (paths rendered on the canvas overlay below). */}
         {gcodeToolpath &&
           (() => {
             const { minX, maxX, minY, maxY } = gcodeToolpath.bounds;
-            const svgLeft = isCenter
-              ? PAD + (bedW / 2 + minX) * MM_TO_PX
-              : isRight
-                ? PAD + (bedW - maxX) * MM_TO_PX
-                : PAD + minX * MM_TO_PX;
-            const svgRight = isCenter
-              ? PAD + (bedW / 2 + maxX) * MM_TO_PX
-              : isRight
-                ? PAD + (bedW - minX) * MM_TO_PX
-                : PAD + maxX * MM_TO_PX;
-            const svgTop = isCenter
-              ? PAD + (bedH / 2 - maxY) * MM_TO_PX
-              : isBottom
-                ? PAD + (bedH - maxY) * MM_TO_PX
-                : PAD + minY * MM_TO_PX;
-            const svgBottom = isCenter
-              ? PAD + (bedH / 2 - minY) * MM_TO_PX
-              : isBottom
-                ? PAD + (bedH - minY) * MM_TO_PX
-                : PAD + maxY * MM_TO_PX;
             return (
               <>
                 <g
@@ -757,76 +959,22 @@ export function PlotCanvas() {
                         : PAD
                   }) scale(${isRight ? -MM_TO_PX : MM_TO_PX}, ${isCenter || isBottom ? -MM_TO_PX : MM_TO_PX})`}
                 >
-                  <clipPath id="bed-clip">
-                    <rect
-                      x={isCenter ? -bedW / 2 : 0}
-                      y={isCenter ? -bedH / 2 : 0}
-                      width={bedW}
-                      height={bedH}
-                    />
-                  </clipPath>
-                  <g clipPath="url(#bed-clip)">
-                    {gcodeToolpath.rapids && (
-                      <path
-                        d={gcodeToolpath.rapids}
-                        stroke="#4a5568"
-                        strokeWidth={0.5}
-                        fill="none"
-                        strokeDasharray="2 1"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-                    {gcodeToolpath.cuts && (
-                      <path
-                        d={gcodeToolpath.cuts}
-                        stroke={toolpathSelected ? "#38bdf8" : "#0ea5e9"}
-                        strokeWidth={1.5}
-                        fill="none"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-                    {/* ── Live plot-progress overlay ─────────────────────────
-                         Completed rapid moves → orange; completed cut moves → red.
-                         Rendered on top of the base toolpath, segment by segment,
-                         matching the path data exactly so no drift from sampling. */}
-                    {plotProgressRapids && (
-                      <path
-                        d={plotProgressRapids}
-                        stroke="#f97316"
-                        strokeWidth={0.5}
-                        fill="none"
-                        strokeDasharray="2 1"
-                        vectorEffect="non-scaling-stroke"
-                        pointerEvents="none"
-                      />
-                    )}
-                    {plotProgressCuts && (
-                      <path
-                        d={plotProgressCuts}
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        fill="none"
-                        vectorEffect="non-scaling-stroke"
-                        pointerEvents="none"
-                      />
-                    )}
-                    {/* Invisible hit-area for selecting the toolpath */}
-                    <rect
-                      x={minX}
-                      y={minY}
-                      width={maxX - minX}
-                      height={maxY - minY}
-                      fill="transparent"
-                      style={{ cursor: "pointer" }}
-                      vectorEffect="non-scaling-stroke"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectImport(null);
-                        selectToolpath(true);
-                        // selectedJobFile is synced by the toolpathSelected effect below.
-                      }}
-                    />
-                  </g>
+                  {/* Invisible hit-area for selecting the toolpath */}
+                  <rect
+                    x={minX}
+                    y={minY}
+                    width={maxX - minX}
+                    height={maxY - minY}
+                    fill="transparent"
+                    style={{ cursor: "pointer" }}
+                    vectorEffect="non-scaling-stroke"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectImport(null);
+                      selectToolpath(true);
+                      // selectedJobFile is synced by the toolpathSelected effect below.
+                    }}
+                  />
                 </g>
 
                 {toolpathSelected && (
