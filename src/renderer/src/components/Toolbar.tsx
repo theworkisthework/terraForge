@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
@@ -16,6 +16,7 @@ import {
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
 import { CloseLayoutDialog } from "./CloseLayoutDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
@@ -305,6 +306,10 @@ export function Toolbar({
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  /** Parsed imports waiting for the user to confirm overwriting the canvas. */
+  const [pendingLayout, setPendingLayout] = useState<
+    import("../../../types").SvgImport[] | null
+  >(null);
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -740,14 +745,19 @@ export function Toolbar({
       if (!Array.isArray(layout.imports)) {
         throw new Error("Layout file does not contain a valid imports array.");
       }
-      loadLayout(layout.imports);
       upsertTask({
         id: taskId,
         type: "svg-parse",
-        label: `Layout loaded (${layout.imports.length} object${layout.imports.length !== 1 ? "s" : ""})`,
+        label: "Layout ready",
         progress: 100,
         status: "completed",
       });
+      if (imports.length > 0) {
+        // Canvas already has content — ask before overwriting.
+        setPendingLayout(layout.imports);
+      } else {
+        loadLayout(layout.imports);
+      }
     } catch (err) {
       upsertTask({
         id: taskId,
@@ -770,6 +780,40 @@ export function Toolbar({
     clearImports();
     setShowCloseDialog(false);
   };
+
+  // Keep refs current so the menu IPC listeners (subscribed once on mount)
+  // always call the latest function closures without stale state.
+  const saveLayoutRef = useRef(handleSaveLayout);
+  const loadLayoutRef = useRef(handleLoadLayout);
+  const closeLayoutRef = useRef(handleCloseLayout);
+  saveLayoutRef.current = handleSaveLayout;
+  loadLayoutRef.current = handleLoadLayout;
+  closeLayoutRef.current = handleCloseLayout;
+
+  // Subscribe to native File-menu → layout action events.
+  useEffect(() => {
+    const unsubImport = window.terraForge.fs.onMenuImport(() => handleImport());
+    const unsubOpen = window.terraForge.fs.onMenuOpenLayout(() =>
+      loadLayoutRef.current(),
+    );
+    const unsubSave = window.terraForge.fs.onMenuSaveLayout(() =>
+      saveLayoutRef.current(),
+    );
+    const unsubClose = window.terraForge.fs.onMenuCloseLayout(() =>
+      closeLayoutRef.current(),
+    );
+    return () => {
+      unsubImport();
+      unsubOpen();
+      unsubSave();
+      unsubClose();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep Save Layout / Close Layout menu items enabled only when there are imports.
+  useEffect(() => {
+    window.terraForge.fs.setLayoutMenuState(imports.length > 0);
+  }, [imports.length]);
 
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
@@ -1005,31 +1049,6 @@ export function Toolbar({
         Import
       </button>
 
-      {/* Canvas layout save / load */}
-      <button
-        onClick={handleSaveLayout}
-        disabled={imports.length === 0}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
-        title="Save the current canvas layout as a .tforge file"
-      >
-        Save Layout
-      </button>
-      <button
-        onClick={handleLoadLayout}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
-        title="Open a previously saved .tforge canvas layout"
-      >
-        Open Layout
-      </button>
-      <button
-        onClick={handleCloseLayout}
-        disabled={imports.length === 0}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
-        title="Close the current canvas layout"
-      >
-        Close Layout
-      </button>
-
       {/* Generate G-code — opens options dialog */}
       <button
         onClick={() => setShowGcodeDialog(true)}
@@ -1129,6 +1148,19 @@ export function Toolbar({
           }}
           onDiscard={doCloseLayout}
           onCancel={() => setShowCloseDialog(false)}
+        />
+      )}
+
+      {pendingLayout !== null && (
+        <ConfirmDialog
+          title="Replace Canvas?"
+          message={`The canvas already has ${imports.length} object${imports.length !== 1 ? "s" : ""}. Opening this layout will replace it.\n\nContinue?`}
+          confirmLabel="Replace"
+          onConfirm={() => {
+            loadLayout(pendingLayout);
+            setPendingLayout(null);
+          }}
+          onCancel={() => setPendingLayout(null)}
         />
       )}
     </header>

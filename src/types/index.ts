@@ -291,6 +291,13 @@ export interface FsApi {
   saveFileDialog: (defaultName: string) => Promise<string | null>;
   saveLayoutDialog: (defaultName: string) => Promise<string | null>;
   openLayoutDialog: () => Promise<string | null>;
+  /** Subscribe to native File-menu → layout action events. Returns an unsubscribe fn. */
+  onMenuImport: (cb: () => void) => () => void;
+  onMenuOpenLayout: (cb: () => void) => () => void;
+  onMenuSaveLayout: (cb: () => void) => () => void;
+  onMenuCloseLayout: (cb: () => void) => () => void;
+  /** Notify the main process whether the Save/Close Layout menu items should be enabled. */
+  setLayoutMenuState: (hasImports: boolean) => void;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }
