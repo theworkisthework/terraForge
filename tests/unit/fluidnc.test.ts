@@ -1,6 +1,47 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { FluidNCClient } from "../../src/machine/fluidnc";
 
+// ── Mock WebSocket from "ws" ──────────────────────────────────────────────────
+// vi.hoisted creates a value accessible in vi.mock factories (they're both
+// hoisted before static imports by Vitest).
+
+const wsCapture = vi.hoisted(() => ({
+  instances: [] as Array<{
+    url: string;
+    readyState: number;
+    send: ReturnType<typeof vi.fn>;
+    terminate: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+    emit: (event: string, ...args: unknown[]) => boolean;
+    on: (event: string, listener: (...args: unknown[]) => void) => void;
+  }>,
+}));
+
+vi.mock("ws", () => {
+  // EventEmitter must be required inside the factory (hoisted context)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { EventEmitter } = require("events");
+
+  class MockWebSocket extends EventEmitter {
+    static OPEN = 1;
+    static CONNECTING = 0;
+    readyState = 0;
+    url: string;
+    send = vi.fn();
+    terminate = vi.fn();
+    close = vi.fn();
+    constructor(url: string) {
+      super();
+      this.url = url;
+      wsCapture.instances.push(
+        this as unknown as (typeof wsCapture.instances)[0],
+      );
+    }
+  }
+
+  return { WebSocket: MockWebSocket };
+});
+
 // ── Mock global fetch ─────────────────────────────────────────────────────────
 
 const mockFetch = vi.fn();
@@ -8,6 +49,8 @@ const mockFetch = vi.fn();
 beforeEach(() => {
   vi.stubGlobal("fetch", mockFetch);
   mockFetch.mockReset();
+  // Clear WS instance registry between tests
+  wsCapture.instances.length = 0;
 });
 
 afterEach(() => {
@@ -376,5 +419,297 @@ describe("FluidNCClient", () => {
     client.disconnectWebSocket();
     const gen2 = (client as any).wsGeneration;
     expect(gen2).toBeGreaterThan(gen1);
+  });
+
+  // ── sendRealtime via open WebSocket (line 196) ──────────────────────────
+
+  it("pauseJob sends '!' directly via WebSocket when WS is open", async () => {
+    const mockWs = { readyState: 1 /* OPEN */, send: vi.fn() };
+    (client as any).ws = mockWs;
+    await client.pauseJob();
+    expect(mockWs.send).toHaveBeenCalledWith("!");
+    (client as any).ws = null;
+  });
+
+  it("resumeJob sends '~' directly via WebSocket when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    await client.resumeJob();
+    expect(mockWs.send).toHaveBeenCalledWith("~");
+    (client as any).ws = null;
+  });
+
+  it("abortJob sends 0x18 directly via WebSocket when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    await client.abortJob();
+    expect(mockWs.send).toHaveBeenCalledWith("\x18");
+    (client as any).ws = null;
+  });
+
+  // ── resolveHost DNS fallback (lines 49-53) ─────────────────────────────
+
+  it("resolveHost returns the original hostname when DNS lookup fails", async () => {
+    // ".invalid" TLD is RFC-guaranteed to never resolve
+    const result = await (client as any).resolveHost("bogus.host.invalid");
+    expect(result).toBe("bogus.host.invalid");
+  });
+
+  // ── connectWebSocket explicit wsPort override (lines 534-537) ──────────
+
+  it("connectWebSocket with wsPort override skips firmware probe", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    const probeSpy = vi
+      .spyOn(client as any, "probeFirmwareVersion")
+      .mockResolvedValue(null);
+
+    await client.connectWebSocket("192.168.1.10", 80, 8888);
+
+    expect(probeSpy).not.toHaveBeenCalled();
+    expect((client as any).wsPort).toBe(8888);
+    expect(openWsSpy).toHaveBeenCalled();
+    openWsSpy.mockRestore();
+    probeSpy.mockRestore();
+  });
+
+  // ── connectWebSocket without wsPort, probe succeeds ────────────────────
+
+  it("connectWebSocket without wsPort uses firmware-probed WS port", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    const resolveHostSpy = vi
+      .spyOn(client as any, "resolveHost")
+      .mockResolvedValue("192.168.1.10");
+    const probeSpy = vi
+      .spyOn(client as any, "probeFirmwareVersion")
+      .mockResolvedValue({ major: 4, version: "4.0.1", wsPort: 80 });
+
+    await client.connectWebSocket("myplotter.local", 80);
+
+    expect(probeSpy).toHaveBeenCalled();
+    expect((client as any).fwMajor).toBe(4);
+    expect((client as any).wsPort).toBe(80);
+    openWsSpy.mockRestore();
+    resolveHostSpy.mockRestore();
+    probeSpy.mockRestore();
+  });
+
+  it("connectWebSocket emits firmware event on probe success", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    vi.spyOn(client as any, "resolveHost").mockResolvedValue("192.168.1.10");
+    vi.spyOn(client as any, "probeFirmwareVersion").mockResolvedValue({
+      major: 4,
+      version: "4.0.1",
+      wsPort: 80,
+    });
+
+    const fwEvents: (string | null)[] = [];
+    client.on("firmware", (info) => fwEvents.push(info));
+
+    await client.connectWebSocket("myplotter.local", 80);
+
+    expect(fwEvents).toContain("FluidNC v4.0.1");
+    openWsSpy.mockRestore();
+  });
+
+  it("connectWebSocket uses version heuristic when probe returns null wsPort", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    vi.spyOn(client as any, "resolveHost").mockResolvedValue("192.168.1.5");
+    vi.spyOn(client as any, "probeFirmwareVersion").mockResolvedValue({
+      major: 3,
+      version: "3.9.7",
+      wsPort: null, // no webcommunication field
+    });
+
+    await client.connectWebSocket("oldplotter.local", 80);
+
+    // major < 4 → heuristic wsPort = 81
+    expect((client as any).wsPort).toBe(81);
+    openWsSpy.mockRestore();
+  });
+
+  // ── connectWebSocket without wsPort, probe fails ────────────────────────
+
+  it("connectWebSocket defaults to HTTP port when probe fails", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    vi.spyOn(client as any, "resolveHost").mockResolvedValue("192.168.1.20");
+    vi.spyOn(client as any, "probeFirmwareVersion").mockResolvedValue(null);
+
+    const fwEvents: (string | null)[] = [];
+    client.on("firmware", (info) => fwEvents.push(info));
+
+    await client.connectWebSocket("unknown.local", 80);
+
+    expect((client as any).wsPort).toBe(80);
+    expect((client as any).fwInfo).toBeNull();
+    expect(fwEvents).toContain(null);
+    openWsSpy.mockRestore();
+  });
+
+  // ── openWs WebSocket event handlers ────────────────────────────────────
+
+  describe("openWs event handlers", () => {
+    beforeEach(() => {
+      client = new FluidNCClient();
+      client.setHost("192.168.1.100", 80);
+      (client as any).wsEnabled = true;
+    });
+
+    afterEach(() => {
+      // Prevent reconnect timers from leaking
+      (client as any).wsEnabled = false;
+    });
+
+    function lastWs() {
+      return wsCapture.instances[wsCapture.instances.length - 1];
+    }
+
+    it("'open' event emits console message and sends $RI=500", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("open");
+
+      expect(consoleEvents).toContain("[terraForge] WebSocket connected");
+      expect(lastWs().send).toHaveBeenCalledWith("$RI=500\n");
+    });
+
+    it("'message' with status string emits status event", () => {
+      const statusEvents: unknown[] = [];
+      client.on("status", (s) => statusEvents.push(s));
+
+      (client as any).openWs();
+      lastWs().emit("message", "<Idle|MPos:1.000,2.000,0.000>");
+
+      expect(statusEvents).toHaveLength(1);
+      expect((statusEvents[0] as any).state).toBe("Idle");
+    });
+
+    it("'message' with PING emits ping event and suppresses console", () => {
+      const pingEvents: unknown[] = [];
+      const consoleEvents: string[] = [];
+      client.on("ping", () => pingEvents.push(true));
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("message", "PING");
+
+      expect(pingEvents).toHaveLength(1);
+      expect(consoleEvents).toHaveLength(0);
+    });
+
+    it("'message' with PING:<...> also emits ping and suppresses console", () => {
+      const pingEvents: unknown[] = [];
+      client.on("ping", () => pingEvents.push(true));
+
+      (client as any).openWs();
+      lastWs().emit("message", "PING:60000:60000");
+
+      expect(pingEvents).toHaveLength(1);
+    });
+
+    it("'message' with currentID: suppresses console output", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("message", "currentID:12345");
+
+      expect(consoleEvents).toHaveLength(0);
+    });
+
+    it("'message' with ACTIVE_ID: suppresses console output", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("message", "ACTIVE_ID:session1");
+
+      expect(consoleEvents).toHaveLength(0);
+    });
+
+    it("'message' with regular text emits console event", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("message", "ok");
+
+      expect(consoleEvents).toContain("ok");
+    });
+
+    it("'close' event schedules reconnect", () => {
+      vi.useFakeTimers();
+      const openWsSpy = vi.spyOn(client as any, "openWs");
+
+      (client as any).openWs();
+      (client as any).wsEnabled = true; // keep reconnect loop alive
+      lastWs().emit("close", 1006, Buffer.from(""));
+
+      vi.advanceTimersByTime(5000);
+      // openWs should have been called again via scheduleReconnect
+      expect(openWsSpy).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it("'error' with 503 does not emit console message", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("error", new Error("HTTP 503 Bad Gateway"));
+
+      // Only WS-internal console messages (none for 503)
+      expect(consoleEvents.some((m) => !m.startsWith("[terraForge]"))).toBe(
+        false,
+      );
+    });
+
+    it("'error' with HTTP 200 switches wsPort to 81", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).wsPort = 80;
+      (client as any).openWs();
+      lastWs().emit("error", new Error("Unexpected server response: 200"));
+
+      expect((client as any).wsPort).toBe(81);
+      expect(consoleEvents.some((m) => m.includes("port 81"))).toBe(true);
+    });
+
+    it("'error' with non-503 non-HTTP200 emits console error message", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      lastWs().emit("error", new Error("ECONNREFUSED"));
+
+      expect(consoleEvents.some((m) => m.includes("WebSocket error"))).toBe(
+        true,
+      );
+    });
+
+    it("stale-generation open event is ignored", () => {
+      const consoleEvents: string[] = [];
+      client.on("console", (msg) => consoleEvents.push(msg));
+
+      (client as any).openWs();
+      // Bump generation so the handlers are stale
+      (client as any).wsGeneration++;
+      lastWs().emit("open");
+
+      expect(consoleEvents).toHaveLength(0);
+    });
   });
 });
