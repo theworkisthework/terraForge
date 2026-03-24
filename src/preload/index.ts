@@ -110,6 +110,33 @@ const fs: TerraForgeAPI["fs"] = {
     invoke<string | null>("fs:saveGcodeDialog", defaultName),
   saveFileDialog: (defaultName) =>
     invoke<string | null>("fs:saveFileDialog", defaultName),
+  saveLayoutDialog: (defaultName) =>
+    invoke<string | null>("fs:saveLayoutDialog", defaultName),
+  openLayoutDialog: () => invoke<string | null>("fs:openLayoutDialog"),
+
+  onMenuImport: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:import", listener);
+    return () => ipcRenderer.off("menu:import", listener);
+  },
+  onMenuOpenLayout: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:openLayout", listener);
+    return () => ipcRenderer.off("menu:openLayout", listener);
+  },
+  onMenuSaveLayout: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:saveLayout", listener);
+    return () => ipcRenderer.off("menu:saveLayout", listener);
+  },
+  onMenuCloseLayout: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:closeLayout", listener);
+    return () => ipcRenderer.off("menu:closeLayout", listener);
+  },
+  setLayoutMenuState: (hasImports) =>
+    ipcRenderer.send("menu:setLayoutMenuState", hasImports),
+
   loadConfigs: () => invoke<MachineConfig[]>("fs:loadConfigs"),
   saveConfigs: (configs) => invoke<void>("fs:saveConfigs", configs),
 };

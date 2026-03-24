@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
@@ -9,11 +9,14 @@ import {
   type GcodeOptions,
   type SvgImport,
   type SvgPath,
+  type CanvasLayout,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
+import { CloseLayoutDialog } from "./CloseLayoutDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
@@ -282,6 +285,8 @@ export function Toolbar({
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const imports = useCanvasStore((s) => s.imports);
   const addImport = useCanvasStore((s) => s.addImport);
+  const clearImports = useCanvasStore((s) => s.clearImports);
+  const loadLayout = useCanvasStore((s) => s.loadLayout);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
@@ -300,6 +305,11 @@ export function Toolbar({
   const [isConnecting, setIsConnecting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  /** Parsed imports waiting for the user to confirm overwriting the canvas. */
+  const [pendingLayout, setPendingLayout] = useState<
+    import("../../../types").SvgImport[] | null
+  >(null);
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -669,6 +679,142 @@ export function Toolbar({
     }
   };
 
+  const handleSaveLayout = async () => {
+    if (imports.length === 0) return;
+    const taskId = uuid();
+    const baseName = imports.length === 1 ? imports[0].name : "layout";
+    const defaultFilename = `${baseName}.tforge`;
+    const savePath =
+      await window.terraForge.fs.saveLayoutDialog(defaultFilename);
+    if (!savePath) return;
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: "Saving layout…",
+      progress: null,
+      status: "running",
+    });
+    try {
+      const layout: CanvasLayout = {
+        tfVersion: 1,
+        savedAt: new Date().toISOString(),
+        imports,
+      };
+      await window.terraForge.fs.writeFile(
+        savePath,
+        JSON.stringify(layout, null, 2),
+      );
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Layout saved",
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Save failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
+  const handleLoadLayout = async () => {
+    const filePath = await window.terraForge.fs.openLayoutDialog();
+    if (!filePath) return;
+    const taskId = uuid();
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: "Loading layout…",
+      progress: null,
+      status: "running",
+    });
+    try {
+      const raw = await window.terraForge.fs.readFile(filePath);
+      let layout: CanvasLayout;
+      try {
+        layout = JSON.parse(raw) as CanvasLayout;
+      } catch {
+        throw new Error("Not a valid terraForge layout file.");
+      }
+      if (!Array.isArray(layout.imports)) {
+        throw new Error("Layout file does not contain a valid imports array.");
+      }
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Layout ready",
+        progress: 100,
+        status: "completed",
+      });
+      if (imports.length > 0) {
+        // Canvas already has content — ask before overwriting.
+        setPendingLayout(layout.imports);
+      } else {
+        loadLayout(layout.imports);
+      }
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Load layout failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
+  const handleCloseLayout = () => {
+    // Nothing to close.
+    if (imports.length === 0) return;
+    setShowCloseDialog(true);
+  };
+
+  const doCloseLayout = () => {
+    clearImports();
+    setShowCloseDialog(false);
+  };
+
+  // Keep refs current so the menu IPC listeners (subscribed once on mount)
+  // always call the latest function closures without stale state.
+  const saveLayoutRef = useRef(handleSaveLayout);
+  const loadLayoutRef = useRef(handleLoadLayout);
+  const closeLayoutRef = useRef(handleCloseLayout);
+  saveLayoutRef.current = handleSaveLayout;
+  loadLayoutRef.current = handleLoadLayout;
+  closeLayoutRef.current = handleCloseLayout;
+
+  // Subscribe to native File-menu → layout action events.
+  useEffect(() => {
+    const unsubImport = window.terraForge.fs.onMenuImport(() => handleImport());
+    const unsubOpen = window.terraForge.fs.onMenuOpenLayout(() =>
+      loadLayoutRef.current(),
+    );
+    const unsubSave = window.terraForge.fs.onMenuSaveLayout(() =>
+      saveLayoutRef.current(),
+    );
+    const unsubClose = window.terraForge.fs.onMenuCloseLayout(() =>
+      closeLayoutRef.current(),
+    );
+    return () => {
+      unsubImport();
+      unsubOpen();
+      unsubSave();
+      unsubClose();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep Save Layout / Close Layout menu items enabled only when there are imports.
+  useEffect(() => {
+    window.terraForge.fs.setLayoutMenuState(imports.length > 0);
+  }, [imports.length]);
+
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
@@ -987,6 +1133,35 @@ export function Toolbar({
 
       {showSettings && (
         <MachineConfigDialog onClose={() => setShowSettings(false)} />
+      )}
+
+      {showCloseDialog && (
+        <CloseLayoutDialog
+          importCount={imports.length}
+          onSave={async () => {
+            setShowCloseDialog(false);
+            await handleSaveLayout();
+            // Only clear canvas once save dialog resolves (user may cancel it)
+            // We clear unconditionally because the user explicitly chose Save —
+            // if they cancelled the file picker we still dismiss the close dialog.
+            clearImports();
+          }}
+          onDiscard={doCloseLayout}
+          onCancel={() => setShowCloseDialog(false)}
+        />
+      )}
+
+      {pendingLayout !== null && (
+        <ConfirmDialog
+          title="Replace Canvas?"
+          message={`The canvas already has ${imports.length} object${imports.length !== 1 ? "s" : ""}. Opening this layout will replace it.\n\nContinue?`}
+          confirmLabel="Replace"
+          onConfirm={() => {
+            loadLayout(pendingLayout);
+            setPendingLayout(null);
+          }}
+          onCancel={() => setPendingLayout(null)}
+        />
       )}
     </header>
   );

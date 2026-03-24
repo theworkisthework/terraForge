@@ -46,6 +46,8 @@ interface CanvasState {
   /** Select or deselect the G-code toolpath.  Deselects any SVG import. */
   selectToolpath: (selected: boolean) => void;
   clearImports: () => void;
+  /** Replace the entire imports list atomically — used by canvas layout load. */
+  loadLayout: (imports: SvgImport[]) => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
   setGcodeSource: (
@@ -177,6 +179,18 @@ export const useCanvasStore = create<CanvasState>()(
     clearImports: () =>
       set((state) => {
         state.imports = [];
+        state.selectedImportId = null;
+        state.selectedPathId = null;
+      }),
+
+    loadLayout: (newImports) =>
+      set((state) => {
+        state.imports = newImports.map((imp) => ({
+          hatchEnabled: false,
+          hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
+          hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+          ...imp,
+        }));
         state.selectedImportId = null;
         state.selectedPathId = null;
       }),

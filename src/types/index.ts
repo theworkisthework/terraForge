@@ -129,6 +129,16 @@ export interface SvgImport {
   hatchAngleDeg?: number;
 }
 
+// ─── Canvas Layout ──────────────────────────────────────────────────────────────
+
+/** Serialised canvas layout — saved/loaded as .tforge JSON. */
+export interface CanvasLayout {
+  /** Format version — increment if the schema changes in a breaking way. */
+  tfVersion: number;
+  savedAt: string;
+  imports: SvgImport[];
+}
+
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 
 export interface Job {
@@ -279,6 +289,15 @@ export interface FsApi {
   writeFile: (filePath: string, content: string) => Promise<void>;
   saveGcodeDialog: (defaultName: string) => Promise<string | null>;
   saveFileDialog: (defaultName: string) => Promise<string | null>;
+  saveLayoutDialog: (defaultName: string) => Promise<string | null>;
+  openLayoutDialog: () => Promise<string | null>;
+  /** Subscribe to native File-menu → layout action events. Returns an unsubscribe fn. */
+  onMenuImport: (cb: () => void) => () => void;
+  onMenuOpenLayout: (cb: () => void) => () => void;
+  onMenuSaveLayout: (cb: () => void) => () => void;
+  onMenuCloseLayout: (cb: () => void) => () => void;
+  /** Notify the main process whether the Save/Close Layout menu items should be enabled. */
+  setLayoutMenuState: (hasImports: boolean) => void;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }
