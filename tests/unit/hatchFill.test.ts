@@ -149,4 +149,55 @@ describe("generateHatchPaths", () => {
     const result = generateHatchPaths(blob, 1, 0);
     expect(result.length).toBeGreaterThan(0);
   });
+
+  // ── H and V command support ─────────────────────────────────────────────────
+
+  it("handles a path using H (horizontal) commands", () => {
+    // Rectangle defined with H and V instead of L
+    const path = "M 0 0 H 10 V 10 H 0 Z";
+    const result = generateHatchPaths(path, 2, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("H-command rectangle produces same hatch count as L-command rectangle", () => {
+    const withH = "M 0 0 H 10 V 10 H 0 Z";
+    const withL = "M 0 0 L 10 0 L 10 10 L 0 10 Z";
+    const hResult = generateHatchPaths(withH, 2, 0);
+    const lResult = generateHatchPaths(withL, 2, 0);
+    expect(hResult.length).toBe(lResult.length);
+  });
+
+  it("handles a path using V (vertical) commands", () => {
+    // Tall rectangle using V commands
+    const path = "M 0 0 L 5 0 V 10 L 0 10 Z";
+    const result = generateHatchPaths(path, 2, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("handles a Z close-path on an open contour", () => {
+    // Z should close the path back to start before hatching
+    const path = "M 0 0 L 10 0 L 10 10 Z";
+    const result = generateHatchPaths(path, 2, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("handles a smooth cubic (S) bezier path", () => {
+    // S command reflects last control point of preceding C
+    const path = "M 0 5 C 0 0 10 0 10 5 S 20 10 20 5 Z";
+    const result = generateHatchPaths(path, 2, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("handles a quadratic bezier (Q) path", () => {
+    const path = "M 0 0 Q 5 10 10 0 Q 5 -10 0 0 Z";
+    const result = generateHatchPaths(path, 1, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("handles a smooth quadratic (T) bezier path", () => {
+    // T reflects the control point from preceding Q
+    const path = "M 0 0 Q 5 10 10 0 T 20 0 Z";
+    const result = generateHatchPaths(path, 2, 0);
+    expect(result.length).toBeGreaterThan(0);
+  });
 });

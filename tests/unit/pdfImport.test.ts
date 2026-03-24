@@ -247,4 +247,190 @@ describe("importPdf", () => {
       expect(result[0].scale).toBeCloseTo(25.4 / 72, 5);
     }
   });
+
+  // ── Canvas proxy intercept coverage ──────────────────────────────────────
+  // The following tests exercise the proxy get/set intercepts inside
+  // extractPagePaths by calling different canvas methods from the mock render.
+
+  it("covers the bezierCurveTo proxy intercept", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                canvasContext.beginPath();
+                canvasContext.moveTo(0, 0);
+                canvasContext.bezierCurveTo(10, 10, 20, 20, 30, 0);
+                canvasContext.stroke();
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "bezier");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers the quadraticCurveTo proxy intercept", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                canvasContext.beginPath();
+                canvasContext.moveTo(0, 0);
+                canvasContext.quadraticCurveTo(50, 50, 100, 0);
+                canvasContext.stroke();
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "quad");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers the rect proxy intercept with fill", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                canvasContext.beginPath();
+                canvasContext.rect(10, 10, 50, 50);
+                canvasContext.fill();
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "rect-fill");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers the clip proxy intercept (discards path)", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                // clip() should discard the path (emitted=true, d not collected)
+                canvasContext.beginPath();
+                canvasContext.rect(0, 0, 50, 50);
+                canvasContext.clip();
+                // Draw visible line after clip — should be collected
+                canvasContext.beginPath();
+                canvasContext.moveTo(5, 5);
+                canvasContext.lineTo(45, 45);
+                canvasContext.stroke();
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "clip");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers the closePath proxy intercept and trailing commit", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                // Path ended with closePath but NO stroke → collected by trailing commit()
+                canvasContext.beginPath();
+                canvasContext.moveTo(0, 0);
+                canvasContext.lineTo(50, 0);
+                canvasContext.closePath();
+                // Intentionally no stroke here — exercises the trailing commit path
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "close-trail");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers strokeRect and fillRect proxy intercepts", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                canvasContext.beginPath();
+                canvasContext.moveTo(0, 0);
+                canvasContext.lineTo(10, 0);
+                canvasContext.strokeRect(20, 20, 30, 30);
+                canvasContext.fillRect(60, 60, 10, 10);
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "rects");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("covers the proxy pass-through getter (non-intercepted function) and set trap", async () => {
+    const { getDocument } = await vi.importMock<any>("pdfjs-dist");
+    getDocument.mockReturnValueOnce({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() =>
+          Promise.resolve({
+            getViewport: () => ({ width: 100, height: 100 }),
+            render: ({ canvasContext }: { canvasContext: any }) => ({
+              promise: Promise.resolve().then(() => {
+                // set trap: assign a non-function property
+                canvasContext.strokeStyle = "red";
+                // generic getter: read it back (non-function prop → return val)
+                const _style = canvasContext.strokeStyle;
+                // Also call a non-intercepted function (e.g. save/restore)
+                canvasContext.save();
+                canvasContext.beginPath();
+                canvasContext.moveTo(0, 0);
+                canvasContext.lineTo(10, 0);
+                canvasContext.stroke();
+                canvasContext.restore();
+              }),
+            }),
+          }),
+        ),
+      }),
+    });
+    const result = await importPdf(new Uint8Array([1]), "passthru");
+    expect(Array.isArray(result)).toBe(true);
+  });
 });

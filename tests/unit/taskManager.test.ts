@@ -102,6 +102,21 @@ describe("TaskManager", () => {
     expect(all.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
   });
 
+  // ── no-op on unknown task ids ────────────────────────────────────────────
+
+  it("fail is a no-op for unknown task", () => {
+    expect(() => tm.fail("nonexistent", "oops")).not.toThrow();
+  });
+
+  it("cancel is a no-op for unknown task", () => {
+    expect(() => tm.cancel("nonexistent")).not.toThrow();
+    expect(tm.isCancelled("nonexistent")).toBe(false);
+  });
+
+  it("complete is a no-op for unknown task", () => {
+    expect(() => tm.complete("nonexistent")).not.toThrow();
+  });
+
   // ── Multiple concurrent tasks ──────────────────────────────────────────
 
   it("tracks multiple concurrent tasks independently", () => {

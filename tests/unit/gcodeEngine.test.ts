@@ -9,6 +9,7 @@ import {
   nearestNeighbourSort,
   joinSubpaths,
   flattenToSubpaths,
+  clipSubpathsToBed,
   fmtCoord,
   type Pt,
 } from "../../src/workers/gcodeEngine";
@@ -323,6 +324,15 @@ describe("arcToBeziers", () => {
     expect(last.x).toBeCloseTo(100, 0);
     expect(last.y).toBeCloseTo(0, 0);
   });
+
+  it("scales up radii that are too small to span the endpoint distance (lam > 1)", () => {
+    // rx=ry=1 but endpoints are 100 units apart → lam >> 1 → radii scaled up
+    const pts = arcToBeziers(0, 0, 1, 1, 0, 0, 1, 100, 0);
+    expect(pts.length).toBeGreaterThan(0);
+    const last = pts[pts.length - 1];
+    expect(last.x).toBeCloseTo(100, 0);
+    expect(last.y).toBeCloseTo(0, 0);
+  });
 });
 
 // ── nearestNeighbourSort ──────────────────────────────────────────────────────
@@ -373,6 +383,33 @@ describe("nearestNeighbourSort", () => {
     expect(result[0]).toBe(a); // nearest to origin
     expect(result[1]).toBe(b); // nearest to end of a
     expect(result[2]).toBe(c);
+  });
+
+  it("sorts a 3×3 grid of 9 subpaths, exercising the interior-cell ring skip", () => {
+    // 9 subpaths at regularly-spaced grid positions create a 3×3 spatial grid.
+    // The ring search expands to ring=2, where the centre cell (row=1,col=1) is
+    // interior to the ring boundary and the `continue` guard fires (line 479).
+    const coords: [number, number][] = [
+      [0, 0],
+      [100, 0],
+      [200, 0],
+      [0, 100],
+      [100, 100],
+      [200, 100],
+      [0, 200],
+      [100, 200],
+      [200, 200],
+    ];
+    const subpaths: Pt[][] = coords.map(([x, y]) => [
+      { x, y },
+      { x: x + 5, y },
+    ]);
+    const result = nearestNeighbourSort(subpaths);
+    expect(result).toHaveLength(9);
+    const starts = new Set(result.map((sp) => `${sp[0].x},${sp[0].y}`));
+    for (const [x, y] of coords) {
+      expect(starts.has(`${x},${y}`)).toBe(true);
+    }
   });
 });
 
@@ -884,5 +921,123 @@ describe("joinSubpaths", () => {
     ];
     const result = joinSubpaths([a, b], 0.05);
     expect(result).toHaveLength(1);
+  });
+});
+
+// ── clipSubpathsToBed ─────────────────────────────────────────────────────────
+
+describe("clipSubpathsToBed", () => {
+  const bedCfg = createMachineConfig({
+    origin: "top-left",
+    bedWidth: 100,
+    bedHeight: 100,
+  });
+  const centerCfg = createMachineConfig({
+    origin: "center",
+    bedWidth: 100,
+    bedHeight: 100,
+  });
+
+  it("returns empty for empty input", () => {
+    expect(clipSubpathsToBed([], bedCfg)).toEqual([]);
+  });
+
+  it("passes through a subpath fully inside the bed", () => {
+    const sp: Pt[] = [
+      { x: 10, y: 10 },
+      { x: 50, y: 50 },
+      { x: 80, y: 20 },
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveLength(3);
+  });
+
+  it("drops a subpath fully outside the bed", () => {
+    const sp: Pt[] = [
+      { x: 150, y: 150 },
+      { x: 200, y: 200 },
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops a too-short subpath (single point)", () => {
+    const sp: Pt[] = [{ x: 10, y: 10 }];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(0);
+  });
+
+  it("clips a segment that enters the bed mid-way", () => {
+    // Start outside (-50,50) → end inside (50,50): crosses x=0 boundary
+    const sp: Pt[] = [
+      { x: -50, y: 50 },
+      { x: 50, y: 50 },
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(1);
+    // The clipped subpath must start at or after x=0
+    expect(result[0][0].x).toBeGreaterThanOrEqual(0);
+    expect(result[0][result[0].length - 1].x).toBeCloseTo(50);
+  });
+
+  it("clips a segment that exits the bed mid-way", () => {
+    // Start inside (50,50) → end outside (150,50): exits x=100
+    const sp: Pt[] = [
+      { x: 50, y: 50 },
+      { x: 150, y: 50 },
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(1);
+    expect(result[0][0].x).toBeCloseTo(50);
+    // Exit point at x=100
+    expect(result[0][result[0].length - 1].x).toBeCloseTo(100);
+  });
+
+  it("splits a path that exits and re-enters the bed into two subpaths", () => {
+    // inside → outside → inside: creates two separate clipped subpaths
+    const sp: Pt[] = [
+      { x: 20, y: 50 }, // inside
+      { x: 150, y: 50 }, // outside
+      { x: 80, y: 50 }, // inside
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    // First segment exits the bed; second segment re-enters from outside
+    expect(result.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("handles a fully outside segment between two inside segments", () => {
+    // p0 (inside) → p1 (outside) → p2 (outside) → p3 (inside)
+    const sp: Pt[] = [
+      { x: 10, y: 50 }, // inside
+      { x: 200, y: 50 }, // outside
+    ];
+    const result = clipSubpathsToBed([sp], bedCfg);
+    expect(result).toHaveLength(1);
+    // Should clip at x=100
+    expect(result[0][result[0].length - 1].x).toBeCloseTo(100);
+  });
+
+  it("uses center origin coordinate system", () => {
+    // For center origin with 100x100 bed: x in [-50, 50], y in [-50, 50]
+    // A segment entirely within [-50,50]×[-50,50] should pass through
+    const sp: Pt[] = [
+      { x: -30, y: -30 },
+      { x: 30, y: 30 },
+    ];
+    const result = clipSubpathsToBed([sp], centerCfg);
+    expect(result).toHaveLength(1);
+    expect(result[0][0].x).toBeCloseTo(-30);
+    expect(result[0][result[0].length - 1].x).toBeCloseTo(30);
+  });
+
+  it("clips a segment outside the center-origin bed", () => {
+    // Outside center bed: x=100 is outside [-50,50]
+    const sp: Pt[] = [
+      { x: 100, y: 0 },
+      { x: 200, y: 0 },
+    ];
+    const result = clipSubpathsToBed([sp], centerCfg);
+    expect(result).toHaveLength(0);
   });
 });

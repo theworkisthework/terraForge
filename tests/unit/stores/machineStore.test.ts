@@ -164,4 +164,30 @@ describe("machineStore", () => {
     expect(useMachineStore.getState().configs[0].id).toBe("r1");
     expect(useMachineStore.getState().configs[1].id).toBe("r2");
   });
+
+  // ── branch coverage gaps ────────────────────────────────────────────────
+
+  it("updateConfig is a no-op for an unknown id (idx === -1 branch)", async () => {
+    const cfg = createMachineConfig({ id: "u1", name: "Original" });
+    useMachineStore.setState({ configs: [cfg] });
+    await useMachineStore
+      .getState()
+      .updateConfig("nonexistent", { name: "Changed" });
+    // config should be unchanged; saveMachineConfig should not have been called
+    expect(useMachineStore.getState().configs[0].name).toBe("Original");
+  });
+
+  it("deleteConfig sets activeConfigId to null when deleting the only config", async () => {
+    const cfg = createMachineConfig({ id: "only" });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: "only" });
+    await useMachineStore.getState().deleteConfig("only");
+    expect(useMachineStore.getState().configs).toHaveLength(0);
+    expect(useMachineStore.getState().activeConfigId).toBeNull();
+  });
+
+  it("setActiveConfig sets activeConfigId directly", () => {
+    useMachineStore.setState({ activeConfigId: null });
+    useMachineStore.getState().setActiveConfig("cfg-42");
+    expect(useMachineStore.getState().activeConfigId).toBe("cfg-42");
+  });
 });

@@ -301,4 +301,36 @@ describe("parseGcode", () => {
     const r = parse("G1 F1000 X5 Y5\nG1 F2000 X10 Y10\n");
     expect(r.feedrate).toBe(2000);
   });
+
+  // ── Targeted branch coverage ──────────────────────────────────────────────
+
+  it("updates minX when a later move goes to a smaller X (line 94)", () => {
+    // First point sets minX=30; second point has X=10 < minX → minX=10
+    const r = parse("G1 X30 Y5\nG1 X10 Y20\n");
+    expect(r.bounds.minX).toBeCloseTo(10);
+  });
+
+  it("skips a line that has content but no G-code word pairs (line 121)", () => {
+    // '%' is a valid G-code program delimiter but contains no letter+number pairs
+    const r = parse("G1 X10 Y10\n%\nG1 X20 Y20\n");
+    expect(cutsContainPoint(r, 20, 20)).toBe(true);
+  });
+
+  it("restores absolute mode with explicit G90 after G91 (line 133)", () => {
+    // G91 → relative. G90 → back to absolute. Final G1 X5 Y5 must be (5,5), not (15,15).
+    const r = parse("G91\nG1 X10 Y10\nG90\nG1 X5 Y5\n");
+    expect(cutsContainPoint(r, 5, 5)).toBe(true);
+  });
+
+  it("inherits current X when move specifies only Y (line 149 false branch)", () => {
+    // 'G1 Y20' has no X word → nx falls back to current x (10)
+    const r = parse("G1 X10 Y10\nG1 Y20\n");
+    expect(cutsContainPoint(r, 10, 20)).toBe(true);
+  });
+
+  it("unrecognised modal G-code falls through the else-if chain without error", () => {
+    // G17 (plane select) is not in the modal list — hits the implicit else of the chain
+    const r = parse("G17\nG1 X10 Y10\n");
+    expect(cutsContainPoint(r, 10, 10)).toBe(true);
+  });
 });
