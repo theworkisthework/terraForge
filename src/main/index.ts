@@ -603,6 +603,26 @@ ipcMain.handle("fs:saveFileDialog", async (_e, defaultName: string) => {
   return result.canceled ? null : result.filePath;
 });
 
+ipcMain.handle("fs:saveLayoutDialog", async (_e, defaultName: string) => {
+  if (!mainWindow) return null;
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Save Canvas Layout",
+    defaultPath: defaultName,
+    filters: [{ name: "terraForge Layout", extensions: ["tforge"] }],
+  });
+  return result.canceled ? null : result.filePath;
+});
+
+ipcMain.handle("fs:openLayoutDialog", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Open Canvas Layout",
+    filters: [{ name: "terraForge Layout", extensions: ["tforge"] }],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle("fs:loadConfigs", () => loadConfigs());
 ipcMain.handle("fs:saveConfigs", (_e, configs: MachineConfig[]) =>
   saveConfigs(configs),

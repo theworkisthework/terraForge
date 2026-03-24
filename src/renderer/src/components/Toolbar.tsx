@@ -9,11 +9,13 @@ import {
   type GcodeOptions,
   type SvgImport,
   type SvgPath,
+  type CanvasLayout,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
+import { CloseLayoutDialog } from "./CloseLayoutDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
@@ -282,6 +284,8 @@ export function Toolbar({
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const imports = useCanvasStore((s) => s.imports);
   const addImport = useCanvasStore((s) => s.addImport);
+  const clearImports = useCanvasStore((s) => s.clearImports);
+  const loadLayout = useCanvasStore((s) => s.loadLayout);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
@@ -300,6 +304,7 @@ export function Toolbar({
   const [isConnecting, setIsConnecting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -669,6 +674,103 @@ export function Toolbar({
     }
   };
 
+  const handleSaveLayout = async () => {
+    if (imports.length === 0) return;
+    const taskId = uuid();
+    const baseName = imports.length === 1 ? imports[0].name : "layout";
+    const defaultFilename = `${baseName}.tforge`;
+    const savePath =
+      await window.terraForge.fs.saveLayoutDialog(defaultFilename);
+    if (!savePath) return;
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: "Saving layout…",
+      progress: null,
+      status: "running",
+    });
+    try {
+      const layout: CanvasLayout = {
+        tfVersion: 1,
+        savedAt: new Date().toISOString(),
+        imports,
+      };
+      await window.terraForge.fs.writeFile(
+        savePath,
+        JSON.stringify(layout, null, 2),
+      );
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Layout saved",
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Save failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
+  const handleLoadLayout = async () => {
+    const filePath = await window.terraForge.fs.openLayoutDialog();
+    if (!filePath) return;
+    const taskId = uuid();
+    upsertTask({
+      id: taskId,
+      type: "svg-parse",
+      label: "Loading layout…",
+      progress: null,
+      status: "running",
+    });
+    try {
+      const raw = await window.terraForge.fs.readFile(filePath);
+      let layout: CanvasLayout;
+      try {
+        layout = JSON.parse(raw) as CanvasLayout;
+      } catch {
+        throw new Error("Not a valid terraForge layout file.");
+      }
+      if (!Array.isArray(layout.imports)) {
+        throw new Error("Layout file does not contain a valid imports array.");
+      }
+      loadLayout(layout.imports);
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: `Layout loaded (${layout.imports.length} object${layout.imports.length !== 1 ? "s" : ""})`,
+        progress: 100,
+        status: "completed",
+      });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "svg-parse",
+        label: "Load layout failed",
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+  };
+
+  const handleCloseLayout = () => {
+    // Nothing to close.
+    if (imports.length === 0) return;
+    setShowCloseDialog(true);
+  };
+
+  const doCloseLayout = () => {
+    clearImports();
+    setShowCloseDialog(false);
+  };
+
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
@@ -903,6 +1005,31 @@ export function Toolbar({
         Import
       </button>
 
+      {/* Canvas layout save / load */}
+      <button
+        onClick={handleSaveLayout}
+        disabled={imports.length === 0}
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
+        title="Save the current canvas layout as a .tforge file"
+      >
+        Save Layout
+      </button>
+      <button
+        onClick={handleLoadLayout}
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+        title="Open a previously saved .tforge canvas layout"
+      >
+        Open Layout
+      </button>
+      <button
+        onClick={handleCloseLayout}
+        disabled={imports.length === 0}
+        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
+        title="Close the current canvas layout"
+      >
+        Close Layout
+      </button>
+
       {/* Generate G-code — opens options dialog */}
       <button
         onClick={() => setShowGcodeDialog(true)}
@@ -987,6 +1114,22 @@ export function Toolbar({
 
       {showSettings && (
         <MachineConfigDialog onClose={() => setShowSettings(false)} />
+      )}
+
+      {showCloseDialog && (
+        <CloseLayoutDialog
+          importCount={imports.length}
+          onSave={async () => {
+            setShowCloseDialog(false);
+            await handleSaveLayout();
+            // Only clear canvas once save dialog resolves (user may cancel it)
+            // We clear unconditionally because the user explicitly chose Save —
+            // if they cancelled the file picker we still dismiss the close dialog.
+            clearImports();
+          }}
+          onDiscard={doCloseLayout}
+          onCancel={() => setShowCloseDialog(false)}
+        />
       )}
     </header>
   );

@@ -110,6 +110,9 @@ const fs: TerraForgeAPI["fs"] = {
     invoke<string | null>("fs:saveGcodeDialog", defaultName),
   saveFileDialog: (defaultName) =>
     invoke<string | null>("fs:saveFileDialog", defaultName),
+  saveLayoutDialog: (defaultName) =>
+    invoke<string | null>("fs:saveLayoutDialog", defaultName),
+  openLayoutDialog: () => invoke<string | null>("fs:openLayoutDialog"),
   loadConfigs: () => invoke<MachineConfig[]>("fs:loadConfigs"),
   saveConfigs: (configs) => invoke<void>("fs:saveConfigs", configs),
 };

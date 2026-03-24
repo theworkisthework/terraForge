@@ -129,6 +129,16 @@ export interface SvgImport {
   hatchAngleDeg?: number;
 }
 
+// ─── Canvas Layout ──────────────────────────────────────────────────────────────
+
+/** Serialised canvas layout — saved/loaded as .tforge JSON. */
+export interface CanvasLayout {
+  /** Format version — increment if the schema changes in a breaking way. */
+  tfVersion: number;
+  savedAt: string;
+  imports: SvgImport[];
+}
+
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 
 export interface Job {
@@ -279,6 +289,8 @@ export interface FsApi {
   writeFile: (filePath: string, content: string) => Promise<void>;
   saveGcodeDialog: (defaultName: string) => Promise<string | null>;
   saveFileDialog: (defaultName: string) => Promise<string | null>;
+  saveLayoutDialog: (defaultName: string) => Promise<string | null>;
+  openLayoutDialog: () => Promise<string | null>;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }
