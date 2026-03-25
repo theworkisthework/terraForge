@@ -559,4 +559,45 @@ describe("usePlotProgress", () => {
 
     expect(typeof useCanvasStore.getState().plotProgressCuts).toBe("string");
   });
+
+  // ── Retreat guard ("Never retreat the frontier") ────────────────────
+
+  it("does not retreat frontier when machine reports earlier t on the same segment", async () => {
+    // Single long cut segment (0,0)→(100,0) so any x in [0,100] matches it.
+    // First status: x=80 → frontier at segment 0, t≈0.8.
+    // Second status: x=20 → same segment, t≈0.2 < 0.8 → retreat guard fires.
+    const segs: GcodeSegment[] = [
+      {
+        from: { x: 0, y: 0 },
+        to: { x: 100, y: 0 },
+        type: "cut" as const,
+        lineNum: 0,
+      },
+    ];
+    (segs[0] as any).lineNum = undefined;
+    const tp = makeToolpath(segs);
+
+    render(<ProgressHost />);
+    await act(async () => {
+      useCanvasStore.setState({ gcodeToolpath: tp });
+      useMachineStore.setState({ connected: true });
+    });
+
+    // First tick — advance frontier to t≈0.8
+    await act(async () => {
+      setStatus("Run", 80, 0);
+    });
+    const cutsAfterForward = useCanvasStore.getState().plotProgressCuts;
+
+    // Second tick — same segment at t≈0.2 (retreat)
+    await act(async () => {
+      setStatus("Run", 20, 0);
+    });
+    const cutsAfterRetreat = useCanvasStore.getState().plotProgressCuts;
+
+    // Frontier must not have gone backward
+    expect(cutsAfterRetreat.length).toBeGreaterThanOrEqual(
+      cutsAfterForward.length,
+    );
+  });
 });

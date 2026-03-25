@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -649,5 +649,170 @@ describe("FileBrowserPanel", () => {
     // Deselect
     await userEvent.click(screen.getByText("art.gcode"));
     expect(useMachineStore.getState().selectedJobFile).toBeNull();
+  });
+
+  // ── Download button ──────────────────────────────────────────────────
+
+  it("download button calls saveGcodeDialog then downloadFile for .gcode files", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        name: "output.gcode",
+        path: "/output.gcode",
+        size: 512,
+        isDirectory: false,
+      },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("/local/output.gcode");
+    (
+      window.terraForge.fluidnc.downloadFile as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(undefined);
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("output.gcode")).toBeInTheDocument(),
+    );
+    const row = screen.getByTestId("file-row-output.gcode");
+    await userEvent.hover(row);
+    const dlBtn = screen.getByTitle("Download");
+    await userEvent.click(dlBtn);
+    await waitFor(() => {
+      expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalledWith(
+        "output.gcode",
+      );
+      expect(window.terraForge.fluidnc.downloadFile).toHaveBeenCalled();
+    });
+  });
+
+  it("download button cancelled when saveGcodeDialog returns null", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      { name: "out.gcode", path: "/out.gcode", size: 100, isDirectory: false },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(null);
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("out.gcode")).toBeInTheDocument(),
+    );
+    const row = screen.getByTestId("file-row-out.gcode");
+    await userEvent.hover(row);
+    await userEvent.click(screen.getByTitle("Download"));
+    await waitFor(() => {
+      expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalled();
+    });
+    expect(window.terraForge.fluidnc.downloadFile).not.toHaveBeenCalled();
+  });
+
+  // ── Pause / Resume buttons while job running ────────────────────────
+
+  it("shows Pause button when the active job file is running (Run state)", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        name: "run.gcode",
+        path: "/run.gcode",
+        size: 100,
+        isDirectory: false,
+      },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
+      status: {
+        state: "Run" as any,
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+        activeJobPath: "/run.gcode",
+      } as any,
+    });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("run.gcode")).toBeInTheDocument(),
+    );
+    expect(screen.getByTitle("Pause job")).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("Pause job"));
+    expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
+  });
+
+  it("shows Resume button when the active job file is in Hold state", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        name: "held.gcode",
+        path: "/held.gcode",
+        size: 100,
+        isDirectory: false,
+      },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "/held.gcode",
+        source: "sd",
+        name: "held.gcode",
+      },
+      status: {
+        state: "Hold" as any,
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Hold|MPos:0,0,0>",
+        activeJobPath: "/held.gcode",
+      } as any,
+    });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("held.gcode")).toBeInTheDocument(),
+    );
+    expect(screen.getByTitle("Resume job")).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("Resume job"));
+    expect(window.terraForge.fluidnc.resumeJob).toHaveBeenCalled();
+  });
+
+  // ── Drag-to-resize divider ──────────────────────────────────────────
+
+  it("dragging the resize divider calls onMouseMove and onMouseUp handlers", async () => {
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    // Open the internal pane so both are open and the drag handle appears
+    await userEvent.click(screen.getByText(/internal/i));
+    const divider = await screen.findByTitle("Drag to resize");
+    // Start drag at y=100
+    fireEvent.mouseDown(divider, { clientY: 100 });
+    // Move mouse down by 50px — should call setSplitPx
+    fireEvent.mouseMove(document, { clientY: 150 });
+    // Release mouse
+    fireEvent.mouseUp(document);
+    // Moving after release should be a no-op (dragRef cleared)
+    fireEvent.mouseMove(document, { clientY: 200 });
+    // The test just verifies no error thrown and the component is still rendered
+    expect(screen.getByTitle("Drag to resize")).toBeInTheDocument();
   });
 });

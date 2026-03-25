@@ -521,3 +521,196 @@ describe("PropertiesPanel", () => {
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(90);
   });
 });
+
+// ── Scale and rotation shortcut buttons ───────────────────────────────────────
+
+describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
+  function setupScaleFixture(svgW = 100, svgH = 100) {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "scale-shortcut",
+      svgWidth: svgW,
+      svgHeight: svgH,
+      scale: 2,
+      rotation: 30,
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    return imp;
+  }
+
+  // ── Fit to bed ─────────────────────────────────────────────────────────
+
+  it("fit-to-bed button sets scale to min(bedW/svgW, bedH/svgH)", async () => {
+    // bedW=200, bedH=150, svgW=100, svgH=100
+    // fitScale = min(200/100, 150/100) = min(2, 1.5) = 1.5
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    const fitBtn = screen.getByTitle(/Fit to bed/);
+    await userEvent.click(fitBtn);
+    expect(useCanvasStore.getState().imports[0].scale).toBeCloseTo(1.5);
+  });
+
+  it("fit-to-bed button resets scaleX and scaleY overrides and positions to 0", async () => {
+    setupScaleFixture();
+    // Pre-set scaleX/scaleY overrides
+    useCanvasStore.setState((s) => ({
+      imports: s.imports.map((i) => ({
+        ...i,
+        scaleX: 3,
+        scaleY: 2,
+        x: 10,
+        y: 20,
+      })),
+    }));
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Fit to bed/));
+    const imp = useCanvasStore.getState().imports[0];
+    expect(imp.scaleX).toBeUndefined();
+    expect(imp.scaleY).toBeUndefined();
+    expect(imp.x).toBe(0);
+    expect(imp.y).toBe(0);
+  });
+
+  // ── Reset to 1:1 ──────────────────────────────────────────────────────
+
+  it("reset-scale button sets scale to 1", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    const resetBtn = screen.getByTitle(
+      "Reset scale to 1:1 (1 SVG unit = 1 mm)",
+    );
+    await userEvent.click(resetBtn);
+    expect(useCanvasStore.getState().imports[0].scale).toBe(1);
+  });
+
+  it("reset-scale button clears scaleX and scaleY overrides", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState((s) => ({
+      imports: s.imports.map((i) => ({ ...i, scaleX: 3, scaleY: 2 })),
+    }));
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Reset scale to 1:1 (1 SVG unit = 1 mm)"),
+    );
+    const imp = useCanvasStore.getState().imports[0];
+    expect(imp.scaleX).toBeUndefined();
+    expect(imp.scaleY).toBeUndefined();
+  });
+
+  // ── CCW / CW rotate ───────────────────────────────────────────────────
+
+  it("CCW button decrements rotation by current step (default 45°)", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Rotate 45° counter-clockwise"));
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(-15);
+  });
+
+  it("CW button increments rotation by current step (default 45°)", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Rotate 45° clockwise"));
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(75);
+  });
+
+  // ── Step flyout ───────────────────────────────────────────────────────
+
+  it("clicking step button opens flyout with step options", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // ROT_STEPS = [1, 5, 15, 30, 45]. Trigger already shows "45°" so check a
+    // different step value to avoid multiple-element ambiguity.
+    expect(screen.getByText("15°")).toBeInTheDocument();
+    expect(screen.getByText("30°")).toBeInTheDocument();
+  });
+
+  it("selecting a step from flyout updates the step and closes the flyout", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // Click the 15° option inside the flyout
+    const fifteenBtns = screen.getAllByText("15°");
+    // The flyout option is the one inside the dropdown (last one, not the trigger label)
+    await userEvent.click(fifteenBtns[fifteenBtns.length - 1]);
+    // Flyout should be closed — the 5°/30°/45° options should be gone
+    expect(screen.queryByText("45°")).not.toBeInTheDocument();
+    // Step trigger should now show 15°
+    expect(screen.getByTitle("Change rotation step")).toHaveTextContent("15°");
+  });
+
+  it("clicking backdrop closes the flyout", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // "30°" only appears in the flyout (trigger shows "45°"), so use it to
+    // verify the flyout is open and then gone after backdrop click.
+    expect(screen.getByText("30°")).toBeInTheDocument();
+    const backdrop = document.querySelector(".fixed.inset-0") as HTMLElement;
+    expect(backdrop).not.toBeNull();
+    await userEvent.click(backdrop);
+    expect(screen.queryByText("30°")).not.toBeInTheDocument();
+  });
+
+  // ── Centre marker toggle ──────────────────────────────────────────────
+
+  it("centre marker button toggles showCentreMarker in store", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState({ showCentreMarker: false });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Show centre marker"));
+    expect(useCanvasStore.getState().showCentreMarker).toBe(true);
+  });
+
+  it("centre marker button shows 'Hide' title when marker is active", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState({ showCentreMarker: true });
+    render(<PropertiesPanel />);
+    expect(screen.getByTitle("Hide centre marker")).toBeInTheDocument();
+  });
+
+  // ── Magnet snap ───────────────────────────────────────────────────────
+
+  it("magnet button snaps rotation to first ROT_PRESET when no current preset", async () => {
+    setupScaleFixture(); // rotation = 30° (not in ROT_PRESETS)
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // norm = 30 → no match in presets → idx = -1 → next = ROT_PRESETS[0] = 0
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(0);
+  });
+
+  it("magnet button advances to next preset when already on one", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "magnet-preset",
+      rotation: 45, // ROT_PRESETS index 1
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // idx=1 → next = ROT_PRESETS[2] = 90
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(90);
+  });
+
+  it("magnet wraps from last preset back to first", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "magnet-wrap",
+      rotation: 315, // last ROT_PRESET index 7
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // idx=7 → (7+1) % 8 = 0 → ROT_PRESETS[0] = 0
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(0);
+  });
+});

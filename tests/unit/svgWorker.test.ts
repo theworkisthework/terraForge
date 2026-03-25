@@ -227,7 +227,9 @@ describe("svgWorker — G-code body", () => {
       taskId: "custom-start",
       objects: [makeSimpleObj()],
       config: makeConfig(),
-      options: createGcodeOptions({ customStartGcode: "M42 P0 S1 ; custom start" }),
+      options: createGcodeOptions({
+        customStartGcode: "M42 P0 S1 ; custom start",
+      }),
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
@@ -551,5 +553,27 @@ describe("svgWorker — join paths mode", () => {
     expect(gcode).toContain("Joined   : yes (tolerance 0.2 mm)");
     expect(gcode).toContain("G0 X");
     expect(gcode).toContain("G1 X");
+  });
+});
+
+// ── Error handling ────────────────────────────────────────────────────────────
+
+describe("svgWorker — error handling", () => {
+  it("posts an 'error' message when generate() throws (e.g. null config)", async () => {
+    // Passing null as config causes generate() to throw synchronously
+    // (accessing config.name etc.), which becomes a rejected promise
+    // caught by the .catch() handler on the onmessage branch.
+    const taskId = "error-null-config";
+    dispatch({
+      type: "generate",
+      taskId,
+      objects: [makeSimpleObj()],
+      config: null as any,
+      options: createGcodeOptions(),
+    });
+    const msg = await waitForMsgById("error", taskId);
+    expect(msg.type).toBe("error");
+    expect(msg.taskId).toBe(taskId);
+    expect(typeof msg.error).toBe("string");
   });
 });

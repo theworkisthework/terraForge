@@ -314,4 +314,149 @@ describe("MachineConfigDialog", () => {
       expect(screen.getByDisplayValue("CUSTOM")).toBeInTheDocument();
     });
   });
+
+  // ── Connection type switching ──────────────────────────────────────────────
+
+  describe("connection type switching", () => {
+    it("switching to USB hides host/port fields and shows serial port input", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      // Initial state: wifi → host field visible
+      expect(screen.getByPlaceholderText("fluidnc.local")).toBeInTheDocument();
+      // Switch to USB
+      await userEvent.click(screen.getByRole("radio", { name: "usb" }));
+      // Host field gone, serial port placeholder visible
+      expect(
+        screen.queryByPlaceholderText("fluidnc.local"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("/dev/ttyUSB0")).toBeInTheDocument();
+    });
+
+    it("switching back to wifi shows host/port fields again", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      // Go to USB first
+      await userEvent.click(screen.getByRole("radio", { name: "usb" }));
+      expect(
+        screen.queryByPlaceholderText("fluidnc.local"),
+      ).not.toBeInTheDocument();
+      // Back to wifi
+      await userEvent.click(screen.getByRole("radio", { name: "wifi" }));
+      expect(screen.getByPlaceholderText("fluidnc.local")).toBeInTheDocument();
+    });
+
+    it("editing host field updates form value", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      const hostInput = screen.getByPlaceholderText("fluidnc.local");
+      await userEvent.clear(hostInput);
+      await userEvent.type(hostInput, "192.168.1.100");
+      expect((hostInput as HTMLInputElement).value).toBe("192.168.1.100");
+    });
+
+    it("WS port override field updates and can be cleared", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      // WS port override is the third number input in the wifi section
+      // It has a placeholder equal to the HTTP port (80)
+      const wsInput = screen.getByPlaceholderText("80") as HTMLInputElement;
+      // Type a WS port value
+      await userEvent.clear(wsInput);
+      await userEvent.type(wsInput, "81");
+      expect(wsInput.value).toBe("81");
+      // Clearing it should leave the field empty (maps to wsPort: undefined)
+      await userEvent.clear(wsInput);
+      expect(wsInput.value).toBe("");
+    });
+
+    it("shows serial port dropdown when ports are available", async () => {
+      (
+        window.terraForge.serial.listPorts as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(["/dev/ttyUSB0", "/dev/ttyUSB1"]);
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      // Switch to USB
+      await userEvent.click(screen.getByRole("radio", { name: "usb" }));
+      // findAllByRole because Origin and Pen type selects are also comboboxes;
+      // the serial port select is the last one appended after switching to USB.
+      const selects = await screen.findAllByRole("combobox");
+      const select = selects[selects.length - 1];
+      expect(select).toBeInTheDocument();
+      expect(screen.getByText("/dev/ttyUSB0")).toBeInTheDocument();
+      expect(screen.getByText("/dev/ttyUSB1")).toBeInTheDocument();
+    });
+
+    it("selecting a different serial port from dropdown updates form", async () => {
+      (
+        window.terraForge.serial.listPorts as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(["/dev/ttyUSB0", "/dev/ttyUSB1"]);
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      await userEvent.click(screen.getByRole("radio", { name: "usb" }));
+      const selects = await screen.findAllByRole("combobox");
+      const select = selects[selects.length - 1];
+      await userEvent.selectOptions(select, "/dev/ttyUSB1");
+      expect((select as HTMLSelectElement).value).toBe("/dev/ttyUSB1");
+    });
+  });
+
+  // ── alertInfo dialog ───────────────────────────────────────────────────────
+
+  describe("alertInfo dialog", () => {
+    it("export success shows alert with file path", async () => {
+      (
+        window.terraForge.config.exportConfigs as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/home/user/configs.json");
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("↑ Export"));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByText("Configs Exported")).toBeInTheDocument();
+      expect(
+        screen.getByText(/\/home\/user\/configs\.json/),
+      ).toBeInTheDocument();
+      // Dismiss
+      await userEvent.click(screen.getByRole("button", { name: "OK" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("import success shows 'Import Complete' alert with counts", async () => {
+      const newCfg = createMachineConfig({ name: "ImportedConfig" });
+      (
+        window.terraForge.config.importConfigs as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ added: 2, skipped: 1 });
+      (
+        window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([newCfg]);
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("↓ Import"));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByText("Import Complete")).toBeInTheDocument();
+      expect(screen.getByText(/2 configs imported/)).toBeInTheDocument();
+      expect(screen.getByText(/1 skipped/)).toBeInTheDocument();
+    });
+
+    it("import error shows 'Import Failed' alert", async () => {
+      (
+        window.terraForge.config.importConfigs as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(new Error("disk full"));
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("↓ Import"));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByText("Import Failed")).toBeInTheDocument();
+    });
+
+    it("export error shows 'Export Failed' alert", async () => {
+      (
+        window.terraForge.config.exportConfigs as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(new Error("permission denied"));
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("↑ Export"));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByText("Export Failed")).toBeInTheDocument();
+    });
+  });
 });
