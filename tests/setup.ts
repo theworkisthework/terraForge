@@ -66,6 +66,38 @@ if (typeof globalThis.DOMMatrix === "undefined") {
   (globalThis as any).DOMMatrix = DOMMatrixPolyfill;
 }
 
+// ── Path2D polyfill for jsdom ─────────────────────────────────────────────────
+// jsdom does not implement Path2D. Provide a no-op stub so canvas-rendering
+// code that calls `new Path2D(d)` and passes the result to `ctx.stroke(path)`
+// does not throw during tests (the mock canvas ctx accepts any argument).
+if (typeof globalThis.Path2D === "undefined") {
+  class Path2DPolyfill {
+    constructor(_d?: string | Path2DPolyfill) {}
+    addPath(_path: Path2DPolyfill, _transform?: unknown) {}
+    closePath() {}
+    moveTo(_x: number, _y: number) {}
+    lineTo(_x: number, _y: number) {}
+    bezierCurveTo(
+      _cp1x: number,
+      _cp1y: number,
+      _cp2x: number,
+      _cp2y: number,
+      _x: number,
+      _y: number,
+    ) {}
+    arc(
+      _x: number,
+      _y: number,
+      _r: number,
+      _start: number,
+      _end: number,
+      _ccw?: boolean,
+    ) {}
+    rect(_x: number, _y: number, _w: number, _h: number) {}
+  }
+  (globalThis as Record<string, unknown>).Path2D = Path2DPolyfill;
+}
+
 // ── ResizeObserver polyfill for jsdom ──────────────────────────────────────────
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {

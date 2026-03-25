@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
@@ -882,9 +882,11 @@ describe("Toolbar", () => {
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       await waitFor(() => expect(workerInstance).not.toBeNull());
-      workerInstance!.onmessage?.({
-        data: { type: "complete", gcode: "G0 X0 Y0\n" },
-      } as MessageEvent);
+      await act(async () => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\n" },
+        } as MessageEvent);
+      });
 
       await waitFor(() => {
         expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalled();
@@ -1344,6 +1346,108 @@ describe("Toolbar", () => {
       });
     });
 
+    it("Load Layout shows error task when imports field is not an array", async () => {
+      (
+        window.terraForge.fs.openLayoutDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/bad-structure.tforge");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(
+        JSON.stringify({ tfVersion: 1, savedAt: "2025-01-01", imports: null }),
+      );
+
+      render(<Toolbar />);
+      const onMenuOpen = (
+        window.terraForge.fs.onMenuOpenLayout as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuOpen?.();
+
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const task = tasks.find((t) => t.type === "svg-parse");
+        expect(task?.status).toBe("error");
+        expect(task?.error).toContain("valid imports array");
+      });
+    });
+
+    it("Save Layout shows error task when writeFile throws", async () => {
+      const imp = createSvgImport({ name: "artwork" });
+      useCanvasStore.setState({ imports: [imp] });
+      (
+        window.terraForge.fs.saveLayoutDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/out/artwork.tforge");
+      (
+        window.terraForge.fs.writeFile as ReturnType<typeof vi.fn>
+      ).mockRejectedValueOnce(new Error("Disk full"));
+
+      render(<Toolbar />);
+      const onMenuSave = (
+        window.terraForge.fs.onMenuSaveLayout as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuSave?.();
+
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const task = tasks.find((t) => t.type === "svg-parse");
+        expect(task?.status).toBe("error");
+        expect(task?.label).toBe("Save failed");
+      });
+    });
+
+    it("CloseLayoutDialog Cancel button dismisses dialog leaving canvas intact", async () => {
+      const imp = createSvgImport({ name: "keep-me" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      const onMenuClose = (
+        window.terraForge.fs.onMenuCloseLayout as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0] as (() => void) | undefined;
+      await act(async () => {
+        onMenuClose?.();
+      });
+
+      await waitFor(() =>
+        expect(screen.getByText(/Close Layout/i)).toBeInTheDocument(),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByText(/Close Layout/i)).not.toBeInTheDocument();
+      expect(useCanvasStore.getState().imports).toHaveLength(1);
+    });
+
+    it("Replace Canvas confirm dialog Cancel preserves existing canvas", async () => {
+      const existing = createSvgImport({ name: "keep-existing" });
+      useCanvasStore.setState({ imports: [existing] });
+
+      const incoming = createSvgImport({ name: "incoming" });
+      const layout = {
+        tfVersion: 1,
+        savedAt: new Date().toISOString(),
+        imports: [incoming],
+      };
+      (
+        window.terraForge.fs.openLayoutDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/incoming.tforge");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(JSON.stringify(layout));
+
+      render(<Toolbar />);
+      const onMenuOpen = (
+        window.terraForge.fs.onMenuOpenLayout as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuOpen?.();
+
+      await waitFor(() =>
+        expect(screen.getByRole("dialog")).toBeInTheDocument(),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      // Canvas should still have the original import
+      expect(useCanvasStore.getState().imports[0]?.name).toBe("keep-existing");
+    });
+
     it("Close Layout shows confirmation dialog when canvas has imports", async () => {
       const imp = createSvgImport({ name: "drawing" });
       useCanvasStore.setState({ imports: [imp] });
@@ -1352,7 +1456,9 @@ describe("Toolbar", () => {
       const onMenuClose = (
         window.terraForge.fs.onMenuCloseLayout as ReturnType<typeof vi.fn>
       ).mock.calls[0]?.[0] as (() => void) | undefined;
-      onMenuClose?.();
+      await act(async () => {
+        onMenuClose?.();
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Close Layout/i)).toBeInTheDocument();
@@ -1367,7 +1473,9 @@ describe("Toolbar", () => {
       const onMenuClose = (
         window.terraForge.fs.onMenuCloseLayout as ReturnType<typeof vi.fn>
       ).mock.calls[0]?.[0] as (() => void) | undefined;
-      onMenuClose?.();
+      await act(async () => {
+        onMenuClose?.();
+      });
 
       await waitFor(() =>
         expect(screen.getByText(/Close Layout/i)).toBeInTheDocument(),
@@ -1392,7 +1500,9 @@ describe("Toolbar", () => {
       const onMenuClose = (
         window.terraForge.fs.onMenuCloseLayout as ReturnType<typeof vi.fn>
       ).mock.calls[0]?.[0] as (() => void) | undefined;
-      onMenuClose?.();
+      await act(async () => {
+        onMenuClose?.();
+      });
 
       await waitFor(() =>
         expect(screen.getByText(/Close Layout/i)).toBeInTheDocument(),
@@ -1417,6 +1527,23 @@ describe("Toolbar", () => {
     render(<Toolbar />);
     await userEvent.click(screen.getByTitle("Machine settings"));
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+  });
+
+  it("settings dialog Close button dismisses the dialog", async () => {
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    (
+      window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([cfg]);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByTitle("Machine settings"));
+    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+
+    // Click the Close button inside MachineConfigDialog
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(
+      screen.queryByText("Machine Configurations"),
+    ).not.toBeInTheDocument();
   });
 
   // ── Disconnect via USB ─────────────────────────────────────────────────────
