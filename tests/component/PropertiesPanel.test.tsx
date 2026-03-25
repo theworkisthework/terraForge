@@ -713,4 +713,175 @@ describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
     // idx=7 → (7+1) % 8 = 0 → ROT_PRESETS[0] = 0
     expect(useCanvasStore.getState().imports[0].rotation).toBe(0);
   });
+
+  // ── W / H dimension inputs with ratio lock ───────────────────────────────
+
+  function setupWHFixture() {
+    const path = createSvgPath();
+    // svgWidth=100, svgHeight=50, scale=1 → W=100mm, H=50mm displayed
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-test",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    return imp;
+  }
+
+  it("W input (ratio locked) updates scale uniformly", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    // W input shows 100; H input shows 50.
+    // Unique values: X/Y show 0, Scale shows 1, Rotation shows 0 — so 100 is unique.
+    const wInput = screen.getByDisplayValue("100") as HTMLInputElement;
+    fireEvent.change(wInput, { target: { value: "200" } });
+    const st = useCanvasStore.getState().imports[0];
+    // scale = 200/100 = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  it("H input (ratio locked) updates scale uniformly", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    // H input shows 50.
+    const hInput = screen.getByDisplayValue("50") as HTMLInputElement;
+    fireEvent.change(hInput, { target: { value: "100" } });
+    const st = useCanvasStore.getState().imports[0];
+    // scale = 100/50 = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  it("ratio lock button unlocks and sets independent scaleX/scaleY", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    const lockBtn = screen.getByTitle("Ratio locked — click to unlock");
+    await userEvent.click(lockBtn);
+    const st = useCanvasStore.getState().imports[0];
+    // After unlock: scaleX = scaleY = imp.scale = 1
+    expect(st.scaleX).toBeCloseTo(1);
+    expect(st.scaleY).toBeCloseTo(1);
+  });
+
+  it("W input (ratio unlocked) updates only scaleX", async () => {
+    const path = createSvgPath();
+    // Start with independent scales already set (simulates post-unlock)
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-unlocked",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // Unlock ratio first
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // Now W input: change to 200 → scaleX = 200/100 = 2 only
+    const wInput = screen.getByDisplayValue("100") as HTMLInputElement;
+    fireEvent.change(wInput, { target: { value: "200" } });
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleX).toBeCloseTo(2);
+    // scaleY unchanged
+    expect(st.scaleY).toBeCloseTo(1);
+  });
+
+  it("H input (ratio unlocked) updates only scaleY", async () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-unlocked-h",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // Unlock ratio
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // H input: change to 150 → scaleY = 150/50 = 3
+    const hInput = screen.getByDisplayValue("50") as HTMLInputElement;
+    fireEvent.change(hInput, { target: { value: "150" } });
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleY).toBeCloseTo(3);
+    expect(st.scaleX).toBeCloseTo(1);
+  });
+
+  it("ratio lock button re-locks and clears independent scales", async () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-relock",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 2,
+      scaleY: 3,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // The import has independent scales so ratioLocked starts based on state.
+    // After unlock click: ratioLocked=false → button shows "Ratio unlocked — click to lock"
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // Now re-lock
+    await userEvent.click(screen.getByTitle("Ratio unlocked — click to lock"));
+    const st = useCanvasStore.getState().imports[0];
+    // scale = scaleX ?? scale = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  // ── Toolpath statistics edge cases ────────────────────────────────────────
+
+  it("formatBytes shows MB for files over 1 MB", () => {
+    const tp = createGcodeToolpath({ fileSizeBytes: 2 * 1024 * 1024 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("2.0 MB")).toBeInTheDocument();
+  });
+
+  it("formatDuration shows hours for very long jobs", () => {
+    // 200 000 mm at 3000 mm/min = 66.7 min ≈ 1h 6m
+    const tp = createGcodeToolpath({
+      totalCutDistance: 200000,
+      totalRapidDistance: 0,
+      feedrate: 3000,
+    });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText(/\dh \d+m/)).toBeInTheDocument();
+  });
+
+  it("estimateDuration shows '—' when both cut and rapid distances are zero", () => {
+    const tp = createGcodeToolpath({
+      totalCutDistance: 0,
+      totalRapidDistance: 0,
+      feedrate: 3000,
+    });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
 });

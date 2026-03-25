@@ -6,6 +6,13 @@ import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useTaskStore } from "@renderer/store/taskStore";
 import { Toolbar } from "@renderer/components/Toolbar";
 import { createMachineConfig, createSvgImport } from "../helpers/factories";
+import { importPdf } from "@renderer/utils/pdfImport";
+
+// Mock importPdf so component tests can control PDF-parsing outcomes without
+// running the real pdfjs renderer.
+vi.mock("@renderer/utils/pdfImport", () => ({
+  importPdf: vi.fn().mockResolvedValue([]),
+}));
 
 beforeEach(() => {
   useMachineStore.setState({
@@ -1106,7 +1113,7 @@ describe("Toolbar", () => {
       ).mockResolvedValue("/doc.pdf");
       (
         window.terraForge.fs.readFileBinary as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(new Error("PDF read error"));
+      ).mockRejectedValueOnce(new Error("PDF read error"));
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Import"));
@@ -1114,6 +1121,59 @@ describe("Toolbar", () => {
         const tasks = Object.values(useTaskStore.getState().tasks);
         const parseTask = tasks.find((t) => t.type === "svg-parse");
         expect(parseTask?.status).toBe("error");
+      });
+    });
+
+    it("shows 'No vector paths' error task when PDF has no extractable paths", async () => {
+      (importPdf as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/empty.pdf");
+      // readFileBinary default mock returns new Uint8Array()
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const t = tasks.find((t) => t.label === "No vector paths found in PDF");
+        expect(t?.status).toBe("error");
+      });
+    });
+
+    it("shows 'PDF imported: <name>' label for a single-page PDF", async () => {
+      const fakeImport = createSvgImport({ name: "brochure" });
+      (importPdf as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        fakeImport,
+      ]);
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/brochure.pdf");
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const t = tasks.find((t) =>
+          t.label?.startsWith("PDF imported: brochure"),
+        );
+        expect(t?.status).toBe("completed");
+      });
+    });
+
+    it("shows 'PDF imported: N pages' label for a multi-page PDF", async () => {
+      const p1 = createSvgImport({ name: "report_page1" });
+      const p2 = createSvgImport({ name: "report_page2" });
+      (importPdf as ReturnType<typeof vi.fn>).mockResolvedValueOnce([p1, p2]);
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/report.pdf");
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const t = tasks.find((t) => t.label === "PDF imported: 2 pages");
+        expect(t?.status).toBe("completed");
       });
     });
 
@@ -1317,6 +1377,46 @@ describe("Toolbar", () => {
       );
       expect(useCanvasStore.getState().imports).toHaveLength(0);
     });
+
+    it("Close Layout Save and Exit saves then clears canvas", async () => {
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+      (
+        window.terraForge.fs.saveLayoutDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/out.tforge");
+      (
+        window.terraForge.fs.writeFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(undefined);
+
+      render(<Toolbar />);
+      const onMenuClose = (
+        window.terraForge.fs.onMenuCloseLayout as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuClose?.();
+
+      await waitFor(() =>
+        expect(screen.getByText(/Close Layout/i)).toBeInTheDocument(),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Save and Exit" }),
+      );
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports).toHaveLength(0);
+      });
+    });
+  });
+
+  // ── Machine settings dialog ────────────────────────────────────────────────
+
+  it("settings button opens Machine Configurations dialog", async () => {
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    (
+      window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([cfg]);
+    render(<Toolbar />);
+    await userEvent.click(screen.getByTitle("Machine settings"));
+    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
   });
 
   // ── Disconnect via USB ─────────────────────────────────────────────────────
@@ -1353,6 +1453,7 @@ describe("Toolbar", () => {
       window.terraForge.fluidnc.connectWebSocket as ReturnType<typeof vi.fn>
     ).mockRejectedValue(new Error("Connection refused"));
 
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(<Toolbar />);
     await userEvent.click(screen.getByText("Connect"));
     await waitFor(() => {
@@ -1360,5 +1461,6 @@ describe("Toolbar", () => {
       const connectTask = tasks.find((t) => t.type === "ws-connect");
       expect(connectTask?.status).toBe("error");
     });
+    consoleSpy.mockRestore();
   });
 });

@@ -459,4 +459,105 @@ describe("MachineConfigDialog", () => {
       expect(screen.getByText("Export Failed")).toBeInTheDocument();
     });
   });
+
+  // ── Save new config (isNew path) ───────────────────────────────────────────
+
+  it("+ New then Save Changes creates a new config", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    // Switch to new-config mode
+    await userEvent.click(screen.getByText("+ New"));
+    // The name input should have "New Machine" — rename it to make the form dirty
+    const nameInput = screen.getByDisplayValue("New Machine");
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, "Brand New Plotter");
+    // Save the new config
+    await userEvent.click(screen.getByText("Save Changes"));
+    expect(window.terraForge.config.saveMachineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Brand New Plotter" }),
+    );
+  });
+
+  // ── Import selects first newly-added config ────────────────────────────────
+
+  it("import with 1 added config selects the newly imported entry", async () => {
+    const existing = useMachineStore.getState().configs[0];
+    const newCfg = createMachineConfig({ name: "Newly Imported" });
+    (
+      window.terraForge.config.importConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({ added: 1, skipped: 0 });
+    // getMachineConfigs returns [existing, newCfg]; newCfg is at index 1 = length-added
+    (
+      window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([existing, newCfg]);
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("↓ Import"));
+    // After import, the newly imported config should appear in the list
+    await screen.findByText("Newly Imported");
+    expect(screen.getByText("Newly Imported")).toBeInTheDocument();
+  });
+
+  // ── Input field onChange handlers ─────────────────────────────────────────
+
+  it("editing bed width updates form (marks dirty)", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    const bedWidthInput = screen.getByDisplayValue("300") as HTMLInputElement;
+    await userEvent.clear(bedWidthInput);
+    await userEvent.type(bedWidthInput, "250");
+    expect(screen.getByText("Save Changes")).not.toBeDisabled();
+  });
+
+  it("editing bed height updates form (marks dirty)", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    const bedHeightInput = screen.getByDisplayValue("200") as HTMLInputElement;
+    await userEvent.clear(bedHeightInput);
+    await userEvent.type(bedHeightInput, "150");
+    expect(screen.getByText("Save Changes")).not.toBeDisabled();
+  });
+
+  it("editing feedrate updates form (marks dirty)", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    const feedrateInput = screen.getByDisplayValue("3000") as HTMLInputElement;
+    await userEvent.clear(feedrateInput);
+    await userEvent.type(feedrateInput, "4500");
+    expect(screen.getByText("Save Changes")).not.toBeDisabled();
+  });
+
+  it("editing HTTP port updates form (marks dirty)", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    const portInput = screen.getByDisplayValue("80") as HTMLInputElement;
+    await userEvent.clear(portInput);
+    await userEvent.type(portInput, "8080");
+    expect(screen.getByText("Save Changes")).not.toBeDisabled();
+  });
+
+  it("editing serial path text input (USB mode, no port list) updates form", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    // Switch to USB mode
+    await userEvent.click(screen.getByRole("radio", { name: "usb" }));
+    // No ports available → text input shown
+    const serialInput = screen.getByPlaceholderText(
+      "/dev/ttyUSB0",
+    ) as HTMLInputElement;
+    await userEvent.clear(serialInput);
+    await userEvent.type(serialInput, "COM5");
+    expect(serialInput.value).toBe("COM5");
+  });
+
+  // ── listPorts rejection handled gracefully ─────────────────────────────────
+
+  it("listPorts rejection is handled without crashing (portList stays empty)", async () => {
+    (
+      window.terraForge.serial.listPorts as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new Error("port scan failed"));
+    render(<MachineConfigDialog onClose={onClose} />);
+    await act(async () => {});
+    // Dialog should still render normally after catch sets portList=[]
+    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+  });
 });

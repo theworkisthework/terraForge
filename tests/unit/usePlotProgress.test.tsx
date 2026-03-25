@@ -600,4 +600,112 @@ describe("usePlotProgress", () => {
       cutsAfterForward.length,
     );
   });
+
+  // ── Rapid segment handling ────────────────────────────────────────────────
+
+  it("rapid segments are appended via normal path (else acc.rapids) and shown in plotProgressRapids", async () => {
+    // 3 segments with line numbers: cut(1), rapid(2), cut(3).
+    // Advancing to line 3 calls appendSegmentsToAcc for segs[0..2] via the
+    // normal (non-bulk) path.  seg[1] is a rapid → "else acc.rapids += p".
+    const segs = [
+      makeSeg(0, 0, 10, 0, "cut", 1),
+      makeSeg(10, 0, 50, 0, "rapid", 2),
+      makeSeg(50, 0, 60, 0, "cut", 3),
+    ];
+    const tp = makeToolpath(segs);
+    render(<ProgressHost />);
+    await act(async () => {
+      useCanvasStore.setState({ gcodeToolpath: tp });
+      useMachineStore.setState({ connected: true });
+    });
+    // Line-number tracking: doneIdx=2 → appendSegmentsToAcc(acc, segs, 0, 2)
+    // segs[1] is "rapid" → else branch in normal loop → line 177 covered.
+    await act(async () => {
+      setStatus("Run", 55, 0, 3);
+    });
+    expect(useCanvasStore.getState().plotProgressRapids.length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("rapid segment at frontier contributes to plotProgressRapids (frontier partial display)", async () => {
+    // seg[0]=cut (0→10), seg[1]=rapid (10→50) — coordinate tracking.
+    // Machine at midpoint of seg[1] (x=30): frontier lands on the rapid.
+    // setPlotProgress: seg[1] is "rapid" → "else displayRapids += part" (line 484).
+    const segs: GcodeSegment[] = [
+      { from: { x: 0, y: 0 }, to: { x: 10, y: 0 }, type: "cut" as const },
+      { from: { x: 10, y: 0 }, to: { x: 50, y: 0 }, type: "rapid" as const },
+    ];
+    segs.forEach((s) => {
+      (s as any).lineNum = undefined;
+    });
+    const tp = makeToolpath(segs);
+    render(<ProgressHost />);
+    await act(async () => {
+      useCanvasStore.setState({ gcodeToolpath: tp });
+      useMachineStore.setState({ connected: true });
+    });
+    // jump = 1 - max(0,-1) = 1 ≤ NATURAL_ADVANCE → immediate confirm.
+    // appendSegmentsToAcc(acc, segs, 0, 0): seg[0] (cut).
+    // Frontier partial: seg[1] is "rapid" → displayRapids updated.
+    await act(async () => {
+      setStatus("Run", 30, 0);
+    });
+    expect(useCanvasStore.getState().plotProgressRapids.length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  // ── Stale relocation beyond the LOOKAHEAD horizon ──────────────────────────
+
+  it("stale relocation past the bounded lookahead window commits frontier via bulk-append", async () => {
+    // 602 segments:
+    //   seg[0]     : cut at y=0, x=0→1  (initial match, frontier established here)
+    //   seg[1..600]: cut at y=50         (stale zone — 50 mm from the y=0 machine)
+    //   seg[601]   : cut at y=0, x=800→810  (relocation target, beyond LOOKAHEAD=600)
+    //
+    // Bounded search (searchStart=0, count=600) covers seg[0..599]; seg[601] is
+    // outside that window.  Machine at (805,0) → all bounded segs are stale.
+    // After 6 stale ticks the hook starts the unbounded relocation search;
+    // on the 7th stale tick it finds two consecutive hits → commits frontier to
+    // seg[601], appending segs[0..600] (601 segs, >50) via the BULK path.
+    const segs: GcodeSegment[] = [
+      { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, type: "cut" as const },
+      ...Array.from({ length: 600 }, (_, i) => ({
+        from: { x: i, y: 50 },
+        to: { x: i + 1, y: 50 },
+        type: "cut" as const,
+      })),
+      { from: { x: 800, y: 0 }, to: { x: 810, y: 0 }, type: "cut" as const },
+    ];
+    segs.forEach((s) => {
+      (s as any).lineNum = undefined;
+    });
+    const tp = makeToolpath(segs);
+
+    render(<ProgressHost />);
+    await act(async () => {
+      useCanvasStore.setState({ gcodeToolpath: tp });
+      useMachineStore.setState({ connected: true });
+    });
+
+    // Establish frontier at seg[0].
+    await act(async () => {
+      setStatus("Run", 0.5, 0);
+    });
+
+    // 7 stale ticks at (805, 0).
+    // Ticks 1-5: staleTicksRef < STALE_RELOCATION_THRESHOLD (6) → no relocation yet.
+    // Tick 6: staleTicksRef=6 → relocation fires, seg[601] found, hits=1.
+    // Tick 7: staleTicksRef=7 → hits=2 ≥ MIN_CONSECUTIVE_HITS → COMMIT (lines 358-401).
+    //   appendSegmentsToAcc(acc, segs, 0, 600): completedUpTo=-1, 600>50 → bulk path (lines 162-171).
+    for (let i = 0; i < 7; i++) {
+      await act(async () => {
+        setStatus("Run", 805, 0);
+      });
+    }
+
+    const cuts = useCanvasStore.getState().plotProgressCuts;
+    expect(cuts.length).toBeGreaterThan(0);
+  });
 });
