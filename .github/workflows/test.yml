@@ -60,7 +60,7 @@ jobs:
       - name: Install system deps
         # libudev-dev  → serialport native module
         # xvfb         → virtual display for Electron window
-        run: sudo apt-get install -y libudev-dev xvfb
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
       - name: Install Node dependencies
         run: npm i
