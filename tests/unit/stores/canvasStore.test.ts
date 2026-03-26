@@ -11,6 +11,7 @@ beforeEach(() => {
     imports: [],
     selectedImportId: null,
     selectedPathId: null,
+    allImportsSelected: false,
     clipboardImport: null,
     gcodeToolpath: null,
     gcodeSource: null,
@@ -696,32 +697,43 @@ describe("canvasStore", () => {
       expect(useCanvasStore.getState().imports).toHaveLength(0);
     });
 
-    it("selectAllImports selects first import when nothing is selected", () => {
+    it("selectAllImports enters all-selected mode when multiple imports exist and none selected", () => {
       const imp1 = createSvgImport();
       const imp2 = createSvgImport();
       useCanvasStore.getState().addImport(imp1);
       useCanvasStore.getState().addImport(imp2);
       useCanvasStore.getState().selectAllImports();
-      expect(useCanvasStore.getState().selectedImportId).toBe(imp1.id);
+      expect(useCanvasStore.getState().allImportsSelected).toBe(true);
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
     });
 
-    it("selectAllImports cycles to the next import when one is already active", () => {
+    it("selectAllImports enters all-selected mode when one import is already selected", () => {
       const imp1 = createSvgImport();
       const imp2 = createSvgImport();
       useCanvasStore.getState().addImport(imp1);
       useCanvasStore.getState().addImport(imp2);
       useCanvasStore.getState().selectImport(imp1.id);
       useCanvasStore.getState().selectAllImports();
-      expect(useCanvasStore.getState().selectedImportId).toBe(imp2.id);
+      expect(useCanvasStore.getState().allImportsSelected).toBe(true);
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
     });
 
-    it("selectAllImports wraps from last import back to first", () => {
+    it("selectAllImports cycles to first import individually when already all-selected", () => {
       const imp1 = createSvgImport();
       const imp2 = createSvgImport();
       useCanvasStore.getState().addImport(imp1);
       useCanvasStore.getState().addImport(imp2);
-      useCanvasStore.getState().selectImport(imp2.id);
+      useCanvasStore.getState().selectAllImports(); // enter all-selected
+      useCanvasStore.getState().selectAllImports(); // cycle to first
+      expect(useCanvasStore.getState().allImportsSelected).toBe(false);
+      expect(useCanvasStore.getState().selectedImportId).toBe(imp1.id);
+    });
+
+    it("selectAllImports selects single import directly when only one exists", () => {
+      const imp1 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
       useCanvasStore.getState().selectAllImports();
+      expect(useCanvasStore.getState().allImportsSelected).toBe(false);
       expect(useCanvasStore.getState().selectedImportId).toBe(imp1.id);
     });
 

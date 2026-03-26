@@ -297,6 +297,7 @@ export function Toolbar({
   const pasteImport = useCanvasStore((s) => s.pasteImport);
   const selectAllImports = useCanvasStore((s) => s.selectAllImports);
   const clipboardImport = useCanvasStore((s) => s.clipboardImport);
+  const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -801,16 +802,20 @@ export function Toolbar({
   // ── Edit clipboard — keep refs current for use in stable IPC/keyboard listeners ─
   const selectedImportIdRef = useRef(selectedImportId);
   const clipboardImportRef = useRef(clipboardImport);
+  const allImportsSelectedRef = useRef(allImportsSelected);
   selectedImportIdRef.current = selectedImportId;
   clipboardImportRef.current = clipboardImport;
+  allImportsSelectedRef.current = allImportsSelected;
   const copyImportRef = useRef(copyImport);
   const cutImportRef = useRef(cutImport);
   const pasteImportRef = useRef(pasteImport);
   const selectAllImportsRef = useRef(selectAllImports);
+  const clearImportsRef = useRef(clearImports);
   copyImportRef.current = copyImport;
   cutImportRef.current = cutImport;
   pasteImportRef.current = pasteImport;
   selectAllImportsRef.current = selectAllImports;
+  clearImportsRef.current = clearImports;
 
   /** Returns true if the event originates from a text editing element. */
   function isTextInputFocused(): boolean {
@@ -832,6 +837,10 @@ export function Toolbar({
 
   /** Handle a cut request from menu or keyboard — canvas items only. */
   function handleEditCut() {
+    if (allImportsSelectedRef.current) {
+      clearImportsRef.current();
+      return;
+    }
     const id = selectedImportIdRef.current;
     if (id) cutImportRef.current(id);
   }

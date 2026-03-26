@@ -35,6 +35,9 @@ interface CanvasState {
   imports: SvgImport[];
   selectedImportId: string | null;
   selectedPathId: string | null;
+  /** True when the user has "selected all" canvas imports (Ctrl+A). Cleared when
+   *  a single import is clicked, imports are cleared, or the toolpath is selected. */
+  allImportsSelected: boolean;
   /** In-memory clipboard for cut/copy/paste of canvas imports. */
   clipboardImport: SvgImport | null;
   gcodeToolpath: GcodeToolpath | null;
@@ -100,7 +103,8 @@ interface CanvasState {
   cutImport: (id: string) => void;
   /** Paste the clipboard import as a new copy with an offset position and generated name. */
   pasteImport: () => void;
-  /** Select the first import if none is currently selected. No-op when empty. */
+  /** Select all canvas imports.  If already all-selected, cycles to the first single
+   *  import so repeated Ctrl+A is still useful. */
   selectAllImports: () => void;
 }
 
@@ -109,6 +113,7 @@ export const useCanvasStore = create<CanvasState>()(
     imports: [],
     selectedImportId: null,
     selectedPathId: null,
+    allImportsSelected: false,
     clipboardImport: null,
     gcodeToolpath: null,
     gcodeSource: null,
@@ -138,6 +143,16 @@ export const useCanvasStore = create<CanvasState>()(
         if (state.selectedImportId === id) {
           state.selectedImportId = null;
           state.selectedPathId = null;
+        }
+        // If we were in "all selected" mode, re-evaluate — if only one remains select
+        // it individually; if none remain clear everything.
+        if (state.allImportsSelected) {
+          state.allImportsSelected = false;
+          if (state.imports.length === 1) {
+            state.selectedImportId = state.imports[0].id;
+          } else if (state.imports.length === 0) {
+            state.selectedImportId = null;
+          }
         }
       }),
 
@@ -196,6 +211,7 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.selectedImportId = id;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
         // Selecting an SVG import clears toolpath selection (and vice-versa).
         if (id !== null) state.toolpathSelected = false;
       }),
@@ -207,6 +223,7 @@ export const useCanvasStore = create<CanvasState>()(
         if (selected) {
           state.selectedImportId = null;
           state.selectedPathId = null;
+          state.allImportsSelected = false;
         }
       }),
 
@@ -215,6 +232,7 @@ export const useCanvasStore = create<CanvasState>()(
         state.imports = [];
         state.selectedImportId = null;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
       }),
 
     loadLayout: (newImports) =>
@@ -227,6 +245,7 @@ export const useCanvasStore = create<CanvasState>()(
         }));
         state.selectedImportId = null;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
       }),
 
     selectedImport: () => {
@@ -413,19 +432,18 @@ export const useCanvasStore = create<CanvasState>()(
     selectAllImports: () =>
       set((state) => {
         if (state.imports.length === 0) return;
-        if (!state.selectedImportId) {
-          // Nothing selected → select the first import.
+        if (state.imports.length === 1) {
+          // Only one import — just select it directly.
           state.selectedImportId = state.imports[0].id;
+          state.allImportsSelected = false;
+        } else if (!state.allImportsSelected) {
+          // Zero or one import selected → enter "all selected" mode.
+          state.allImportsSelected = true;
+          state.selectedImportId = null;
         } else {
-          // Something already selected → advance to the next import so the user
-          // gets visible feedback and can cycle through all layers with Ctrl+A.
-          // Wraps back to the first import after the last one.
-          const idx = state.imports.findIndex(
-            (i) => i.id === state.selectedImportId,
-          );
-          const nextIdx =
-            idx === -1 || idx >= state.imports.length - 1 ? 0 : idx + 1;
-          state.selectedImportId = state.imports[nextIdx].id;
+          // Already all-selected → cycle to the first import individually.
+          state.allImportsSelected = false;
+          state.selectedImportId = state.imports[0].id;
         }
         state.selectedPathId = null;
         state.toolpathSelected = false;

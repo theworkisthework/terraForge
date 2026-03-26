@@ -49,8 +49,10 @@ export function PlotCanvas() {
 
   const imports = useCanvasStore((s) => s.imports);
   const selectedImportId = useCanvasStore((s) => s.selectedImportId);
+  const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
   const selectImport = useCanvasStore((s) => s.selectImport);
   const removeImport = useCanvasStore((s) => s.removeImport);
+  const clearImports = useCanvasStore((s) => s.clearImports);
   const updateImport = useCanvasStore((s) => s.updateImport);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
@@ -275,7 +277,9 @@ export function PlotCanvas() {
 
       // Delete / Backspace → remove selected item
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedImportId) {
+        if (allImportsSelected) {
+          clearImports();
+        } else if (selectedImportId) {
           removeImport(selectedImportId);
         } else if (toolpathSelected && !isJobActive) {
           setGcodeToolpath(null);
@@ -323,9 +327,11 @@ export function PlotCanvas() {
     };
   }, [
     selectedImportId,
+    allImportsSelected,
     toolpathSelected,
     isJobActive,
     removeImport,
+    clearImports,
     selectImport,
     selectToolpath,
     setGcodeToolpath,
@@ -773,7 +779,8 @@ export function PlotCanvas() {
           // Effective pixels-per-user-unit: used to emulate non-scaling-stroke.
           const avgImpScale =
             Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
-          const isImpSelected = imp.id === selectedImportId;
+          const isImpSelected =
+            allImportsSelected || imp.id === selectedImportId;
 
           ctx.save();
           ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
@@ -975,6 +982,7 @@ export function PlotCanvas() {
     bedYMax,
     imports,
     selectedImportId,
+    allImportsSelected,
     canvasH,
   ]);
 
@@ -1136,7 +1144,7 @@ export function PlotCanvas() {
             <ImportLayer
               key={imp.id}
               imp={imp}
-              selected={selectedImportId === imp.id}
+              selected={allImportsSelected || selectedImportId === imp.id}
               onImportMouseDown={onImportMouseDown}
               getBedY={getBedY}
             />
@@ -1144,12 +1152,10 @@ export function PlotCanvas() {
       </svg>
 
       {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
-      {selectedImportId &&
-        containerSize.w > 0 &&
-        (() => {
-          const imp = imports.find((i) => i.id === selectedImportId);
-          return imp ? (
+      {allImportsSelected && containerSize.w > 0
+        ? imports.map((imp) => (
             <HandleOverlay
+              key={imp.id}
               imp={imp}
               zoom={vp.zoom}
               panX={vp.panX}
@@ -1161,8 +1167,26 @@ export function PlotCanvas() {
               onRotateHandleMouseDown={onRotateHandleMouseDown}
               onDelete={() => removeImport(imp.id)}
             />
-          ) : null;
-        })()}
+          ))
+        : selectedImportId &&
+          containerSize.w > 0 &&
+          (() => {
+            const imp = imports.find((i) => i.id === selectedImportId);
+            return imp ? (
+              <HandleOverlay
+                imp={imp}
+                zoom={vp.zoom}
+                panX={vp.panX}
+                panY={vp.panY}
+                containerW={containerSize.w}
+                containerH={containerSize.h}
+                getBedY={getBedY}
+                onHandleMouseDown={onHandleMouseDown}
+                onRotateHandleMouseDown={onRotateHandleMouseDown}
+                onDelete={() => removeImport(imp.id)}
+              />
+            ) : null;
+          })()}
 
       {/* ── Toolpath selection overlay — screen-pixel space ─────────────── */}
       {gcodeToolpath &&
