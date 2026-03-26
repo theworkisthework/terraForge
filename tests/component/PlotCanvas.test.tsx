@@ -993,22 +993,30 @@ describe("PlotCanvas", () => {
   it("wheel event (scroll up) zooms in without crash", () => {
     const { container } = render(<PlotCanvas />);
     const div = container.querySelector("div")!;
-    div.dispatchEvent(
-      new WheelEvent("wheel", {
-        deltaY: -100,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
+    act(() => {
+      div.dispatchEvent(
+        new WheelEvent("wheel", {
+          deltaY: -100,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
     expect(container.querySelector("svg")).toBeTruthy();
   });
 
   it("wheel event (scroll down) zooms out without crash", () => {
     const { container } = render(<PlotCanvas />);
     const div = container.querySelector("div")!;
-    div.dispatchEvent(
-      new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true }),
-    );
+    act(() => {
+      div.dispatchEvent(
+        new WheelEvent("wheel", {
+          deltaY: 100,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
     expect(container.querySelector("svg")).toBeTruthy();
   });
 

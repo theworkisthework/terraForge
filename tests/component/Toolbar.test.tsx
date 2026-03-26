@@ -695,9 +695,11 @@ describe("Toolbar", () => {
 
       // Simulate worker sending complete
       await waitFor(() => expect(workerInstance).not.toBeNull());
-      workerInstance!.onmessage?.({
-        data: { type: "complete", gcode: "G0 X0 Y0\nG1 X10 Y10 F1000\n" },
-      } as MessageEvent);
+      act(() => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\nG1 X10 Y10 F1000\n" },
+        } as MessageEvent);
+      });
 
       await waitFor(() => {
         const tasks = Object.values(useTaskStore.getState().tasks);
@@ -735,9 +737,11 @@ describe("Toolbar", () => {
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       await waitFor(() => expect(workerInstance).not.toBeNull());
-      workerInstance!.onmessage?.({
-        data: { type: "cancelled" },
-      } as MessageEvent);
+      act(() => {
+        workerInstance!.onmessage?.({
+          data: { type: "cancelled" },
+        } as MessageEvent);
+      });
 
       await waitFor(() => {
         const tasks = Object.values(useTaskStore.getState().tasks);
@@ -776,9 +780,11 @@ describe("Toolbar", () => {
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       await waitFor(() => expect(workerInstance).not.toBeNull());
-      workerInstance!.onmessage?.({
-        data: { type: "error", error: "Out of memory" },
-      } as MessageEvent);
+      act(() => {
+        workerInstance!.onmessage?.({
+          data: { type: "error", error: "Out of memory" },
+        } as MessageEvent);
+      });
 
       await waitFor(() => {
         const tasks = Object.values(useTaskStore.getState().tasks);
@@ -822,9 +828,11 @@ describe("Toolbar", () => {
       await userEvent.click(screen.getByRole("button", { name: "Generate" }));
 
       await waitFor(() => expect(workerInstance).not.toBeNull());
-      workerInstance!.onmessage?.({
-        data: { type: "complete", gcode: "G0 X0 Y0\n" },
-      } as MessageEvent);
+      act(() => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\n" },
+        } as MessageEvent);
+      });
 
       await waitFor(() => {
         expect(window.terraForge.fluidnc.uploadGcode).toHaveBeenCalled();

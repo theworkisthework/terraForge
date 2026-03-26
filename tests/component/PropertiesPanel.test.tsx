@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useMachineStore } from "@renderer/store/machineStore";
@@ -300,7 +300,9 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Collapsed when not selected — stats hidden
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
-    useCanvasStore.setState({ toolpathSelected: true });
+    act(() => {
+      useCanvasStore.setState({ toolpathSelected: true });
+    });
   });
 
   it("shows file size formatted in KB", () => {
