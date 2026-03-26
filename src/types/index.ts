@@ -326,6 +326,15 @@ export interface ConfigApi {
   importConfigs: () => Promise<{ added: number; skipped: number }>;
 }
 
+export interface AppApi {
+  /** Returns the version string from package.json (via app.getVersion()). */
+  getVersion: () => Promise<string>;
+  /** Open a URL in the system default browser. */
+  openExternal: (url: string) => Promise<void>;
+  /** Subscribe to the native Help → About menu item. Returns an unsubscribe function. */
+  onMenuAbout: (cb: () => void) => () => void;
+}
+
 export interface TerraForgeAPI {
   fluidnc: FluidNCApi;
   serial: SerialApi;
@@ -333,6 +342,7 @@ export interface TerraForgeAPI {
   tasks: TasksApi;
   jobs: JobsApi;
   config: ConfigApi;
+  app: AppApi;
 }
 
 // ─── Jog ─────────────────────────────────────────────────────────────────────

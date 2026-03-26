@@ -138,6 +138,24 @@ function buildApplicationMenu(): void {
         { role: "togglefullscreen" as const },
       ],
     },
+
+    {
+      role: "help" as const,
+      submenu: [
+        {
+          label: "User Guide",
+          click: () =>
+            shell.openExternal(
+              "https://github.com/theworkisthework/terraForge/blob/main/docs/terraForge-user-guide.md",
+            ),
+        },
+        { type: "separator" as const },
+        {
+          label: "About terraForge",
+          click: () => safeSend("menu:about"),
+        },
+      ],
+    },
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -376,6 +394,14 @@ ipcMain.handle("config:importConfigs", async () => {
   }
   return { added: toAdd.length, skipped };
 });
+
+// ─── IPC Handlers — App ───────────────────────────────────────────────────────
+
+ipcMain.handle("app:getVersion", () => app.getVersion());
+
+ipcMain.handle("app:openExternal", (_e, url: string) =>
+  shell.openExternal(url),
+);
 
 // ─── IPC Handlers — FluidNC ──────────────────────────────────────────────────
 // All handlers transparently route to either the HTTP client (Wi-Fi) or the
