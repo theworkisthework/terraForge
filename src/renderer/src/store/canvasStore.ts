@@ -413,12 +413,22 @@ export const useCanvasStore = create<CanvasState>()(
     selectAllImports: () =>
       set((state) => {
         if (state.imports.length === 0) return;
-        // If nothing is selected, select the first import
         if (!state.selectedImportId) {
+          // Nothing selected → select the first import.
           state.selectedImportId = state.imports[0].id;
-          state.selectedPathId = null;
-          state.toolpathSelected = false;
+        } else {
+          // Something already selected → advance to the next import so the user
+          // gets visible feedback and can cycle through all layers with Ctrl+A.
+          // Wraps back to the first import after the last one.
+          const idx = state.imports.findIndex(
+            (i) => i.id === state.selectedImportId,
+          );
+          const nextIdx =
+            idx === -1 || idx >= state.imports.length - 1 ? 0 : idx + 1;
+          state.selectedImportId = state.imports[nextIdx].id;
         }
+        state.selectedPathId = null;
+        state.toolpathSelected = false;
       }),
   })),
 );

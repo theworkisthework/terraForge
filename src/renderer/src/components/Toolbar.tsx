@@ -873,10 +873,7 @@ export function Toolbar({
       if (!isTextInputFocused()) handleEditPaste();
     });
     const unsubSelectAll = window.terraForge.edit.onMenuSelectAll(() => {
-      // Only canvas-select when focus isn't in a text field AND there is no
-      // active text selection (e.g. user highlighted text in the console).
-      if (!isTextInputFocused() && !window.getSelection()?.toString())
-        handleEditSelectAll();
+      if (!isTextInputFocused()) handleEditSelectAll();
     });
 
     // ── Keyboard shortcuts — intercept only when no text field is focused ────
@@ -894,9 +891,6 @@ export function Toolbar({
           handleEditPaste();
           break;
         case "a":
-          // If text is already selected somewhere, let the browser expand it
-          // natively rather than hijacking the shortcut for canvas selection.
-          if (window.getSelection()?.toString()) break;
           handleEditSelectAll();
           e.preventDefault(); // prevent browser select-all of page text
           break;
