@@ -117,10 +117,49 @@ function buildApplicationMenu(): void {
         { role: "undo" as const },
         { role: "redo" as const },
         { type: "separator" as const },
-        { role: "cut" as const },
-        { role: "copy" as const },
-        { role: "paste" as const },
-        { role: "selectAll" as const },
+        {
+          id: "editCut",
+          label: "Cut",
+          accelerator: "CmdOrCtrl+X",
+          enabled: false,
+          click: (_item, win) => {
+            // Let native cut handle any text-input focus, and also notify the
+            // renderer so it can perform a canvas-layer cut if one is selected.
+            win?.webContents.cut();
+            safeSend("menu:editCut");
+          },
+        },
+        {
+          id: "editCopy",
+          label: "Copy",
+          accelerator: "CmdOrCtrl+C",
+          enabled: false,
+          click: (_item, win) => {
+            win?.webContents.copy();
+            safeSend("menu:editCopy");
+          },
+        },
+        {
+          id: "editPaste",
+          label: "Paste",
+          accelerator: "CmdOrCtrl+V",
+          click: (_item, win) => {
+            // Native paste for text fields; canvas clipboard paste handled in renderer.
+            win?.webContents.paste();
+            safeSend("menu:editPaste");
+          },
+        },
+        {
+          id: "editSelectAll",
+          label: "Select All",
+          accelerator: "CmdOrCtrl+A",
+          click: () => {
+            // Do NOT call webContents.selectAll() here — that selects all page
+            // text.  The renderer decides whether to canvas-select or let the
+            // native text-selection behaviour take over.
+            safeSend("menu:editSelectAll");
+          },
+        },
       ],
     },
 
@@ -168,6 +207,15 @@ ipcMain.on("menu:setLayoutMenuState", (_e, hasImports: boolean) => {
   const close = menu?.getMenuItemById("closeLayout");
   if (save) save.enabled = hasImports;
   if (close) close.enabled = hasImports;
+});
+
+// Enable/disable Cut and Copy menu items based on whether a canvas import is selected.
+ipcMain.on("menu:setEditMenuState", (_e, hasSelection: boolean) => {
+  const menu = Menu.getApplicationMenu();
+  const cut = menu?.getMenuItemById("editCut");
+  const copy = menu?.getMenuItemById("editCopy");
+  if (cut) cut.enabled = hasSelection;
+  if (copy) copy.enabled = hasSelection;
 });
 
 app.whenReady().then(() => {

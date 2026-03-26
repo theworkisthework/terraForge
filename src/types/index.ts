@@ -335,6 +335,22 @@ export interface AppApi {
   onMenuAbout: (cb: () => void) => () => void;
 }
 
+export interface EditApi {
+  /** Subscribe to Edit → Copy menu item (fired alongside native webContents.copy). Returns unsub fn. */
+  onMenuCopy: (cb: () => void) => () => void;
+  /** Subscribe to Edit → Cut menu item. Returns unsub fn. */
+  onMenuCut: (cb: () => void) => () => void;
+  /** Subscribe to Edit → Paste menu item. Returns unsub fn. */
+  onMenuPaste: (cb: () => void) => () => void;
+  /** Subscribe to Edit → Select All menu item. Returns unsub fn. */
+  onMenuSelectAll: (cb: () => void) => () => void;
+  /**
+   * Notify the main process whether Copy/Cut should be enabled in the Edit menu.
+   * Call with true when an import is selected, false when nothing is selected.
+   */
+  setHasSelection: (hasSelection: boolean) => void;
+}
+
 export interface TerraForgeAPI {
   fluidnc: FluidNCApi;
   serial: SerialApi;
@@ -343,6 +359,7 @@ export interface TerraForgeAPI {
   jobs: JobsApi;
   config: ConfigApi;
   app: AppApi;
+  edit: EditApi;
 }
 
 // ─── Jog ─────────────────────────────────────────────────────────────────────

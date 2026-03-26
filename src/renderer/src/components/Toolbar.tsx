@@ -285,12 +285,18 @@ export function Toolbar({
   const setConnected = useMachineStore((s) => s.setConnected);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const imports = useCanvasStore((s) => s.imports);
+  const selectedImportId = useCanvasStore((s) => s.selectedImportId);
   const addImport = useCanvasStore((s) => s.addImport);
   const clearImports = useCanvasStore((s) => s.clearImports);
   const loadLayout = useCanvasStore((s) => s.loadLayout);
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
+  const copyImport = useCanvasStore((s) => s.copyImport);
+  const cutImport = useCanvasStore((s) => s.cutImport);
+  const pasteImport = useCanvasStore((s) => s.pasteImport);
+  const selectAllImports = useCanvasStore((s) => s.selectAllImports);
+  const clipboardImport = useCanvasStore((s) => s.clipboardImport);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -792,6 +798,54 @@ export function Toolbar({
   loadLayoutRef.current = handleLoadLayout;
   closeLayoutRef.current = handleCloseLayout;
 
+  // ── Edit clipboard — keep refs current for use in stable IPC/keyboard listeners ─
+  const selectedImportIdRef = useRef(selectedImportId);
+  const clipboardImportRef = useRef(clipboardImport);
+  selectedImportIdRef.current = selectedImportId;
+  clipboardImportRef.current = clipboardImport;
+  const copyImportRef = useRef(copyImport);
+  const cutImportRef = useRef(cutImport);
+  const pasteImportRef = useRef(pasteImport);
+  const selectAllImportsRef = useRef(selectAllImports);
+  copyImportRef.current = copyImport;
+  cutImportRef.current = cutImport;
+  pasteImportRef.current = pasteImport;
+  selectAllImportsRef.current = selectAllImports;
+
+  /** Returns true if the event originates from a text editing element. */
+  function isTextInputFocused(): boolean {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName.toLowerCase();
+    return (
+      tag === "input" ||
+      tag === "textarea" ||
+      (el as HTMLElement).isContentEditable
+    );
+  }
+
+  /** Handle a copy request from menu or keyboard — canvas items only. */
+  function handleEditCopy() {
+    const id = selectedImportIdRef.current;
+    if (id) copyImportRef.current(id);
+  }
+
+  /** Handle a cut request from menu or keyboard — canvas items only. */
+  function handleEditCut() {
+    const id = selectedImportIdRef.current;
+    if (id) cutImportRef.current(id);
+  }
+
+  /** Handle a paste request from menu or keyboard. */
+  function handleEditPaste() {
+    if (clipboardImportRef.current) pasteImportRef.current();
+  }
+
+  /** Handle select-all from menu or keyboard — canvas items only. */
+  function handleEditSelectAll() {
+    selectAllImportsRef.current();
+  }
+
   // Subscribe to native File-menu → layout action events.
   useEffect(() => {
     const unsubImport = window.terraForge.fs.onMenuImport(() => handleImport());
@@ -807,12 +861,60 @@ export function Toolbar({
     const unsubAbout = window.terraForge.app.onMenuAbout(() =>
       setShowAbout(true),
     );
+
+    // ── Edit menu events (fired alongside native webContents ops) ────────────
+    const unsubCopy = window.terraForge.edit.onMenuCopy(() => {
+      if (!isTextInputFocused()) handleEditCopy();
+    });
+    const unsubCut = window.terraForge.edit.onMenuCut(() => {
+      if (!isTextInputFocused()) handleEditCut();
+    });
+    const unsubPaste = window.terraForge.edit.onMenuPaste(() => {
+      if (!isTextInputFocused()) handleEditPaste();
+    });
+    const unsubSelectAll = window.terraForge.edit.onMenuSelectAll(() => {
+      // Only canvas-select when focus isn't in a text field AND there is no
+      // active text selection (e.g. user highlighted text in the console).
+      if (!isTextInputFocused() && !window.getSelection()?.toString())
+        handleEditSelectAll();
+    });
+
+    // ── Keyboard shortcuts — intercept only when no text field is focused ────
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (isTextInputFocused()) return;
+      switch (e.key.toLowerCase()) {
+        case "c":
+          handleEditCopy();
+          break;
+        case "x":
+          handleEditCut();
+          break;
+        case "v":
+          handleEditPaste();
+          break;
+        case "a":
+          // If text is already selected somewhere, let the browser expand it
+          // natively rather than hijacking the shortcut for canvas selection.
+          if (window.getSelection()?.toString()) break;
+          handleEditSelectAll();
+          e.preventDefault(); // prevent browser select-all of page text
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+
     return () => {
       unsubImport();
       unsubOpen();
       unsubSave();
       unsubClose();
       unsubAbout();
+      unsubCopy();
+      unsubCut();
+      unsubPaste();
+      unsubSelectAll();
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -820,6 +922,11 @@ export function Toolbar({
   useEffect(() => {
     window.terraForge.fs.setLayoutMenuState(imports.length > 0);
   }, [imports.length]);
+
+  // Keep Edit → Cut / Copy menu items enabled only when a canvas import is selected.
+  useEffect(() => {
+    window.terraForge.edit.setHasSelection(selectedImportId !== null);
+  }, [selectedImportId]);
 
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
