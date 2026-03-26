@@ -231,6 +231,8 @@ export function PlotCanvas() {
     startMouseY: number;
     startObjX: number;
     startObjY: number;
+    /** Set when dragging all selected imports as a group. */
+    group?: { id: string; startX: number; startY: number }[];
   } | null>(null);
 
   // ── Scale-handle state ────────────────────────────────────────────────────────
@@ -393,8 +395,26 @@ export function PlotCanvas() {
     (e: React.MouseEvent, id: string) => {
       if (spaceRef.current) return; // space held → pan mode, not drag
       e.stopPropagation();
+      const state = useCanvasStore.getState();
+      // In group mode clicking an import continues the group drag without
+      // breaking out to single selection.
+      if (state.allImportsSelected) {
+        setDragging({
+          id,
+          startMouseX: e.clientX,
+          startMouseY: e.clientY,
+          startObjX: 0,
+          startObjY: 0,
+          group: state.imports.map((imp) => ({
+            id: imp.id,
+            startX: imp.x,
+            startY: imp.y,
+          })),
+        });
+        return;
+      }
       selectImport(id);
-      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
+      const imp = state.imports.find((i) => i.id === id);
       if (!imp) return;
       setDragging({
         id,
@@ -459,6 +479,28 @@ export function PlotCanvas() {
     [],
   );
 
+  /** Starts a group drag — fired from the GroupHandleOverlay hit area. */
+  const onGroupMouseDown = useCallback(
+    (e: React.MouseEvent<SVGRectElement>) => {
+      if (spaceRef.current) return;
+      e.stopPropagation();
+      const currentImports = useCanvasStore.getState().imports;
+      setDragging({
+        id: "__group__",
+        startMouseX: e.clientX,
+        startMouseY: e.clientY,
+        startObjX: 0,
+        startObjY: 0,
+        group: currentImports.map((imp) => ({
+          id: imp.id,
+          startX: imp.x,
+          startY: imp.y,
+        })),
+      });
+    },
+    [],
+  );
+
   // ── Unified window mousemove / mouseup ────────────────────────────────────────
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -480,10 +522,16 @@ export function PlotCanvas() {
         const zoom = vpRef.current.zoom;
         const dx = (e.clientX - dragging.startMouseX) / (MM_TO_PX * zoom);
         const dy = -(e.clientY - dragging.startMouseY) / (MM_TO_PX * zoom);
-        updateImport(dragging.id, {
-          x: dragging.startObjX + dx,
-          y: dragging.startObjY + dy,
-        });
+        if (dragging.group) {
+          for (const item of dragging.group) {
+            updateImport(item.id, { x: item.startX + dx, y: item.startY + dy });
+          }
+        } else {
+          updateImport(dragging.id, {
+            x: dragging.startObjX + dx,
+            y: dragging.startObjY + dy,
+          });
+        }
       }
 
       // Scale-handle drag
@@ -1152,10 +1200,25 @@ export function PlotCanvas() {
       </svg>
 
       {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
-      {allImportsSelected && containerSize.w > 0
-        ? imports.map((imp) => (
+      {allImportsSelected && containerSize.w > 0 ? (
+        <GroupHandleOverlay
+          imports={imports.filter((i) => i.visible)}
+          zoom={vp.zoom}
+          panX={vp.panX}
+          panY={vp.panY}
+          containerW={containerSize.w}
+          containerH={containerSize.h}
+          getBedY={getBedY}
+          onGroupMouseDown={onGroupMouseDown}
+          onDelete={clearImports}
+        />
+      ) : (
+        selectedImportId &&
+        containerSize.w > 0 &&
+        (() => {
+          const imp = imports.find((i) => i.id === selectedImportId);
+          return imp ? (
             <HandleOverlay
-              key={imp.id}
               imp={imp}
               zoom={vp.zoom}
               panX={vp.panX}
@@ -1167,26 +1230,9 @@ export function PlotCanvas() {
               onRotateHandleMouseDown={onRotateHandleMouseDown}
               onDelete={() => removeImport(imp.id)}
             />
-          ))
-        : selectedImportId &&
-          containerSize.w > 0 &&
-          (() => {
-            const imp = imports.find((i) => i.id === selectedImportId);
-            return imp ? (
-              <HandleOverlay
-                imp={imp}
-                zoom={vp.zoom}
-                panX={vp.panX}
-                panY={vp.panY}
-                containerW={containerSize.w}
-                containerH={containerSize.h}
-                getBedY={getBedY}
-                onHandleMouseDown={onHandleMouseDown}
-                onRotateHandleMouseDown={onRotateHandleMouseDown}
-                onDelete={() => removeImport(imp.id)}
-              />
-            ) : null;
-          })()}
+          ) : null;
+        })()
+      )}
 
       {/* ── Toolpath selection overlay — screen-pixel space ─────────────── */}
       {gcodeToolpath &&
@@ -1803,6 +1849,159 @@ function ImportLayer({
         />
       </g>
     </g>
+  );
+}
+
+// ─── Group handle overlay ─ single AABB around all selected imports ──────────
+interface GroupHandleOverlayProps {
+  imports: SvgImport[];
+  zoom: number;
+  panX: number;
+  panY: number;
+  containerW: number;
+  containerH: number;
+  getBedY: (mm: number) => number;
+  onGroupMouseDown: (e: React.MouseEvent<SVGRectElement>) => void;
+  onDelete: () => void;
+}
+
+function GroupHandleOverlay({
+  imports,
+  zoom,
+  panX,
+  panY,
+  containerW,
+  containerH,
+  getBedY,
+  onGroupMouseDown,
+  onDelete,
+}: GroupHandleOverlayProps) {
+  if (imports.length === 0) return null;
+
+  // World (SVG canvas) → screen (CSS pixel) transform
+  const w2s = (x: number, y: number): [number, number] => [
+    x * zoom + panX,
+    y * zoom + panY,
+  ];
+
+  // Compute axis-aligned bounding box across ALL rotated import corners
+  let minSx = Infinity,
+    maxSx = -Infinity;
+  let minSy = Infinity,
+    maxSy = -Infinity;
+
+  for (const imp of imports) {
+    const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
+    const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
+    const left = PAD + imp.x * MM_TO_PX;
+    const top = getBedY(imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale));
+    const bboxW = imp.svgWidth * sX;
+    const bboxH = imp.svgHeight * sY;
+    const cxSvg = left + bboxW / 2;
+    const cySvg = top + bboxH / 2;
+    const hw = bboxW / 2;
+    const hh = bboxH / 2;
+    const rad = ((imp.rotation ?? 0) * Math.PI) / 180;
+    const cosA = Math.cos(rad);
+    const sinA = Math.sin(rad);
+
+    for (const [ox, oy] of [
+      [-hw, -hh],
+      [hw, -hh],
+      [hw, hh],
+      [-hw, hh],
+    ] as [number, number][]) {
+      const [sx, sy] = w2s(
+        cxSvg + ox * cosA - oy * sinA,
+        cySvg + ox * sinA + oy * cosA,
+      );
+      if (sx < minSx) minSx = sx;
+      if (sx > maxSx) maxSx = sx;
+      if (sy < minSy) minSy = sy;
+      if (sy > maxSy) maxSy = sy;
+    }
+  }
+
+  const BBOX_PAD = 6; // extra padding around AABB in screen px
+  minSx -= BBOX_PAD;
+  minSy -= BBOX_PAD;
+  maxSx += BBOX_PAD;
+  maxSy += BBOX_PAD;
+
+  // Place the delete button at the top-right corner
+  const delSx = maxSx + DEL_OFFSET_PX * 0.7;
+  const delSy = minSy - DEL_OFFSET_PX * 0.7;
+
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+        zIndex: 5,
+      }}
+      width={containerW}
+      height={containerH}
+      viewBox={`0 0 ${containerW} ${containerH}`}
+    >
+      {/* Dashed bounding box outline */}
+      <rect
+        x={minSx}
+        y={minSy}
+        width={maxSx - minSx}
+        height={maxSy - minSy}
+        fill="none"
+        stroke="#e94560"
+        strokeWidth={1}
+        strokeDasharray="4 2"
+        pointerEvents="none"
+      />
+      {/* Transparent drag hit area — same bounds as the outline */}
+      <rect
+        x={minSx}
+        y={minSy}
+        width={maxSx - minSx}
+        height={maxSy - minSy}
+        fill="transparent"
+        style={{ cursor: "grab", pointerEvents: "all" }}
+        onMouseDown={onGroupMouseDown}
+      />
+      {/* Delete button */}
+      <g
+        data-testid="group-handle-delete"
+        transform={`translate(${delSx},${delSy})`}
+        style={{ cursor: "pointer", pointerEvents: "all" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+      >
+        <svg
+          x={-DEL_HALF_PX}
+          y={-DEL_HALF_PX}
+          width={DEL_HALF_PX * 2}
+          height={DEL_HALF_PX * 2}
+          viewBox="0 0 24 24"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect
+            width="18"
+            height="18"
+            x="3"
+            y="3"
+            rx="2"
+            ry="2"
+            fill="#e94560"
+            stroke="none"
+          />
+          <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
+          <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
+        </svg>
+      </g>
+    </svg>
   );
 }
 
