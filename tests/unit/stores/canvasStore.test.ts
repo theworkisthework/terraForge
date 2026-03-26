@@ -286,24 +286,48 @@ describe("canvasStore", () => {
   });
 
   it("applyHatch ignores NaN spacingMM and keeps existing value", () => {
-    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
-    const imp = createSvgImport({ paths: [path], scale: 1, hatchSpacingMM: 2, hatchEnabled: true });
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchSpacingMM: 2,
+      hatchEnabled: true,
+    });
     useCanvasStore.getState().addImport(imp);
     useCanvasStore.getState().applyHatch(imp.id, NaN, 0, true);
     expect(useCanvasStore.getState().imports[0].hatchSpacingMM).toBe(2);
   });
 
   it("applyHatch ignores NaN angleDeg and keeps existing value", () => {
-    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
-    const imp = createSvgImport({ paths: [path], scale: 1, hatchAngleDeg: 45, hatchEnabled: true });
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchAngleDeg: 45,
+      hatchEnabled: true,
+    });
     useCanvasStore.getState().addImport(imp);
     useCanvasStore.getState().applyHatch(imp.id, 2, NaN, true);
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(45);
   });
 
   it("applyHatch with Infinity angleDeg keeps existing angle", () => {
-    const path = createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true });
-    const imp = createSvgImport({ paths: [path], scale: 1, hatchAngleDeg: 30, hatchEnabled: true });
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: true,
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchAngleDeg: 30,
+      hatchEnabled: true,
+    });
     useCanvasStore.getState().addImport(imp);
     useCanvasStore.getState().applyHatch(imp.id, 2, Infinity, true);
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(30);
@@ -326,11 +350,13 @@ describe("canvasStore", () => {
     useCanvasStore.getState().addImport(imp);
     // Apply hatch at scale 1 to get initial lines
     useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
-    const linesBefore = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+    const linesBefore =
+      useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
 
     // Change scale → should regenerate lines
     useCanvasStore.getState().updateImport(imp.id, { scale: 0.5 });
-    const linesAfter = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+    const linesAfter =
+      useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
 
     // At half scale the spacing in SVG units doubles → half as many lines
     expect(linesAfter.length).toBeLessThan(linesBefore.length);
@@ -351,7 +377,9 @@ describe("canvasStore", () => {
     // Changing scale while hatch is off should NOT touch hatchLines
     useCanvasStore.getState().updateImport(imp.id, { scale: 2 });
     // hatchLines unchanged (still the one we seeded)
-    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual(["M0,2 L10,2"]);
+    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual([
+      "M0,2 L10,2",
+    ]);
   });
 
   it("updateImport does not regenerate hatch when non-scale properties change", () => {
@@ -368,7 +396,9 @@ describe("canvasStore", () => {
     useCanvasStore.getState().addImport(imp);
     useCanvasStore.getState().updateImport(imp.id, { x: 50, rotation: 90 });
     // hatchLines unchanged — position/rotation don't affect spacing
-    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual(["M0,2 L10,2"]);
+    expect(useCanvasStore.getState().imports[0].paths[0].hatchLines).toEqual([
+      "M0,2 L10,2",
+    ]);
   });
 
   it("applyHatch uses geometric mean of scaleX/scaleY for spacing when ratio is unlocked", () => {
@@ -386,7 +416,9 @@ describe("canvasStore", () => {
       hatchEnabled: false,
     });
     const impUniform = createSvgImport({
-      paths: [createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true })],
+      paths: [
+        createSvgPath({ d: "M 0 0 L 10 0 L 10 10 L 0 10 Z", hasFill: true }),
+      ],
       scale: 1,
       hatchEnabled: false,
     });
@@ -395,9 +427,124 @@ describe("canvasStore", () => {
     useCanvasStore.getState().applyHatch(imp.id, 2, 0, true);
     useCanvasStore.getState().applyHatch(impUniform.id, 2, 0, true);
 
-    const linesNonUniform = useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
-    const linesUniform = useCanvasStore.getState().imports[1].paths[0].hatchLines ?? [];
+    const linesNonUniform =
+      useCanvasStore.getState().imports[0].paths[0].hatchLines ?? [];
+    const linesUniform =
+      useCanvasStore.getState().imports[1].paths[0].hatchLines ?? [];
     // Geometric mean of 0.5*2=1 → same spacing as scale=1 → same number of lines
     expect(linesNonUniform.length).toBe(linesUniform.length);
+  });
+
+  // ── updatePath edge cases ────────────────────────────────────────────────
+
+  it("updatePath is a no-op for unknown importId", () => {
+    const path = createSvgPath({ visible: true });
+    const imp = createSvgImport({ paths: [path] });
+    useCanvasStore.getState().addImport(imp);
+    // Should not throw and path remains unchanged
+    useCanvasStore
+      .getState()
+      .updatePath("nonexistent", path.id, { visible: false });
+    expect(useCanvasStore.getState().imports[0].paths[0].visible).toBe(true);
+  });
+
+  // ── removePath edge cases ────────────────────────────────────────────────
+
+  it("removePath clears selectedPathId when the removed path was selected", () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({ paths: [path] });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.setState({ selectedPathId: path.id });
+    useCanvasStore.getState().removePath(imp.id, path.id);
+    expect(useCanvasStore.getState().selectedPathId).toBeNull();
+  });
+
+  it("removePath does not clear selectedPathId when a different path is removed", () => {
+    const path1 = createSvgPath();
+    const path2 = createSvgPath();
+    const imp = createSvgImport({ paths: [path1, path2] });
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.setState({ selectedPathId: path1.id });
+    useCanvasStore.getState().removePath(imp.id, path2.id);
+    expect(useCanvasStore.getState().selectedPathId).toBe(path1.id);
+  });
+
+  // ── setGcodeToolpath plotProgress clearing ───────────────────────────────
+
+  it("setGcodeToolpath(null) clears plotProgressCuts and plotProgressRapids", () => {
+    useCanvasStore.setState({
+      plotProgressCuts: "M0 0 L10 10",
+      plotProgressRapids: "M10 10 L20 20",
+    });
+    useCanvasStore.getState().setGcodeToolpath(null);
+    expect(useCanvasStore.getState().plotProgressCuts).toBe("");
+    expect(useCanvasStore.getState().plotProgressRapids).toBe("");
+  });
+
+  it("setGcodeToolpath(null) clears toolpathSelected", () => {
+    useCanvasStore.setState({ toolpathSelected: true });
+    useCanvasStore.getState().setGcodeToolpath(null);
+    expect(useCanvasStore.getState().toolpathSelected).toBe(false);
+  });
+
+  // ── loadLayout ────────────────────────────────────────────────────────────
+
+  it("loadLayout replaces imports and clears selection", () => {
+    const imp = createSvgImport();
+    useCanvasStore.getState().addImport(imp);
+    useCanvasStore.setState({ selectedImportId: imp.id, selectedPathId: "p1" });
+
+    const freshImport = createSvgImport({ id: "loaded-1" });
+    useCanvasStore.getState().loadLayout([freshImport]);
+
+    expect(useCanvasStore.getState().imports).toHaveLength(1);
+    expect(useCanvasStore.getState().imports[0].id).toBe("loaded-1");
+    expect(useCanvasStore.getState().selectedImportId).toBeNull();
+    expect(useCanvasStore.getState().selectedPathId).toBeNull();
+  });
+
+  it("loadLayout applies default hatch settings to ingested imports", () => {
+    const freshImport = createSvgImport({ id: "hatch-test" });
+    useCanvasStore.getState().loadLayout([freshImport]);
+    const loaded = useCanvasStore.getState().imports[0];
+    expect(loaded.hatchEnabled).toBe(false);
+    expect(typeof loaded.hatchSpacingMM).toBe("number");
+    expect(typeof loaded.hatchAngleDeg).toBe("number");
+  });
+
+  // ── toggleCentreMarker ────────────────────────────────────────────────────
+
+  it("toggleCentreMarker flips showCentreMarker", () => {
+    // Initial store value is true; verify toggling works both ways
+    useCanvasStore.setState({ showCentreMarker: true } as any);
+    useCanvasStore.getState().toggleCentreMarker();
+    expect(useCanvasStore.getState().showCentreMarker).toBe(false);
+    useCanvasStore.getState().toggleCentreMarker();
+    expect(useCanvasStore.getState().showCentreMarker).toBe(true);
+  });
+
+  // ── updateImport non-filled path on scale change ──────────────────────────
+
+  it("updateImport clears hatchLines for non-filled paths when scale changes", () => {
+    // Path without fill but with pre-existing hatchLines (edge case: should be cleared)
+    const path = createSvgPath({
+      d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+      hasFill: false,
+      hatchLines: ["M0,1 L10,1"],
+    });
+    const imp = createSvgImport({
+      paths: [path],
+      scale: 1,
+      hatchEnabled: true,
+      hatchSpacingMM: 2,
+      hatchAngleDeg: 0,
+    });
+    useCanvasStore.getState().addImport(imp);
+    // Changing scale while hatchEnabled=true triggers the hatch regen block.
+    // The path has hasFill=false → `p.hatchLines = undefined; continue;` branch fires.
+    useCanvasStore.getState().updateImport(imp.id, { scale: 0.5 });
+    expect(
+      useCanvasStore.getState().imports[0].paths[0].hatchLines,
+    ).toBeUndefined();
   });
 });

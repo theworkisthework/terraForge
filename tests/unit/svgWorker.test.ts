@@ -227,7 +227,9 @@ describe("svgWorker — G-code body", () => {
       taskId: "custom-start",
       objects: [makeSimpleObj()],
       config: makeConfig(),
-      options: createGcodeOptions({ customStartGcode: "M42 P0 S1 ; custom start" }),
+      options: createGcodeOptions({
+        customStartGcode: "M42 P0 S1 ; custom start",
+      }),
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
@@ -394,6 +396,52 @@ describe("svgWorker — cancellation", () => {
       .filter((m) => m.type === "error" && m.taskId === taskId);
     expect(errorMsgs).toHaveLength(0);
   });
+
+  it("cancel during phase-4 G-code emission emits 'cancelled' (covers phase-4 cancel branch)", async () => {
+    // Strategy: hook postSpy so that the first phase-4 progress message
+    // (percent > 40) synchronously dispatches a cancel for the same taskId.
+    // Phase 4 posts progress BEFORE the next await yieldPh4(), so the cancel
+    // flag is already set when the next loop iteration's cancel check runs.
+    const taskId = "cancel-phase4";
+    let cancelDispatched = false;
+
+    postSpy.mockImplementation((msg: Record<string, unknown>) => {
+      if (
+        !cancelDispatched &&
+        msg.type === "progress" &&
+        (msg.percent as number) > 40 &&
+        msg.taskId === taskId
+      ) {
+        cancelDispatched = true;
+        dispatch({ type: "cancel", taskId });
+      }
+    });
+
+    // 5 objects → 5 subpaths in phase 4; gives several cancel-check points
+    // after the first progress message triggers the cancel.
+    dispatch({
+      type: "generate",
+      taskId,
+      objects: Array.from({ length: 5 }, () => makeSimpleObj()),
+      config: makeConfig(),
+      options: createGcodeOptions({ optimisePaths: false }),
+    });
+
+    try {
+      const msg = await waitForMsgById("cancelled", taskId);
+      expect(msg.type).toBe("cancelled");
+      expect(msg.taskId).toBe(taskId);
+      // Confirm no 'complete' was posted for this task
+      const completeMsgs = postSpy.mock.calls
+        .map(([m]) => m as Record<string, unknown>)
+        .filter((m) => m.type === "complete" && m.taskId === taskId);
+      expect(completeMsgs).toHaveLength(0);
+    } finally {
+      // Reset mock so subsequent tests are unaffected (mockClear only clears
+      // calls; mockReset also clears the custom implementation).
+      postSpy.mockReset();
+    }
+  });
 });
 
 // ── Coordinate integration ────────────────────────────────────────────────────
@@ -551,5 +599,27 @@ describe("svgWorker — join paths mode", () => {
     expect(gcode).toContain("Joined   : yes (tolerance 0.2 mm)");
     expect(gcode).toContain("G0 X");
     expect(gcode).toContain("G1 X");
+  });
+});
+
+// ── Error handling ────────────────────────────────────────────────────────────
+
+describe("svgWorker — error handling", () => {
+  it("posts an 'error' message when generate() throws (e.g. null config)", async () => {
+    // Passing null as config causes generate() to throw synchronously
+    // (accessing config.name etc.), which becomes a rejected promise
+    // caught by the .catch() handler on the onmessage branch.
+    const taskId = "error-null-config";
+    dispatch({
+      type: "generate",
+      taskId,
+      objects: [makeSimpleObj()],
+      config: null as any,
+      options: createGcodeOptions(),
+    });
+    const msg = await waitForMsgById("error", taskId);
+    expect(msg.type).toBe("error");
+    expect(msg.taskId).toBe(taskId);
+    expect(typeof msg.error).toBe("string");
   });
 });

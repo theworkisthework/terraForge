@@ -212,6 +212,31 @@ describe("computePathsBounds", () => {
     expect(bounds!.minX).toBeCloseTo(0);
     expect(bounds!.maxX).toBeCloseTo(100);
   });
+
+  it("includes S (smooth cubic) control and endpoint coordinates", () => {
+    // M to (0,0), C to (50,60) with last cp=(30,40), then S with cp2=(70,80) end=(90,100)
+    const d = "M 0 0 C 10 20 30 40 50 60 S 70 80 90 100";
+    const bounds = computePathsBounds([d]);
+    expect(bounds).not.toBeNull();
+    expect(bounds!.maxX).toBeGreaterThanOrEqual(70);
+    expect(bounds!.maxY).toBeGreaterThanOrEqual(80);
+  });
+
+  it("includes Q (quadratic bezier) control and endpoint coordinates", () => {
+    const d = "M 0 0 Q 50 100 100 0";
+    const bounds = computePathsBounds([d]);
+    expect(bounds).not.toBeNull();
+    expect(bounds!.maxX).toBeGreaterThanOrEqual(50);
+    expect(bounds!.maxY).toBeGreaterThanOrEqual(100);
+  });
+
+  it("includes T (smooth quadratic) endpoint coordinates", () => {
+    // T only contributes its endpoint to bounds
+    const d = "M 0 0 Q 25 50 50 0 T 100 0";
+    const bounds = computePathsBounds([d]);
+    expect(bounds).not.toBeNull();
+    expect(bounds!.maxX).toBeGreaterThanOrEqual(100);
+  });
 });
 
 // ── getAccumulatedTransform ───────────────────────────────────────────────────

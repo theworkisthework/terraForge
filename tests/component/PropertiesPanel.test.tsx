@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { useMachineStore } from "@renderer/store/machineStore";
@@ -300,7 +300,9 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Collapsed when not selected — stats hidden
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
-    useCanvasStore.setState({ toolpathSelected: true });
+    act(() => {
+      useCanvasStore.setState({ toolpathSelected: true });
+    });
   });
 
   it("shows file size formatted in KB", () => {
@@ -519,5 +521,369 @@ describe("PropertiesPanel", () => {
     await userEvent.clear(angleInput);
     await userEvent.type(angleInput, "90");
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(90);
+  });
+});
+
+// ── Scale and rotation shortcut buttons ───────────────────────────────────────
+
+describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
+  function setupScaleFixture(svgW = 100, svgH = 100) {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "scale-shortcut",
+      svgWidth: svgW,
+      svgHeight: svgH,
+      scale: 2,
+      rotation: 30,
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    return imp;
+  }
+
+  // ── Fit to bed ─────────────────────────────────────────────────────────
+
+  it("fit-to-bed button sets scale to min(bedW/svgW, bedH/svgH)", async () => {
+    // bedW=200, bedH=150, svgW=100, svgH=100
+    // fitScale = min(200/100, 150/100) = min(2, 1.5) = 1.5
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    const fitBtn = screen.getByTitle(/Fit to bed/);
+    await userEvent.click(fitBtn);
+    expect(useCanvasStore.getState().imports[0].scale).toBeCloseTo(1.5);
+  });
+
+  it("fit-to-bed button resets scaleX and scaleY overrides and positions to 0", async () => {
+    setupScaleFixture();
+    // Pre-set scaleX/scaleY overrides
+    useCanvasStore.setState((s) => ({
+      imports: s.imports.map((i) => ({
+        ...i,
+        scaleX: 3,
+        scaleY: 2,
+        x: 10,
+        y: 20,
+      })),
+    }));
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Fit to bed/));
+    const imp = useCanvasStore.getState().imports[0];
+    expect(imp.scaleX).toBeUndefined();
+    expect(imp.scaleY).toBeUndefined();
+    expect(imp.x).toBe(0);
+    expect(imp.y).toBe(0);
+  });
+
+  // ── Reset to 1:1 ──────────────────────────────────────────────────────
+
+  it("reset-scale button sets scale to 1", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    const resetBtn = screen.getByTitle(
+      "Reset scale to 1:1 (1 SVG unit = 1 mm)",
+    );
+    await userEvent.click(resetBtn);
+    expect(useCanvasStore.getState().imports[0].scale).toBe(1);
+  });
+
+  it("reset-scale button clears scaleX and scaleY overrides", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState((s) => ({
+      imports: s.imports.map((i) => ({ ...i, scaleX: 3, scaleY: 2 })),
+    }));
+    render(<PropertiesPanel />);
+    await userEvent.click(
+      screen.getByTitle("Reset scale to 1:1 (1 SVG unit = 1 mm)"),
+    );
+    const imp = useCanvasStore.getState().imports[0];
+    expect(imp.scaleX).toBeUndefined();
+    expect(imp.scaleY).toBeUndefined();
+  });
+
+  // ── CCW / CW rotate ───────────────────────────────────────────────────
+
+  it("CCW button decrements rotation by current step (default 45°)", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Rotate 45° counter-clockwise"));
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(-15);
+  });
+
+  it("CW button increments rotation by current step (default 45°)", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Rotate 45° clockwise"));
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(75);
+  });
+
+  // ── Step flyout ───────────────────────────────────────────────────────
+
+  it("clicking step button opens flyout with step options", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // ROT_STEPS = [1, 5, 15, 30, 45]. Trigger already shows "45°" so check a
+    // different step value to avoid multiple-element ambiguity.
+    expect(screen.getByText("15°")).toBeInTheDocument();
+    expect(screen.getByText("30°")).toBeInTheDocument();
+  });
+
+  it("selecting a step from flyout updates the step and closes the flyout", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // Click the 15° option inside the flyout
+    const fifteenBtns = screen.getAllByText("15°");
+    // The flyout option is the one inside the dropdown (last one, not the trigger label)
+    await userEvent.click(fifteenBtns[fifteenBtns.length - 1]);
+    // Flyout should be closed — the 5°/30°/45° options should be gone
+    expect(screen.queryByText("45°")).not.toBeInTheDocument();
+    // Step trigger should now show 15°
+    expect(screen.getByTitle("Change rotation step")).toHaveTextContent("15°");
+  });
+
+  it("clicking backdrop closes the flyout", async () => {
+    setupScaleFixture();
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Change rotation step"));
+    // "30°" only appears in the flyout (trigger shows "45°"), so use it to
+    // verify the flyout is open and then gone after backdrop click.
+    expect(screen.getByText("30°")).toBeInTheDocument();
+    const backdrop = document.querySelector(".fixed.inset-0") as HTMLElement;
+    expect(backdrop).not.toBeNull();
+    await userEvent.click(backdrop);
+    expect(screen.queryByText("30°")).not.toBeInTheDocument();
+  });
+
+  // ── Centre marker toggle ──────────────────────────────────────────────
+
+  it("centre marker button toggles showCentreMarker in store", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState({ showCentreMarker: false });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle("Show centre marker"));
+    expect(useCanvasStore.getState().showCentreMarker).toBe(true);
+  });
+
+  it("centre marker button shows 'Hide' title when marker is active", async () => {
+    setupScaleFixture();
+    useCanvasStore.setState({ showCentreMarker: true });
+    render(<PropertiesPanel />);
+    expect(screen.getByTitle("Hide centre marker")).toBeInTheDocument();
+  });
+
+  // ── Magnet snap ───────────────────────────────────────────────────────
+
+  it("magnet button snaps rotation to first ROT_PRESET when no current preset", async () => {
+    setupScaleFixture(); // rotation = 30° (not in ROT_PRESETS)
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // norm = 30 → no match in presets → idx = -1 → next = ROT_PRESETS[0] = 0
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(0);
+  });
+
+  it("magnet button advances to next preset when already on one", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "magnet-preset",
+      rotation: 45, // ROT_PRESETS index 1
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // idx=1 → next = ROT_PRESETS[2] = 90
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(90);
+  });
+
+  it("magnet wraps from last preset back to first", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "magnet-wrap",
+      rotation: 315, // last ROT_PRESET index 7
+    });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    await userEvent.click(screen.getByTitle(/Snap to next preset/));
+    // idx=7 → (7+1) % 8 = 0 → ROT_PRESETS[0] = 0
+    expect(useCanvasStore.getState().imports[0].rotation).toBe(0);
+  });
+
+  // ── W / H dimension inputs with ratio lock ───────────────────────────────
+
+  function setupWHFixture() {
+    const path = createSvgPath();
+    // svgWidth=100, svgHeight=50, scale=1 → W=100mm, H=50mm displayed
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-test",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    return imp;
+  }
+
+  it("W input (ratio locked) updates scale uniformly", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    // W input shows 100; H input shows 50.
+    // Unique values: X/Y show 0, Scale shows 1, Rotation shows 0 — so 100 is unique.
+    const wInput = screen.getByDisplayValue("100") as HTMLInputElement;
+    fireEvent.change(wInput, { target: { value: "200" } });
+    const st = useCanvasStore.getState().imports[0];
+    // scale = 200/100 = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  it("H input (ratio locked) updates scale uniformly", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    // H input shows 50.
+    const hInput = screen.getByDisplayValue("50") as HTMLInputElement;
+    fireEvent.change(hInput, { target: { value: "100" } });
+    const st = useCanvasStore.getState().imports[0];
+    // scale = 100/50 = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  it("ratio lock button unlocks and sets independent scaleX/scaleY", async () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+    const lockBtn = screen.getByTitle("Ratio locked — click to unlock");
+    await userEvent.click(lockBtn);
+    const st = useCanvasStore.getState().imports[0];
+    // After unlock: scaleX = scaleY = imp.scale = 1
+    expect(st.scaleX).toBeCloseTo(1);
+    expect(st.scaleY).toBeCloseTo(1);
+  });
+
+  it("W input (ratio unlocked) updates only scaleX", async () => {
+    const path = createSvgPath();
+    // Start with independent scales already set (simulates post-unlock)
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-unlocked",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // Unlock ratio first
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // Now W input: change to 200 → scaleX = 200/100 = 2 only
+    const wInput = screen.getByDisplayValue("100") as HTMLInputElement;
+    fireEvent.change(wInput, { target: { value: "200" } });
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleX).toBeCloseTo(2);
+    // scaleY unchanged
+    expect(st.scaleY).toBeCloseTo(1);
+  });
+
+  it("H input (ratio unlocked) updates only scaleY", async () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-unlocked-h",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // Unlock ratio
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // H input: change to 150 → scaleY = 150/50 = 3
+    const hInput = screen.getByDisplayValue("50") as HTMLInputElement;
+    fireEvent.change(hInput, { target: { value: "150" } });
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleY).toBeCloseTo(3);
+    expect(st.scaleX).toBeCloseTo(1);
+  });
+
+  it("ratio lock button re-locks and clears independent scales", async () => {
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "wh-relock",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      scaleX: 2,
+      scaleY: 3,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    // The import has independent scales so ratioLocked starts based on state.
+    // After unlock click: ratioLocked=false → button shows "Ratio unlocked — click to lock"
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    // Now re-lock
+    await userEvent.click(screen.getByTitle("Ratio unlocked — click to lock"));
+    const st = useCanvasStore.getState().imports[0];
+    // scale = scaleX ?? scale = 2, scaleX/scaleY cleared
+    expect(st.scale).toBeCloseTo(2);
+    expect(st.scaleX).toBeUndefined();
+    expect(st.scaleY).toBeUndefined();
+  });
+
+  // ── Toolpath statistics edge cases ────────────────────────────────────────
+
+  it("formatBytes shows MB for files over 1 MB", () => {
+    const tp = createGcodeToolpath({ fileSizeBytes: 2 * 1024 * 1024 });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("2.0 MB")).toBeInTheDocument();
+  });
+
+  it("formatDuration shows hours for very long jobs", () => {
+    // 200 000 mm at 3000 mm/min = 66.7 min ≈ 1h 6m
+    const tp = createGcodeToolpath({
+      totalCutDistance: 200000,
+      totalRapidDistance: 0,
+      feedrate: 3000,
+    });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText(/\dh \d+m/)).toBeInTheDocument();
+  });
+
+  it("estimateDuration shows '—' when both cut and rapid distances are zero", () => {
+    const tp = createGcodeToolpath({
+      totalCutDistance: 0,
+      totalRapidDistance: 0,
+      feedrate: 3000,
+    });
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      gcodeSource: null,
+      toolpathSelected: true,
+    });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });
