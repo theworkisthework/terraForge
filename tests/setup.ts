@@ -111,6 +111,11 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as any;
 }
 
+// ── Canvas stub for jsdom ─────────────────────────────────────────────────────
+// jsdom doesn't implement HTMLCanvasElement.getContext(). Stub it out so tests
+// don't emit "Not implemented" warnings. Returns a no-op 2D context object.
+HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
+
 // ── DOM method stubs for jsdom ────────────────────────────────────────────────
 // jsdom doesn't implement scrollIntoView or scrollTo
 if (typeof window !== "undefined") {
