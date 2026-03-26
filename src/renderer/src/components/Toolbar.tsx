@@ -17,6 +17,7 @@ import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
 import { CloseLayoutDialog } from "./CloseLayoutDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { AboutDialog } from "./AboutDialog";
 import type { GcodePrefs } from "./GcodeOptionsDialog";
 import {
   getAccumulatedTransform,
@@ -306,6 +307,7 @@ export function Toolbar({
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   /** Parsed imports waiting for the user to confirm overwriting the canvas. */
   const [pendingLayout, setPendingLayout] = useState<
     import("../../../types").SvgImport[] | null
@@ -802,11 +804,15 @@ export function Toolbar({
     const unsubClose = window.terraForge.fs.onMenuCloseLayout(() =>
       closeLayoutRef.current(),
     );
+    const unsubAbout = window.terraForge.app.onMenuAbout(() =>
+      setShowAbout(true),
+    );
     return () => {
       unsubImport();
       unsubOpen();
       unsubSave();
       unsubClose();
+      unsubAbout();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -974,7 +980,7 @@ export function Toolbar({
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-[#16213e] border-b border-[#0f3460] shrink-0">
       {/* Brand */}
-      <span className="text-[#e94560] font-bold tracking-widest uppercase text-sm mr-2">
+      <span className="text-[#e94560] font-bold tracking-widest text-sm mr-2">
         terraForge
       </span>
 
@@ -1163,6 +1169,8 @@ export function Toolbar({
           onCancel={() => setPendingLayout(null)}
         />
       )}
+
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
     </header>
   );
 }

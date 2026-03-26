@@ -190,6 +190,11 @@ if (typeof window !== "undefined") {
       exportConfigs: vi.fn().mockResolvedValue(null),
       importConfigs: vi.fn().mockResolvedValue({ added: 0, skipped: 0 }),
     },
+    app: {
+      getVersion: vi.fn().mockResolvedValue("1.0.0"),
+      openExternal: vi.fn().mockResolvedValue(undefined),
+      onMenuAbout: vi.fn().mockReturnValue(() => {}),
+    },
   };
   (window as any).terraForge = mockApi;
 }

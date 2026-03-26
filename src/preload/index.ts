@@ -174,7 +174,27 @@ const config: TerraForgeAPI["config"] = {
     invoke<{ added: number; skipped: number }>("config:importConfigs"),
 };
 
+// ─── App API ─────────────────────────────────────────────────────────────────
+
+const appApi: TerraForgeAPI["app"] = {
+  getVersion: () => invoke<string>("app:getVersion"),
+  openExternal: (url) => invoke<void>("app:openExternal", url),
+  onMenuAbout: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:about", listener);
+    return () => ipcRenderer.off("menu:about", listener);
+  },
+};
+
 // ─── Expose to renderer ───────────────────────────────────────────────────────
 
-const api: TerraForgeAPI = { fluidnc, serial, fs, tasks, jobs, config };
+const api: TerraForgeAPI = {
+  fluidnc,
+  serial,
+  fs,
+  tasks,
+  jobs,
+  config,
+  app: appApi,
+};
 contextBridge.exposeInMainWorld("terraForge", api);

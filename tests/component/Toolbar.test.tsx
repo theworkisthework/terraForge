@@ -1598,4 +1598,29 @@ describe("Toolbar", () => {
     });
     consoleSpy.mockRestore();
   });
+
+  // ── About dialog ───────────────────────────────────────────────────────────
+
+  it("native menu:about event opens the About dialog", async () => {
+    let aboutCallback: (() => void) | null = null;
+    (
+      window.terraForge.app.onMenuAbout as ReturnType<typeof vi.fn>
+    ).mockImplementation((cb: () => void) => {
+      aboutCallback = cb;
+      return () => {};
+    });
+
+    render(<Toolbar />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await act(async () => {
+      aboutCallback?.();
+    });
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // The About dialog heading is an <h1>; the toolbar brand is a <span>
+    expect(
+      screen.getByRole("heading", { name: "terraForge" }),
+    ).toBeInTheDocument();
+  });
 });
