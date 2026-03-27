@@ -131,6 +131,12 @@ interface CanvasState {
   assignImportToGroup: (importId: string, groupId: string | null) => void;
   /** Returns VectorObjects for only the imports belonging to the given group. */
   toVectorObjectsForGroup: (groupId: string) => VectorObject[];
+  /** The id of the layer group currently "selected" (all members highlighted
+   *  and group OBB shown).  Null when no group is selected. */
+  selectedGroupId: string | null;
+  /** Select a layer group by id, clearing any single-import or all-import
+   *  selection.  Pass null to deselect the current group. */
+  selectGroup: (id: string | null) => void;
 }
 
 // ─── Gesture-undo stash ──────────────────────────────────────────────────────
@@ -166,6 +172,7 @@ export const useCanvasStore = create<CanvasState>()(
       selectedImportId: null,
       selectedPathId: null,
       allImportsSelected: false,
+      selectedGroupId: null,
       clipboardImport: null,
       gcodeToolpath: null,
       gcodeSource: null,
@@ -270,8 +277,18 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedImportId = id;
           state.selectedPathId = null;
           state.allImportsSelected = false;
+          state.selectedGroupId = null;
           // Selecting an SVG import clears toolpath selection (and vice-versa).
           if (id !== null) state.toolpathSelected = false;
+        }),
+
+      selectGroup: (id) =>
+        set((state) => {
+          state.selectedGroupId = id;
+          state.selectedImportId = null;
+          state.selectedPathId = null;
+          state.allImportsSelected = false;
+          state.toolpathSelected = false;
         }),
 
       selectToolpath: (selected) =>
@@ -282,6 +299,7 @@ export const useCanvasStore = create<CanvasState>()(
             state.selectedImportId = null;
             state.selectedPathId = null;
             state.allImportsSelected = false;
+            state.selectedGroupId = null;
           }
         }),
 
@@ -293,6 +311,7 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedImportId = null;
           state.selectedPathId = null;
           state.allImportsSelected = false;
+          state.selectedGroupId = null;
           state.layerGroups = [];
         });
       },
@@ -309,6 +328,7 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedImportId = null;
           state.selectedPathId = null;
           state.allImportsSelected = false;
+          state.selectedGroupId = null;
           state.layerGroups = newLayerGroups ?? [];
         });
       },
@@ -499,6 +519,7 @@ export const useCanvasStore = create<CanvasState>()(
       selectAllImports: () =>
         set((state) => {
           if (state.imports.length === 0) return;
+          state.selectedGroupId = null;
           if (state.imports.length === 1) {
             // Only one import — just select it directly.
             state.selectedImportId = state.imports[0].id;
@@ -582,6 +603,7 @@ export const useCanvasStore = create<CanvasState>()(
       removeLayerGroup: (id) =>
         set((state) => {
           state.layerGroups = state.layerGroups.filter((g) => g.id !== id);
+          if (state.selectedGroupId === id) state.selectedGroupId = null;
         }),
 
       updateLayerGroup: (id, patch) =>

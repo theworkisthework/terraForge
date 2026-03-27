@@ -58,6 +58,8 @@ export function PlotCanvas() {
   const imports = useCanvasStore((s) => s.imports);
   const selectedImportId = useCanvasStore((s) => s.selectedImportId);
   const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
+  const selectedGroupId = useCanvasStore((s) => s.selectedGroupId);
+  const selectGroup = useCanvasStore((s) => s.selectGroup);
   const selectImport = useCanvasStore((s) => s.selectImport);
   const removeImport = useCanvasStore((s) => s.removeImport);
   const clearImports = useCanvasStore((s) => s.clearImports);
@@ -321,11 +323,11 @@ export function PlotCanvas() {
   // Clear the persistent OBB whenever the group selection is dropped so a
   // new Ctrl+A always starts with a fresh axis-aligned bounding box.
   useEffect(() => {
-    if (!allImportsSelected) {
+    if (!allImportsSelected && !selectedGroupId) {
       setPersistentGroupOBB(null);
       setGroupOBBAngle(0);
     }
-  }, [allImportsSelected]);
+  }, [allImportsSelected, selectedGroupId]);
 
   // ── Toolpath selection ────────────────────────────────────────────────────────
   // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
@@ -351,6 +353,16 @@ export function PlotCanvas() {
       if (e.key === "Delete" || e.key === "Backspace") {
         if (allImportsSelected) {
           clearImports();
+        } else if (selectedGroupId) {
+          const st = useCanvasStore.getState();
+          const groupImportIds = new Set(
+            st.layerGroups.find((g) => g.id === selectedGroupId)?.importIds ??
+              [],
+          );
+          st.imports
+            .filter((i) => groupImportIds.has(i.id))
+            .forEach((i) => st.removeImport(i.id));
+          selectGroup(null);
         } else if (selectedImportId) {
           removeImport(selectedImportId);
         } else if (toolpathSelected && !isJobActive) {
@@ -400,6 +412,8 @@ export function PlotCanvas() {
   }, [
     selectedImportId,
     allImportsSelected,
+    selectedGroupId,
+    selectGroup,
     toolpathSelected,
     isJobActive,
     removeImport,
@@ -484,6 +498,27 @@ export function PlotCanvas() {
         });
         return;
       }
+      // Layer-group mode: if the clicked import belongs to the selected group,
+      // drag all group members together.
+      if (state.selectedGroupId) {
+        const groupImportIds = new Set(
+          state.layerGroups.find((g) => g.id === state.selectedGroupId)
+            ?.importIds ?? [],
+        );
+        if (groupImportIds.has(id)) {
+          setDragging({
+            id,
+            startMouseX: e.clientX,
+            startMouseY: e.clientY,
+            startObjX: 0,
+            startObjY: 0,
+            group: state.imports
+              .filter((i) => groupImportIds.has(i.id))
+              .map((imp) => ({ id: imp.id, startX: imp.x, startY: imp.y })),
+          });
+          return;
+        }
+      }
       selectImport(id);
       const imp = state.imports.find((i) => i.id === id);
       if (!imp) return;
@@ -566,7 +601,17 @@ export function PlotCanvas() {
     (e: React.MouseEvent<SVGCircleElement>, handle: HandlePos) => {
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const { imports: imps } = useCanvasStore.getState();
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const imps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       const gBedY = getBedYRef.current;
       let minWx = Infinity,
         maxWx = -Infinity,
@@ -637,7 +682,17 @@ export function PlotCanvas() {
     ) => {
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const { imports: imps } = useCanvasStore.getState();
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const imps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       const gBedY = getBedYRef.current;
       const container = containerRef.current;
       if (!container) return;
@@ -679,14 +734,24 @@ export function PlotCanvas() {
       if (spaceRef.current) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const currentImports = useCanvasStore.getState().imports;
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const groupImps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       setDragging({
         id: "__group__",
         startMouseX: e.clientX,
         startMouseY: e.clientY,
         startObjX: 0,
         startObjY: 0,
-        group: currentImports.map((imp) => ({
+        group: groupImps.map((imp) => ({
           id: imp.id,
           startX: imp.x,
           startY: imp.y,
@@ -1165,7 +1230,12 @@ export function PlotCanvas() {
           const avgImpScale =
             Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
           const isImpSelected =
-            allImportsSelected || imp.id === selectedImportId;
+            allImportsSelected ||
+            imp.id === selectedImportId ||
+            (!!selectedGroupId &&
+              !!layerGroups
+                .find((g) => g.id === selectedGroupId)
+                ?.importIds.includes(imp.id));
 
           ctx.save();
           ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
@@ -1545,7 +1615,14 @@ export function PlotCanvas() {
             <ImportLayer
               key={imp.id}
               imp={imp}
-              selected={allImportsSelected || selectedImportId === imp.id}
+              selected={
+                allImportsSelected ||
+                selectedImportId === imp.id ||
+                (!!selectedGroupId &&
+                  !!layerGroups
+                    .find((g) => g.id === selectedGroupId)
+                    ?.importIds.includes(imp.id))
+              }
               onImportMouseDown={onImportMouseDown}
               getBedY={getBedY}
             />
@@ -1553,9 +1630,17 @@ export function PlotCanvas() {
       </svg>
 
       {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
-      {allImportsSelected && containerSize.w > 0 ? (
+      {(allImportsSelected || !!selectedGroupId) && containerSize.w > 0 ? (
         <GroupHandleOverlay
-          imports={imports.filter((i) => i.visible)}
+          imports={(allImportsSelected
+            ? imports
+            : imports.filter(
+                (i) =>
+                  !!layerGroups
+                    .find((g) => g.id === selectedGroupId)
+                    ?.importIds.includes(i.id),
+              )
+          ).filter((i) => i.visible)}
           zoom={vp.zoom}
           panX={vp.panX}
           panY={vp.panY}
@@ -1565,7 +1650,21 @@ export function PlotCanvas() {
           onGroupMouseDown={onGroupMouseDown}
           onGroupHandleMouseDown={onGroupHandleMouseDown}
           onGroupRotateHandleMouseDown={onGroupRotateHandleMouseDown}
-          onDelete={clearImports}
+          onDelete={
+            allImportsSelected
+              ? clearImports
+              : () => {
+                  const st = useCanvasStore.getState();
+                  const gids = new Set(
+                    st.layerGroups.find((g) => g.id === selectedGroupId)
+                      ?.importIds ?? [],
+                  );
+                  st.imports
+                    .filter((i) => gids.has(i.id))
+                    .forEach((i) => st.removeImport(i.id));
+                  selectGroup(null);
+                }
+          }
           activeOBB={
             groupRotating
               ? {
