@@ -915,4 +915,91 @@ describe("canvasStore", () => {
       expect(useCanvasStore.getState().allImportsSelected).toBe(false);
     });
   });
+
+  // ── snapshotForGesture / commitGesture ────────────────────────────────────
+
+  describe("snapshotForGesture / commitGesture", () => {
+    it("commitGesture is a no-op when no snapshot was taken", () => {
+      const imp = createSvgImport({ x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().commitGesture();
+      expect(useCanvasStore.getState().undoStack).toHaveLength(0);
+    });
+
+    it("commits snapshot to undoStack when imports changed", () => {
+      const imp = createSvgImport({ x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      // Simulate gesture changing position
+      useCanvasStore.getState().updateImport(imp.id, { x: 50, y: 50 });
+      useCanvasStore.getState().commitGesture();
+      expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+    });
+
+    it("discards snapshot (no undoStack push) when imports did not change", () => {
+      const imp = createSvgImport({ x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      // No mutation — simulates click without drag
+      useCanvasStore.getState().commitGesture();
+      expect(useCanvasStore.getState().undoStack).toHaveLength(0);
+    });
+
+    it("undo after committed gesture restores original position", () => {
+      const imp = createSvgImport({ x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      useCanvasStore.getState().updateImport(imp.id, { x: 99, y: 99 });
+      useCanvasStore.getState().commitGesture();
+      useCanvasStore.getState().undo();
+      expect(useCanvasStore.getState().imports[0].x).toBe(0);
+      expect(useCanvasStore.getState().imports[0].y).toBe(0);
+    });
+
+    it("redo after undo restores the gesture result", () => {
+      const imp = createSvgImport({ x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      useCanvasStore.getState().updateImport(imp.id, { x: 99, y: 99 });
+      useCanvasStore.getState().commitGesture();
+      useCanvasStore.getState().undo();
+      useCanvasStore.getState().redo();
+      expect(useCanvasStore.getState().imports[0].x).toBe(99);
+      expect(useCanvasStore.getState().imports[0].y).toBe(99);
+    });
+
+    it("snapshotForGesture clears the redo stack", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().undo(); // populate redoStack
+      expect(useCanvasStore.getState().redoStack).toHaveLength(1);
+      useCanvasStore.getState().snapshotForGesture();
+      expect(useCanvasStore.getState().redoStack).toHaveLength(0);
+    });
+
+    it("commitGesture detects scale changes", () => {
+      const imp = createSvgImport({ scale: 1 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      useCanvasStore.getState().updateImport(imp.id, { scale: 2 });
+      useCanvasStore.getState().commitGesture();
+      expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+    });
+
+    it("commitGesture detects rotation changes", () => {
+      const imp = createSvgImport({ rotation: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.setState({ undoStack: [] });
+      useCanvasStore.getState().snapshotForGesture();
+      useCanvasStore.getState().updateImport(imp.id, { rotation: 45 });
+      useCanvasStore.getState().commitGesture();
+      expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+    });
+  });
 });

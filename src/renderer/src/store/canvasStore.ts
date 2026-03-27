@@ -112,7 +112,26 @@ interface CanvasState {
   /** Select all canvas imports.  If already all-selected, cycles to the first single
    *  import so repeated Ctrl+A is still useful. */
   selectAllImports: () => void;
+  /** Snapshot the current imports before a gesture (drag/scale/rotate) begins.
+   *  Clears the redo stack — starting a new gesture invalidates redo history. */
+  snapshotForGesture: () => void;
+  /** Commit the gesture snapshot to the undo stack only if imports actually changed.
+   *  Discards the snapshot if nothing was modified (e.g. click without drag). */
+  commitGesture: () => void;
 }
+
+// ─── Gesture-undo stash ──────────────────────────────────────────────────────
+// Holds a snapshot captured at gesture-start (drag/scale/rotate mousedown).
+// Committed to undoStack on mouseup only if imports actually changed.
+let _gestureSnapshot: SvgImport[] | null = null;
+
+const gestureFingerprint = (imps: SvgImport[]) =>
+  imps
+    .map(
+      (i) =>
+        `${i.id}:${i.x},${i.y},${i.scale},${i.scaleX ?? ""},${i.scaleY ?? ""},${i.rotation ?? 0}`,
+    )
+    .join("|");
 
 export const useCanvasStore = create<CanvasState>()(
   immer((set, get) => {
@@ -480,6 +499,28 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedPathId = null;
           state.toolpathSelected = false;
         }),
+
+      snapshotForGesture: () => {
+        _gestureSnapshot = structuredClone(get().imports);
+        // Starting a new gesture invalidates the redo history.
+        set((state) => {
+          state.redoStack = [];
+        });
+      },
+
+      commitGesture: () => {
+        const before = _gestureSnapshot;
+        _gestureSnapshot = null;
+        if (!before) return;
+        const current = get().imports;
+        // Only push if something gesture-mutable actually changed.
+        if (gestureFingerprint(before) === gestureFingerprint(current)) return;
+        set((state) => {
+          state.undoStack.push(before);
+          if (state.undoStack.length > 50)
+            state.undoStack.splice(0, state.undoStack.length - 50);
+        });
+      },
 
       undo: () => {
         const stack = get().undoStack;

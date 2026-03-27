@@ -457,6 +457,7 @@ export function PlotCanvas() {
       if (spaceRef.current) return; // space held → pan mode, not drag
       e.stopPropagation();
       const state = useCanvasStore.getState();
+      state.snapshotForGesture();
       // In group mode clicking an import continues the group drag without
       // breaking out to single selection.
       if (state.allImportsSelected) {
@@ -491,6 +492,7 @@ export function PlotCanvas() {
   const onHandleMouseDown = useCallback(
     (e: React.MouseEvent<SVGCircleElement>, id: string, handle: HandlePos) => {
       e.stopPropagation();
+      useCanvasStore.getState().snapshotForGesture();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
       if (!imp) return;
       const sX = imp.scaleX ?? imp.scale;
@@ -521,6 +523,7 @@ export function PlotCanvas() {
       cySvg: number,
     ) => {
       e.stopPropagation();
+      useCanvasStore.getState().snapshotForGesture();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
       if (!imp) return;
       const container = containerRef.current;
@@ -553,6 +556,7 @@ export function PlotCanvas() {
   const onGroupHandleMouseDown = useCallback(
     (e: React.MouseEvent<SVGCircleElement>, handle: HandlePos) => {
       e.stopPropagation();
+      useCanvasStore.getState().snapshotForGesture();
       const { imports: imps } = useCanvasStore.getState();
       const gBedY = getBedYRef.current;
       let minWx = Infinity,
@@ -623,6 +627,7 @@ export function PlotCanvas() {
       gHH: number,
     ) => {
       e.stopPropagation();
+      useCanvasStore.getState().snapshotForGesture();
       const { imports: imps } = useCanvasStore.getState();
       const gBedY = getBedYRef.current;
       const container = containerRef.current;
@@ -664,6 +669,7 @@ export function PlotCanvas() {
     (e: React.MouseEvent<SVGRectElement>) => {
       if (spaceRef.current) return;
       e.stopPropagation();
+      useCanvasStore.getState().snapshotForGesture();
       const currentImports = useCanvasStore.getState().imports;
       setDragging({
         id: "__group__",
@@ -902,6 +908,8 @@ export function PlotCanvas() {
   );
 
   const onMouseUp = useCallback(() => {
+    // Commit gesture snapshot to undo stack (only if imports actually changed).
+    useCanvasStore.getState().commitGesture();
     // If any gesture was active, mark it so the SVG onClick can ignore the
     // synthetic click that the browser fires after mouseup.
     if (
