@@ -13,6 +13,7 @@
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useMachineStore } from "../store/machineStore";
+import { useCanvasStore } from "../store/canvasStore";
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ export interface GcodePrefs {
   optimise: boolean;
   uploadToSd: boolean;
   saveLocally: boolean;
+  /** When true, generate a separate G-code file per layer group (multi-pen plots). */
+  exportPerGroup: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
   liftPenAtEnd: boolean;
@@ -34,6 +37,7 @@ const DEFAULTS: GcodePrefs = {
   optimise: true,
   uploadToSd: true,
   saveLocally: false,
+  exportPerGroup: false,
   joinPaths: false,
   joinTolerance: 0.2,
   liftPenAtEnd: true,
@@ -76,6 +80,7 @@ interface Props {
 
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
+  const layerGroupCount = useCanvasStore((s) => s.layerGroups.length);
   const [prefs, setPrefs] = useState<GcodePrefs>(loadPrefs);
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
@@ -342,6 +347,31 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 Open a save dialog to choose where to write the G-code file on
                 this computer.
               </div>
+            </div>
+          </label>
+
+          {/* ── Export one file per group ── */}
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="Export one file per group"
+              className="mt-0.5 accent-[#e94560] cursor-pointer"
+              checked={prefs.exportPerGroup}
+              onChange={() => toggle("exportPerGroup")}
+            />
+            <div>
+              <div className="text-sm text-white font-medium">
+                Export one file per group
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Generate a separate G-code file for each layer group — ideal for
+                multi-colour pen plots. Each file is named after its group.
+              </div>
+              {prefs.exportPerGroup && layerGroupCount === 0 && (
+                <div className="text-xs text-amber-400 mt-1">
+                  No groups defined — add groups in the Properties panel first.
+                </div>
+              )}
             </div>
           </label>
         </div>

@@ -64,6 +64,11 @@ export function PropertiesPanel() {
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
+  const layerGroups = useCanvasStore((s) => s.layerGroups);
+  const addLayerGroup = useCanvasStore((s) => s.addLayerGroup);
+  const removeLayerGroup = useCanvasStore((s) => s.removeLayerGroup);
+  const updateLayerGroup = useCanvasStore((s) => s.updateLayerGroup);
+  const assignImportToGroup = useCanvasStore((s) => s.assignImportToGroup);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const machineStatus = useMachineStore((s) => s.status);
   const isJobActive =
@@ -74,9 +79,28 @@ export function PropertiesPanel() {
     id: string;
     value: string;
   } | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState<{
+    id: string;
+    value: string;
+  } | null>(null);
   const [rotStep, setRotStep] = useState<RotStep>(45);
   const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
   const [ratioLocked, setRatioLocked] = useState(true);
+
+  /** Returns the group id that the given import belongs to, or null. */
+  const importGroupId = (importId: string): string | null =>
+    layerGroups.find((g) => g.importIds.includes(importId))?.id ?? null;
+
+  const GROUP_COLORS = [
+    "#e94560",
+    "#0ea5e9",
+    "#22c55e",
+    "#f59e0b",
+    "#a855f7",
+    "#ec4899",
+    "#14b8a6",
+    "#f97316",
+  ];
 
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => {
@@ -226,15 +250,126 @@ export function PropertiesPanel() {
                 );
               })()}
 
+            {/* ── Layer Groups section ──────────────────────────────── */}
+            {imports.length > 0 && (
+              <div className="border-b border-[#0f3460]/50">
+                {/* Header row */}
+                <div className="flex items-center gap-1 px-2 py-1">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider flex-1">
+                    Groups
+                  </span>
+                  <button
+                    className="text-gray-500 hover:text-[#e94560] text-xs leading-none px-1"
+                    title="Add layer group"
+                    onClick={() => {
+                      const n = layerGroups.length + 1;
+                      addLayerGroup(
+                        `Group ${n}`,
+                        GROUP_COLORS[layerGroups.length % GROUP_COLORS.length],
+                      );
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+                {/* Group rows */}
+                {layerGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center gap-1.5 px-2 py-0.5"
+                  >
+                    {/* Color picker */}
+                    <input
+                      type="color"
+                      value={group.color}
+                      onChange={(e) =>
+                        updateLayerGroup(group.id, { color: e.target.value })
+                      }
+                      className="cursor-pointer border-0 rounded shrink-0"
+                      style={{ width: 16, height: 16, padding: 0 }}
+                      title="Group colour"
+                    />
+                    {/* Editable name */}
+                    {editingGroupName?.id === group.id ? (
+                      <input
+                        type="text"
+                        className="flex-1 min-w-0 bg-transparent text-[10px] text-gray-200 border-b border-[#e94560] outline-none"
+                        value={editingGroupName.value}
+                        autoFocus
+                        onChange={(e) =>
+                          setEditingGroupName({
+                            id: group.id,
+                            value: e.target.value,
+                          })
+                        }
+                        onBlur={() => {
+                          updateLayerGroup(group.id, {
+                            name: editingGroupName.value.trim() || group.name,
+                          });
+                          setEditingGroupName(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            updateLayerGroup(group.id, {
+                              name: editingGroupName.value.trim() || group.name,
+                            });
+                            setEditingGroupName(null);
+                          }
+                          if (e.key === "Escape") setEditingGroupName(null);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="flex-1 min-w-0 text-[10px] text-gray-300 truncate cursor-pointer"
+                        title="Double-click to rename"
+                        onDoubleClick={() =>
+                          setEditingGroupName({
+                            id: group.id,
+                            value: group.name,
+                          })
+                        }
+                      >
+                        {group.name}
+                      </span>
+                    )}
+                    {/* Member count */}
+                    <span className="text-[9px] text-gray-600 shrink-0">
+                      {
+                        group.importIds.filter((id) =>
+                          imports.some((i) => i.id === id),
+                        ).length
+                      }
+                    </span>
+                    {/* Delete group */}
+                    <button
+                      className="text-gray-600 hover:text-[#e94560] shrink-0"
+                      title="Delete group"
+                      onClick={() => removeLayerGroup(group.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ── SVG import entries ─────────────────────────────────── */}
             {imports.map((imp) => {
               const isSelected = imp.id === selectedImportId;
               const isExpanded = expandedIds.has(imp.id);
+              const groupId = importGroupId(imp.id);
+              const groupColor =
+                layerGroups.find((g) => g.id === groupId)?.color ?? null;
 
               return (
                 <div
                   key={imp.id}
                   className={`border-b border-[#0f3460]/30 ${isSelected ? "bg-[#0f3460]/20" : ""}`}
+                  style={
+                    groupColor
+                      ? { borderLeft: `3px solid ${groupColor}` }
+                      : undefined
+                  }
                 >
                   {/* Import header row */}
                   <div
@@ -302,6 +437,27 @@ export function PropertiesPanel() {
                     <span className="text-[9px] text-gray-600 shrink-0 ml-1">
                       {imp.paths.length}p
                     </span>
+                    {/* Group assignment selector */}
+                    {layerGroups.length > 0 && (
+                      <select
+                        className="text-[9px] bg-[#1a1a2e] text-gray-400 border-0 outline-none cursor-pointer ml-1 shrink-0 max-w-[56px] rounded"
+                        value={groupId ?? ""}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          assignImportToGroup(imp.id, e.target.value || null);
+                        }}
+                        title="Assign to group"
+                        style={{ fontSize: "9px" }}
+                      >
+                        <option value="">—</option>
+                        {layerGroups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <button
                       className="ml-1 text-gray-600 hover:text-[#e94560] shrink-0"
                       title="Delete import"

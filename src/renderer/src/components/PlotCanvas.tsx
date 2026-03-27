@@ -43,6 +43,14 @@ interface Vp {
   panY: number;
 }
 
+/** Scale each RGB channel of a CSS hex colour by `factor` (clamped to 0-255). */
+function scaleHexColor(hex: string, factor: number): string {
+  const r = Math.min(255, Math.round(parseInt(hex.slice(1, 3), 16) * factor));
+  const g = Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor));
+  const b = Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,6 +69,7 @@ export function PlotCanvas() {
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
   const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
+  const layerGroups = useCanvasStore((s) => s.layerGroups);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
@@ -1103,6 +1112,13 @@ export function PlotCanvas() {
         const vpA = vp.zoom * dpr;
         const vpE = vp.panX * dpr;
         const vpF = vp.panY * dpr;
+        // Build a fast importId → group colour lookup used for stroke colours below.
+        const groupColorMap = new Map<string, string>();
+        for (const g of layerGroups) {
+          for (const id of g.importIds) {
+            groupColorMap.set(id, g.color);
+          }
+        }
         // Prune cache entries for imports that no longer exist.
         for (const id of importPath2DCacheRef.current.keys()) {
           if (!imports.some((imp) => imp.id === id))
@@ -1158,12 +1174,27 @@ export function PlotCanvas() {
           ctx.scale(impSX, impSY);
           ctx.translate(-(vbX + imp.svgWidth / 2), -(vbY + imp.svgHeight / 2));
           ctx.setLineDash([]);
-          // Outline paths
-          ctx.strokeStyle = isImpSelected ? "#60a0ff" : "#3a6aaa";
+          // Outline paths — use group colour when assigned, otherwise default blue
+          const groupColor = groupColorMap.get(imp.id);
+          const outlineColor = groupColor
+            ? isImpSelected
+              ? scaleHexColor(groupColor, 1.35)
+              : groupColor
+            : isImpSelected
+              ? "#60a0ff"
+              : "#3a6aaa";
+          const hatchColor = groupColor
+            ? isImpSelected
+              ? groupColor
+              : scaleHexColor(groupColor, 0.65)
+            : isImpSelected
+              ? "#4a88cc"
+              : "#2a5a8a";
+          ctx.strokeStyle = outlineColor;
           ctx.lineWidth = 1.5 / avgImpScale;
           ctx.stroke(impCache.outline);
           // Hatch fill lines
-          ctx.strokeStyle = isImpSelected ? "#4a88cc" : "#2a5a8a";
+          ctx.strokeStyle = hatchColor;
           ctx.lineWidth = 0.8 / avgImpScale;
           ctx.stroke(impCache.hatch);
           ctx.restore();
@@ -1352,6 +1383,7 @@ export function PlotCanvas() {
     imports,
     selectedImportId,
     allImportsSelected,
+    layerGroups,
     canvasH,
   ]);
 

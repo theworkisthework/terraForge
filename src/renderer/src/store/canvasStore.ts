@@ -5,6 +5,7 @@ import {
   type SvgImport,
   type SvgPath,
   type VectorObject,
+  type LayerGroup,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
@@ -79,7 +80,7 @@ interface CanvasState {
   selectToolpath: (selected: boolean) => void;
   clearImports: () => void;
   /** Replace the entire imports list atomically — used by canvas layout load. */
-  loadLayout: (imports: SvgImport[]) => void;
+  loadLayout: (imports: SvgImport[], layerGroups?: LayerGroup[]) => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
   setGcodeSource: (
@@ -118,6 +119,18 @@ interface CanvasState {
   /** Commit the gesture snapshot to the undo stack only if imports actually changed.
    *  Discards the snapshot if nothing was modified (e.g. click without drag). */
   commitGesture: () => void;
+
+  // ─── Layer Groups ─────────────────────────────────────────────────────────
+  layerGroups: LayerGroup[];
+  addLayerGroup: (name: string, color: string) => void;
+  removeLayerGroup: (id: string) => void;
+  updateLayerGroup: (
+    id: string,
+    patch: Partial<Pick<LayerGroup, "name" | "color">>,
+  ) => void;
+  assignImportToGroup: (importId: string, groupId: string | null) => void;
+  /** Returns VectorObjects for only the imports belonging to the given group. */
+  toVectorObjectsForGroup: (groupId: string) => VectorObject[];
 }
 
 // ─── Gesture-undo stash ──────────────────────────────────────────────────────
@@ -161,6 +174,7 @@ export const useCanvasStore = create<CanvasState>()(
       plotProgressCuts: "",
       plotProgressRapids: "",
       gcodePreviewLoading: false,
+      layerGroups: [],
       setGcodePreviewLoading: (loading) =>
         set((state) => {
           state.gcodePreviewLoading = loading;
@@ -279,10 +293,11 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedImportId = null;
           state.selectedPathId = null;
           state.allImportsSelected = false;
+          state.layerGroups = [];
         });
       },
 
-      loadLayout: (newImports) => {
+      loadLayout: (newImports, newLayerGroups) => {
         pushUndo();
         set((state) => {
           state.imports = newImports.map((imp) => ({
@@ -294,6 +309,7 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedImportId = null;
           state.selectedPathId = null;
           state.allImportsSelected = false;
+          state.layerGroups = newLayerGroups ?? [];
         });
       },
 
@@ -554,6 +570,82 @@ export const useCanvasStore = create<CanvasState>()(
           state.selectedPathId = null;
           state.allImportsSelected = false;
         });
+      },
+
+      // ─── Layer Group actions ────────────────────────────────────────────────
+
+      addLayerGroup: (name, color) =>
+        set((state) => {
+          state.layerGroups.push({ id: uuid(), name, color, importIds: [] });
+        }),
+
+      removeLayerGroup: (id) =>
+        set((state) => {
+          state.layerGroups = state.layerGroups.filter((g) => g.id !== id);
+        }),
+
+      updateLayerGroup: (id, patch) =>
+        set((state) => {
+          const g = state.layerGroups.find((g) => g.id === id);
+          if (!g) return;
+          if (patch.name !== undefined) g.name = patch.name;
+          if (patch.color !== undefined) g.color = patch.color;
+        }),
+
+      assignImportToGroup: (importId, groupId) =>
+        set((state) => {
+          // Remove from any existing group first
+          for (const g of state.layerGroups) {
+            g.importIds = g.importIds.filter((id) => id !== importId);
+          }
+          // Add to the target group if specified
+          if (groupId !== null) {
+            const g = state.layerGroups.find((g) => g.id === groupId);
+            if (g && !g.importIds.includes(importId)) {
+              g.importIds.push(importId);
+            }
+          }
+        }),
+
+      toVectorObjectsForGroup: (groupId) => {
+        const { imports, layerGroups } = get();
+        const group = layerGroups.find((g) => g.id === groupId);
+        if (!group) return [];
+        const groupImportIds = new Set(group.importIds);
+        return imports
+          .filter((imp) => imp.visible && groupImportIds.has(imp.id))
+          .flatMap((imp) =>
+            imp.paths
+              .filter((p) => p.visible)
+              .flatMap((p): VectorObject[] => {
+                const base: VectorObject = {
+                  id: p.id,
+                  svgSource: p.svgSource,
+                  path: p.d,
+                  x: imp.x,
+                  y: imp.y,
+                  scale: imp.scale,
+                  scaleX: imp.scaleX,
+                  scaleY: imp.scaleY,
+                  rotation: imp.rotation,
+                  visible: true,
+                  originalWidth: imp.svgWidth,
+                  originalHeight: imp.svgHeight,
+                  layer: p.layer,
+                };
+                const outlineVOs: VectorObject[] =
+                  p.outlineVisible !== false ? [base] : [];
+                const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
+                  (hl, i): VectorObject => ({
+                    ...base,
+                    id: `${p.id}-h${i}`,
+                    svgSource: "",
+                    path: hl,
+                  }),
+                );
+                return [...outlineVOs, ...hatchVOs];
+              }),
+          );
       },
     };
   }),

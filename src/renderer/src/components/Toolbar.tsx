@@ -289,6 +289,10 @@ export function Toolbar({
   const addImport = useCanvasStore((s) => s.addImport);
   const clearImports = useCanvasStore((s) => s.clearImports);
   const loadLayout = useCanvasStore((s) => s.loadLayout);
+  const layerGroups = useCanvasStore((s) => s.layerGroups);
+  const toVectorObjectsForGroup = useCanvasStore(
+    (s) => s.toVectorObjectsForGroup,
+  );
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
@@ -317,10 +321,8 @@ export function Toolbar({
   const [showSettings, setShowSettings] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  /** Parsed imports waiting for the user to confirm overwriting the canvas. */
-  const [pendingLayout, setPendingLayout] = useState<
-    import("../../../types").SvgImport[] | null
-  >(null);
+  /** Parsed layout waiting for the user to confirm overwriting the canvas. */
+  const [pendingLayout, setPendingLayout] = useState<CanvasLayout | null>(null);
 
   const handleConnect = async () => {
     const cfg = activeConfig();
@@ -710,6 +712,7 @@ export function Toolbar({
         tfVersion: 1,
         savedAt: new Date().toISOString(),
         imports,
+        layerGroups,
       };
       await window.terraForge.fs.writeFile(
         savePath,
@@ -765,9 +768,9 @@ export function Toolbar({
       });
       if (imports.length > 0) {
         // Canvas already has content — ask before overwriting.
-        setPendingLayout(layout.imports);
+        setPendingLayout(layout);
       } else {
-        loadLayout(layout.imports);
+        loadLayout(layout.imports, layout.layerGroups);
       }
     } catch (err) {
       upsertTask({
@@ -953,6 +956,12 @@ export function Toolbar({
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
 
+    // Route to per-group export when the option is enabled and groups exist.
+    if (prefs.exportPerGroup && layerGroups.length > 0) {
+      await handleGenerateGcodePerGroup(prefs, cfg);
+      return;
+    }
+
     setGenerating(true);
     const taskId = uuid();
     const options: GcodeOptions = {
@@ -1103,6 +1112,126 @@ export function Toolbar({
       config: cfg,
       options,
     });
+  };
+
+  // ── Per-group G-code export ───────────────────────────────────────────────
+  const handleGenerateGcodePerGroup = async (
+    prefs: GcodePrefs,
+    cfg: ReturnType<typeof activeConfig>,
+  ) => {
+    if (!cfg) return;
+    const options: GcodeOptions = {
+      arcFitting: false,
+      arcTolerance: 0.01,
+      optimisePaths: prefs.optimise,
+      joinPaths: prefs.joinPaths,
+      joinTolerance: prefs.joinTolerance,
+      liftPenAtEnd: prefs.liftPenAtEnd,
+      returnToHome: prefs.returnToHome,
+      customStartGcode: prefs.customStartGcode,
+      customEndGcode: prefs.customEndGcode,
+    };
+
+    // Only process groups that have at least one visible path in them.
+    const groupsWithContent = layerGroups.filter(
+      (g) => toVectorObjectsForGroup(g.id).length > 0,
+    );
+    if (groupsWithContent.length === 0) return;
+
+    // Ask for a save directory once when the user wants local files.
+    let saveDir: string | null = null;
+    if (prefs.saveLocally) {
+      saveDir = await window.terraForge.fs.chooseDirectory();
+      if (!saveDir) return; // user cancelled
+    }
+
+    setGenerating(true);
+
+    for (const group of groupsWithContent) {
+      const objects = toVectorObjectsForGroup(group.id);
+      const taskId = uuid();
+      const safeName = group.name.replace(/[\\/:*?"<>|]/g, "_");
+      const defaultFilename = prefs.optimise
+        ? `${safeName}_opt.gcode`
+        : `${safeName}.gcode`;
+
+      upsertTask({
+        id: taskId,
+        type: "gcode-generate",
+        label: `Generating ${group.name}…`,
+        progress: 0,
+        status: "running",
+      });
+
+      const gcode = await new Promise<string | null>((resolve) => {
+        const worker = new Worker(
+          new URL("../../../workers/svgWorker.ts", import.meta.url),
+          { type: "module" },
+        );
+        worker.onmessage = (e) => {
+          const msg = e.data;
+          if (msg.type === "progress") {
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `Generating ${group.name}…`,
+              progress: msg.percent,
+              status: "running",
+            });
+          } else if (msg.type === "complete") {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `${group.name} ready`,
+              progress: 100,
+              status: "completed",
+            });
+            resolve(msg.gcode as string);
+          } else {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `${group.name} failed`,
+              progress: null,
+              status: "error",
+            });
+            resolve(null);
+          }
+        };
+        worker.postMessage({
+          type: "generate",
+          taskId,
+          objects,
+          config: cfg,
+          options,
+        });
+      });
+
+      if (!gcode) continue;
+
+      if (prefs.saveLocally && saveDir) {
+        const savePath = `${saveDir}/${defaultFilename}`;
+        await window.terraForge.fs.writeFile(savePath, gcode);
+      }
+
+      if (prefs.uploadToSd && useMachineStore.getState().connected) {
+        const uploadTaskId = uuid();
+        const remotePath = "/" + defaultFilename;
+        try {
+          await window.terraForge.fluidnc.uploadGcode(
+            uploadTaskId,
+            gcode,
+            remotePath,
+          );
+        } catch {
+          // Upload error surfaced via upload task toast
+        }
+      }
+    }
+
+    setGenerating(false);
   };
 
   return (
@@ -1291,7 +1420,7 @@ export function Toolbar({
           message={`The canvas already has ${imports.length} object${imports.length !== 1 ? "s" : ""}. Opening this layout will replace it.\n\nContinue?`}
           confirmLabel="Replace"
           onConfirm={() => {
-            loadLayout(pendingLayout);
+            loadLayout(pendingLayout.imports, pendingLayout.layerGroups);
             setPendingLayout(null);
           }}
           onCancel={() => setPendingLayout(null)}

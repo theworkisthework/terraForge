@@ -27,6 +27,7 @@ const defaultPrefs: GcodePrefs = {
   returnToHome: false,
   customStartGcode: "",
   customEndGcode: "",
+  exportPerGroup: false,
 };
 
 beforeEach(() => {
@@ -380,6 +381,7 @@ describe("GcodeOptionsDialog", () => {
       returnToHome: false,
       customStartGcode: "",
       customEndGcode: "",
+      exportPerGroup: false,
     });
   });
 });

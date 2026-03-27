@@ -137,6 +137,24 @@ export interface CanvasLayout {
   tfVersion: number;
   savedAt: string;
   imports: SvgImport[];
+  /** Layer groups — optional for backward compatibility with older layout files. */
+  layerGroups?: LayerGroup[];
+}
+
+// ─── Layer Groups ────────────────────────────────────────────────────────────
+
+/**
+ * A named, coloured collection of SvgImport objects for multi-pen plotting.
+ * Each group can be exported as a separate G-code file via "Export per group".
+ */
+export interface LayerGroup {
+  id: string;
+  /** User-visible name — used as the G-code filename base */
+  name: string;
+  /** Display colour in CSS hex notation, e.g. "#e94560" */
+  color: string;
+  /** SvgImport.id values belonging to this group */
+  importIds: string[];
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
@@ -291,6 +309,8 @@ export interface FsApi {
   saveFileDialog: (defaultName: string) => Promise<string | null>;
   saveLayoutDialog: (defaultName: string) => Promise<string | null>;
   openLayoutDialog: () => Promise<string | null>;
+  /** Open a native folder picker. Returns the chosen directory path, or null if cancelled. */
+  chooseDirectory: () => Promise<string | null>;
   /** Subscribe to native File-menu → layout action events. Returns an unsubscribe fn. */
   onMenuImport: (cb: () => void) => () => void;
   onMenuOpenLayout: (cb: () => void) => () => void;
