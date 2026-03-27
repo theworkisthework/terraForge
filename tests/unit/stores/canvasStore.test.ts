@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useCanvasStore } from "../../../src/renderer/src/store/canvasStore";
+import {
+  useCanvasStore,
+  generateCopyName,
+} from "../../../src/renderer/src/store/canvasStore";
 import { createSvgImport, createSvgPath } from "../../helpers/factories";
 
 // Reset Zustand state between tests
@@ -8,6 +11,8 @@ beforeEach(() => {
     imports: [],
     selectedImportId: null,
     selectedPathId: null,
+    allImportsSelected: false,
+    clipboardImport: null,
     gcodeToolpath: null,
     gcodeSource: null,
   });
@@ -546,5 +551,195 @@ describe("canvasStore", () => {
     expect(
       useCanvasStore.getState().imports[0].paths[0].hatchLines,
     ).toBeUndefined();
+  });
+
+  // ── generateCopyName (pure helper) ────────────────────────────────────────
+
+  describe("generateCopyName", () => {
+    it("appends ' copy' when no copy exists", () => {
+      expect(generateCopyName("my layer", [])).toBe("my layer copy");
+    });
+
+    it("appends ' copy (2)' when '<base> copy' already exists", () => {
+      expect(generateCopyName("my layer", ["my layer copy"])).toBe(
+        "my layer copy (2)",
+      );
+    });
+
+    it("increments n until a unique name is found", () => {
+      expect(
+        generateCopyName("my layer", ["my layer copy", "my layer copy (2)"]),
+      ).toBe("my layer copy (3)");
+    });
+
+    it("strips existing ' copy' suffix before computing base", () => {
+      // Copying "foo copy" should produce "foo copy (2)" not "foo copy copy"
+      expect(generateCopyName("foo copy", ["foo copy"])).toBe("foo copy (2)");
+    });
+
+    it("strips existing ' copy (n)' suffix before computing base", () => {
+      expect(generateCopyName("foo copy (3)", ["foo copy"])).toBe(
+        "foo copy (2)",
+      );
+    });
+  });
+
+  // ── copyImport / cutImport / pasteImport / selectAllImports ──────────────
+
+  describe("clipboard actions", () => {
+    beforeEach(() => {
+      useCanvasStore.setState({
+        imports: [],
+        selectedImportId: null,
+        selectedPathId: null,
+        clipboardImport: null,
+      });
+    });
+
+    it("copyImport stores a snapshot in clipboardImport", () => {
+      const imp = createSvgImport({ name: "layer1" });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      expect(useCanvasStore.getState().clipboardImport?.id).toBe(imp.id);
+      expect(useCanvasStore.getState().clipboardImport?.name).toBe("layer1");
+    });
+
+    it("copyImport does not remove the import from the canvas", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      expect(useCanvasStore.getState().imports).toHaveLength(1);
+    });
+
+    it("copyImport is a no-op for unknown id", () => {
+      useCanvasStore.getState().copyImport("nonexistent");
+      expect(useCanvasStore.getState().clipboardImport).toBeNull();
+    });
+
+    it("cutImport stores snapshot and removes from canvas", () => {
+      const imp = createSvgImport({ name: "to-cut" });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().selectImport(imp.id);
+      useCanvasStore.getState().cutImport(imp.id);
+      expect(useCanvasStore.getState().clipboardImport?.name).toBe("to-cut");
+      expect(useCanvasStore.getState().imports).toHaveLength(0);
+    });
+
+    it("cutImport clears selection when the cut import was selected", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().selectImport(imp.id);
+      useCanvasStore.getState().cutImport(imp.id);
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
+    });
+
+    it("pasteImport adds a copy with ' copy' suffix", () => {
+      const imp = createSvgImport({ name: "layer1", x: 0, y: 0 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      const { imports } = useCanvasStore.getState();
+      expect(imports).toHaveLength(2);
+      expect(imports[1].name).toBe("layer1 copy");
+    });
+
+    it("pasteImport offsets position by 5mm", () => {
+      const imp = createSvgImport({ x: 10, y: 20 });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      const pasted = useCanvasStore.getState().imports[1];
+      expect(pasted.x).toBe(15);
+      expect(pasted.y).toBe(25);
+    });
+
+    it("pasteImport assigns a new unique id", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      const { imports } = useCanvasStore.getState();
+      expect(imports[1].id).not.toBe(imports[0].id);
+    });
+
+    it("pasteImport assigns new ids to all paths", () => {
+      const path = createSvgPath();
+      const imp = createSvgImport({ paths: [path] });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      const { imports } = useCanvasStore.getState();
+      expect(imports[1].paths[0].id).not.toBe(imports[0].paths[0].id);
+    });
+
+    it("pasteImport selects the pasted import", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      const { selectedImportId, imports } = useCanvasStore.getState();
+      expect(selectedImportId).toBe(imports[1].id);
+    });
+
+    it("pasteImport generates incrementing copy names on multiple pastes", () => {
+      const imp = createSvgImport({ name: "logo" });
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().copyImport(imp.id);
+      useCanvasStore.getState().pasteImport();
+      useCanvasStore.getState().pasteImport();
+      const names = useCanvasStore.getState().imports.map((i) => i.name);
+      expect(names).toContain("logo copy");
+      expect(names).toContain("logo copy (2)");
+    });
+
+    it("pasteImport is a no-op when clipboard is empty", () => {
+      useCanvasStore.getState().pasteImport();
+      expect(useCanvasStore.getState().imports).toHaveLength(0);
+    });
+
+    it("selectAllImports enters all-selected mode when multiple imports exist and none selected", () => {
+      const imp1 = createSvgImport();
+      const imp2 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().addImport(imp2);
+      useCanvasStore.getState().selectAllImports();
+      expect(useCanvasStore.getState().allImportsSelected).toBe(true);
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
+    });
+
+    it("selectAllImports enters all-selected mode when one import is already selected", () => {
+      const imp1 = createSvgImport();
+      const imp2 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().addImport(imp2);
+      useCanvasStore.getState().selectImport(imp1.id);
+      useCanvasStore.getState().selectAllImports();
+      expect(useCanvasStore.getState().allImportsSelected).toBe(true);
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
+    });
+
+    it("selectAllImports cycles to first import individually when already all-selected", () => {
+      const imp1 = createSvgImport();
+      const imp2 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().addImport(imp2);
+      useCanvasStore.getState().selectAllImports(); // enter all-selected
+      useCanvasStore.getState().selectAllImports(); // cycle to first
+      expect(useCanvasStore.getState().allImportsSelected).toBe(false);
+      expect(useCanvasStore.getState().selectedImportId).toBe(imp1.id);
+    });
+
+    it("selectAllImports selects single import directly when only one exists", () => {
+      const imp1 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().selectAllImports();
+      expect(useCanvasStore.getState().allImportsSelected).toBe(false);
+      expect(useCanvasStore.getState().selectedImportId).toBe(imp1.id);
+    });
+
+    it("selectAllImports is a no-op when no imports exist", () => {
+      useCanvasStore.getState().selectAllImports();
+      expect(useCanvasStore.getState().selectedImportId).toBeNull();
+    });
   });
 });

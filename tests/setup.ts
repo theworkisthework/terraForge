@@ -195,6 +195,13 @@ if (typeof window !== "undefined") {
       openExternal: vi.fn().mockResolvedValue(undefined),
       onMenuAbout: vi.fn().mockReturnValue(() => {}),
     },
+    edit: {
+      onMenuCopy: vi.fn().mockReturnValue(() => {}),
+      onMenuCut: vi.fn().mockReturnValue(() => {}),
+      onMenuPaste: vi.fn().mockReturnValue(() => {}),
+      onMenuSelectAll: vi.fn().mockReturnValue(() => {}),
+      setHasSelection: vi.fn(),
+    },
   };
   (window as any).terraForge = mockApi;
 }

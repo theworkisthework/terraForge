@@ -186,6 +186,33 @@ const appApi: TerraForgeAPI["app"] = {
   },
 };
 
+// ─── Edit API ─────────────────────────────────────────────────────────────────
+
+const editApi: TerraForgeAPI["edit"] = {
+  onMenuCopy: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:editCopy", listener);
+    return () => ipcRenderer.off("menu:editCopy", listener);
+  },
+  onMenuCut: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:editCut", listener);
+    return () => ipcRenderer.off("menu:editCut", listener);
+  },
+  onMenuPaste: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:editPaste", listener);
+    return () => ipcRenderer.off("menu:editPaste", listener);
+  },
+  onMenuSelectAll: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("menu:editSelectAll", listener);
+    return () => ipcRenderer.off("menu:editSelectAll", listener);
+  },
+  setHasSelection: (hasSelection) =>
+    ipcRenderer.send("menu:setEditMenuState", hasSelection),
+};
+
 // ─── Expose to renderer ───────────────────────────────────────────────────────
 
 const api: TerraForgeAPI = {
@@ -196,5 +223,6 @@ const api: TerraForgeAPI = {
   jobs,
   config,
   app: appApi,
+  edit: editApi,
 };
 contextBridge.exposeInMainWorld("terraForge", api);

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { v4 as uuid } from "uuid";
 import {
   type SvgImport,
   type SvgPath,
@@ -10,10 +11,35 @@ import {
 import type { GcodeToolpath } from "../utils/gcodeParser";
 import { generateHatchPaths } from "../utils/hatchFill";
 
+// ─── Clipboard helpers ────────────────────────────────────────────────────────
+
+/**
+ * Generate a unique copy name for a pasted import, following the pattern:
+ * "<base> copy" → "<base> copy (2)" → "<base> copy (3)" etc.
+ * Strips any existing copy suffix from sourceName before computing the base,
+ * so copying "foo copy" produces "foo copy (2)" rather than "foo copy copy".
+ */
+export function generateCopyName(
+  sourceName: string,
+  existingNames: string[],
+): string {
+  const base = sourceName.replace(/ copy \(\d+\)$/, "").replace(/ copy$/, "");
+  const copyBase = `${base} copy`;
+  if (!existingNames.includes(copyBase)) return copyBase;
+  let n = 2;
+  while (existingNames.includes(`${copyBase} (${n})`)) n++;
+  return `${copyBase} (${n})`;
+}
+
 interface CanvasState {
   imports: SvgImport[];
   selectedImportId: string | null;
   selectedPathId: string | null;
+  /** True when the user has "selected all" canvas imports (Ctrl+A). Cleared when
+   *  a single import is clicked, imports are cleared, or the toolpath is selected. */
+  allImportsSelected: boolean;
+  /** In-memory clipboard for cut/copy/paste of canvas imports. */
+  clipboardImport: SvgImport | null;
   gcodeToolpath: GcodeToolpath | null;
   /** Persists the file info for the currently loaded G-code toolpath so it
    *  can be restored into selectedJobFile when the user re-selects the toolpath
@@ -69,6 +95,17 @@ interface CanvasState {
     angleDeg: number,
     enabled: boolean,
   ) => void;
+
+  // ─── Clipboard ──────────────────────────────────────────────────────────────
+  /** Copy the selected import to the in-memory clipboard without removing it. */
+  copyImport: (id: string) => void;
+  /** Copy to clipboard and remove the import from the canvas. */
+  cutImport: (id: string) => void;
+  /** Paste the clipboard import as a new copy with an offset position and generated name. */
+  pasteImport: () => void;
+  /** Select all canvas imports.  If already all-selected, cycles to the first single
+   *  import so repeated Ctrl+A is still useful. */
+  selectAllImports: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>()(
@@ -76,6 +113,8 @@ export const useCanvasStore = create<CanvasState>()(
     imports: [],
     selectedImportId: null,
     selectedPathId: null,
+    allImportsSelected: false,
+    clipboardImport: null,
     gcodeToolpath: null,
     gcodeSource: null,
     toolpathSelected: false,
@@ -104,6 +143,16 @@ export const useCanvasStore = create<CanvasState>()(
         if (state.selectedImportId === id) {
           state.selectedImportId = null;
           state.selectedPathId = null;
+        }
+        // If we were in "all selected" mode, re-evaluate — if only one remains select
+        // it individually; if none remain clear everything.
+        if (state.allImportsSelected) {
+          state.allImportsSelected = false;
+          if (state.imports.length === 1) {
+            state.selectedImportId = state.imports[0].id;
+          } else if (state.imports.length === 0) {
+            state.selectedImportId = null;
+          }
         }
       }),
 
@@ -162,6 +211,7 @@ export const useCanvasStore = create<CanvasState>()(
       set((state) => {
         state.selectedImportId = id;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
         // Selecting an SVG import clears toolpath selection (and vice-versa).
         if (id !== null) state.toolpathSelected = false;
       }),
@@ -173,6 +223,7 @@ export const useCanvasStore = create<CanvasState>()(
         if (selected) {
           state.selectedImportId = null;
           state.selectedPathId = null;
+          state.allImportsSelected = false;
         }
       }),
 
@@ -181,6 +232,7 @@ export const useCanvasStore = create<CanvasState>()(
         state.imports = [];
         state.selectedImportId = null;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
       }),
 
     loadLayout: (newImports) =>
@@ -193,6 +245,7 @@ export const useCanvasStore = create<CanvasState>()(
         }));
         state.selectedImportId = null;
         state.selectedPathId = null;
+        state.allImportsSelected = false;
       }),
 
     selectedImport: () => {
@@ -325,6 +378,75 @@ export const useCanvasStore = create<CanvasState>()(
           const lines = generateHatchPaths(p.d, spacingUnits, safeAngle);
           p.hatchLines = lines.length ? lines : undefined;
         }
+      }),
+
+    // ─── Clipboard actions ──────────────────────────────────────────────────
+
+    copyImport: (id) => {
+      const imp = get().imports.find((i) => i.id === id);
+      if (!imp) return;
+      const snap = structuredClone(imp);
+      set((state) => {
+        state.clipboardImport = snap;
+      });
+    },
+
+    cutImport: (id) => {
+      const imp = get().imports.find((i) => i.id === id);
+      if (!imp) return;
+      const snap = structuredClone(imp);
+      set((state) => {
+        state.clipboardImport = snap;
+        state.imports = state.imports.filter((i) => i.id !== id);
+        if (state.selectedImportId === id) {
+          state.selectedImportId = null;
+          state.selectedPathId = null;
+        }
+      });
+    },
+
+    pasteImport: () => {
+      const clipboard = get().clipboardImport;
+      if (!clipboard) return;
+      const existingNames = get().imports.map((i) => i.name);
+      const newName = generateCopyName(clipboard.name, existingNames);
+      const newId = uuid();
+      const pasted: SvgImport = {
+        ...structuredClone(clipboard),
+        id: newId,
+        name: newName,
+        // Assign fresh IDs to all paths so they don't alias the originals
+        paths: clipboard.paths.map((p) => ({ ...p, id: uuid() })),
+        // Offset slightly so the copy doesn't sit exactly on top of the original
+        x: clipboard.x + 5,
+        y: clipboard.y + 5,
+      };
+      set((state) => {
+        state.imports.push(pasted);
+        state.selectedImportId = newId;
+        state.selectedPathId = null;
+        if (state.toolpathSelected) state.toolpathSelected = false;
+      });
+    },
+
+    selectAllImports: () =>
+      set((state) => {
+        if (state.imports.length === 0) return;
+        if (state.imports.length === 1) {
+          // Only one import — just select it directly.
+          state.selectedImportId = state.imports[0].id;
+          state.allImportsSelected = false;
+        } else if (!state.allImportsSelected) {
+          // Zero or one import selected → enter "all selected" mode.
+          state.allImportsSelected = true;
+          state.selectedImportId = null;
+        } else {
+          // Already all-selected → cycle to the first import individually.
+          state.allImportsSelected = false;
+          state.selectedImportId = state.imports[0].id;
+        }
+        state.selectedPathId = null;
+        state.toolpathSelected = false;
       }),
   })),
 );
