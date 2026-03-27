@@ -125,7 +125,7 @@ function buildApplicationMenu(): void {
           click: (_item, win) => {
             // Let native cut handle any text-input focus, and also notify the
             // renderer so it can perform a canvas-layer cut if one is selected.
-            win?.webContents.cut();
+            if (win instanceof BrowserWindow) win.webContents.cut();
             safeSend("menu:editCut");
           },
         },
@@ -135,7 +135,7 @@ function buildApplicationMenu(): void {
           accelerator: "CmdOrCtrl+C",
           enabled: false,
           click: (_item, win) => {
-            win?.webContents.copy();
+            if (win instanceof BrowserWindow) win.webContents.copy();
             safeSend("menu:editCopy");
           },
         },
@@ -145,7 +145,7 @@ function buildApplicationMenu(): void {
           accelerator: "CmdOrCtrl+V",
           click: (_item, win) => {
             // Native paste for text fields; canvas clipboard paste handled in renderer.
-            win?.webContents.paste();
+            if (win instanceof BrowserWindow) win.webContents.paste();
             safeSend("menu:editPaste");
           },
         },
