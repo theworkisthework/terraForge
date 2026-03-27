@@ -298,6 +298,8 @@ export function Toolbar({
   const selectAllImports = useCanvasStore((s) => s.selectAllImports);
   const clipboardImport = useCanvasStore((s) => s.clipboardImport);
   const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -816,6 +818,10 @@ export function Toolbar({
   pasteImportRef.current = pasteImport;
   selectAllImportsRef.current = selectAllImports;
   clearImportsRef.current = clearImports;
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
+  const redoRef = useRef(redo);
+  redoRef.current = redo;
 
   /** Returns true if the event originates from a text editing element. */
   function isTextInputFocused(): boolean {
@@ -902,6 +908,18 @@ export function Toolbar({
         case "a":
           handleEditSelectAll();
           e.preventDefault(); // prevent browser select-all of page text
+          break;
+        case "z":
+          e.preventDefault();
+          if (e.shiftKey) {
+            redoRef.current();
+          } else {
+            undoRef.current();
+          }
+          break;
+        case "y":
+          e.preventDefault();
+          redoRef.current();
           break;
       }
     };
