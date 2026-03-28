@@ -987,6 +987,9 @@ export function Toolbar({
 
     setGenerating(true);
     const taskId = uuid();
+    const activePageSize = pageTemplate
+      ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+      : undefined;
     const options: GcodeOptions = {
       arcFitting: false,
       arcTolerance: 0.01,
@@ -997,6 +1000,21 @@ export function Toolbar({
       returnToHome: prefs.returnToHome,
       customStartGcode: prefs.customStartGcode,
       customEndGcode: prefs.customEndGcode,
+      pageClip:
+        activePageSize && prefs.clipMode !== "none"
+          ? {
+              widthMM: pageTemplate!.landscape
+                ? activePageSize.heightMM
+                : activePageSize.widthMM,
+              heightMM: pageTemplate!.landscape
+                ? activePageSize.widthMM
+                : activePageSize.heightMM,
+              marginMM:
+                prefs.clipMode === "margin"
+                  ? (pageTemplate!.marginMM ?? 20)
+                  : (prefs.clipOffsetMM ?? 0),
+            }
+          : undefined,
     };
 
     const worker = new Worker(
@@ -1143,6 +1161,9 @@ export function Toolbar({
     cfg: ReturnType<typeof activeConfig>,
   ) => {
     if (!cfg) return;
+    const activePageSize = pageTemplate
+      ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+      : undefined;
     const options: GcodeOptions = {
       arcFitting: false,
       arcTolerance: 0.01,
@@ -1153,6 +1174,21 @@ export function Toolbar({
       returnToHome: prefs.returnToHome,
       customStartGcode: prefs.customStartGcode,
       customEndGcode: prefs.customEndGcode,
+      pageClip:
+        activePageSize && prefs.clipMode !== "none"
+          ? {
+              widthMM: pageTemplate!.landscape
+                ? activePageSize.heightMM
+                : activePageSize.widthMM,
+              heightMM: pageTemplate!.landscape
+                ? activePageSize.widthMM
+                : activePageSize.heightMM,
+              marginMM:
+                prefs.clipMode === "margin"
+                  ? (pageTemplate!.marginMM ?? 20)
+                  : (prefs.clipOffsetMM ?? 0),
+            }
+          : undefined,
     };
 
     // Only process groups that have at least one visible path in them.
@@ -1463,7 +1499,10 @@ export function Toolbar({
               onChange={(e) =>
                 setPageTemplate({
                   ...pageTemplate,
-                  marginMM: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                  marginMM: Math.max(
+                    0,
+                    Math.min(100, Number(e.target.value) || 0),
+                  ),
                 })
               }
               className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 text-right"

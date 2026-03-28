@@ -735,21 +735,19 @@ function liangBarsky(
 }
 
 /**
- * Clips an array of polyline subpaths (already in machine mm coordinates)
- * against the bed rectangle implied by config.  A single input subpath may
- * split into several output subpaths when its segments exit and re-enter the
- * bed area.  Segments entirely outside the bed are silently dropped.
+ * Clips an array of polyline subpaths against an explicit axis-aligned
+ * rectangle [xMin, xMax] × [yMin, yMax] (all in machine mm).
+ * A single input subpath may split into several output subpaths when its
+ * segments exit and re-enter the rectangle.  Segments entirely outside are
+ * silently dropped.
  */
-export function clipSubpathsToBed(
+export function clipSubpathsToRect(
   subpaths: Subpath[],
-  config: MachineConfig,
+  xMin: number,
+  xMax: number,
+  yMin: number,
+  yMax: number,
 ): Subpath[] {
-  const isCenter = config.origin === "center";
-  const xMin = isCenter ? -config.bedWidth / 2 : 0;
-  const xMax = isCenter ? config.bedWidth / 2 : config.bedWidth;
-  const yMin = isCenter ? -config.bedHeight / 2 : 0;
-  const yMax = isCenter ? config.bedHeight / 2 : config.bedHeight;
-
   const result: Subpath[] = [];
 
   for (const subpath of subpaths) {
@@ -775,18 +773,18 @@ export function clipSubpathsToBed(
       const [t0, t1] = clip;
 
       if (t0 > 1e-9) {
-        // Segment enters the bed mid-way — flush previous run and start fresh.
+        // Segment enters the rect mid-way — flush previous run and start fresh.
         if (current.length >= 2) result.push(current);
         current = [interp(p0, p1, t0)];
       } else if (current.length === 0) {
-        // Starting a new run from inside (or right on) the bed boundary.
+        // Starting a new run from inside (or right on) the rect boundary.
         current.push(p0);
       }
       // Append the exit point.
       current.push(interp(p0, p1, t1));
 
       if (t1 < 1 - 1e-9) {
-        // Segment exits the bed before reaching p1 — flush this run.
+        // Segment exits the rect before reaching p1 — flush this run.
         if (current.length >= 2) result.push(current);
         current = [];
       }
@@ -796,6 +794,24 @@ export function clipSubpathsToBed(
   }
 
   return result;
+}
+
+/**
+ * Clips an array of polyline subpaths (already in machine mm coordinates)
+ * against the bed rectangle implied by config.  A single input subpath may
+ * split into several output subpaths when its segments exit and re-enter the
+ * bed area.  Segments entirely outside the bed are silently dropped.
+ */
+export function clipSubpathsToBed(
+  subpaths: Subpath[],
+  config: MachineConfig,
+): Subpath[] {
+  const isCenter = config.origin === "center";
+  const xMin = isCenter ? -config.bedWidth / 2 : 0;
+  const xMax = isCenter ? config.bedWidth / 2 : config.bedWidth;
+  const yMin = isCenter ? -config.bedHeight / 2 : 0;
+  const yMax = isCenter ? config.bedHeight / 2 : config.bedHeight;
+  return clipSubpathsToRect(subpaths, xMin, xMax, yMin, yMax);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

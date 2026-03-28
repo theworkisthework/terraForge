@@ -219,6 +219,9 @@ export interface GcodeOptions {
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
   customStartGcode: string; // raw G-code lines inserted after the preamble, before paths
   customEndGcode: string; // raw G-code lines appended after lift/return, before EOF comment
+  /** When a page template is active, clip G-code to the page's printable area
+   *  (page dimensions minus margin on all sides) instead of the full machine bed. */
+  pageClip?: { widthMM: number; heightMM: number; marginMM: number };
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
