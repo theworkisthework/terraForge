@@ -9,6 +9,7 @@ import { JogControls } from "./components/JogControls";
 import { useMachineStore } from "./store/machineStore";
 import { useTaskStore } from "./store/taskStore";
 import { useConsoleStore } from "./store/consoleStore";
+import { useThemeStore, applyTheme } from "./store/themeStore";
 
 export default function App() {
   const setConfigs = useMachineStore((s) => s.setConfigs);
@@ -17,6 +18,12 @@ export default function App() {
   const setFwInfo = useMachineStore((s) => s.setFwInfo);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
+  const theme = useThemeStore((s) => s.theme);
+
+  // Keep <html> class in sync with theme store
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   const [showJog, setShowJog] = useState(true);
   // null = use CSS default (aligned with right panel + 16px gap); set when user first drags
@@ -99,14 +106,14 @@ export default function App() {
   }, [setConfigs, setStatus, setWsLive, setFwInfo, upsertTask, appendLine]);
 
   return (
-    <div className="flex flex-col h-screen bg-[#1a1a2e] text-gray-200 overflow-hidden">
+    <div className="flex flex-col h-screen bg-app text-content overflow-hidden">
       {/* Top toolbar */}
       <Toolbar showJog={showJog} onToggleJog={() => setShowJog((v) => !v)} />
 
       {/* Main work area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel — SD card file browser */}
-        <aside className="w-60 bg-[#16213e] border-r border-[#0f3460] overflow-y-auto shrink-0">
+        <aside className="w-60 bg-panel border-r border-border-ui overflow-y-auto shrink-0">
           <FileBrowserPanel />
         </aside>
 
@@ -118,13 +125,13 @@ export default function App() {
         </main>
 
         {/* Right panel — object properties */}
-        <aside className="w-64 bg-[#16213e] border-l border-[#0f3460] overflow-y-auto shrink-0">
+        <aside className="w-64 bg-panel border-l border-border-ui overflow-y-auto shrink-0">
           <PropertiesPanel />
         </aside>
       </div>
 
       {/* Bottom — console + job progress */}
-      <div className="h-40 bg-[#16213e] border-t border-[#0f3460] shrink-0">
+      <div className="h-40 bg-panel border-t border-border-ui shrink-0">
         <ConsolePanel />
       </div>
 
@@ -132,7 +139,7 @@ export default function App() {
       {showJog && (
         <div
           ref={jogPanelRef}
-          className="fixed z-[100] bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl overflow-hidden"
+          className="fixed z-[100] bg-panel border border-border-ui rounded-lg shadow-2xl overflow-hidden"
           style={
             jogPos
               ? { left: jogPos.x, top: jogPos.y }
@@ -143,7 +150,7 @@ export default function App() {
           onPointerCancel={onJogDragEnd}
         >
           <div
-            className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-[#0f3460]/50 hover:bg-[#0f3460] transition-colors"
+            className="h-2.5 w-full cursor-grab active:cursor-grabbing bg-secondary/50 hover:bg-secondary transition-colors"
             title="Drag to move"
             onPointerDown={startJogDrag}
           />

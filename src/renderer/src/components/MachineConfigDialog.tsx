@@ -255,15 +255,15 @@ export function MachineConfigDialog({ onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-[780px] max-h-[90vh] flex flex-col">
+        <div className="bg-app border border-border-ui rounded-xl shadow-2xl w-[780px] max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-ui">
             <h2 className="text-lg font-semibold text-white">
               Machine Configurations
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors text-xl leading-none"
+              className="text-content-muted hover:text-content transition-colors text-xl leading-none"
             >
               ×
             </button>
@@ -271,7 +271,7 @@ export function MachineConfigDialog({ onClose }: Props) {
 
           <div className="flex flex-1 min-h-0">
             {/* Sidebar — machine list */}
-            <div className="w-52 border-r border-gray-700 flex flex-col">
+            <div className="w-52 border-r border-border-ui flex flex-col">
               <div className="flex-1 overflow-y-auto py-2">
                 <DndContext
                   sensors={sensors}
@@ -297,16 +297,16 @@ export function MachineConfigDialog({ onClose }: Props) {
                   </SortableContext>
                 </DndContext>
                 {isNew && (
-                  <div className="px-4 py-2 text-sm bg-indigo-600 text-white truncate">
+                  <div className="px-4 py-2 text-sm bg-accent text-white truncate">
                     New Machine
                   </div>
                 )}
               </div>
-              <div className="p-2 border-t border-gray-700 flex gap-1">
+              <div className="p-2 border-t border-border-ui flex gap-1">
                 <button
                   onClick={handleNew}
                   title="New config"
-                  className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                  className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
                 >
                   + New
                 </button>
@@ -314,7 +314,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                   onClick={handleDuplicate}
                   disabled={!selectedId || isNew}
                   title="Duplicate selected config"
-                  className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Copy
                 </button>
@@ -335,14 +335,14 @@ export function MachineConfigDialog({ onClose }: Props) {
                 <button
                   onClick={handleExport}
                   title="Export all configs to a JSON file"
-                  className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                  className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
                 >
                   ↑ Export
                 </button>
                 <button
                   onClick={handleImport}
                   title="Import configs from a JSON file"
-                  className="flex-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                  className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
                 >
                   ↓ Import
                 </button>
@@ -459,7 +459,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <button
                       type="button"
                       onClick={handleSwapCommands}
-                      className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors font-mono"
+                      className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors font-mono"
                       title="Swap pen-up and pen-down commands (useful for reversed solenoid wiring)"
                     >
                       ⇕ Swap up / down
@@ -473,12 +473,12 @@ export function MachineConfigDialog({ onClose }: Props) {
                           penDownCommand: d.penDownCommand,
                         });
                       }}
-                      className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-400 rounded transition-colors"
+                      className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content-muted rounded transition-colors"
                       title="Reset to default commands for the selected pen type"
                     >
                       ↺ Reset to defaults
                     </button>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-content-faint">
                       {form.penType === "solenoid"
                         ? "Solenoid: M3Sn spindle speed controls the solenoid"
                         : "Servo / Stepper: G0 Z moves the Z axis"}
@@ -520,9 +520,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                                   }),
                             })
                           }
-                          className="accent-indigo-500"
+                          className="accent-accent"
                         />
-                        <span className="text-sm text-gray-300 capitalize">
+                        <span className="text-sm text-content capitalize">
                           {ct}
                         </span>
                       </label>
@@ -571,12 +571,14 @@ export function MachineConfigDialog({ onClose }: Props) {
                         />
                       </Field>
                       <div className="flex items-center">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-content-faint">
                           Leave blank to auto-detect from firmware version
                           ([ESP800]). FluidNC 4.x uses the HTTP port; older
                           ESP3D firmware uses{" "}
-                          <span className="font-mono text-gray-400">81</span>.
-                          Set an explicit value only if auto-detect fails.
+                          <span className="font-mono text-content-muted">
+                            81
+                          </span>
+                          . Set an explicit value only if auto-detect fails.
                         </p>
                       </div>
                     </div>
@@ -615,7 +617,7 @@ export function MachineConfigDialog({ onClose }: Props) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border-ui">
             <button
               onClick={handleActivate}
               disabled={!selectedId || isNew || connected}
@@ -631,14 +633,14 @@ export function MachineConfigDialog({ onClose }: Props) {
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 text-sm bg-secondary hover:bg-secondary-hover text-content rounded-lg transition-colors"
               >
                 Close
               </button>
               <button
                 onClick={handleSave}
                 disabled={!isDirty || isLocked}
-                className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isDirty ? "Save Changes" : "Saved"}
               </button>
@@ -727,14 +729,14 @@ function SortableConfigItem({
       ref={setNodeRef}
       style={style}
       className={`flex items-center group ${
-        isSelected ? "bg-indigo-600" : "hover:bg-gray-800"
+        isSelected ? "bg-accent" : "hover:bg-secondary"
       }`}
     >
       {/* drag handle */}
       <span
         {...attributes}
         {...listeners}
-        className="px-2 py-2 cursor-grab active:cursor-grabbing text-gray-600 group-hover:text-gray-400 flex-shrink-0 select-none"
+        className="px-2 py-2 cursor-grab active:cursor-grabbing text-content-faint group-hover:text-content-muted flex-shrink-0 select-none"
         title="Drag to reorder"
       >
         ⠿
@@ -742,7 +744,7 @@ function SortableConfigItem({
       <button
         onClick={onSelect}
         className={`flex-1 text-left py-2 pr-4 text-sm transition-colors truncate min-w-0 ${
-          isSelected ? "text-white" : "text-gray-300"
+          isSelected ? "text-white" : "text-content"
         }`}
       >
         {config.name}
@@ -763,7 +765,7 @@ function Section({
 }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-content-faint mb-3">
         {title}
       </h3>
       <div className="space-y-3">{children}</div>
@@ -780,12 +782,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs text-gray-400 mb-1">{label}</label>
+      <label className="block text-xs text-content-muted mb-1">{label}</label>
       {children}
     </div>
   );
 }
 
 const inputCls =
-  "w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-600 rounded-lg text-white " +
-  "focus:outline-none focus:border-indigo-500 transition-colors";
+  "w-full px-3 py-1.5 text-sm bg-panel border border-border-ui rounded-lg text-content " +
+  "focus:outline-none focus:border-accent transition-colors";

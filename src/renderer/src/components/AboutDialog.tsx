@@ -31,7 +31,7 @@ export function AboutDialog({ onClose }: Props) {
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-[#16213e] border border-[#0f3460] rounded-xl shadow-2xl w-[340px] p-7 flex flex-col items-center gap-4 text-center">
+      <div className="bg-panel border border-border-ui rounded-xl shadow-2xl w-[340px] p-7 flex flex-col items-center gap-4 text-center">
         {/* Logo */}
         <TerraForgeLogo
           aria-label="terraForge logo"
@@ -42,29 +42,31 @@ export function AboutDialog({ onClose }: Props) {
         <div>
           <h1
             id="about-dialog-title"
-            className="text-[#e94560] font-bold tracking-widest text-xl"
+            className="text-accent font-bold tracking-widest text-xl"
           >
             terraForge
           </h1>
-          <p className="text-gray-400 text-sm mt-1">terraPen plotter control</p>
+          <p className="text-content-muted text-sm mt-1">
+            terraPen plotter control
+          </p>
         </div>
 
         {/* Version */}
-        <div className="bg-[#0f3460]/50 rounded-lg px-4 py-2 w-full">
-          <span className="text-xs text-gray-500 uppercase tracking-wider">
+        <div className="bg-secondary/50 rounded-lg px-4 py-2 w-full">
+          <span className="text-xs text-content-faint uppercase tracking-wider">
             Version
           </span>
-          <p className="text-white font-mono text-sm mt-0.5">{version}</p>
+          <p className="text-content font-mono text-sm mt-0.5">{version}</p>
         </div>
 
         {/* License & copyright */}
-        <div className="text-xs text-gray-500 leading-relaxed space-y-1">
+        <div className="text-xs text-content-faint leading-relaxed space-y-1">
           <p>Released under the MIT License.</p>
           <p>© 2026 Mark Benson</p>
-          <p className="pt-1 border-t border-[#0f3460]">
+          <p className="pt-1 border-t border-border-ui">
             Logo &amp; logotype © 2026 Richard Hurst
           </p>
-          <p className="pt-1 border-t border-[#0f3460]">
+          <p className="pt-1 border-t border-border-ui">
             A &lsquo;THEWORKISTHEWORK&rsquo; project
           </p>
         </div>
@@ -73,7 +75,7 @@ export function AboutDialog({ onClose }: Props) {
         <button
           onClick={onClose}
           autoFocus
-          className="mt-1 px-5 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
+          className="mt-1 px-5 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
         >
           Close
         </button>

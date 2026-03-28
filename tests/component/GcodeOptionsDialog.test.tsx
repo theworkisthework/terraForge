@@ -353,8 +353,8 @@ describe("GcodeOptionsDialog", () => {
       JSON.stringify({ ...defaultPrefs, customStartGcode: "M3 S0" }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    // The dot is a <span> with bg-[#e94560] — check it exists
-    const dots = document.querySelectorAll(".bg-\\[\\#e94560\\]");
+    // The dot is a <span> with bg-accent — check it exists
+    const dots = document.querySelectorAll(".bg-accent");
     // At least one such element for the dot indicator
     expect(dots.length).toBeGreaterThan(0);
   });

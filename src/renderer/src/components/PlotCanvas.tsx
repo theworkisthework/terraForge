@@ -1167,7 +1167,10 @@ export function PlotCanvas() {
       // Always paint the bed background — visible with or without a toolpath.
       ctx.save();
       ctx.setTransform(a, 0, 0, d, e, f);
-      ctx.fillStyle = "#0d1117";
+      ctx.fillStyle =
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--tf-bg-terminal")
+          .trim() || "#0d1117";
       ctx.fillRect(bedXMin, bedYMin, bedXMax - bedXMin, bedYMax - bedYMin);
       ctx.restore();
 
@@ -1478,7 +1481,7 @@ export function PlotCanvas() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden bg-[#1a1a2e] relative select-none"
+      className="w-full h-full overflow-hidden bg-app relative select-none"
       style={{ cursor }}
       onMouseDown={onContainerMouseDown}
       onContextMenu={onContextMenu}
@@ -1532,7 +1535,7 @@ export function PlotCanvas() {
           width={bedW * MM_TO_PX}
           height={bedH * MM_TO_PX}
           fill="none"
-          stroke="#0f3460"
+          stroke="var(--tf-border)"
           strokeWidth={1}
         />
 
@@ -1547,7 +1550,7 @@ export function PlotCanvas() {
             y1={PAD}
             x2={PAD + mm * MM_TO_PX}
             y2={PAD + bedH * MM_TO_PX}
-            stroke="#0f3460"
+            stroke="var(--tf-border)"
             strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
           />
         ))}
@@ -1561,7 +1564,7 @@ export function PlotCanvas() {
             y1={getBedY(mm)}
             x2={PAD + bedW * MM_TO_PX}
             y2={getBedY(mm)}
-            stroke="#0f3460"
+            stroke="var(--tf-border)"
             strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
           />
         ))}
@@ -1877,7 +1880,7 @@ export function PlotCanvas() {
                       y="3"
                       rx="2"
                       ry="2"
-                      fill="#e94560"
+                      fill="var(--tf-accent)"
                       stroke="none"
                     />
                     <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
@@ -2013,16 +2016,16 @@ export function PlotCanvas() {
         <button
           title="Zoom in (Ctrl+Shift++)"
           onClick={onZoomIn}
-          className="w-8 h-8 rounded bg-[#16213e] border border-[#0f3460] text-[#e0e0e0] text-base font-bold
-                     hover:bg-[#0f3460] active:bg-[#0a2040] flex items-center justify-center leading-none"
+          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
+                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
         >
           +
         </button>
         <button
           title="Zoom out (Ctrl+Shift+-)"
           onClick={onZoomOut}
-          className="w-8 h-8 rounded bg-[#16213e] border border-[#0f3460] text-[#e0e0e0] text-base font-bold
-                     hover:bg-[#0f3460] active:bg-[#0a2040] flex items-center justify-center leading-none"
+          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
+                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
         >
           −
         </button>
@@ -2032,8 +2035,8 @@ export function PlotCanvas() {
           className={`w-8 h-8 rounded border text-[11px] font-bold flex items-center justify-center leading-none
             ${
               fitted
-                ? "bg-[#e94560] border-[#e94560] text-white"
-                : "bg-[#16213e] border-[#0f3460] text-[#e0e0e0] hover:bg-[#0f3460]"
+                ? "bg-accent border-accent text-white"
+                : "bg-panel border-border-ui text-content hover:bg-secondary"
             }`}
         >
           ⊡
@@ -2053,14 +2056,14 @@ export function PlotCanvas() {
       )}
 
       {/* ── Zoom-level badge ─────────────────────────────────────────────── */}
-      <div className="absolute bottom-4 left-4 z-10 text-[10px] text-[#4a5568] font-mono pointer-events-none">
+      <div className="absolute bottom-4 left-4 z-10 text-[10px] text-content-faint font-mono pointer-events-none">
         {Math.round(vp.zoom * 100)}%
       </div>
 
       {/* ── Space-pan hint ────────────────────────────────────────────────── */}
       {spaceDown && (
         <div className="absolute inset-0 z-20 pointer-events-none flex items-start justify-center pt-3">
-          <span className="text-[10px] text-[#8080a0] bg-[#1a1a2e]/80 px-2 py-0.5 rounded">
+          <span className="text-[10px] text-content-muted bg-app/80 px-2 py-0.5 rounded">
             Pan mode · drag to pan · release Space to exit
           </span>
         </div>
@@ -2184,10 +2187,10 @@ function RulerOverlay({
   );
 
   // ── Visuals ───────────────────────────────────────────────────────────────
-  const TICK_COL = "#2a5a8a";
-  const LABEL_COL = "#7090b0";
-  const ORIGIN_COL = "#e94560";
-  const BG = "#0d1520";
+  const TICK_COL = "var(--tf-border)";
+  const LABEL_COL = "var(--tf-text-muted)";
+  const ORIGIN_COL = "var(--tf-accent)";
+  const BG = "var(--tf-bg-app)";
   const FONT = 9;
   const MAJOR_LEN = Math.round(R * 0.4);
   const MINOR_LEN = Math.round(R * 0.2);
@@ -2485,7 +2488,7 @@ function GroupHandleOverlay({
         y="3"
         rx="2"
         ry="2"
-        fill="#e94560"
+        fill="var(--tf-accent)"
         stroke="none"
       />
       <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
@@ -2538,7 +2541,7 @@ function GroupHandleOverlay({
             width={hw * 2}
             height={hh * 2}
             fill="none"
-            stroke="#e94560"
+            stroke="var(--tf-accent)"
             strokeWidth={1}
             strokeDasharray="4 2"
             pointerEvents="none"
@@ -2559,7 +2562,7 @@ function GroupHandleOverlay({
             y1={pivotSy - hh}
             x2={pivotSx}
             y2={rotHy}
-            stroke="#e94560"
+            stroke="var(--tf-accent)"
             strokeWidth={1}
             pointerEvents="none"
           />
@@ -2568,7 +2571,7 @@ function GroupHandleOverlay({
             cx={pivotSx}
             cy={rotHy}
             r={HANDLE_SCREEN_R}
-            fill="#e94560"
+            fill="var(--tf-accent)"
             stroke="white"
             strokeWidth={1.5}
             style={{ cursor: ROTATE_CURSOR, pointerEvents: "all" }}
@@ -2584,7 +2587,7 @@ function GroupHandleOverlay({
               cy={sy}
               r={HANDLE_SCREEN_R}
               fill="white"
-              stroke="#e94560"
+              stroke="var(--tf-accent)"
               strokeWidth={1.5}
               style={{ cursor: cursorMap[id], pointerEvents: "all" }}
               onMouseDown={(e) => onGroupHandleMouseDown(e, id)}
@@ -2704,7 +2707,7 @@ function GroupHandleOverlay({
         width={trSx - tlSx}
         height={blSy - tlSy}
         fill="none"
-        stroke="#e94560"
+        stroke="var(--tf-accent)"
         strokeWidth={1}
         strokeDasharray="4 2"
         pointerEvents="none"
@@ -2725,7 +2728,7 @@ function GroupHandleOverlay({
         y1={tcSy}
         x2={rotHx}
         y2={rotHy}
-        stroke="#e94560"
+        stroke="var(--tf-accent)"
         strokeWidth={1}
         pointerEvents="none"
       />
@@ -2734,7 +2737,7 @@ function GroupHandleOverlay({
         cx={rotHx}
         cy={rotHy}
         r={HANDLE_SCREEN_R}
-        fill="#e94560"
+        fill="var(--tf-accent)"
         stroke="white"
         strokeWidth={1.5}
         style={{ cursor: ROTATE_CURSOR, pointerEvents: "all" }}
@@ -2748,7 +2751,7 @@ function GroupHandleOverlay({
           cy={sy}
           r={HANDLE_SCREEN_R}
           fill="white"
-          stroke="#e94560"
+          stroke="var(--tf-accent)"
           strokeWidth={1.5}
           style={{ cursor: cursorMap[id], pointerEvents: "all" }}
           onMouseDown={(e) => onGroupHandleMouseDown(e, id)}
@@ -2781,7 +2784,7 @@ function GroupHandleOverlay({
             y="3"
             rx="2"
             ry="2"
-            fill="#e94560"
+            fill="var(--tf-accent)"
             stroke="none"
           />
           <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
@@ -2937,7 +2940,7 @@ function HandleOverlay({
         data-testid="selection-bbox"
         points={polyPoints}
         fill="none"
-        stroke="#e94560"
+        stroke="var(--tf-accent)"
         strokeWidth={1}
         strokeDasharray="4 2"
         pointerEvents="none"
@@ -2993,7 +2996,7 @@ function HandleOverlay({
             cy={hy}
             r={HANDLE_SCREEN_R}
             fill="#16213e"
-            stroke="#e94560"
+            stroke="var(--tf-accent)"
             strokeWidth={1.5}
             style={{ cursor: cursorMap[id], pointerEvents: "all" }}
             onMouseDown={(e) => onHandleMouseDown(e, imp.id, id)}
@@ -3007,7 +3010,7 @@ function HandleOverlay({
         y1={topCy}
         x2={rotHx}
         y2={rotHy}
-        stroke="#e94560"
+        stroke="var(--tf-accent)"
         strokeWidth={1}
         pointerEvents="none"
       />
@@ -3018,7 +3021,7 @@ function HandleOverlay({
         cx={rotHx}
         cy={rotHy}
         r={HANDLE_SCREEN_R}
-        fill="#e94560"
+        fill="var(--tf-accent)"
         stroke="#fff"
         strokeWidth={1.5}
         style={{ cursor: ROTATE_CURSOR, pointerEvents: "all" }}
@@ -3052,7 +3055,7 @@ function HandleOverlay({
             y="3"
             rx="2"
             ry="2"
-            fill="#e94560"
+            fill="var(--tf-accent)"
             stroke="none"
           />
           <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />

@@ -130,9 +130,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4">
+      <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4">
         {/* Title */}
-        <h2 className="text-white font-semibold text-sm tracking-widest uppercase">
+        <h2 className="text-content font-semibold text-sm tracking-widest uppercase">
           Generate G-code
         </h2>
 
@@ -143,7 +143,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             <button
               type="button"
               onClick={() => setPathsOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+              className="flex items-center gap-1.5 text-xs font-semibold text-content-faint hover:text-content uppercase tracking-wider transition-colors select-none w-full text-left py-1"
             >
               <ChevronDown
                 size={13}
@@ -158,15 +158,15 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Optimise paths"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.optimise}
                     onChange={() => toggle("optimise")}
                   />
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-content font-medium">
                       Optimise paths
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Reorder subpaths with a nearest-neighbour algorithm to
                       minimise total rapid-travel distance between strokes.
                     </div>
@@ -178,7 +178,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Join nearby paths"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer flex-shrink-0"
+                    className="mt-0.5 accent-accent cursor-pointer flex-shrink-0"
                     checked={prefs.joinPaths}
                     onChange={() => toggle("joinPaths")}
                     id="join-paths-cb"
@@ -188,21 +188,20 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                       htmlFor="join-paths-cb"
                       className="cursor-pointer flex items-center gap-2 flex-wrap"
                     >
-                      <span className="text-sm text-white font-medium">
+                      <span className="text-sm text-content font-medium">
                         Join nearby paths
                       </span>
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
                         Experimental
                       </span>
                     </label>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Connect path endpoints within the tolerance below,
+                    <div className="text-xs text-content-muted mt-0.5">
                       skipping pen up/down between nearly-touching strokes.
                     </div>
                     <div
                       className={`flex items-center gap-2 mt-2 transition-opacity ${prefs.joinPaths ? "opacity-100" : "opacity-30 pointer-events-none"}`}
                     >
-                      <label className="text-xs text-gray-400 whitespace-nowrap">
+                      <label className="text-xs text-content-muted whitespace-nowrap">
                         Tolerance
                       </label>
                       <input
@@ -213,9 +212,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                         value={prefs.joinTolerance}
                         onChange={(e) => setJoinTolerance(e.target.value)}
                         disabled={!prefs.joinPaths}
-                        className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                        className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
                       />
-                      <span className="text-xs text-gray-400">mm</span>
+                      <span className="text-xs text-content-muted">mm</span>
                     </div>
                   </div>
                 </div>
@@ -223,14 +222,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             )}
           </div>
 
-          <div className="border-t border-[#0f3460]" />
+          <div className="border-t border-border-ui" />
 
           {/* ────────────── OPTIONS ────────────── */}
           <div>
             <button
               type="button"
               onClick={() => setOptionsOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+              className="flex items-center gap-1.5 text-xs font-semibold text-content-faint hover:text-content uppercase tracking-wider transition-colors select-none w-full text-left py-1"
             >
               <ChevronDown
                 size={13}
@@ -245,15 +244,15 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Lift pen at end"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.liftPenAtEnd}
                     onChange={() => toggle("liftPenAtEnd")}
                   />
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-content font-medium">
                       Lift pen at end
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Send the pen-up command after the last stroke. Recommended
                       to avoid leaving the pen pressed on the paper.
                     </div>
@@ -265,15 +264,15 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Return to home (X0 Y0)"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.returnToHome}
                     onChange={() => toggle("returnToHome")}
                   />
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-content font-medium">
                       Return to home (X0 Y0)
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Send the pen to the origin after the job finishes.
                     </div>
                   </div>
@@ -299,9 +298,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                             onChange={() =>
                               setPrefs((p) => ({ ...p, clipMode: mode }))
                             }
-                            className="accent-[#e94560] cursor-pointer"
+                            className="accent-accent cursor-pointer"
                           />
-                          <span className="text-xs text-gray-300">
+                          <span className="text-xs text-content">
                             {mode === "none"
                               ? "No clipping"
                               : mode === "margin"
@@ -313,7 +312,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                     </div>
                     {prefs.clipMode === "page" && (
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                        <span className="text-xs text-content-muted whitespace-nowrap">
                           Safety inset
                         </span>
                         <input
@@ -327,14 +326,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                             if (!isNaN(n) && n >= 0)
                               setPrefs((p) => ({ ...p, clipOffsetMM: n }));
                           }}
-                          className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                          className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
                         />
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-content-muted">
                           mm from edge
                         </span>
                       </div>
                     )}
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       {prefs.clipMode === "none" &&
                         "G-code is clipped to the machine bed only."}
                       {prefs.clipMode === "margin" &&
@@ -349,7 +348,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 <button
                   type="button"
                   onClick={() => setCustomGcodeOpen((o) => !o)}
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors select-none w-fit"
+                  className="flex items-center gap-1.5 text-xs text-content-muted hover:text-content transition-colors select-none w-fit"
                 >
                   <ChevronDown
                     size={14}
@@ -357,16 +356,16 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   />
                   Custom G-code
                   {(prefs.customStartGcode || prefs.customEndGcode) && (
-                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[#e94560] inline-block" />
+                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />
                   )}
                 </button>
 
                 {customGcodeOpen && (
                   <div className="flex flex-col gap-3 pl-1">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400 select-none">
+                      <label className="text-xs text-content-muted select-none">
                         Start G-code
-                        <span className="ml-1 text-gray-600">
+                        <span className="ml-1 text-content-faint">
                           (after preamble)
                         </span>
                       </label>
@@ -379,13 +378,13 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                         }
                         placeholder="; e.g. M3 S0"
                         spellCheck={false}
-                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-secondary border border-secondary-hover text-content placeholder-content-faint focus:outline-none focus:border-accent resize-none"
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400 select-none">
+                      <label className="text-xs text-content-muted select-none">
                         End G-code
-                        <span className="ml-1 text-gray-600">
+                        <span className="ml-1 text-content-faint">
                           (after lift / return)
                         </span>
                       </label>
@@ -398,7 +397,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                         }
                         placeholder="; e.g. M5"
                         spellCheck={false}
-                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-secondary border border-secondary-hover text-content placeholder-content-faint focus:outline-none focus:border-accent resize-none"
                       />
                     </div>
                   </div>
@@ -407,14 +406,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             )}
           </div>
 
-          <div className="border-t border-[#0f3460]" />
+          <div className="border-t border-border-ui" />
 
           {/* ────────────── OUTPUT ────────────── */}
           <div>
             <button
               type="button"
               onClick={() => setOutputOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+              className="flex items-center gap-1.5 text-xs font-semibold text-content-faint hover:text-content uppercase tracking-wider transition-colors select-none w-full text-left py-1"
             >
               <ChevronDown
                 size={13}
@@ -429,12 +428,12 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Upload to SD card"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.uploadToSd}
                     onChange={() => toggle("uploadToSd")}
                   />
                   <div className="min-w-0">
-                    <div className="text-sm text-white font-medium flex items-center flex-wrap gap-x-1.5">
+                    <div className="text-sm text-content font-medium flex items-center flex-wrap gap-x-1.5">
                       Upload to SD card
                       {!connected && (
                         <span className="text-xs text-amber-400 font-normal">
@@ -442,7 +441,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Upload the generated file directly to the machine SD card
                       root. Auto-selects it as the queued job.
                     </div>
@@ -454,15 +453,15 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Save to computer"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.saveLocally}
                     onChange={() => toggle("saveLocally")}
                   />
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-content font-medium">
                       Save to computer
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Open a save dialog to choose where to write the G-code
                       file on this computer.
                     </div>
@@ -474,15 +473,15 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                   <input
                     type="checkbox"
                     aria-label="Export one file per group"
-                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    className="mt-0.5 accent-accent cursor-pointer"
                     checked={prefs.exportPerGroup}
                     onChange={() => toggle("exportPerGroup")}
                   />
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-content font-medium">
                       Export one file per group
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-content-muted mt-0.5">
                       Generate a separate G-code file for each layer group —
                       ideal for multi-colour pen plots. Each file is named after
                       its group.
@@ -512,14 +511,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
         <div className="flex gap-2 justify-end mt-1">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={neitherOutput}
-            className="px-3 py-1.5 text-sm rounded bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white"
           >
             Generate
           </button>

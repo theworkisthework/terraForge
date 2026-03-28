@@ -73,9 +73,9 @@ export function ConsolePanel() {
       )}
       {/* Console log */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-1 border-b border-[#0f3460] shrink-0">
+        <div className="flex items-center justify-between px-3 py-1 border-b border-border-ui shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
               Console
             </span>
             {status &&
@@ -93,14 +93,14 @@ export function ConsolePanel() {
                   className={`text-xs px-2 py-0.5 rounded ${
                     status.state === "Run"
                       ? "bg-green-900 text-green-300"
-                      : "bg-[#0f3460] text-gray-300"
+                      : "bg-secondary text-content-muted"
                   }`}
                 >
                   {status.state}
                 </span>
               ))}
             {status?.wpos && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-content-faint">
                 X:{status.wpos.x.toFixed(2)} Y:{status.wpos.y.toFixed(2)} Z:
                 {status.wpos.z.toFixed(2)}
               </span>
@@ -119,13 +119,13 @@ export function ConsolePanel() {
             )}
             <button
               onClick={clear}
-              className="text-xs text-gray-600 hover:text-gray-300"
+              className="text-xs text-content-faint hover:text-content"
             >
               Clear
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-[#0d1117] text-green-400">
+        <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-terminal text-green-400">
           {lines.map((line, i) => (
             <div key={i} className="leading-5 whitespace-pre">
               {line}
@@ -135,7 +135,7 @@ export function ConsolePanel() {
         </div>
 
         {/* Command input */}
-        <div className="flex items-center border-t border-[#0f3460] px-2 py-1 shrink-0 bg-[#0d1117]">
+        <div className="flex items-center border-t border-border-ui px-2 py-1 shrink-0 bg-terminal">
           <span className="text-green-600 font-mono text-xs mr-2 shrink-0">
             {">"}
           </span>
@@ -153,7 +153,7 @@ export function ConsolePanel() {
           <button
             onClick={handleSend}
             disabled={!connected || !cmd.trim()}
-            className="text-[10px] px-2 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 text-gray-300 shrink-0 ml-1"
+            className="text-[10px] px-2 py-0.5 rounded bg-secondary hover:bg-secondary-hover disabled:opacity-40 text-content-muted shrink-0 ml-1"
           >
             Send
           </button>
@@ -161,7 +161,7 @@ export function ConsolePanel() {
       </div>
 
       {/* Job controls sidebar */}
-      <div className="w-48 border-l border-[#0f3460] shrink-0">
+      <div className="w-48 border-l border-border-ui shrink-0">
         <JobControls />
       </div>
     </div>

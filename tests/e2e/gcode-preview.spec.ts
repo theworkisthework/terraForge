@@ -210,12 +210,12 @@ test("clicking a remote gcode file in the file browser selects it as the job", a
   // Use the data-testid row to avoid ambiguous text matches.
   const jobRow = window.locator("[data-testid='file-row-job.gcode']");
 
-  // If the row is already selected (blue highlight), clicking would deselect it.
+  // If the row is already selected (highlighted), clicking would deselect it.
   // Ensure it ends up selected regardless of prior state.
-  const isBlueBg = await jobRow.evaluate((el) =>
-    el.className.includes("bg-[#1a3a6e]"),
+  const isSelected = await jobRow.evaluate((el) =>
+    el.className.includes("bg-[var(--tf-file-selected)]"),
   );
-  if (!isBlueBg) {
+  if (!isSelected) {
     await jobRow.click();
     await window.waitForTimeout(200);
   }
@@ -258,20 +258,20 @@ test("'Loading preview…' bar disappears once the toolpath has been fetched", a
 // which buttons the file browser renders for the running file vs other files.
 
 test("file browser: play ▶ becomes pause ⏸ for the running file", async () => {
-  // Ensure job.gcode is selected.  If the row already has the blue highlight,
+  // Ensure job.gcode is selected.  If the row is already highlighted,
   // leave it alone; otherwise click to select and wait for the highlight.
   const jobRow = window.locator("[data-testid='file-row-job.gcode']");
-  const isBlueBg = await jobRow.evaluate((el) =>
-    el.className.includes("bg-[#1a3a6e]"),
+  const isSelected = await jobRow.evaluate((el) =>
+    el.className.includes("bg-[var(--tf-file-selected)]"),
   );
-  if (!isBlueBg) {
+  if (!isSelected) {
     await jobRow.click();
-    // Wait for the selection to register (blue highlight appears).
+    // Wait for the selection to register (highlight appears).
     await window.waitForFunction(
       () =>
         document
           .querySelector("[data-testid='file-row-job.gcode']")
-          ?.className.includes("bg-[#1a3a6e]"),
+          ?.className.includes("bg-[var(--tf-file-selected)]"),
       { timeout: 5_000 },
     );
   }

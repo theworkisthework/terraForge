@@ -68,13 +68,13 @@ export function JogControls({ onClose }: Props) {
   return (
     <div className="select-none">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           Jog Controls
         </span>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-gray-600 hover:text-gray-300 text-xs"
+            className="text-content-faint hover:text-content text-xs"
           >
             ✕
           </button>
@@ -91,7 +91,7 @@ export function JogControls({ onClose }: Props) {
           >
             <button
               onClick={() => setStep(s)}
-              className={`w-full py-1 rounded text-xs transition-colors ${step === s ? "bg-[#e94560] text-white" : "bg-[#0f3460] hover:bg-[#1a4a8a] text-gray-300"}`}
+              className={`w-full py-1 rounded text-xs transition-colors ${step === s ? "bg-accent text-white" : "bg-secondary hover:bg-secondary-hover text-content-muted"}`}
             >
               {s}
             </button>
@@ -148,7 +148,7 @@ export function JogControls({ onClose }: Props) {
             aria-label="Pen down"
             onClick={() => movePen(-1)}
             disabled={penType === "solenoid" && !penDown}
-            className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
+            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <PenLine size={15} />
             <ArrowDown size={11} />
@@ -159,7 +159,7 @@ export function JogControls({ onClose }: Props) {
             aria-label="Pen up"
             onClick={() => movePen(1)}
             disabled={penType === "solenoid" && !penUp}
-            className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
+            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <Pen size={15} />
             <ArrowUp size={11} />
@@ -171,7 +171,7 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 Z0");
             }}
-            className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors flex items-center justify-center"
+            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors flex items-center justify-center"
           >
             <CircleSlash2 size={14} />
           </button>
@@ -180,7 +180,7 @@ export function JogControls({ onClose }: Props) {
 
       {/* Feedrate */}
       <div>
-        <label className="text-xs text-gray-500 block mb-1">
+        <label className="text-xs text-content-faint block mb-1">
           Feedrate mm/min
         </label>
         <input
@@ -190,13 +190,13 @@ export function JogControls({ onClose }: Props) {
           max={10000}
           step={100}
           onChange={(e) => setFeedrate(+e.target.value)}
-          className="w-full text-xs bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-gray-200"
+          className="w-full text-xs bg-app border border-border-ui rounded px-2 py-1 text-content"
         />
       </div>
 
       {/* Positioning shortcuts */}
       <div className="flex flex-col gap-1 mt-4">
-        <span className="text-[9px] uppercase tracking-wider text-gray-500">
+        <span className="text-[9px] uppercase tracking-wider text-content-faint">
           Positioning
         </span>
         <Tooltip text="Run the machine homing cycle ($H)">
@@ -204,7 +204,7 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("$H");
             }}
-            className="w-full py-1.5 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] text-gray-200 transition-colors flex items-center justify-center gap-1.5"
+            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors flex items-center justify-center gap-1.5"
           >
             <House size={13} />
             Run Homing
@@ -215,7 +215,7 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
             }}
-            className="w-full py-1.5 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] text-gray-200 transition-colors flex items-center justify-center gap-1.5"
+            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors flex items-center justify-center gap-1.5"
           >
             <CircleSlash2 size={13} />
             Set Zero
@@ -241,7 +241,7 @@ function JogBtn({
     <button
       onClick={onClick}
       aria-label={ariaLabel}
-      className="py-1.5 px-2 rounded text-xs bg-[#0f3460] hover:bg-[#1a4a8a] active:bg-[#e94560] text-gray-200 transition-colors font-mono flex items-center justify-center w-full"
+      className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors font-mono flex items-center justify-center w-full"
     >
       {label}
     </button>
