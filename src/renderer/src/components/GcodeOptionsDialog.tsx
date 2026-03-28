@@ -31,6 +31,13 @@ export interface GcodePrefs {
   returnToHome: boolean;
   customStartGcode: string;
   customEndGcode: string;
+  /** How to clip G-code when a page template is active.
+   *  "none"   — no page clip (machine bed only)
+   *  "margin" — clip to the margin boundary shown on canvas
+   *  "page"   — clip to the page edge (with optional clipOffsetMM safety inset) */
+  clipMode: "none" | "page" | "margin";
+  /** Safety inset in mm applied when clipMode is "page" (default 0). */
+  clipOffsetMM: number;
 }
 
 const DEFAULTS: GcodePrefs = {
@@ -44,6 +51,8 @@ const DEFAULTS: GcodePrefs = {
   returnToHome: false,
   customStartGcode: "",
   customEndGcode: "",
+  clipMode: "none",
+  clipOffsetMM: 0,
 };
 
 export function loadGcodePrefs(): GcodePrefs {
@@ -81,7 +90,11 @@ interface Props {
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const layerGroupCount = useCanvasStore((s) => s.layerGroups.length);
+  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
   const [prefs, setPrefs] = useState<GcodePrefs>(loadPrefs);
+  const [pathsOpen, setPathsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [outputOpen, setOutputOpen] = useState(true);
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
   const toggle = (key: keyof GcodePrefs) =>
@@ -120,260 +133,371 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
       <div className="bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4">
         {/* Title */}
         <h2 className="text-white font-semibold text-sm tracking-widest uppercase">
-          Options
+          Generate G-code
         </h2>
 
-        {/* Options */}
-        <div className="flex flex-col gap-4">
-          {/* ── Optimise paths ── */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Optimise paths"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.optimise}
-              onChange={() => toggle("optimise")}
-            />
-            <div>
-              <div className="text-sm text-white font-medium">
-                Optimise paths
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Reorder subpaths with a nearest-neighbour algorithm to minimise
-                total rapid-travel distance between strokes.
-              </div>
-            </div>
-          </label>
-
-          {/* ── Join nearby paths ── */}
-          <div className="flex items-start gap-3 select-none">
-            <input
-              type="checkbox"
-              aria-label="Join nearby paths"
-              className="mt-0.5 accent-[#e94560] cursor-pointer flex-shrink-0"
-              checked={prefs.joinPaths}
-              onChange={() => toggle("joinPaths")}
-              id="join-paths-cb"
-            />
-            <div className="flex-1 min-w-0">
-              <label
-                htmlFor="join-paths-cb"
-                className="cursor-pointer flex items-center gap-2 flex-wrap"
-              >
-                <span className="text-sm text-white font-medium">
-                  Join nearby paths
-                </span>
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
-                  Experimental
-                </span>
-              </label>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Connect path endpoints within the tolerance below, skipping pen
-                up/down between nearly-touching strokes.
-              </div>
-              <div
-                className={`flex items-center gap-2 mt-2 transition-opacity ${prefs.joinPaths ? "opacity-100" : "opacity-30 pointer-events-none"}`}
-              >
-                <label className="text-xs text-gray-400 whitespace-nowrap">
-                  Tolerance
+        {/* ── Collapsible sections ── */}
+        <div className="flex flex-col gap-1">
+          {/* ────────────── PATHS ────────────── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setPathsOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+            >
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-150 flex-shrink-0 ${pathsOpen ? "rotate-0" : "-rotate-90"}`}
+              />
+              Paths
+            </button>
+            {pathsOpen && (
+              <div className="flex flex-col gap-4 mt-2 mb-1">
+                {/* ── Optimise paths ── */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Optimise paths"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.optimise}
+                    onChange={() => toggle("optimise")}
+                  />
+                  <div>
+                    <div className="text-sm text-white font-medium">
+                      Optimise paths
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Reorder subpaths with a nearest-neighbour algorithm to
+                      minimise total rapid-travel distance between strokes.
+                    </div>
+                  </div>
                 </label>
-                <input
-                  type="number"
-                  min="0.01"
-                  max="10"
-                  step="0.05"
-                  value={prefs.joinTolerance}
-                  onChange={(e) => setJoinTolerance(e.target.value)}
-                  disabled={!prefs.joinPaths}
-                  className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
-                />
-                <span className="text-xs text-gray-400">mm</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="border-t border-[#0f3460]" />
-
-          {/* ── Options (lift / return) ── */}
-          <div className="text-xs text-gray-500 uppercase tracking-wider -mb-1">
-            Options
-          </div>
-
-          {/* Lift pen at end */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Lift pen at end"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.liftPenAtEnd}
-              onChange={() => toggle("liftPenAtEnd")}
-            />
-            <div>
-              <div className="text-sm text-white font-medium">
-                Lift pen at end
+                {/* ── Join nearby paths ── */}
+                <div className="flex items-start gap-3 select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Join nearby paths"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer flex-shrink-0"
+                    checked={prefs.joinPaths}
+                    onChange={() => toggle("joinPaths")}
+                    id="join-paths-cb"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <label
+                      htmlFor="join-paths-cb"
+                      className="cursor-pointer flex items-center gap-2 flex-wrap"
+                    >
+                      <span className="text-sm text-white font-medium">
+                        Join nearby paths
+                      </span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
+                        Experimental
+                      </span>
+                    </label>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Connect path endpoints within the tolerance below,
+                      skipping pen up/down between nearly-touching strokes.
+                    </div>
+                    <div
+                      className={`flex items-center gap-2 mt-2 transition-opacity ${prefs.joinPaths ? "opacity-100" : "opacity-30 pointer-events-none"}`}
+                    >
+                      <label className="text-xs text-gray-400 whitespace-nowrap">
+                        Tolerance
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        max="10"
+                        step="0.05"
+                        value={prefs.joinTolerance}
+                        onChange={(e) => setJoinTolerance(e.target.value)}
+                        disabled={!prefs.joinPaths}
+                        className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                      />
+                      <span className="text-xs text-gray-400">mm</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Send the pen-up command after the last stroke. Recommended to
-                avoid leaving the pen pressed on the paper.
-              </div>
-            </div>
-          </label>
-
-          {/* Return to home */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Return to home (X0 Y0)"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.returnToHome}
-              onChange={() => toggle("returnToHome")}
-            />
-            <div>
-              <div className="text-sm text-white font-medium">
-                Return to home (X0 Y0)
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Send the pen to the origin after the job finishes.
-              </div>
-            </div>
-          </label>
-
-          {/* ── Custom G-code collapsible ── */}
-          <button
-            type="button"
-            onClick={() => setCustomGcodeOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors select-none w-fit"
-          >
-            <ChevronDown
-              size={14}
-              className={`transition-transform duration-150 ${
-                customGcodeOpen ? "rotate-0" : "-rotate-90"
-              }`}
-            />
-            Custom G-code
-            {(prefs.customStartGcode || prefs.customEndGcode) && (
-              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[#e94560] inline-block" />
             )}
-          </button>
-
-          {customGcodeOpen && (
-            <div className="flex flex-col gap-3 pl-1">
-              {/* Custom start G-code */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400 select-none">
-                  Start G-code
-                  <span className="ml-1 text-gray-600">(after preamble)</span>
-                </label>
-                <textarea
-                  aria-label="Custom start G-code"
-                  rows={3}
-                  value={prefs.customStartGcode}
-                  onChange={(e) =>
-                    setTextField("customStartGcode")(e.target.value)
-                  }
-                  placeholder="; e.g. M3 S0"
-                  spellCheck={false}
-                  className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
-                />
-              </div>
-              {/* Custom end G-code */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400 select-none">
-                  End G-code
-                  <span className="ml-1 text-gray-600">
-                    (after lift / return)
-                  </span>
-                </label>
-                <textarea
-                  aria-label="Custom end G-code"
-                  rows={3}
-                  value={prefs.customEndGcode}
-                  onChange={(e) =>
-                    setTextField("customEndGcode")(e.target.value)
-                  }
-                  placeholder="; e.g. M5"
-                  spellCheck={false}
-                  className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
-                />
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="border-t border-[#0f3460]" />
 
-          <div className="text-xs text-gray-500 uppercase tracking-wider -mb-1">
-            Output
-          </div>
+          {/* ────────────── OPTIONS ────────────── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setOptionsOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+            >
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-150 flex-shrink-0 ${optionsOpen ? "rotate-0" : "-rotate-90"}`}
+              />
+              Options
+            </button>
+            {optionsOpen && (
+              <div className="flex flex-col gap-4 mt-2 mb-1">
+                {/* Lift pen at end */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Lift pen at end"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.liftPenAtEnd}
+                    onChange={() => toggle("liftPenAtEnd")}
+                  />
+                  <div>
+                    <div className="text-sm text-white font-medium">
+                      Lift pen at end
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Send the pen-up command after the last stroke. Recommended
+                      to avoid leaving the pen pressed on the paper.
+                    </div>
+                  </div>
+                </label>
 
-          {/* ── Upload to SD card ── */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Upload to SD card"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.uploadToSd}
-              onChange={() => toggle("uploadToSd")}
-            />
-            <div className="min-w-0">
-              <div className="text-sm text-white font-medium flex items-center flex-wrap gap-x-1.5">
-                Upload to SD card
-                {!connected && (
-                  <span className="text-xs text-amber-400 font-normal">
-                    (not connected — will be skipped)
-                  </span>
+                {/* Return to home */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Return to home (X0 Y0)"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.returnToHome}
+                    onChange={() => toggle("returnToHome")}
+                  />
+                  <div>
+                    <div className="text-sm text-white font-medium">
+                      Return to home (X0 Y0)
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Send the pen to the origin after the job finishes.
+                    </div>
+                  </div>
+                </label>
+
+                {/* ── Page clipping — only shown when a page template is active ── */}
+                {pageTemplate && (
+                  <div className="flex flex-col gap-1.5 select-none">
+                    <div className="text-sm text-white font-medium">
+                      Page clipping
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {(["none", "margin", "page"] as const).map((mode) => (
+                        <label
+                          key={mode}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            name="clipMode"
+                            value={mode}
+                            checked={prefs.clipMode === mode}
+                            onChange={() =>
+                              setPrefs((p) => ({ ...p, clipMode: mode }))
+                            }
+                            className="accent-[#e94560] cursor-pointer"
+                          />
+                          <span className="text-xs text-gray-300">
+                            {mode === "none"
+                              ? "No clipping"
+                              : mode === "margin"
+                                ? "Clip to margin"
+                                : "Clip to page edge"}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {prefs.clipMode === "page" && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          Safety inset
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          step="0.5"
+                          value={prefs.clipOffsetMM}
+                          onChange={(e) => {
+                            const n = parseFloat(e.target.value);
+                            if (!isNaN(n) && n >= 0)
+                              setPrefs((p) => ({ ...p, clipOffsetMM: n }));
+                          }}
+                          className="w-20 px-2 py-0.5 text-xs rounded bg-[#0f3460] border border-[#1a4a8a] text-white focus:outline-none focus:border-[#e94560]"
+                        />
+                        <span className="text-xs text-gray-400">
+                          mm from edge
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {prefs.clipMode === "none" &&
+                        "G-code is clipped to the machine bed only."}
+                      {prefs.clipMode === "margin" &&
+                        "Clips to the margin boundary shown on canvas."}
+                      {prefs.clipMode === "page" &&
+                        "Clips to the page edge. Add an inset to keep the pen safely on the paper."}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Custom G-code sub-collapsible ── */}
+                <button
+                  type="button"
+                  onClick={() => setCustomGcodeOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors select-none w-fit"
+                >
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-150 ${customGcodeOpen ? "rotate-0" : "-rotate-90"}`}
+                  />
+                  Custom G-code
+                  {(prefs.customStartGcode || prefs.customEndGcode) && (
+                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[#e94560] inline-block" />
+                  )}
+                </button>
+
+                {customGcodeOpen && (
+                  <div className="flex flex-col gap-3 pl-1">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-400 select-none">
+                        Start G-code
+                        <span className="ml-1 text-gray-600">
+                          (after preamble)
+                        </span>
+                      </label>
+                      <textarea
+                        aria-label="Custom start G-code"
+                        rows={3}
+                        value={prefs.customStartGcode}
+                        onChange={(e) =>
+                          setTextField("customStartGcode")(e.target.value)
+                        }
+                        placeholder="; e.g. M3 S0"
+                        spellCheck={false}
+                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-400 select-none">
+                        End G-code
+                        <span className="ml-1 text-gray-600">
+                          (after lift / return)
+                        </span>
+                      </label>
+                      <textarea
+                        aria-label="Custom end G-code"
+                        rows={3}
+                        value={prefs.customEndGcode}
+                        onChange={(e) =>
+                          setTextField("customEndGcode")(e.target.value)
+                        }
+                        placeholder="; e.g. M5"
+                        spellCheck={false}
+                        className="w-full px-2 py-1.5 text-xs font-mono rounded bg-[#0f3460] border border-[#1a4a8a] text-white placeholder-gray-600 focus:outline-none focus:border-[#e94560] resize-none"
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Upload the generated file directly to the machine SD card root.
-                Auto-selects it as the queued job.
-              </div>
-            </div>
-          </label>
+            )}
+          </div>
 
-          {/* ── Save to local computer ── */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Save to computer"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.saveLocally}
-              onChange={() => toggle("saveLocally")}
-            />
-            <div>
-              <div className="text-sm text-white font-medium">
-                Save to computer
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Open a save dialog to choose where to write the G-code file on
-                this computer.
-              </div>
-            </div>
-          </label>
+          <div className="border-t border-[#0f3460]" />
 
-          {/* ── Export one file per group ── */}
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              aria-label="Export one file per group"
-              className="mt-0.5 accent-[#e94560] cursor-pointer"
-              checked={prefs.exportPerGroup}
-              onChange={() => toggle("exportPerGroup")}
-            />
-            <div>
-              <div className="text-sm text-white font-medium">
-                Export one file per group
+          {/* ────────────── OUTPUT ────────────── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setOutputOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors select-none w-full text-left py-1"
+            >
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-150 flex-shrink-0 ${outputOpen ? "rotate-0" : "-rotate-90"}`}
+              />
+              Output
+            </button>
+            {outputOpen && (
+              <div className="flex flex-col gap-4 mt-2 mb-1">
+                {/* Upload to SD card */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Upload to SD card"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.uploadToSd}
+                    onChange={() => toggle("uploadToSd")}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm text-white font-medium flex items-center flex-wrap gap-x-1.5">
+                      Upload to SD card
+                      {!connected && (
+                        <span className="text-xs text-amber-400 font-normal">
+                          (not connected — will be skipped)
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Upload the generated file directly to the machine SD card
+                      root. Auto-selects it as the queued job.
+                    </div>
+                  </div>
+                </label>
+
+                {/* Save to local computer */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Save to computer"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.saveLocally}
+                    onChange={() => toggle("saveLocally")}
+                  />
+                  <div>
+                    <div className="text-sm text-white font-medium">
+                      Save to computer
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Open a save dialog to choose where to write the G-code
+                      file on this computer.
+                    </div>
+                  </div>
+                </label>
+
+                {/* Export one file per group */}
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Export one file per group"
+                    className="mt-0.5 accent-[#e94560] cursor-pointer"
+                    checked={prefs.exportPerGroup}
+                    onChange={() => toggle("exportPerGroup")}
+                  />
+                  <div>
+                    <div className="text-sm text-white font-medium">
+                      Export one file per group
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Generate a separate G-code file for each layer group —
+                      ideal for multi-colour pen plots. Each file is named after
+                      its group.
+                    </div>
+                    {prefs.exportPerGroup && layerGroupCount === 0 && (
+                      <div className="text-xs text-amber-400 mt-1">
+                        No groups defined — add groups in the Properties panel
+                        first.
+                      </div>
+                    )}
+                  </div>
+                </label>
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Generate a separate G-code file for each layer group — ideal for
-                multi-colour pen plots. Each file is named after its group.
-              </div>
-              {prefs.exportPerGroup && layerGroupCount === 0 && (
-                <div className="text-xs text-amber-400 mt-1">
-                  No groups defined — add groups in the Properties panel first.
-                </div>
-              )}
-            </div>
-          </label>
+            )}
+          </div>
         </div>
 
         {/* Validation warning */}

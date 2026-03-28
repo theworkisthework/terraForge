@@ -72,6 +72,8 @@ export function PlotCanvas() {
   const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
   const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
   const layerGroups = useCanvasStore((s) => s.layerGroups);
+  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
+  const pageSizes = useCanvasStore((s) => s.pageSizes);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
@@ -1565,6 +1567,82 @@ export function PlotCanvas() {
         ))}
 
         {/* Rulers are rendered as a screen-space overlay — see below */}
+
+        {/* Page template overlay — non-interactive amber dashed rectangle
+             showing the chosen paper size relative to the machine origin.
+             Hidden from the layers panel; cannot be selected or edited. */}
+        {pageTemplate &&
+          (() => {
+            const activeSize = pageSizes.find(
+              (ps) => ps.id === pageTemplate.sizeId,
+            );
+            if (!activeSize) return null;
+            const pgW = pageTemplate.landscape
+              ? activeSize.heightMM
+              : activeSize.widthMM;
+            const pgH = pageTemplate.landscape
+              ? activeSize.widthMM
+              : activeSize.heightMM;
+            // Convert page corners from machine mm to SVG canvas px.
+            const svgX0 = getBedX(0);
+            const svgX1 = getBedX(pgW);
+            const svgY0 = getBedY(pgH); // top edge (H mm from origin)
+            const svgY1 = getBedY(0); // origin edge
+            const rectX = Math.min(svgX0, svgX1);
+            const rectY = Math.min(svgY0, svgY1);
+            const rectW = Math.abs(svgX1 - svgX0);
+            const rectH = Math.abs(svgY1 - svgY0);
+            const label = `${activeSize.name} ${pageTemplate.landscape ? "Landscape" : "Portrait"}`;
+            // Keep label at a fixed ~11px screen size regardless of zoom level.
+            const labelSize = 11 / vp.zoom;
+            // Margin inset rect (in SVG px).
+            const marginPx = (pageTemplate.marginMM ?? 20) * MM_TO_PX;
+            const mX = rectX + marginPx;
+            const mY = rectY + marginPx;
+            const mW = rectW - marginPx * 2;
+            const mH = rectH - marginPx * 2;
+            return (
+              <g pointerEvents="none">
+                <rect
+                  x={rectX}
+                  y={rectY}
+                  width={rectW}
+                  height={rectH}
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  vectorEffect="non-scaling-stroke"
+                  opacity={0.65}
+                />
+                {mW > 0 && mH > 0 && (
+                  <rect
+                    x={mX}
+                    y={mY}
+                    width={mW}
+                    height={mH}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    vectorEffect="non-scaling-stroke"
+                    opacity={0.35}
+                  />
+                )}
+                <text
+                  x={rectX + 4 / vp.zoom}
+                  y={rectY - 4 / vp.zoom}
+                  fontSize={labelSize}
+                  fill="#f59e0b"
+                  opacity={0.65}
+                  vectorEffect="non-scaling-stroke"
+                  fontFamily="monospace"
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })()}
 
         {/* G-code toolpath hit-area (paths rendered on the canvas overlay below). */}
         {gcodeToolpath &&

@@ -17,6 +17,7 @@ import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
 import {
   flattenToSubpaths,
   clipSubpathsToBed,
+  clipSubpathsToRect,
   nearestNeighbourSort,
   joinSubpaths,
   fmtCoord as fmt,
@@ -73,6 +74,12 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Machine  : ${config.name}`);
   lines.push(`; Bed      : ${config.bedWidth} x ${config.bedHeight} mm`);
   lines.push(`; Origin   : ${config.origin}`);
+  if (options?.pageClip) {
+    const pc = options.pageClip;
+    lines.push(
+      `; Page clip: ${pc.widthMM} x ${pc.heightMM} mm (${pc.marginMM} mm margin)`,
+    );
+  }
   lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
   lines.push(`; Joined   : ${doJoin ? `yes (tolerance ${joinTol} mm)` : "no"}`);
   lines.push(`; Lift end : ${liftPenAtEnd ? "yes" : "no"}`);
@@ -126,7 +133,16 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const raw = flattenToSubpaths(visibleObjects[i], config);
-    for (const sp of clipSubpathsToBed(raw, config)) {
+    const clipped = options?.pageClip
+      ? clipSubpathsToRect(
+          raw,
+          options.pageClip.marginMM,
+          options.pageClip.widthMM - options.pageClip.marginMM,
+          options.pageClip.marginMM,
+          options.pageClip.heightMM - options.pageClip.marginMM,
+        )
+      : clipSubpathsToBed(raw, config);
+    for (const sp of clipped) {
       if (sp.length >= 2) allSubpaths.push(sp);
     }
     const pct = Math.round(((i + 1) / visibleObjects.length) * 40);

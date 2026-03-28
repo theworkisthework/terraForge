@@ -48,7 +48,7 @@ test("toolbar renders with brand name", async () => {
 });
 
 test("machine selector dropdown is present and visible", async () => {
-  const select = window.locator("select").first();
+  const select = window.locator("select[aria-label='Machine selector']");
   await expect(select).toBeVisible();
 });
 
