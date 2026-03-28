@@ -95,6 +95,7 @@ function Toast({ task }: { task: BackgroundTask }) {
         <button
           onClick={() => cancelTask(task.id)}
           className="text-content-faint hover:text-accent text-xs shrink-0 leading-none ml-1"
+          aria-label="Cancel task"
           title="Cancel task"
         >
           ✕
@@ -103,6 +104,7 @@ function Toast({ task }: { task: BackgroundTask }) {
         <button
           onClick={() => removeTask(task.id)}
           className="text-content-faint hover:text-content-muted text-xs shrink-0 leading-none ml-1"
+          aria-label="Dismiss"
           title="Dismiss"
         >
           ✕

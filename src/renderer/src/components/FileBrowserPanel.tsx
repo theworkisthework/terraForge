@@ -437,6 +437,7 @@ function FsPane({
               navigate(path);
             }}
             disabled={!connected || loading}
+            aria-label="Refresh"
             title="Refresh"
             className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
           >

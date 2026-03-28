@@ -255,14 +255,20 @@ export function MachineConfigDialog({ onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <div className="bg-app border border-border-ui rounded-xl shadow-2xl w-[780px] max-h-[90vh] flex flex-col">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="machine-config-title"
+          className="bg-app border border-border-ui rounded-xl shadow-2xl w-[780px] max-h-[90vh] flex flex-col"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border-ui">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 id="machine-config-title" className="text-lg font-semibold text-white">
               Machine Configurations
             </h2>
             <button
               onClick={onClose}
+              aria-label="Dismiss"
               className="text-content-muted hover:text-content transition-colors text-xl leading-none"
             >
               ×

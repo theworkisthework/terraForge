@@ -141,6 +141,7 @@ export function ConsolePanel() {
           </span>
           <input
             type="text"
+            aria-label="Send G-code command"
             value={cmd}
             onChange={(e) => setCmd(e.target.value)}
             onKeyDown={(e) => {

@@ -130,9 +130,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gcode-options-title"
+        className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4"
+      >
         {/* Title */}
-        <h2 className="text-content font-semibold text-sm tracking-widest uppercase">
+        <h2 id="gcode-options-title" className="text-content font-semibold text-sm tracking-widest uppercase">
           Generate G-code
         </h2>
 
