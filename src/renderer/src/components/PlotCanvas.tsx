@@ -16,7 +16,7 @@ import { Crosshair } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
-import type { SvgImport } from "../../../types";
+import { DEFAULT_STROKE_WIDTH_MM, type SvgImport } from "../../../types";
 
 const MM_TO_PX = 3; // internal SVG scale: 3 px per mm
 const PAD = 30; // margin around bed in SVG pixels
@@ -1261,11 +1261,15 @@ export function PlotCanvas() {
               ? "#4a88cc"
               : "#2a5a8a";
           ctx.strokeStyle = outlineColor;
-          ctx.lineWidth = 1.5 / avgImpScale;
+          ctx.lineWidth =
+            ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * MM_TO_PX) /
+            avgImpScale;
           ctx.stroke(impCache.outline);
           // Hatch fill lines
           ctx.strokeStyle = hatchColor;
-          ctx.lineWidth = 0.8 / avgImpScale;
+          ctx.lineWidth =
+            ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * 0.5 * MM_TO_PX) /
+            avgImpScale;
           ctx.stroke(impCache.hatch);
           ctx.restore();
         }

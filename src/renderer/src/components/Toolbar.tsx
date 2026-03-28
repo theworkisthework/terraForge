@@ -293,6 +293,9 @@ export function Toolbar({
   const toVectorObjectsForGroup = useCanvasStore(
     (s) => s.toVectorObjectsForGroup,
   );
+  const toVectorObjectsUngrouped = useCanvasStore(
+    (s) => s.toVectorObjectsUngrouped,
+  );
   const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
   const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
@@ -1133,10 +1136,26 @@ export function Toolbar({
     };
 
     // Only process groups that have at least one visible path in them.
-    const groupsWithContent = layerGroups.filter(
-      (g) => toVectorObjectsForGroup(g.id).length > 0,
-    );
-    if (groupsWithContent.length === 0) return;
+    // Also include a synthetic "ungrouped" entry for imports not in any group.
+    type GroupEntry = {
+      id: string | null;
+      name: string;
+      objects: VectorObject[];
+    };
+    const ungroupedObjects = toVectorObjectsUngrouped();
+    const allEntries: GroupEntry[] = [
+      ...(ungroupedObjects.length > 0
+        ? [{ id: null, name: "ungrouped", objects: ungroupedObjects }]
+        : []),
+      ...layerGroups
+        .map((g) => ({
+          id: g.id,
+          name: g.name,
+          objects: toVectorObjectsForGroup(g.id),
+        }))
+        .filter((e) => e.objects.length > 0),
+    ];
+    if (allEntries.length === 0) return;
 
     // Ask for a save directory once when the user wants local files.
     let saveDir: string | null = null;
@@ -1147,8 +1166,8 @@ export function Toolbar({
 
     setGenerating(true);
 
-    for (const group of groupsWithContent) {
-      const objects = toVectorObjectsForGroup(group.id);
+    for (const group of allEntries) {
+      const objects = group.objects;
       const taskId = uuid();
       const safeName = group.name.replace(/[\\/:*?"<>|]/g, "_");
       const defaultFilename = prefs.optimise

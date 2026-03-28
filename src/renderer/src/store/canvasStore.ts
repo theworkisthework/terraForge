@@ -131,6 +131,8 @@ interface CanvasState {
   assignImportToGroup: (importId: string, groupId: string | null) => void;
   /** Returns VectorObjects for only the imports belonging to the given group. */
   toVectorObjectsForGroup: (groupId: string) => VectorObject[];
+  /** Returns VectorObjects for imports that are NOT assigned to any group. */
+  toVectorObjectsUngrouped: () => VectorObject[];
   /** The id of the layer group currently "selected" (all members highlighted
    *  and group OBB shown).  Null when no group is selected. */
   selectedGroupId: string | null;
@@ -636,6 +638,45 @@ export const useCanvasStore = create<CanvasState>()(
         const groupImportIds = new Set(group.importIds);
         return imports
           .filter((imp) => imp.visible && groupImportIds.has(imp.id))
+          .flatMap((imp) =>
+            imp.paths
+              .filter((p) => p.visible)
+              .flatMap((p): VectorObject[] => {
+                const base: VectorObject = {
+                  id: p.id,
+                  svgSource: p.svgSource,
+                  path: p.d,
+                  x: imp.x,
+                  y: imp.y,
+                  scale: imp.scale,
+                  scaleX: imp.scaleX,
+                  scaleY: imp.scaleY,
+                  rotation: imp.rotation,
+                  visible: true,
+                  originalWidth: imp.svgWidth,
+                  originalHeight: imp.svgHeight,
+                  layer: p.layer,
+                };
+                const outlineVOs: VectorObject[] =
+                  p.outlineVisible !== false ? [base] : [];
+                const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
+                  (hl, i): VectorObject => ({
+                    ...base,
+                    id: `${p.id}-h${i}`,
+                    svgSource: "",
+                    path: hl,
+                  }),
+                );
+                return [...outlineVOs, ...hatchVOs];
+              }),
+          );
+      },
+
+      toVectorObjectsUngrouped: () => {
+        const { imports, layerGroups } = get();
+        const allGroupedIds = new Set(layerGroups.flatMap((g) => g.importIds));
+        return imports
+          .filter((imp) => imp.visible && !allGroupedIds.has(imp.id))
           .flatMap((imp) =>
             imp.paths
               .filter((p) => p.visible)
