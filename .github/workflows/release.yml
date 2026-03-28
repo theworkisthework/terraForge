@@ -155,7 +155,7 @@ jobs:
 
       # serialport native module needs libudev on Linux
       - name: Install native deps
-        run: sudo apt-get install -y libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
