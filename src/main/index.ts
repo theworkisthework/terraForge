@@ -27,6 +27,14 @@ function createWindow(): void {
     minHeight: 700,
     show: false,
     backgroundColor: "#1a1a2e",
+    icon: join(
+      __dirname,
+      process.platform === "win32"
+        ? "../../build/icon.ico"
+        : process.platform === "darwin"
+          ? "../../build/icon.icns"
+          : "../../build/icon.png",
+    ),
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
