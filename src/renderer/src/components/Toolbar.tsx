@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { PenLine, Moon, Sun } from "lucide-react";
+import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { useTaskStore } from "../store/taskStore";
@@ -1315,9 +1316,10 @@ export function Toolbar({
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-border-ui shrink-0">
       {/* Brand */}
-      <span className="text-accent font-bold tracking-widest text-sm mr-2">
-        terraForge
-      </span>
+      <TerraForgeLogotype
+        aria-label="terraForge"
+        className="text-accent h-[22px] w-auto mr-2 shrink-0"
+      />
 
       {/* Machine selector — locked while connected */}
       <select
