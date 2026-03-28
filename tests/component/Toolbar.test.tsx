@@ -142,7 +142,7 @@ describe("Toolbar", () => {
     const cfg = createMachineConfig({ name: "My Plotter" });
     useMachineStore.setState({ configs: [cfg], connected: true });
     render(<Toolbar />);
-    const select = screen.getByRole("combobox");
+    const select = screen.getByRole("combobox", { name: "Machine selector" });
     expect(select).toBeDisabled();
   });
 
@@ -298,7 +298,7 @@ describe("Toolbar", () => {
     const c2 = createMachineConfig({ name: "Beta" });
     useMachineStore.setState({ configs: [c1, c2], activeConfigId: c1.id });
     render(<Toolbar />);
-    const select = screen.getByRole("combobox");
+    const select = screen.getByRole("combobox", { name: "Machine selector" });
     await userEvent.selectOptions(select, c2.id);
     expect(useMachineStore.getState().activeConfigId).toBe(c2.id);
   });
@@ -317,7 +317,7 @@ describe("Toolbar", () => {
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
       expect(
-        screen.getByRole("heading", { name: "Options" }),
+        screen.getByRole("heading", { name: "Generate G-code" }),
       ).toBeInTheDocument();
     });
 
@@ -326,6 +326,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       expect(screen.getByText("Optimise paths")).toBeInTheDocument();
       expect(screen.getByText("Upload to SD card")).toBeInTheDocument();
       expect(screen.getByText("Save to computer")).toBeInTheDocument();
@@ -336,6 +337,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       expect(
         screen.getByRole("checkbox", { name: "Optimise paths" }),
       ).toBeChecked();
@@ -356,11 +358,11 @@ describe("Toolbar", () => {
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
       expect(
-        screen.getByRole("heading", { name: "Options" }),
+        screen.getByRole("heading", { name: "Generate G-code" }),
       ).toBeInTheDocument();
       await userEvent.click(screen.getByText("Cancel"));
       expect(
-        screen.queryByRole("heading", { name: "Options" }),
+        screen.queryByRole("heading", { name: "Generate G-code" }),
       ).not.toBeInTheDocument();
       // No gcode-generate task should have been created
       const tasks = Object.values(useTaskStore.getState().tasks);
@@ -407,7 +409,7 @@ describe("Toolbar", () => {
 
       // Dialog closes after confirm
       expect(
-        screen.queryByRole("heading", { name: "Options" }),
+        screen.queryByRole("heading", { name: "Generate G-code" }),
       ).not.toBeInTheDocument();
 
       // A gcode-generate task should be registered in the store
@@ -477,6 +479,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Optimise paths" }),
       );
@@ -527,6 +530,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       expect(screen.getByText("Join nearby paths")).toBeInTheDocument();
       expect(screen.getByText("Experimental")).toBeInTheDocument();
     });
@@ -536,6 +540,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       // Tolerance input is always rendered
       expect(screen.getByText("Tolerance")).toBeInTheDocument();
       // The number input should be disabled while join is off
@@ -548,6 +553,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );
@@ -579,6 +585,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );
@@ -648,6 +655,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );

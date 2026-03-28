@@ -189,6 +189,8 @@ if (typeof window !== "undefined") {
       deleteMachineConfig: vi.fn().mockResolvedValue(undefined),
       exportConfigs: vi.fn().mockResolvedValue(null),
       importConfigs: vi.fn().mockResolvedValue({ added: 0, skipped: 0 }),
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      openPageSizesFile: vi.fn().mockResolvedValue(undefined),
     },
     app: {
       getVersion: vi.fn().mockResolvedValue("1.0.0"),

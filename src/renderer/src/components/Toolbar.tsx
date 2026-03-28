@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { v4 as uuid } from "uuid";
+import { PenLine } from "lucide-react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { useTaskStore } from "../store/taskStore";
@@ -10,6 +11,7 @@ import {
   type SvgImport,
   type SvgPath,
   type CanvasLayout,
+  type PageTemplate,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
@@ -307,6 +309,10 @@ export function Toolbar({
   const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
+  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
+  const setPageTemplate = useCanvasStore((s) => s.setPageTemplate);
+  const pageSizes = useCanvasStore((s) => s.pageSizes);
+  const setPageSizes = useCanvasStore((s) => s.setPageSizes);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
   const unregisterCancelCallback = useTaskStore(
@@ -716,6 +722,7 @@ export function Toolbar({
         savedAt: new Date().toISOString(),
         imports,
         layerGroups,
+        pageTemplate,
       };
       await window.terraForge.fs.writeFile(
         savePath,
@@ -773,7 +780,7 @@ export function Toolbar({
         // Canvas already has content — ask before overwriting.
         setPendingLayout(layout);
       } else {
-        loadLayout(layout.imports, layout.layerGroups);
+        loadLayout(layout.imports, layout.layerGroups, layout.pageTemplate);
       }
     } catch (err) {
       upsertTask({
@@ -945,6 +952,19 @@ export function Toolbar({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load custom page sizes from the main process on mount.
+  // Falls back to the built-in defaults (already in the store) if IPC fails.
+  useEffect(() => {
+    window.terraForge.config
+      .loadPageSizes()
+      .then((sizes) => {
+        if (sizes.length > 0) setPageSizes(sizes);
+      })
+      .catch(() => {
+        /* keep built-in defaults */
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep Save Layout / Close Layout menu items enabled only when there are imports.
   useEffect(() => {
     window.terraForge.fs.setLayoutMenuState(imports.length > 0);
@@ -967,6 +987,9 @@ export function Toolbar({
 
     setGenerating(true);
     const taskId = uuid();
+    const activePageSize = pageTemplate
+      ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+      : undefined;
     const options: GcodeOptions = {
       arcFitting: false,
       arcTolerance: 0.01,
@@ -977,6 +1000,21 @@ export function Toolbar({
       returnToHome: prefs.returnToHome,
       customStartGcode: prefs.customStartGcode,
       customEndGcode: prefs.customEndGcode,
+      pageClip:
+        activePageSize && prefs.clipMode !== "none"
+          ? {
+              widthMM: pageTemplate!.landscape
+                ? activePageSize.heightMM
+                : activePageSize.widthMM,
+              heightMM: pageTemplate!.landscape
+                ? activePageSize.widthMM
+                : activePageSize.heightMM,
+              marginMM:
+                prefs.clipMode === "margin"
+                  ? (pageTemplate!.marginMM ?? 20)
+                  : (prefs.clipOffsetMM ?? 0),
+            }
+          : undefined,
     };
 
     const worker = new Worker(
@@ -1123,6 +1161,9 @@ export function Toolbar({
     cfg: ReturnType<typeof activeConfig>,
   ) => {
     if (!cfg) return;
+    const activePageSize = pageTemplate
+      ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+      : undefined;
     const options: GcodeOptions = {
       arcFitting: false,
       arcTolerance: 0.01,
@@ -1133,6 +1174,21 @@ export function Toolbar({
       returnToHome: prefs.returnToHome,
       customStartGcode: prefs.customStartGcode,
       customEndGcode: prefs.customEndGcode,
+      pageClip:
+        activePageSize && prefs.clipMode !== "none"
+          ? {
+              widthMM: pageTemplate!.landscape
+                ? activePageSize.heightMM
+                : activePageSize.widthMM,
+              heightMM: pageTemplate!.landscape
+                ? activePageSize.widthMM
+                : activePageSize.heightMM,
+              marginMM:
+                prefs.clipMode === "margin"
+                  ? (pageTemplate!.marginMM ?? 20)
+                  : (prefs.clipOffsetMM ?? 0),
+            }
+          : undefined,
     };
 
     // Only process groups that have at least one visible path in them.
@@ -1262,6 +1318,7 @@ export function Toolbar({
 
       {/* Machine selector — locked while connected */}
       <select
+        aria-label="Machine selector"
         className="bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed"
         value={activeConfigId ?? ""}
         onChange={(e) => setActiveConfigId(e.target.value || null)}
@@ -1353,6 +1410,121 @@ export function Toolbar({
 
       <div className="h-4 w-px bg-[#0f3460]" />
 
+      {/* ── Page Template ─────────────────────────────────────────────────────
+           Shows a non-interactive page-size overlay on the canvas.
+           Sizes come from the store (loaded from IPC / built-in defaults). */}
+      <div className="flex items-center gap-1">
+        <select
+          className="bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 max-w-[110px]"
+          value={pageTemplate?.sizeId ?? "none"}
+          title="Page template — adds a size guide overlay to the canvas"
+          onChange={(e) => {
+            const id = e.target.value;
+            if (id === "none") {
+              setPageTemplate(null);
+            } else {
+              setPageTemplate({
+                sizeId: id,
+                landscape: pageTemplate?.landscape ?? true,
+                marginMM: pageTemplate?.marginMM ?? 20,
+              });
+            }
+          }}
+        >
+          <option value="none">No page</option>
+          {pageSizes.map((ps) => (
+            <option key={ps.id} value={ps.id}>
+              {ps.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Portrait / landscape toggle — only shown when a page is selected */}
+        {pageTemplate && (
+          <button
+            onClick={() =>
+              setPageTemplate({
+                ...pageTemplate,
+                landscape: !pageTemplate.landscape,
+                marginMM: pageTemplate.marginMM ?? 20,
+              })
+            }
+            className="w-7 h-7 rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors flex items-center justify-center text-gray-300"
+            title={
+              pageTemplate.landscape
+                ? "Landscape — click to switch to portrait"
+                : "Portrait — click to switch to landscape"
+            }
+          >
+            {pageTemplate.landscape ? (
+              /* Landscape page icon */
+              <svg
+                width="16"
+                height="12"
+                viewBox="0 0 16 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="0.75" y="0.75" width="14.5" height="10.5" rx="1" />
+              </svg>
+            ) : (
+              /* Portrait page icon */
+              <svg
+                width="11"
+                height="15"
+                viewBox="0 0 11 15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="0.75" y="0.75" width="9.5" height="13.5" rx="1" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {/* Margin input — only shown when a page is selected */}
+        {pageTemplate && (
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={pageTemplate.marginMM ?? 20}
+              onChange={(e) =>
+                setPageTemplate({
+                  ...pageTemplate,
+                  marginMM: Math.max(
+                    0,
+                    Math.min(100, Number(e.target.value) || 0),
+                  ),
+                })
+              }
+              className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 text-right"
+              title="Page margin in mm"
+            />
+            <span className="text-xs text-gray-400">mm</span>
+          </div>
+        )}
+
+        {/* Edit custom page sizes file */}
+        <button
+          onClick={() => window.terraForge.config.openPageSizesFile()}
+          className="w-7 h-7 rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors flex items-center justify-center text-gray-400"
+          title="Edit custom page sizes (opens page-sizes.json in your default editor)"
+        >
+          <PenLine size={12} />
+        </button>
+      </div>
+
+      <div className="h-4 w-px bg-[#0f3460]" />
+
       {/* Home */}
       <button
         onClick={() => window.terraForge.fluidnc.sendCommand("$H")}
@@ -1439,7 +1611,11 @@ export function Toolbar({
           message={`The canvas already has ${imports.length} object${imports.length !== 1 ? "s" : ""}. Opening this layout will replace it.\n\nContinue?`}
           confirmLabel="Replace"
           onConfirm={() => {
-            loadLayout(pendingLayout.imports, pendingLayout.layerGroups);
+            loadLayout(
+              pendingLayout.imports,
+              pendingLayout.layerGroups,
+              pendingLayout.pageTemplate,
+            );
             setPendingLayout(null);
           }}
           onCancel={() => setPendingLayout(null)}

@@ -8,6 +8,7 @@ import { SerialClient } from "../machine/serial";
 import { TaskManager } from "../tasks/taskManager";
 import type {
   MachineConfig,
+  PageSize,
   VectorObject,
   GcodeOptions,
   MachineStatus,
@@ -333,6 +334,42 @@ function getDefaultConfigs(): MachineConfig[] {
   ];
 }
 
+// ─── Page-Size Persistence ────────────────────────────────────────────────────
+// Users can customise the available page sizes by editing page-sizes.json in the
+// app's userData directory.  If the file is absent the built-in defaults are used.
+
+const pageSizesPath = join(app.getPath("userData"), "page-sizes.json");
+
+const BUILT_IN_PAGE_SIZES: PageSize[] = [
+  { id: "a2", name: "A2", widthMM: 420, heightMM: 594 },
+  { id: "a3", name: "A3", widthMM: 297, heightMM: 420 },
+  { id: "a4", name: "A4", widthMM: 210, heightMM: 297 },
+  { id: "a5", name: "A5", widthMM: 148, heightMM: 210 },
+  { id: "a6", name: "A6", widthMM: 105, heightMM: 148 },
+  { id: "letter", name: "Letter", widthMM: 215.9, heightMM: 279.4 },
+  { id: "legal", name: "Legal", widthMM: 215.9, heightMM: 355.6 },
+  { id: "tabloid", name: "Tabloid", widthMM: 279.4, heightMM: 431.8 },
+];
+
+async function loadPageSizes(): Promise<PageSize[]> {
+  if (!existsSync(pageSizesPath)) {
+    await writeFile(
+      pageSizesPath,
+      JSON.stringify(BUILT_IN_PAGE_SIZES, null, 2),
+      "utf-8",
+    );
+    return BUILT_IN_PAGE_SIZES;
+  }
+  try {
+    const raw = await readFile(pageSizesPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed as PageSize[];
+    return BUILT_IN_PAGE_SIZES;
+  } catch {
+    return BUILT_IN_PAGE_SIZES;
+  }
+}
+
 // ─── IPC Handlers — Config ────────────────────────────────────────────────────
 
 ipcMain.handle("config:getMachineConfigs", () => loadConfigs());
@@ -441,6 +478,21 @@ ipcMain.handle("config:importConfigs", async () => {
     await saveConfigs([...existing, ...toAdd]);
   }
   return { added: toAdd.length, skipped };
+});
+
+ipcMain.handle("config:loadPageSizes", () => loadPageSizes());
+
+ipcMain.handle("config:openPageSizesFile", async () => {
+  // Write the built-in defaults if the file doesn't exist yet so the user has
+  // a well-formed starting point to edit.
+  if (!existsSync(pageSizesPath)) {
+    await writeFile(
+      pageSizesPath,
+      JSON.stringify(BUILT_IN_PAGE_SIZES, null, 2),
+      "utf-8",
+    );
+  }
+  shell.openPath(pageSizesPath);
 });
 
 // ─── IPC Handlers — App ───────────────────────────────────────────────────────

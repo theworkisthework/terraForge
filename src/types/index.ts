@@ -134,6 +134,39 @@ export interface SvgImport {
   strokeWidthMM?: number;
 }
 
+// ─── Page Templates ──────────────────────────────────────────────────────────
+
+/** A named paper/page size definition. Dimensions are in portrait orientation. */
+export interface PageSize {
+  id: string;
+  name: string;
+  /** Width in portrait orientation (mm) */
+  widthMM: number;
+  /** Height in portrait orientation (mm) */
+  heightMM: number;
+}
+
+/** The active page template overlay shown on the canvas. */
+export interface PageTemplate {
+  /** Matches PageSize.id */
+  sizeId: string;
+  landscape: boolean;
+  /** Margin in mm drawn as a second inset overlay inside the page boundary. */
+  marginMM: number;
+}
+
+/** Built-in page sizes used as defaults when no custom page-sizes.json exists. */
+export const BUILT_IN_PAGE_SIZES: PageSize[] = [
+  { id: "a2", name: "A2", widthMM: 420, heightMM: 594 },
+  { id: "a3", name: "A3", widthMM: 297, heightMM: 420 },
+  { id: "a4", name: "A4", widthMM: 210, heightMM: 297 },
+  { id: "a5", name: "A5", widthMM: 148, heightMM: 210 },
+  { id: "a6", name: "A6", widthMM: 105, heightMM: 148 },
+  { id: "letter", name: "Letter", widthMM: 215.9, heightMM: 279.4 },
+  { id: "legal", name: "Legal", widthMM: 215.9, heightMM: 355.6 },
+  { id: "tabloid", name: "Tabloid", widthMM: 279.4, heightMM: 431.8 },
+];
+
 // ─── Canvas Layout ──────────────────────────────────────────────────────────────
 
 /** Serialised canvas layout — saved/loaded as .tforge JSON. */
@@ -144,6 +177,8 @@ export interface CanvasLayout {
   imports: SvgImport[];
   /** Layer groups — optional for backward compatibility with older layout files. */
   layerGroups?: LayerGroup[];
+  /** Active page template — optional for backward compatibility. */
+  pageTemplate?: PageTemplate | null;
 }
 
 // ─── Layer Groups ────────────────────────────────────────────────────────────
@@ -184,6 +219,9 @@ export interface GcodeOptions {
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
   customStartGcode: string; // raw G-code lines inserted after the preamble, before paths
   customEndGcode: string; // raw G-code lines appended after lift/return, before EOF comment
+  /** When a page template is active, clip G-code to the page's printable area
+   *  (page dimensions minus margin on all sides) instead of the full machine bed. */
+  pageClip?: { widthMM: number; heightMM: number; marginMM: number };
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
@@ -349,6 +387,10 @@ export interface ConfigApi {
   exportConfigs: () => Promise<string | null>;
   /** Import configs from a .json file chosen by the user. Returns counts of added and skipped configs. */
   importConfigs: () => Promise<{ added: number; skipped: number }>;
+  /** Load page size definitions — returns custom sizes from userData or the built-in defaults. */
+  loadPageSizes: () => Promise<PageSize[]>;
+  /** Ensure page-sizes.json exists in userData (writing defaults if needed), then open it in the OS editor. */
+  openPageSizesFile: () => Promise<void>;
 }
 
 export interface AppApi {

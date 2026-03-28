@@ -110,7 +110,9 @@ test.beforeAll(async () => {
 
   // ── Connect to the mocked machine ─────────────────────────────────────────
   // Select the test machine in the toolbar dropdown.
-  await window.locator("select").selectOption({ label: TEST_CONFIG.name });
+  await window
+    .locator("select[aria-label='Machine selector']")
+    .selectOption({ label: TEST_CONFIG.name });
 
   // Click Connect — the mocked handler resolves immediately.
   await window.locator("button:has-text('Connect')").click();

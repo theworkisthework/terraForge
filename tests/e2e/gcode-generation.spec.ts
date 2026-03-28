@@ -122,16 +122,22 @@ test("clicking Generate G-code opens the options dialog", async () => {
   const btn = window.locator("button:has-text('Generate G-code')");
   await btn.click();
 
-  // Dialog should show the Optimise paths checkbox
+  // Dialog should be open — verify by the dialog heading
+  await expect(window.locator("h2:has-text('Generate G-code')")).toBeVisible({
+    timeout: 3_000,
+  });
+
+  // Expand the Paths section and confirm Optimise paths is present
+  await window.locator("button:has-text('Paths')").click();
   await expect(window.locator("text=Optimise paths")).toBeVisible({
     timeout: 3_000,
   });
 
   // Cancel to close without generating
   await window.locator("button:has-text('Cancel')").click();
-  await expect(window.locator("text=Optimise paths")).not.toBeVisible({
-    timeout: 3_000,
-  });
+  await expect(
+    window.locator("h2:has-text('Generate G-code')"),
+  ).not.toBeVisible({ timeout: 3_000 });
 });
 
 test("generating with Optimise paths checked produces optimised G-code", async () => {
@@ -143,6 +149,9 @@ test("generating with Optimise paths checked produces optimised G-code", async (
   // Wait for the options dialog to appear
   const cancelBtn = window.locator("button:has-text('Cancel')");
   await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
+
+  // Expand the Paths section so the checkbox is accessible
+  await window.locator("button:has-text('Paths')").click();
 
   // Ensure Optimise paths is checked
   const optimiseCheckbox = window.locator(
