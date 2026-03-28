@@ -6,6 +6,9 @@ import {
   type SvgPath,
   type VectorObject,
   type LayerGroup,
+  type PageSize,
+  type PageTemplate,
+  BUILT_IN_PAGE_SIZES,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
@@ -80,7 +83,11 @@ interface CanvasState {
   selectToolpath: (selected: boolean) => void;
   clearImports: () => void;
   /** Replace the entire imports list atomically — used by canvas layout load. */
-  loadLayout: (imports: SvgImport[], layerGroups?: LayerGroup[]) => void;
+  loadLayout: (
+    imports: SvgImport[],
+    layerGroups?: LayerGroup[],
+    pageTemplate?: PageTemplate | null,
+  ) => void;
   selectedImport: () => SvgImport | undefined;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
   setGcodeSource: (
@@ -119,6 +126,14 @@ interface CanvasState {
   /** Commit the gesture snapshot to the undo stack only if imports actually changed.
    *  Discards the snapshot if nothing was modified (e.g. click without drag). */
   commitGesture: () => void;
+
+  // ─── Page Template ────────────────────────────────────────────────────────
+  /** Active page template overlay shown on the canvas (null = none). */
+  pageTemplate: PageTemplate | null;
+  setPageTemplate: (t: PageTemplate | null) => void;
+  /** Available page sizes — loaded from IPC on startup; falls back to built-in defaults. */
+  pageSizes: PageSize[];
+  setPageSizes: (sizes: PageSize[]) => void;
 
   // ─── Layer Groups ─────────────────────────────────────────────────────────
   layerGroups: LayerGroup[];
@@ -183,6 +198,8 @@ export const useCanvasStore = create<CanvasState>()(
       plotProgressCuts: "",
       plotProgressRapids: "",
       gcodePreviewLoading: false,
+      pageTemplate: null,
+      pageSizes: BUILT_IN_PAGE_SIZES,
       layerGroups: [],
       setGcodePreviewLoading: (loading) =>
         set((state) => {
@@ -318,7 +335,7 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      loadLayout: (newImports, newLayerGroups) => {
+      loadLayout: (newImports, newLayerGroups, newPageTemplate) => {
         pushUndo();
         set((state) => {
           state.imports = newImports.map((imp) => ({
@@ -332,8 +349,19 @@ export const useCanvasStore = create<CanvasState>()(
           state.allImportsSelected = false;
           state.selectedGroupId = null;
           state.layerGroups = newLayerGroups ?? [];
+          state.pageTemplate = newPageTemplate ?? null;
         });
       },
+
+      setPageTemplate: (t) =>
+        set((state) => {
+          state.pageTemplate = t;
+        }),
+
+      setPageSizes: (sizes) =>
+        set((state) => {
+          state.pageSizes = sizes;
+        }),
 
       selectedImport: () => {
         const { imports, selectedImportId } = get();

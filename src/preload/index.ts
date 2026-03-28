@@ -173,6 +173,8 @@ const config: TerraForgeAPI["config"] = {
   exportConfigs: () => invoke<string | null>("config:exportConfigs"),
   importConfigs: () =>
     invoke<{ added: number; skipped: number }>("config:importConfigs"),
+  loadPageSizes: () => invoke("config:loadPageSizes"),
+  openPageSizesFile: () => invoke("config:openPageSizesFile"),
 };
 
 // ─── App API ─────────────────────────────────────────────────────────────────
