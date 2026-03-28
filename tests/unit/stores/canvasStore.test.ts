@@ -1141,5 +1141,36 @@ describe("canvasStore", () => {
         useCanvasStore.getState().toVectorObjectsForGroup("no-such-id"),
       ).toEqual([]);
     });
+
+    it("toVectorObjectsUngrouped returns only imports not in any group", () => {
+      const imp1 = createSvgImport();
+      const imp2 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().addImport(imp2);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      const gid = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().assignImportToGroup(imp1.id, gid);
+      const vobjs = useCanvasStore.getState().toVectorObjectsUngrouped();
+      // Only imp2 (ungrouped) should appear
+      const pathIds = vobjs.map((v) => v.id);
+      imp2.paths.forEach((p) => expect(pathIds).toContain(p.id));
+      imp1.paths.forEach((p) => expect(pathIds).not.toContain(p.id));
+    });
+
+    it("toVectorObjectsUngrouped returns all imports when no groups exist", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      const vobjs = useCanvasStore.getState().toVectorObjectsUngrouped();
+      expect(vobjs.length).toBeGreaterThan(0);
+    });
+
+    it("toVectorObjectsUngrouped returns empty array when all imports are grouped", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      const gid = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().assignImportToGroup(imp.id, gid);
+      expect(useCanvasStore.getState().toVectorObjectsUngrouped()).toEqual([]);
+    });
   });
 });
