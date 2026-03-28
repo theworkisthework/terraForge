@@ -119,7 +119,7 @@ export function TaskBar() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="absolute top-4 right-4 z-60 flex flex-col gap-2 pointer-events-none">
       {visible.map((task) => (
         <div key={task.id} className="pointer-events-auto">
           <Toast task={task} />

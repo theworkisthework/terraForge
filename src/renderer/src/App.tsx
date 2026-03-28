@@ -135,11 +135,11 @@ export default function App() {
         <ConsolePanel />
       </div>
 
-      {/* Jog panel — fixed to viewport so it floats above all panels */}
+      {/* Jog panel — fixed to viewport, below modals/dialogs */}
       {showJog && (
         <div
           ref={jogPanelRef}
-          className="fixed z-[100] bg-panel border border-border-ui rounded-lg shadow-2xl overflow-hidden"
+          className="fixed z-30 bg-panel border border-border-ui rounded-lg shadow-2xl overflow-hidden"
           style={
             jogPos
               ? { left: jogPos.x, top: jogPos.y }
