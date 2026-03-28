@@ -151,6 +151,8 @@ export interface PageTemplate {
   /** Matches PageSize.id */
   sizeId: string;
   landscape: boolean;
+  /** Margin in mm drawn as a second inset overlay inside the page boundary. */
+  marginMM: number;
 }
 
 /** Built-in page sizes used as defaults when no custom page-sizes.json exists. */

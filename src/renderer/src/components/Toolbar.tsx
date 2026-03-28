@@ -1389,6 +1389,7 @@ export function Toolbar({
               setPageTemplate({
                 sizeId: id,
                 landscape: pageTemplate?.landscape ?? true,
+                marginMM: pageTemplate?.marginMM ?? 20,
               });
             }
           }}
@@ -1408,6 +1409,7 @@ export function Toolbar({
               setPageTemplate({
                 ...pageTemplate,
                 landscape: !pageTemplate.landscape,
+                marginMM: pageTemplate.marginMM ?? 20,
               })
             }
             className="w-7 h-7 rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors flex items-center justify-center text-gray-300"
@@ -1447,6 +1449,28 @@ export function Toolbar({
               </svg>
             )}
           </button>
+        )}
+
+        {/* Margin input — only shown when a page is selected */}
+        {pageTemplate && (
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={pageTemplate.marginMM ?? 20}
+              onChange={(e) =>
+                setPageTemplate({
+                  ...pageTemplate,
+                  marginMM: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                })
+              }
+              className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 text-right"
+              title="Page margin in mm"
+            />
+            <span className="text-xs text-gray-400">mm</span>
+          </div>
         )}
 
         {/* Edit custom page sizes file */}

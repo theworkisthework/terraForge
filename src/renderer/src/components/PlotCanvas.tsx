@@ -1595,6 +1595,12 @@ export function PlotCanvas() {
             const label = `${activeSize.name} ${pageTemplate.landscape ? "Landscape" : "Portrait"}`;
             // Keep label at a fixed ~11px screen size regardless of zoom level.
             const labelSize = 11 / vp.zoom;
+            // Margin inset rect (in SVG px).
+            const marginPx = (pageTemplate.marginMM ?? 20) * MM_TO_PX;
+            const mX = rectX + marginPx;
+            const mY = rectY + marginPx;
+            const mW = rectW - marginPx * 2;
+            const mH = rectH - marginPx * 2;
             return (
               <g pointerEvents="none">
                 <rect
@@ -1609,6 +1615,20 @@ export function PlotCanvas() {
                   vectorEffect="non-scaling-stroke"
                   opacity={0.65}
                 />
+                {mW > 0 && mH > 0 && (
+                  <rect
+                    x={mX}
+                    y={mY}
+                    width={mW}
+                    height={mH}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    vectorEffect="non-scaling-stroke"
+                    opacity={0.35}
+                  />
+                )}
                 <text
                   x={rectX + 4 / vp.zoom}
                   y={rectY - 4 / vp.zoom}
