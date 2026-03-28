@@ -69,6 +69,14 @@ export function AboutDialog({ onClose }: Props) {
           <p className="pt-1 border-t border-border-ui">
             A &lsquo;THEWORKISTHEWORK&rsquo; project
           </p>
+          <a
+            href="https://github.com/theworkisthework/terraForge"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            github.com/theworkisthework/terraForge
+          </a>
         </div>
 
         {/* Close */}

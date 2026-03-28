@@ -60,6 +60,20 @@ describe("AboutDialog", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("renders a link to the GitHub repo", async () => {
+    await act(async () => {
+      render(<AboutDialog onClose={() => {}} />);
+    });
+    const link = screen.getByRole("link", {
+      name: /github\.com\/theworkisthework\/terraForge/i,
+    });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/theworkisthework/terraForge",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
   it("calls onClose when backdrop is clicked", async () => {
     const onClose = vi.fn();
     render(<AboutDialog onClose={onClose} />);
