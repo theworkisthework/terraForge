@@ -207,7 +207,11 @@ export function PropertiesPanel() {
                     >
                       <button
                         aria-expanded={toolpathSelected}
-                        aria-label={toolpathSelected ? "Collapse toolpath details" : "Expand toolpath details"}
+                        aria-label={
+                          toolpathSelected
+                            ? "Collapse toolpath details"
+                            : "Expand toolpath details"
+                        }
                         className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -374,7 +378,9 @@ export function PropertiesPanel() {
                         {/* Expand toggle */}
                         <button
                           aria-expanded={isExpanded}
-                          aria-label={isExpanded ? "Collapse paths" : "Expand paths"}
+                          aria-label={
+                            isExpanded ? "Collapse paths" : "Expand paths"
+                          }
                           className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1205,7 +1211,9 @@ export function PropertiesPanel() {
                             {/* Collapse toggle */}
                             <button
                               aria-expanded={!isCollapsed}
-                              aria-label={isCollapsed ? "Expand group" : "Collapse group"}
+                              aria-label={
+                                isCollapsed ? "Expand group" : "Collapse group"
+                              }
                               className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                               onClick={() => toggleGroupCollapse(group.id)}
                             >

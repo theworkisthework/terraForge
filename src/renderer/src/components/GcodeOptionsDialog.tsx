@@ -137,7 +137,10 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
         className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4"
       >
         {/* Title */}
-        <h2 id="gcode-options-title" className="text-content font-semibold text-sm tracking-widest uppercase">
+        <h2
+          id="gcode-options-title"
+          className="text-content font-semibold text-sm tracking-widest uppercase"
+        >
           Generate G-code
         </h2>
 

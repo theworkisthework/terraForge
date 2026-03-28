@@ -1581,12 +1581,20 @@ export function Toolbar({
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
           aria-pressed={theme === "light"}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
           className="p-1.5 rounded bg-secondary hover:bg-secondary-hover transition-colors text-content-muted"
         >
-          {theme === "dark" ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
+          {theme === "dark" ? (
+            <Sun size={14} aria-hidden="true" />
+          ) : (
+            <Moon size={14} aria-hidden="true" />
+          )}
         </button>
 
         {/* Settings */}

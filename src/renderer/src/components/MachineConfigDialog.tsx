@@ -263,7 +263,10 @@ export function MachineConfigDialog({ onClose }: Props) {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border-ui">
-            <h2 id="machine-config-title" className="text-lg font-semibold text-white">
+            <h2
+              id="machine-config-title"
+              className="text-lg font-semibold text-white"
+            >
               Machine Configurations
             </h2>
             <button
