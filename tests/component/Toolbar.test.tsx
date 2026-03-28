@@ -1628,9 +1628,9 @@ describe("Toolbar", () => {
     });
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    // The About dialog heading is an <h1>; the toolbar brand is a <span>
+    // The About dialog logotype SVG carries aria-label="terraForge"
     expect(
-      screen.getByRole("heading", { name: "terraForge" }),
+      document.querySelector('[aria-label="terraForge"]'),
     ).toBeInTheDocument();
   });
 });
