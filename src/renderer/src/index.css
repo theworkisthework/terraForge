@@ -16,12 +16,13 @@
   --tf-bg-secondary-hover: #1a4a8a;
   --tf-bg-secondary-active: #0a2040;
   --tf-bg-terminal: #0d1117;
-  --tf-border: #0f3460;
+  --tf-border: #5c7a9e;
   --tf-text: #e0e0e0;
   --tf-text-muted: #9ca3af;
-  --tf-text-faint: #6b7280;
-  /* Fixed accent (also available as --tf-accent for SVG attributes) */
+  --tf-text-faint: #818ea5;
+  /* Accent (also available as --tf-accent for SVG attributes) */
   --tf-accent: #e94560;
+  --tf-accent-hover: #c73d56;
   /* File browser panel variants */
   --tf-fs-blue-bg: #0a1628;
   --tf-fs-blue-border: #0f3460;
@@ -42,11 +43,12 @@
   --tf-bg-secondary-hover: #c5d0ec;
   --tf-bg-secondary-active: #b0bdd4;
   --tf-bg-terminal: #f6f8fa;
-  --tf-border: #c5cce8;
+  --tf-border: #7584a8;
   --tf-text: #1a1e2e;
   --tf-text-muted: #5a6080;
-  --tf-text-faint: #8090b0;
-  --tf-accent: #e94560;
+  --tf-text-faint: #5d6e88;
+  --tf-accent: #b82d45;
+  --tf-accent-hover: #9a2539;
   /* File browser panel variants */
   --tf-fs-blue-bg: #e8f0ff;
   --tf-fs-blue-border: #93b4e8;
@@ -74,9 +76,9 @@
   --color-content: var(--tf-text);
   --color-content-muted: var(--tf-text-muted);
   --color-content-faint: var(--tf-text-faint);
-  /* Fixed accent — same in both themes */
-  --color-accent: #e94560;
-  --color-accent-hover: #c73d56;
+  /* Per-theme accent — resolved from :root / :root.light tokens */
+  --color-accent: var(--tf-accent);
+  --color-accent-hover: var(--tf-accent-hover);
   /* Mono font */
   --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
 }
