@@ -37,7 +37,9 @@ beforeEach(() => {
 describe("Toolbar", () => {
   it("renders the brand logotype", () => {
     render(<Toolbar />);
-    expect(document.querySelector('[aria-label="terraForge"]')).toBeInTheDocument();
+    expect(
+      document.querySelector('[aria-label="terraForge"]'),
+    ).toBeInTheDocument();
   });
 
   it("renders the machine selector dropdown", () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import TerraForgeLogo from "../assets/terraForgeAnimated.svg?react";
+import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 
 interface Props {
   onClose: () => void;
@@ -40,13 +41,12 @@ export function AboutDialog({ onClose }: Props) {
 
         {/* Title */}
         <div>
-          <h1
+          <TerraForgeLogotype
             id="about-dialog-title"
-            className="text-accent font-bold tracking-widest text-xl"
-          >
-            terraForge
-          </h1>
-          <p className="text-content-muted text-sm mt-1">
+            aria-label="terraForge"
+            className="text-accent h-[28px] w-auto mx-auto"
+          />
+          <p className="text-content-muted text-sm mt-2">
             terraPen plotter control
           </p>
         </div>

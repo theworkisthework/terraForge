@@ -13,7 +13,9 @@ describe("AboutDialog", () => {
       render(<AboutDialog onClose={() => {}} />);
     });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("terraForge")).toBeInTheDocument();
+    expect(
+      document.querySelector('[aria-label="terraForge"]'),
+    ).toBeInTheDocument();
     expect(screen.getByText("terraPen plotter control")).toBeInTheDocument();
   });
 
