@@ -113,6 +113,7 @@ const fs: TerraForgeAPI["fs"] = {
   saveLayoutDialog: (defaultName) =>
     invoke<string | null>("fs:saveLayoutDialog", defaultName),
   openLayoutDialog: () => invoke<string | null>("fs:openLayoutDialog"),
+  chooseDirectory: () => invoke<string | null>("fs:chooseDirectory"),
 
   onMenuImport: (cb) => {
     const listener = () => cb();

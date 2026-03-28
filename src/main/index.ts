@@ -799,6 +799,15 @@ ipcMain.handle("fs:openLayoutDialog", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("fs:chooseDirectory", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Choose folder for G-code files",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+
 ipcMain.handle("fs:loadConfigs", () => loadConfigs());
 ipcMain.handle("fs:saveConfigs", (_e, configs: MachineConfig[]) =>
   saveConfigs(configs),

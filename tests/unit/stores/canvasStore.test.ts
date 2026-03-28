@@ -17,6 +17,7 @@ beforeEach(() => {
     gcodeSource: null,
     undoStack: [],
     redoStack: [],
+    layerGroups: [],
   });
 });
 
@@ -1000,6 +1001,145 @@ describe("canvasStore", () => {
       useCanvasStore.getState().updateImport(imp.id, { rotation: 45 });
       useCanvasStore.getState().commitGesture();
       expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+    });
+  });
+
+  // ── Layer Groups ──────────────────────────────────────────────────────────
+
+  describe("layer groups", () => {
+    it("starts with no groups", () => {
+      expect(useCanvasStore.getState().layerGroups).toEqual([]);
+    });
+
+    it("addLayerGroup creates a group with the given name and color", () => {
+      useCanvasStore.getState().addLayerGroup("Pen 1", "#e94560");
+      const groups = useCanvasStore.getState().layerGroups;
+      expect(groups).toHaveLength(1);
+      expect(groups[0].name).toBe("Pen 1");
+      expect(groups[0].color).toBe("#e94560");
+      expect(groups[0].importIds).toEqual([]);
+      expect(groups[0].id).toBeTruthy();
+    });
+
+    it("removeLayerGroup deletes the group by id", () => {
+      useCanvasStore.getState().addLayerGroup("A", "#ff0000");
+      const id = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().removeLayerGroup(id);
+      expect(useCanvasStore.getState().layerGroups).toHaveLength(0);
+    });
+
+    it("removeLayerGroup is a no-op for unknown id", () => {
+      useCanvasStore.getState().addLayerGroup("A", "#ff0000");
+      useCanvasStore.getState().removeLayerGroup("not-an-id");
+      expect(useCanvasStore.getState().layerGroups).toHaveLength(1);
+    });
+
+    it("updateLayerGroup changes name and color", () => {
+      useCanvasStore.getState().addLayerGroup("Old", "#000000");
+      const id = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore
+        .getState()
+        .updateLayerGroup(id, { name: "New", color: "#ffffff" });
+      const g = useCanvasStore.getState().layerGroups[0];
+      expect(g.name).toBe("New");
+      expect(g.color).toBe("#ffffff");
+    });
+
+    it("updateLayerGroup only updates supplied fields", () => {
+      useCanvasStore.getState().addLayerGroup("Keep", "#aabbcc");
+      const id = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().updateLayerGroup(id, { color: "#112233" });
+      const g = useCanvasStore.getState().layerGroups[0];
+      expect(g.name).toBe("Keep");
+      expect(g.color).toBe("#112233");
+    });
+
+    it("assignImportToGroup assigns an import to a group", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      const gid = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().assignImportToGroup(imp.id, gid);
+      expect(useCanvasStore.getState().layerGroups[0].importIds).toContain(
+        imp.id,
+      );
+    });
+
+    it("assignImportToGroup moves import between groups", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().addLayerGroup("G1", "#ff0000");
+      useCanvasStore.getState().addLayerGroup("G2", "#00ff00");
+      const [g1, g2] = useCanvasStore.getState().layerGroups;
+      useCanvasStore.getState().assignImportToGroup(imp.id, g1.id);
+      useCanvasStore.getState().assignImportToGroup(imp.id, g2.id);
+      expect(useCanvasStore.getState().layerGroups[0].importIds).not.toContain(
+        imp.id,
+      );
+      expect(useCanvasStore.getState().layerGroups[1].importIds).toContain(
+        imp.id,
+      );
+    });
+
+    it("assignImportToGroup(null) removes import from its group", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      const gid = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().assignImportToGroup(imp.id, gid);
+      useCanvasStore.getState().assignImportToGroup(imp.id, null);
+      expect(useCanvasStore.getState().layerGroups[0].importIds).not.toContain(
+        imp.id,
+      );
+    });
+
+    it("clearImports also clears layerGroups", () => {
+      const imp = createSvgImport();
+      useCanvasStore.getState().addImport(imp);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      useCanvasStore.getState().clearImports();
+      expect(useCanvasStore.getState().layerGroups).toHaveLength(0);
+    });
+
+    it("loadLayout restores layerGroups from the layout", () => {
+      const imp = createSvgImport();
+      const groups = [
+        { id: "g1", name: "Pen 1", color: "#e94560", importIds: [imp.id] },
+      ];
+      useCanvasStore.getState().loadLayout([imp], groups);
+      expect(useCanvasStore.getState().layerGroups).toHaveLength(1);
+      expect(useCanvasStore.getState().layerGroups[0].name).toBe("Pen 1");
+    });
+
+    it("loadLayout with no layerGroups clears existing groups", () => {
+      useCanvasStore.getState().addLayerGroup("Old", "#ff0000");
+      const imp = createSvgImport();
+      useCanvasStore.getState().loadLayout([imp]);
+      expect(useCanvasStore.getState().layerGroups).toHaveLength(0);
+    });
+
+    it("toVectorObjectsForGroup returns only objects for that group's imports", () => {
+      const imp1 = createSvgImport();
+      const imp2 = createSvgImport();
+      useCanvasStore.getState().addImport(imp1);
+      useCanvasStore.getState().addImport(imp2);
+      useCanvasStore.getState().addLayerGroup("G", "#ff0000");
+      const gid = useCanvasStore.getState().layerGroups[0].id;
+      useCanvasStore.getState().assignImportToGroup(imp1.id, gid);
+      const vobjs = useCanvasStore.getState().toVectorObjectsForGroup(gid);
+      // imp1 has one visible path (from createSvgImport which creates a path)
+      expect(vobjs.length).toBeGreaterThan(0);
+      // Only imp1's path ids should appear
+      const pathIds = vobjs.map((v) => v.id);
+      imp2.paths.forEach((p) => {
+        expect(pathIds).not.toContain(p.id);
+      });
+    });
+
+    it("toVectorObjectsForGroup returns empty array for unknown group", () => {
+      expect(
+        useCanvasStore.getState().toVectorObjectsForGroup("no-such-id"),
+      ).toEqual([]);
     });
   });
 });

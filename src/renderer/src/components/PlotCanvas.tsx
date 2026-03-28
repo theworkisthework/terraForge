@@ -43,6 +43,14 @@ interface Vp {
   panY: number;
 }
 
+/** Scale each RGB channel of a CSS hex colour by `factor` (clamped to 0-255). */
+function scaleHexColor(hex: string, factor: number): string {
+  const r = Math.min(255, Math.round(parseInt(hex.slice(1, 3), 16) * factor));
+  const g = Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor));
+  const b = Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +58,8 @@ export function PlotCanvas() {
   const imports = useCanvasStore((s) => s.imports);
   const selectedImportId = useCanvasStore((s) => s.selectedImportId);
   const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
+  const selectedGroupId = useCanvasStore((s) => s.selectedGroupId);
+  const selectGroup = useCanvasStore((s) => s.selectGroup);
   const selectImport = useCanvasStore((s) => s.selectImport);
   const removeImport = useCanvasStore((s) => s.removeImport);
   const clearImports = useCanvasStore((s) => s.clearImports);
@@ -61,6 +71,7 @@ export function PlotCanvas() {
   const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
   const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
+  const layerGroups = useCanvasStore((s) => s.layerGroups);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
@@ -312,11 +323,11 @@ export function PlotCanvas() {
   // Clear the persistent OBB whenever the group selection is dropped so a
   // new Ctrl+A always starts with a fresh axis-aligned bounding box.
   useEffect(() => {
-    if (!allImportsSelected) {
+    if (!allImportsSelected && !selectedGroupId) {
       setPersistentGroupOBB(null);
       setGroupOBBAngle(0);
     }
-  }, [allImportsSelected]);
+  }, [allImportsSelected, selectedGroupId]);
 
   // ── Toolpath selection ────────────────────────────────────────────────────────
   // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
@@ -342,6 +353,16 @@ export function PlotCanvas() {
       if (e.key === "Delete" || e.key === "Backspace") {
         if (allImportsSelected) {
           clearImports();
+        } else if (selectedGroupId) {
+          const st = useCanvasStore.getState();
+          const groupImportIds = new Set(
+            st.layerGroups.find((g) => g.id === selectedGroupId)?.importIds ??
+              [],
+          );
+          st.imports
+            .filter((i) => groupImportIds.has(i.id))
+            .forEach((i) => st.removeImport(i.id));
+          selectGroup(null);
         } else if (selectedImportId) {
           removeImport(selectedImportId);
         } else if (toolpathSelected && !isJobActive) {
@@ -391,6 +412,8 @@ export function PlotCanvas() {
   }, [
     selectedImportId,
     allImportsSelected,
+    selectedGroupId,
+    selectGroup,
     toolpathSelected,
     isJobActive,
     removeImport,
@@ -475,6 +498,27 @@ export function PlotCanvas() {
         });
         return;
       }
+      // Layer-group mode: if the clicked import belongs to the selected group,
+      // drag all group members together.
+      if (state.selectedGroupId) {
+        const groupImportIds = new Set(
+          state.layerGroups.find((g) => g.id === state.selectedGroupId)
+            ?.importIds ?? [],
+        );
+        if (groupImportIds.has(id)) {
+          setDragging({
+            id,
+            startMouseX: e.clientX,
+            startMouseY: e.clientY,
+            startObjX: 0,
+            startObjY: 0,
+            group: state.imports
+              .filter((i) => groupImportIds.has(i.id))
+              .map((imp) => ({ id: imp.id, startX: imp.x, startY: imp.y })),
+          });
+          return;
+        }
+      }
       selectImport(id);
       const imp = state.imports.find((i) => i.id === id);
       if (!imp) return;
@@ -557,7 +601,17 @@ export function PlotCanvas() {
     (e: React.MouseEvent<SVGCircleElement>, handle: HandlePos) => {
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const { imports: imps } = useCanvasStore.getState();
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const imps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       const gBedY = getBedYRef.current;
       let minWx = Infinity,
         maxWx = -Infinity,
@@ -628,7 +682,17 @@ export function PlotCanvas() {
     ) => {
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const { imports: imps } = useCanvasStore.getState();
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const imps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       const gBedY = getBedYRef.current;
       const container = containerRef.current;
       if (!container) return;
@@ -670,14 +734,24 @@ export function PlotCanvas() {
       if (spaceRef.current) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
-      const currentImports = useCanvasStore.getState().imports;
+      const state = useCanvasStore.getState();
+      const {
+        imports: allImps,
+        selectedGroupId: gid,
+        layerGroups: groups,
+      } = state;
+      const groupImps = gid
+        ? allImps.filter((i) =>
+            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
+          )
+        : allImps;
       setDragging({
         id: "__group__",
         startMouseX: e.clientX,
         startMouseY: e.clientY,
         startObjX: 0,
         startObjY: 0,
-        group: currentImports.map((imp) => ({
+        group: groupImps.map((imp) => ({
           id: imp.id,
           startX: imp.x,
           startY: imp.y,
@@ -1103,6 +1177,13 @@ export function PlotCanvas() {
         const vpA = vp.zoom * dpr;
         const vpE = vp.panX * dpr;
         const vpF = vp.panY * dpr;
+        // Build a fast importId → group colour lookup used for stroke colours below.
+        const groupColorMap = new Map<string, string>();
+        for (const g of layerGroups) {
+          for (const id of g.importIds) {
+            groupColorMap.set(id, g.color);
+          }
+        }
         // Prune cache entries for imports that no longer exist.
         for (const id of importPath2DCacheRef.current.keys()) {
           if (!imports.some((imp) => imp.id === id))
@@ -1149,7 +1230,12 @@ export function PlotCanvas() {
           const avgImpScale =
             Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
           const isImpSelected =
-            allImportsSelected || imp.id === selectedImportId;
+            allImportsSelected ||
+            imp.id === selectedImportId ||
+            (!!selectedGroupId &&
+              !!layerGroups
+                .find((g) => g.id === selectedGroupId)
+                ?.importIds.includes(imp.id));
 
           ctx.save();
           ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
@@ -1158,12 +1244,27 @@ export function PlotCanvas() {
           ctx.scale(impSX, impSY);
           ctx.translate(-(vbX + imp.svgWidth / 2), -(vbY + imp.svgHeight / 2));
           ctx.setLineDash([]);
-          // Outline paths
-          ctx.strokeStyle = isImpSelected ? "#60a0ff" : "#3a6aaa";
+          // Outline paths — use group colour when assigned, otherwise default blue
+          const groupColor = groupColorMap.get(imp.id);
+          const outlineColor = groupColor
+            ? isImpSelected
+              ? scaleHexColor(groupColor, 1.35)
+              : groupColor
+            : isImpSelected
+              ? "#60a0ff"
+              : "#3a6aaa";
+          const hatchColor = groupColor
+            ? isImpSelected
+              ? groupColor
+              : scaleHexColor(groupColor, 0.65)
+            : isImpSelected
+              ? "#4a88cc"
+              : "#2a5a8a";
+          ctx.strokeStyle = outlineColor;
           ctx.lineWidth = 1.5 / avgImpScale;
           ctx.stroke(impCache.outline);
           // Hatch fill lines
-          ctx.strokeStyle = isImpSelected ? "#4a88cc" : "#2a5a8a";
+          ctx.strokeStyle = hatchColor;
           ctx.lineWidth = 0.8 / avgImpScale;
           ctx.stroke(impCache.hatch);
           ctx.restore();
@@ -1352,6 +1453,7 @@ export function PlotCanvas() {
     imports,
     selectedImportId,
     allImportsSelected,
+    layerGroups,
     canvasH,
   ]);
 
@@ -1513,7 +1615,14 @@ export function PlotCanvas() {
             <ImportLayer
               key={imp.id}
               imp={imp}
-              selected={allImportsSelected || selectedImportId === imp.id}
+              selected={
+                allImportsSelected ||
+                selectedImportId === imp.id ||
+                (!!selectedGroupId &&
+                  !!layerGroups
+                    .find((g) => g.id === selectedGroupId)
+                    ?.importIds.includes(imp.id))
+              }
               onImportMouseDown={onImportMouseDown}
               getBedY={getBedY}
             />
@@ -1521,9 +1630,17 @@ export function PlotCanvas() {
       </svg>
 
       {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
-      {allImportsSelected && containerSize.w > 0 ? (
+      {(allImportsSelected || !!selectedGroupId) && containerSize.w > 0 ? (
         <GroupHandleOverlay
-          imports={imports.filter((i) => i.visible)}
+          imports={(allImportsSelected
+            ? imports
+            : imports.filter(
+                (i) =>
+                  !!layerGroups
+                    .find((g) => g.id === selectedGroupId)
+                    ?.importIds.includes(i.id),
+              )
+          ).filter((i) => i.visible)}
           zoom={vp.zoom}
           panX={vp.panX}
           panY={vp.panY}
@@ -1533,7 +1650,21 @@ export function PlotCanvas() {
           onGroupMouseDown={onGroupMouseDown}
           onGroupHandleMouseDown={onGroupHandleMouseDown}
           onGroupRotateHandleMouseDown={onGroupRotateHandleMouseDown}
-          onDelete={clearImports}
+          onDelete={
+            allImportsSelected
+              ? clearImports
+              : () => {
+                  const st = useCanvasStore.getState();
+                  const gids = new Set(
+                    st.layerGroups.find((g) => g.id === selectedGroupId)
+                      ?.importIds ?? [],
+                  );
+                  st.imports
+                    .filter((i) => gids.has(i.id))
+                    .forEach((i) => st.removeImport(i.id));
+                  selectGroup(null);
+                }
+          }
           activeOBB={
             groupRotating
               ? {
