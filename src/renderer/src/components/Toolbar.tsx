@@ -1318,6 +1318,7 @@ export function Toolbar({
 
       {/* Machine selector — locked while connected */}
       <select
+        aria-label="Machine selector"
         className="bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed"
         value={activeConfigId ?? ""}
         onChange={(e) => setActiveConfigId(e.target.value || null)}
