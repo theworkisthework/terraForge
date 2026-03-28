@@ -1,6 +1,7 @@
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import svgr from "vite-plugin-svgr";
 
 // Files are at the electron-vite default locations (src/main, src/preload, src/renderer)
 // so no explicit entry overrides are needed.
@@ -10,6 +11,6 @@ export default defineConfig({
   main: {},
   preload: {},
   renderer: {
-    plugins: [react(), tailwindcss()],
+    plugins: [svgr(), react(), tailwindcss()],
   },
 });
