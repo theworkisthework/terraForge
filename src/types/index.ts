@@ -93,6 +93,8 @@ export interface SvgPath {
 export const DEFAULT_HATCH_SPACING_MM = 2;
 /** Default hatch angle in degrees — used on import and as the UI default. */
 export const DEFAULT_HATCH_ANGLE_DEG = 45;
+/** Default stroke width in mm — used on import and as the UI default. */
+export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {
@@ -127,6 +129,9 @@ export interface SvgImport {
   hatchEnabled?: boolean;
   hatchSpacingMM?: number;
   hatchAngleDeg?: number;
+  /** Preview stroke width in mm — controls how thick paths appear on the canvas.
+   *  Does not affect G-code output. Defaults to DEFAULT_STROKE_WIDTH_MM. */
+  strokeWidthMM?: number;
 }
 
 // ─── Canvas Layout ──────────────────────────────────────────────────────────────

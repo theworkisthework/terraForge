@@ -161,9 +161,7 @@ describe("PropertiesPanel", () => {
     const imp = createSvgImport({ paths: [path], name: "pos-test", x: 0 });
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     render(<PropertiesPanel />);
-    const xLabel = screen.getByText("X (mm)");
-    // eslint-disable-next-line testing-library/no-node-access
-    const xInput = xLabel.parentElement!.querySelector("input")!;
+    const xInput = screen.getByRole("spinbutton", { name: "X (mm)" });
     await userEvent.clear(xInput);
     await userEvent.type(xInput, "50");
     expect(useCanvasStore.getState().imports[0].x).toBe(50);
@@ -194,9 +192,7 @@ describe("PropertiesPanel", () => {
     });
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     render(<PropertiesPanel />);
-    const rotLabel = screen.getByText("Rotation (°)");
-    // eslint-disable-next-line testing-library/no-node-access
-    const rotInput = rotLabel.parentElement!.querySelector("input")!;
+    const rotInput = screen.getByRole("spinbutton", { name: "Rotation (°)" });
     await userEvent.clear(rotInput);
     await userEvent.type(rotInput, "45");
     expect(useCanvasStore.getState().imports[0].rotation).toBe(45);
@@ -492,9 +488,9 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     render(<PropertiesPanel />);
 
-    const spacingLabel = screen.getByText("Spacing (mm)");
-    // eslint-disable-next-line testing-library/no-node-access
-    const spacingInput = spacingLabel.parentElement!.querySelector("input")!;
+    const spacingInput = screen.getByRole("spinbutton", {
+      name: "Spacing (mm)",
+    });
     fireEvent.change(spacingInput, { target: { value: "3" } });
     expect(useCanvasStore.getState().imports[0].hatchSpacingMM).toBe(3);
   });
@@ -515,9 +511,7 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     render(<PropertiesPanel />);
 
-    const angleLabel = screen.getByText("Angle (°)");
-    // eslint-disable-next-line testing-library/no-node-access
-    const angleInput = angleLabel.parentElement!.querySelector("input")!;
+    const angleInput = screen.getByRole("spinbutton", { name: "Angle (°)" });
     await userEvent.clear(angleInput);
     await userEvent.type(angleInput, "90");
     expect(useCanvasStore.getState().imports[0].hatchAngleDeg).toBe(90);
@@ -885,5 +879,129 @@ describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
     });
     render(<PropertiesPanel />);
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+});
+
+// ── Stroke width ──────────────────────────────────────────────────────────────
+
+describe("PropertiesPanel — stroke width", () => {
+  function getStrokeSlider(): HTMLInputElement {
+    return screen.getByRole("slider", {
+      name: "Stroke width",
+    }) as HTMLInputElement;
+  }
+
+  function getStrokeNumberInput(): HTMLInputElement {
+    return screen.getByRole("spinbutton", {
+      name: "Stroke width value",
+    }) as HTMLInputElement;
+  }
+
+  it("shows Stroke width section when an import is selected", () => {
+    const imp = createSvgImport({ name: "sw-test" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(screen.getByText("Stroke width")).toBeInTheDocument();
+  });
+
+  it("slider defaults to DEFAULT_STROKE_WIDTH_MM (0.5) when strokeWidthMM is unset", () => {
+    const imp = createSvgImport({ name: "sw-default" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(getStrokeSlider().value).toBe("0.5");
+  });
+
+  it("slider reflects a custom strokeWidthMM", () => {
+    const imp = createSvgImport({ name: "sw-custom", strokeWidthMM: 2.5 });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(getStrokeSlider().value).toBe("2.5");
+  });
+
+  it("slider has min=0, max=10, step=0.1", () => {
+    const imp = createSvgImport({ name: "sw-attrs" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    const slider = getStrokeSlider();
+    expect(slider.min).toBe("0");
+    expect(slider.max).toBe("10");
+    expect(slider.step).toBe("0.1");
+  });
+
+  it("slider change updates strokeWidthMM on the import", () => {
+    const imp = createSvgImport({ name: "sw-change" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    fireEvent.change(getStrokeSlider(), { target: { value: "1.5" } });
+    expect(useCanvasStore.getState().imports[0].strokeWidthMM).toBe(1.5);
+  });
+
+  it("number input change updates strokeWidthMM on the import", () => {
+    const imp = createSvgImport({ name: "sw-number" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    fireEvent.change(getStrokeNumberInput(), { target: { value: "3" } });
+    expect(useCanvasStore.getState().imports[0].strokeWidthMM).toBe(3);
+  });
+
+  it("number input ignores non-finite values", () => {
+    const imp = createSvgImport({ name: "sw-nan", strokeWidthMM: 1 });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    fireEvent.change(getStrokeNumberInput(), { target: { value: "" } });
+    // strokeWidthMM should remain unchanged
+    expect(useCanvasStore.getState().imports[0].strokeWidthMM).toBe(1);
+  });
+
+  // ── Group sync ────────────────────────────────────────────────────────
+
+  it("changing stroke on a grouped import syncs all members of the group", () => {
+    const imp1 = createSvgImport({ name: "g-imp1", strokeWidthMM: 0.5 });
+    const imp2 = createSvgImport({ name: "g-imp2", strokeWidthMM: 0.5 });
+    const unrelated = createSvgImport({
+      name: "ungrouped",
+      strokeWidthMM: 0.5,
+    });
+    useCanvasStore.getState().addLayerGroup("pen1", "#e94560");
+    const group = useCanvasStore.getState().layerGroups[0];
+    useCanvasStore.getState().assignImportToGroup(imp1.id, group.id);
+    useCanvasStore.getState().assignImportToGroup(imp2.id, group.id);
+    useCanvasStore.setState({
+      imports: [imp1, imp2, unrelated],
+      selectedImportId: imp1.id,
+    });
+    render(<PropertiesPanel />);
+
+    fireEvent.change(getStrokeSlider(), { target: { value: "2" } });
+
+    const state = useCanvasStore.getState();
+    const getImp = (id: string) => state.imports.find((i) => i.id === id)!;
+    expect(getImp(imp1.id).strokeWidthMM).toBe(2);
+    expect(getImp(imp2.id).strokeWidthMM).toBe(2);
+    // Unrelated (ungrouped) import must NOT be affected
+    expect(getImp(unrelated.id).strokeWidthMM).toBe(0.5);
+  });
+
+  it("changing stroke on an ungrouped import syncs all other ungrouped imports", () => {
+    const imp1 = createSvgImport({ name: "ug1", strokeWidthMM: 0.5 });
+    const imp2 = createSvgImport({ name: "ug2", strokeWidthMM: 0.5 });
+    const grouped = createSvgImport({ name: "grouped", strokeWidthMM: 0.5 });
+    useCanvasStore.getState().addLayerGroup("grp", "#3a6aaa");
+    const group = useCanvasStore.getState().layerGroups[0];
+    useCanvasStore.getState().assignImportToGroup(grouped.id, group.id);
+    useCanvasStore.setState({
+      imports: [imp1, imp2, grouped],
+      selectedImportId: imp1.id,
+    });
+    render(<PropertiesPanel />);
+
+    fireEvent.change(getStrokeSlider(), { target: { value: "3" } });
+
+    const state = useCanvasStore.getState();
+    const getImp = (id: string) => state.imports.find((i) => i.id === id)!;
+    expect(getImp(imp1.id).strokeWidthMM).toBe(3);
+    expect(getImp(imp2.id).strokeWidthMM).toBe(3);
+    // The grouped import must NOT be affected
+    expect(getImp(grouped.id).strokeWidthMM).toBe(0.5);
   });
 });

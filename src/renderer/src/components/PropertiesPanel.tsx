@@ -17,6 +17,7 @@ import {
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import type { GcodeToolpath } from "../utils/gcodeParser";
+import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -105,6 +106,23 @@ export function PropertiesPanel() {
   const importGroupId = (importId: string): string | null =>
     layerGroups.find((g) => g.importIds.includes(importId))?.id ?? null;
 
+  /**
+   * Set strokeWidthMM on all imports that share the same "pen group" as the
+   * changed import.  If it belongs to a LayerGroup, all members get the same
+   * value.  If it is ungrouped, all other ungrouped imports are synced too.
+   */
+  const syncStrokeWidth = (changedId: string, widthMM: number) => {
+    const groupId = importGroupId(changedId);
+    const siblings = groupId
+      ? (layerGroups.find((g) => g.id === groupId)?.importIds ?? [])
+      : imports
+          .filter((imp) => importGroupId(imp.id) === null)
+          .map((imp) => imp.id);
+    for (const id of siblings) {
+      updateImport(id, { strokeWidthMM: widthMM });
+    }
+  };
+
   const GROUP_COLORS = [
     "#e94560",
     "#0ea5e9",
@@ -129,19 +147,31 @@ export function PropertiesPanel() {
     onChange: (v: number) => void,
     step = 1,
     min?: number,
-  ) => (
-    <div className="mb-2">
-      <label className="block text-[10px] text-gray-400 mb-0.5">{label}</label>
-      <input
-        type="number"
-        value={Math.round(value * 1000) / 1000}
-        step={step}
-        min={min}
-        onChange={(e) => onChange(+e.target.value)}
-        className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
-      />
-    </div>
-  );
+  ) => {
+    const inputId = `numfield-${label
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase()}`;
+    return (
+      <div className="mb-2">
+        <label
+          htmlFor={inputId}
+          className="block text-[10px] text-gray-400 mb-0.5"
+        >
+          {label}
+        </label>
+        <input
+          id={inputId}
+          type="number"
+          value={Math.round(value * 1000) / 1000}
+          step={step}
+          min={min}
+          onChange={(e) => onChange(+e.target.value)}
+          className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -313,16 +343,6 @@ export function PropertiesPanel() {
                           ? { borderLeft: `3px solid ${groupColor}` }
                           : {}),
                       }}
-                      draggable
-                      onDragStart={(e) => {
-                        setDraggingImportId(imp.id);
-                        e.dataTransfer.setData("text/plain", imp.id);
-                        e.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => {
-                        setDraggingImportId(null);
-                        setDragOverGroupId(null);
-                      }}
                     >
                       {/* Import header row */}
                       <div
@@ -334,6 +354,16 @@ export function PropertiesPanel() {
                           className="text-gray-700 hover:text-gray-400 shrink-0 mr-0.5 select-none"
                           style={{ cursor: "grab", fontSize: "10px" }}
                           title="Drag to a group"
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggingImportId(imp.id);
+                            e.dataTransfer.setData("text/plain", imp.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggingImportId(null);
+                            setDragOverGroupId(null);
+                          }}
                         >
                           ⠿
                         </span>
@@ -455,7 +485,10 @@ export function PropertiesPanel() {
 
                       {/* Properties form — shown when import is selected */}
                       {isSelected && (
-                        <div className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30">
+                        <div
+                          className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30"
+                          onDragStart={(e) => e.stopPropagation()}
+                        >
                           {(() => {
                             const objW =
                               imp.svgWidth * (imp.scaleX ?? imp.scale);
@@ -955,6 +988,58 @@ export function PropertiesPanel() {
                                       <path d="m12 15 4 4" />
                                     </svg>
                                   </button>
+                                </div>
+
+                                {/* ── Stroke width ──────────────────────────── */}
+                                <div className="mt-2 pt-2 border-t border-[#0f3460]/30">
+                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1.5">
+                                    Stroke width
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="range"
+                                      aria-label="Stroke width"
+                                      min={0}
+                                      max={10}
+                                      step={0.1}
+                                      value={
+                                        imp.strokeWidthMM ??
+                                        DEFAULT_STROKE_WIDTH_MM
+                                      }
+                                      onChange={(e) =>
+                                        syncStrokeWidth(
+                                          imp.id,
+                                          Math.max(0, +e.target.value),
+                                        )
+                                      }
+                                      className="flex-1 accent-[#e94560]"
+                                    />
+                                    <input
+                                      type="number"
+                                      aria-label="Stroke width value"
+                                      min={0}
+                                      max={10}
+                                      step={0.1}
+                                      value={
+                                        Math.round(
+                                          (imp.strokeWidthMM ??
+                                            DEFAULT_STROKE_WIDTH_MM) * 1000,
+                                        ) / 1000
+                                      }
+                                      onChange={(e) => {
+                                        const v = e.target.valueAsNumber;
+                                        if (Number.isFinite(v) && v >= 0)
+                                          syncStrokeWidth(
+                                            imp.id,
+                                            Math.max(0, v),
+                                          );
+                                      }}
+                                      className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-1.5 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                                    />
+                                    <span className="text-[10px] text-gray-500 shrink-0">
+                                      mm
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {/* ── Hatch fill ─────────────────────────────── */}
