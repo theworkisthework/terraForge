@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PenTool } from "lucide-react";
+import TerraForgeLogo from "../assets/terraForgeAnimated.svg?react";
 
 interface Props {
   onClose: () => void;
@@ -32,10 +32,11 @@ export function AboutDialog({ onClose }: Props) {
       tabIndex={-1}
     >
       <div className="bg-[#16213e] border border-[#0f3460] rounded-xl shadow-2xl w-[340px] p-7 flex flex-col items-center gap-4 text-center">
-        {/* Logo placeholder */}
-        <div className="w-16 h-16 rounded-2xl bg-[#0f3460] flex items-center justify-center">
-          <PenTool className="w-8 h-8 text-[#e94560]" strokeWidth={1.5} />
-        </div>
+        {/* Logo */}
+        <TerraForgeLogo
+          aria-label="terraForge logo"
+          className="w-[139px] h-[139px] -mb-2"
+        />
 
         {/* Title */}
         <div>
@@ -60,7 +61,10 @@ export function AboutDialog({ onClose }: Props) {
         <div className="text-xs text-gray-500 leading-relaxed space-y-1">
           <p>Released under the MIT License.</p>
           <p>© 2026 Mark Benson</p>
-          <p className="text-gray-600">
+          <p className="pt-1 border-t border-[#0f3460]">
+            Logo &amp; logotype © 2026 Richard Hurst
+          </p>
+          <p className="pt-1 border-t border-[#0f3460]">
             A &lsquo;THEWORKISTHEWORK&rsquo; project
           </p>
         </div>
