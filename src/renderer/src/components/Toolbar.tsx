@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { v4 as uuid } from "uuid";
-import { PenLine } from "lucide-react";
+import { PenLine, Moon, Sun } from "lucide-react";
+import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { useTaskStore } from "../store/taskStore";
+import { useThemeStore } from "../store/themeStore";
 import {
   type VectorObject,
   type MachineConfig,
@@ -318,6 +320,8 @@ export function Toolbar({
   const unregisterCancelCallback = useTaskStore(
     (s) => s.unregisterCancelCallback,
   );
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
 
   // Holds a reference to the active G-code worker so cancellation can reach it.
   const activeWorkerRef = useRef<{ worker: Worker; taskId: string } | null>(
@@ -1310,16 +1314,17 @@ export function Toolbar({
   };
 
   return (
-    <header className="flex items-center gap-3 px-4 py-2 bg-[#16213e] border-b border-[#0f3460] shrink-0">
+    <header className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-border-ui shrink-0">
       {/* Brand */}
-      <span className="text-[#e94560] font-bold tracking-widest text-sm mr-2">
-        terraForge
-      </span>
+      <TerraForgeLogotype
+        aria-label="terraForge"
+        className="text-accent h-[22px] w-auto mr-2 shrink-0"
+      />
 
       {/* Machine selector — locked while connected */}
       <select
         aria-label="Machine selector"
-        className="bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-app border border-border-ui rounded px-2 py-1 text-sm text-content min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed"
         value={activeConfigId ?? ""}
         onChange={(e) => setActiveConfigId(e.target.value || null)}
         disabled={connected}
@@ -1337,7 +1342,7 @@ export function Toolbar({
       {connected ? (
         <button
           onClick={handleDisconnect}
-          className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#e94560] transition-colors"
+          className="px-3 py-1 rounded text-sm bg-secondary hover:bg-accent transition-colors"
         >
           Disconnect
         </button>
@@ -1345,7 +1350,7 @@ export function Toolbar({
         <button
           onClick={handleConnect}
           disabled={!activeConfigId || isConnecting}
-          className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors flex items-center gap-1.5"
+          className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors flex items-center gap-1.5"
         >
           {isConnecting ? (
             <>
@@ -1377,12 +1382,12 @@ export function Toolbar({
         </button>
       )}
 
-      <div className="h-4 w-px bg-[#0f3460]" />
+      <div className="h-4 w-px bg-border-ui" />
 
       {/* Import — SVG / PDF / G-code, detected from extension */}
       <button
         onClick={handleImport}
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+        className="px-3 py-1 rounded text-sm bg-secondary hover:bg-secondary-hover transition-colors"
         title="Import an SVG, PDF, or G-code file"
       >
         Import
@@ -1392,7 +1397,7 @@ export function Toolbar({
       <button
         onClick={() => setShowGcodeDialog(true)}
         disabled={generating || imports.length === 0}
-        className="px-3 py-1 rounded text-sm bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-40 transition-colors"
+        className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors"
         title="Choose generation options then generate G-code"
       >
         {generating ? "Generating…" : "Generate G-code"}
@@ -1408,14 +1413,14 @@ export function Toolbar({
         />
       )}
 
-      <div className="h-4 w-px bg-[#0f3460]" />
+      <div className="h-4 w-px bg-border-ui" />
 
       {/* ── Page Template ─────────────────────────────────────────────────────
            Shows a non-interactive page-size overlay on the canvas.
            Sizes come from the store (loaded from IPC / built-in defaults). */}
       <div className="flex items-center gap-1">
         <select
-          className="bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 max-w-[110px]"
+          className="bg-app border border-border-ui rounded px-2 py-1 text-sm text-content max-w-[110px]"
           value={pageTemplate?.sizeId ?? "none"}
           title="Page template — adds a size guide overlay to the canvas"
           onChange={(e) => {
@@ -1449,7 +1454,7 @@ export function Toolbar({
                 marginMM: pageTemplate.marginMM ?? 20,
               })
             }
-            className="w-7 h-7 rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors flex items-center justify-center text-gray-300"
+            className="w-7 h-7 rounded bg-secondary hover:bg-secondary-hover transition-colors flex items-center justify-center text-content-muted"
             title={
               pageTemplate.landscape
                 ? "Landscape — click to switch to portrait"
@@ -1506,31 +1511,31 @@ export function Toolbar({
                   ),
                 })
               }
-              className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-sm text-gray-200 text-right"
+              className="w-14 bg-app border border-border-ui rounded px-2 py-1 text-sm text-content text-right"
               title="Page margin in mm"
             />
-            <span className="text-xs text-gray-400">mm</span>
+            <span className="text-xs text-content-muted">mm</span>
           </div>
         )}
 
         {/* Edit custom page sizes file */}
         <button
           onClick={() => window.terraForge.config.openPageSizesFile()}
-          className="w-7 h-7 rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors flex items-center justify-center text-gray-400"
+          className="w-7 h-7 rounded bg-secondary hover:bg-secondary-hover transition-colors flex items-center justify-center text-content-faint"
           title="Edit custom page sizes (opens page-sizes.json in your default editor)"
         >
           <PenLine size={12} />
         </button>
       </div>
 
-      <div className="h-4 w-px bg-[#0f3460]" />
+      <div className="h-4 w-px bg-border-ui" />
 
       {/* Home */}
       <button
         onClick={() => window.terraForge.fluidnc.sendCommand("$H")}
         disabled={!connected}
         title="Run homing cycle ($H)"
-        className="px-3 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40 transition-colors"
+        className="px-3 py-1 rounded text-sm bg-secondary hover:bg-secondary-hover disabled:opacity-40 transition-colors"
       >
         Home
       </button>
@@ -1538,7 +1543,7 @@ export function Toolbar({
       {/* Jog toggle */}
       <button
         onClick={onToggleJog}
-        className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-[#e94560]" : "bg-[#0f3460] hover:bg-[#1a4a8a]"}`}
+        className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-accent" : "bg-secondary hover:bg-secondary-hover"}`}
       >
         Jog
       </button>
@@ -1558,7 +1563,7 @@ export function Toolbar({
         <span
           className={`w-2 h-2 rounded-full transition-colors ${
             !connected
-              ? "bg-gray-600"
+              ? "bg-content-faint"
               : wsLive
                 ? "bg-green-400"
                 : "bg-amber-400 animate-pulse"
@@ -1571,15 +1576,35 @@ export function Toolbar({
                 : "Connected — waiting for WebSocket"
           }
         />
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-content-muted">
           {!connected ? "Offline" : wsLive ? "Connected" : "Connecting…"}
         </span>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          aria-label={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
+          aria-pressed={theme === "light"}
+          title={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
+          className="p-1.5 rounded bg-secondary hover:bg-secondary-hover transition-colors text-content-muted"
+        >
+          {theme === "dark" ? (
+            <Sun size={14} aria-hidden="true" />
+          ) : (
+            <Moon size={14} aria-hidden="true" />
+          )}
+        </button>
 
         {/* Settings */}
         <button
           onClick={() => setShowSettings(true)}
+          aria-label="Machine settings"
           title="Machine settings"
-          className="ml-2 px-2 py-1 rounded text-sm bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors"
+          className="px-2 py-1 rounded text-sm bg-secondary hover:bg-secondary-hover transition-colors"
         >
           ⚙
         </button>

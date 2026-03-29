@@ -49,7 +49,9 @@ describe("App", () => {
   it("renders the Toolbar brand", async () => {
     render(<App />);
     await act(async () => {});
-    expect(screen.getByText("terraForge")).toBeInTheDocument();
+    expect(
+      document.querySelector('[aria-label="terraForge"]'),
+    ).toBeInTheDocument();
   });
 
   it("renders the File Browser panel", async () => {

@@ -42,7 +42,7 @@ export function CloseLayoutDialog({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-[#16213e] border border-[#0f3460] rounded-lg shadow-2xl w-[340px] p-5 flex flex-col gap-4">
+      <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[340px] p-5 flex flex-col gap-4">
         <h2
           id="close-layout-dialog-title"
           className="text-white font-semibold text-base tracking-wide"
@@ -50,7 +50,7 @@ export function CloseLayoutDialog({
           Close Layout
         </h2>
 
-        <p className="text-sm text-gray-300 leading-relaxed">
+        <p className="text-sm text-content leading-relaxed">
           You have{" "}
           <span className="text-white font-medium">
             {importCount} object{importCount !== 1 ? "s" : ""}
@@ -62,7 +62,7 @@ export function CloseLayoutDialog({
           {/* Cancel — neutral, left-most */}
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
           >
             Cancel
           </button>
@@ -70,7 +70,7 @@ export function CloseLayoutDialog({
           {/* Exit without Saving — neutral-destructive */}
           <button
             onClick={onDiscard}
-            className="px-3 py-1.5 text-sm rounded bg-[#0f3460] hover:bg-[#1a4a8a] transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
           >
             Exit without Saving
           </button>
@@ -79,7 +79,7 @@ export function CloseLayoutDialog({
           <button
             onClick={onSave}
             autoFocus
-            className="px-3 py-1.5 text-sm rounded bg-[#e94560] hover:bg-[#c73d56] transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hover transition-colors text-white"
           >
             Save and Exit
           </button>

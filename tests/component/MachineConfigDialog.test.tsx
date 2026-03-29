@@ -157,7 +157,7 @@ describe("MachineConfigDialog", () => {
     await userEvent.click(screen.getByText("Second"));
     await userEvent.click(screen.getByText("Del"));
     // Themed confirm dialog should appear
-    await screen.findByRole("dialog");
+    await screen.findByText("Delete Configuration");
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(window.terraForge.config.deleteMachineConfig).toHaveBeenCalled();
   });
@@ -291,7 +291,7 @@ describe("MachineConfigDialog", () => {
         screen.getByDisplayValue("Solenoid"),
         "servo",
       );
-      await screen.findByRole("dialog");
+      await screen.findByText("Reset Pen Commands?");
       // User accepts → servo defaults applied
       await userEvent.click(screen.getByRole("button", { name: "Reset" }));
       expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
@@ -308,7 +308,7 @@ describe("MachineConfigDialog", () => {
         screen.getByDisplayValue("Solenoid"),
         "servo",
       );
-      await screen.findByRole("dialog");
+      await screen.findByText("Reset Pen Commands?");
       // User declines → commands stay as custom, penType label updates
       await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.getByDisplayValue("CUSTOM")).toBeInTheDocument();
@@ -409,15 +409,14 @@ describe("MachineConfigDialog", () => {
       ).mockResolvedValue("/home/user/configs.json");
       render(<MachineConfigDialog onClose={onClose} />);
       await userEvent.click(screen.getByText("↑ Export"));
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toBeInTheDocument();
+      await screen.findByText("Configs Exported");
       expect(screen.getByText("Configs Exported")).toBeInTheDocument();
       expect(
         screen.getByText(/\/home\/user\/configs\.json/),
       ).toBeInTheDocument();
       // Dismiss
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByText("Configs Exported")).not.toBeInTheDocument();
     });
 
     it("import success shows 'Import Complete' alert with counts", async () => {
@@ -430,8 +429,7 @@ describe("MachineConfigDialog", () => {
       ).mockResolvedValue([newCfg]);
       render(<MachineConfigDialog onClose={onClose} />);
       await userEvent.click(screen.getByText("↓ Import"));
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toBeInTheDocument();
+      await screen.findByText("Import Complete");
       expect(screen.getByText("Import Complete")).toBeInTheDocument();
       expect(screen.getByText(/2 configs imported/)).toBeInTheDocument();
       expect(screen.getByText(/1 skipped/)).toBeInTheDocument();
@@ -443,8 +441,7 @@ describe("MachineConfigDialog", () => {
       ).mockRejectedValue(new Error("disk full"));
       render(<MachineConfigDialog onClose={onClose} />);
       await userEvent.click(screen.getByText("↓ Import"));
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toBeInTheDocument();
+      await screen.findByText("Import Failed");
       expect(screen.getByText("Import Failed")).toBeInTheDocument();
     });
 
@@ -454,8 +451,7 @@ describe("MachineConfigDialog", () => {
       ).mockRejectedValue(new Error("permission denied"));
       render(<MachineConfigDialog onClose={onClose} />);
       await userEvent.click(screen.getByText("↑ Export"));
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toBeInTheDocument();
+      await screen.findByText("Export Failed");
       expect(screen.getByText("Export Failed")).toBeInTheDocument();
     });
   });

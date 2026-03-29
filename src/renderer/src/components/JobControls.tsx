@@ -76,10 +76,10 @@ export function JobControls() {
       title={title}
       className={`w-full py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40 ${
         variant === "primary"
-          ? "bg-[#e94560] hover:bg-[#c73d56] text-white"
+          ? "bg-accent hover:bg-accent-hover text-white"
           : variant === "danger"
-            ? "bg-[#6a2020] hover:bg-[#8a3030] text-red-200"
-            : "bg-[#0f3460] hover:bg-[#1a4a8a] text-gray-200"
+            ? "bg-red-900/60 hover:bg-red-700/60 text-red-200"
+            : "bg-secondary hover:bg-secondary-hover text-content"
       }`}
     >
       {label}
@@ -88,35 +88,35 @@ export function JobControls() {
 
   return (
     <div className="flex flex-col h-full p-3 gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+      <span className="text-xs font-semibold uppercase tracking-wider text-content-muted mb-1">
         Job
       </span>
 
       {/* Preview-loading bar — visible while fetching toolpath before start */}
       {!isActive && gcodePreviewLoading && (
         <div className="flex flex-col gap-1 mb-1">
-          <div className="w-full h-2 bg-[#0f3460] rounded-full overflow-hidden">
-            <div className="h-full w-1/3 bg-[#e94560] animate-pulse" />
+          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full w-1/3 bg-accent animate-pulse" />
           </div>
-          <div className="text-[9px] text-gray-500">Loading preview…</div>
+          <div className="text-[9px] text-content-faint">Loading preview…</div>
         </div>
       )}
 
       {/* Progress bar — visible while active */}
       {isActive && (
         <div className="flex flex-col gap-1 mb-1">
-          <div className="w-full h-2 bg-[#0f3460] rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
             {progress != null ? (
               <div
-                className="h-full bg-[#e94560] transition-all duration-300"
+                className="h-full bg-accent transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             ) : (
               /* indeterminate stripe when no Ln: data yet */
-              <div className="h-full w-1/3 bg-[#e94560] animate-pulse" />
+              <div className="h-full w-1/3 bg-accent animate-pulse" />
             )}
           </div>
-          <div className="flex justify-between text-[9px] text-gray-500">
+          <div className="flex justify-between text-[9px] text-content-faint">
             <span>{isHeld ? "Paused" : "Running"}</span>
             <span>
               {lineNum != null && lineTotal != null
@@ -134,15 +134,15 @@ export function JobControls() {
           title={effectiveJobFile?.path ?? undefined}
         >
           {!effectiveJobFile ? (
-            <span className="italic text-gray-500">
+            <span className="italic text-content-faint">
               No file selected — pick one in File Browser
             </span>
           ) : jobFileValid ? (
-            <span className="text-gray-300">
+            <span className="text-content">
               {effectiveJobFile.source === "local" ? "🖥" : "📄"}{" "}
               {effectiveJobFile.name}
               {effectiveJobFile.source === "local" && (
-                <span className="text-gray-500 ml-1">
+                <span className="text-content-faint ml-1">
                   (local — will upload)
                 </span>
               )}

@@ -404,8 +404,8 @@ describe("PlotCanvas", () => {
   it("fit-to-view button shows active (red) styling by default", () => {
     const { container } = render(<PlotCanvas />);
     const fitBtn = container.querySelector('button[title^="Fit to view"]');
-    // Default fitted=true → active red styling
-    expect(fitBtn?.className).toContain("bg-[#e94560]");
+    // Default fitted=true → active accent styling
+    expect(fitBtn?.className).toContain("bg-accent");
   });
 
   // ── Keyboard zoom shortcuts ────────────────────────────────────────

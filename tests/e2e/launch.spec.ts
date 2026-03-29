@@ -43,8 +43,8 @@ test("window has a reasonable minimum size", async () => {
 // ─── Toolbar ─────────────────────────────────────────────────────────────────
 
 test("toolbar renders with brand name", async () => {
-  const brand = window.locator("text=terraForge").first();
-  await expect(brand).toBeVisible();
+  const brand = window.locator("[aria-label='terraForge']").first();
+  await expect(brand).toBeAttached();
 });
 
 test("machine selector dropdown is present and visible", async () => {

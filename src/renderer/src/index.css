@@ -1,21 +1,85 @@
 @import "tailwindcss";
 
-@theme {
-  --color-surface: #1a1a2e;
-  --color-surface-50: #f0f0f8;
-  --color-surface-100: #e1e1f1;
-  --color-surface-200: #c3c3e3;
-  --color-surface-300: #a5a5d5;
-  --color-surface-400: #8787c7;
-  --color-surface-500: #6969b9;
-  --color-surface-600: #4b4bab;
-  --color-surface-700: #2d2d9d;
-  --color-surface-800: #0f0f8f;
-  --color-surface-900: #000071;
-  --color-accent: #e94560;
-  --color-accent-hover: #c73d56;
-  --color-panel: #16213e;
-  --color-border-custom: #0f3460;
+/* ── Semantic design tokens ──────────────────────────────────────────────────
+   Dark theme is the default (:root).
+   Light theme activates when the <html> element has class="light".
+   All components should use the generated Tailwind utilities (bg-app,
+   bg-panel, bg-secondary, border-secondary, text-content, etc.)
+   rather than hardcoded hex values.
+────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Dark theme (default) ── */
+  --tf-bg-app: #1a1a2e;
+  --tf-bg-panel: #16213e;
+  --tf-bg-secondary: #0f3460;
+  --tf-bg-secondary-hover: #1a4a8a;
+  --tf-bg-secondary-active: #0a2040;
+  --tf-bg-terminal: #0d1117;
+  --tf-border: #5c7a9e;
+  --tf-text: #e0e0e0;
+  --tf-text-muted: #9ca3af;
+  --tf-text-faint: #818ea5;
+  /* Accent (also available as --tf-accent for SVG attributes) */
+  --tf-accent: #e94560;
+  --tf-accent-hover: #c73d56;
+  /* File browser panel variants */
+  --tf-fs-blue-bg: #0a1628;
+  --tf-fs-blue-border: #0f3460;
+  --tf-fs-blue-text: #60a0ff;
+  --tf-fs-purple-bg: #1a0d1a;
+  --tf-fs-purple-border: #3d1060;
+  --tf-fs-purple-text: #c084fc;
+  /* File row selected state */
+  --tf-file-selected: #1a3a6e;
+  --tf-file-selected-hover: #1f4480;
+}
+
+:root.light {
+  /* ── Light theme ── */
+  --tf-bg-app: #f0f2f9;
+  --tf-bg-panel: #ffffff;
+  --tf-bg-secondary: #dde4f5;
+  --tf-bg-secondary-hover: #c5d0ec;
+  --tf-bg-secondary-active: #b0bdd4;
+  --tf-bg-terminal: #f6f8fa;
+  --tf-border: #7584a8;
+  --tf-text: #1a1e2e;
+  --tf-text-muted: #5a6080;
+  --tf-text-faint: #5d6e88;
+  --tf-accent: #b82d45;
+  --tf-accent-hover: #9a2539;
+  /* File browser panel variants */
+  --tf-fs-blue-bg: #e8f0ff;
+  --tf-fs-blue-border: #93b4e8;
+  --tf-fs-blue-text: #1d4ed8;
+  --tf-fs-purple-bg: #f0e8ff;
+  --tf-fs-purple-border: #c4a0e0;
+  --tf-fs-purple-text: #7c3aed;
+  /* File row selected state */
+  --tf-file-selected: #bfcff0;
+  --tf-file-selected-hover: #a8bde8;
+}
+
+/* Map semantic tokens to Tailwind utility classes via @theme inline.
+   "inline" means Tailwind inlines the CSS var reference into each rule
+   instead of creating a redundant CSS variable — this is required for
+   the runtime variable swap (dark ↔ light) to work correctly. */
+@theme inline {
+  --color-app: var(--tf-bg-app);
+  --color-panel: var(--tf-bg-panel);
+  --color-secondary: var(--tf-bg-secondary);
+  --color-secondary-hover: var(--tf-bg-secondary-hover);
+  --color-secondary-active: var(--tf-bg-secondary-active);
+  --color-terminal: var(--tf-bg-terminal);
+  --color-border-ui: var(--tf-border);
+  --color-content: var(--tf-text);
+  --color-content-muted: var(--tf-text-muted);
+  --color-content-faint: var(--tf-text-faint);
+  /* Per-theme accent — resolved from :root / :root.light tokens */
+  --color-accent: var(--tf-accent);
+  --color-accent-hover: var(--tf-accent-hover);
+  /* Mono font */
   --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
@@ -32,8 +96,8 @@
     height: 100%;
     width: 100%;
     overflow: hidden;
-    background-color: #1a1a2e;
-    color: #e0e0e0;
+    background-color: var(--tf-bg-app);
+    color: var(--tf-text);
     font-family:
       system-ui,
       -apple-system,
@@ -48,10 +112,10 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #1a1a2e;
+    background: var(--tf-bg-app);
   }
   ::-webkit-scrollbar-thumb {
-    background: #0f3460;
+    background: var(--tf-border);
     border-radius: 3px;
   }
 }

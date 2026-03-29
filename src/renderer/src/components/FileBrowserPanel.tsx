@@ -45,7 +45,7 @@ function Breadcrumb({
         className={
           path === "/"
             ? "text-white font-semibold"
-            : "text-[#e94560] hover:text-white"
+            : "text-accent hover:text-content"
         }
       >
         /
@@ -54,13 +54,13 @@ function Breadcrumb({
         const segPath = "/" + parts.slice(0, i + 1).join("/");
         return (
           <span key={segPath} className="flex items-center gap-0.5 shrink-0">
-            <span className="text-gray-600">/</span>
+            <span className="text-content-faint">/</span>
             <button
               onClick={() => navigate(segPath)}
               className={
                 segPath === path
                   ? "text-white font-semibold"
-                  : "text-[#e94560] hover:text-white"
+                  : "text-accent hover:text-content"
               }
             >
               {seg}
@@ -371,15 +371,22 @@ function FsPane({
   };
 
   const atRoot = path === "/";
-  const bgAccent = accentColor === "blue" ? "bg-[#0a1628]" : "bg-[#1a0d1a]";
+  const bgAccent =
+    accentColor === "blue"
+      ? "bg-[var(--tf-fs-blue-bg)]"
+      : "bg-[var(--tf-fs-purple-bg)]";
   const borderAccent =
-    accentColor === "blue" ? "border-[#0f3460]" : "border-[#3d1060]";
+    accentColor === "blue"
+      ? "border-[var(--tf-fs-blue-border)]"
+      : "border-[var(--tf-fs-purple-border)]";
   const labelColor =
-    accentColor === "blue" ? "text-[#60a0ff]" : "text-[#c084fc]";
+    accentColor === "blue"
+      ? "text-[var(--tf-fs-blue-text)]"
+      : "text-[var(--tf-fs-purple-text)]";
   const btnColor =
     accentColor === "blue"
-      ? "text-[#60a0ff] hover:text-white"
-      : "text-[#c084fc] hover:text-white";
+      ? "text-[var(--tf-fs-blue-text)] hover:text-content"
+      : "text-[var(--tf-fs-purple-text)] hover:text-content";
 
   return (
     <div className={`flex flex-col h-full border-b ${borderAccent}`}>
@@ -430,6 +437,7 @@ function FsPane({
               navigate(path);
             }}
             disabled={!connected || loading}
+            aria-label="Refresh"
             title="Refresh"
             className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
           >
@@ -448,7 +456,7 @@ function FsPane({
               onClick={() => navigate(parentPath(path))}
               disabled={atRoot || !connected}
               title="Up"
-              className="text-gray-400 hover:text-white disabled:opacity-30 mr-0.5 transition-colors leading-none"
+              className="text-content-muted hover:text-content disabled:opacity-30 mr-0.5 transition-colors leading-none"
             >
               ↑
             </button>
@@ -458,11 +466,11 @@ function FsPane({
           {/* File list */}
           <div className="flex-1 overflow-y-auto">
             {!connected ? (
-              <p className="text-[10px] text-gray-600 text-center py-4 px-3">
+              <p className="text-[10px] text-content-faint text-center py-4 px-3">
                 Not connected.
               </p>
             ) : error && /no sd card/i.test(error) ? (
-              <p className="text-[10px] text-gray-500 text-center py-4 px-3">
+              <p className="text-[10px] text-content-faint text-center py-4 px-3">
                 No SD card.
               </p>
             ) : error ? (
@@ -470,7 +478,7 @@ function FsPane({
                 {error}
               </p>
             ) : files.length === 0 && !loading ? (
-              <p className="text-[10px] text-gray-600 text-center py-4 px-3">
+              <p className="text-[10px] text-content-faint text-center py-4 px-3">
                 Empty.
               </p>
             ) : null}
@@ -478,7 +486,7 @@ function FsPane({
             {/* ".." row */}
             {connected && !atRoot && (
               <div
-                className="flex items-center px-3 py-1 hover:bg-[#1a1a2e] cursor-pointer border-b border-[#0f3460]/20 text-gray-500"
+                className="flex items-center px-3 py-1 hover:bg-app cursor-pointer border-b border-border-ui/20 text-content-faint"
                 onClick={() => navigate(parentPath(path))}
               >
                 <span className="mr-2 text-[11px]">📁</span>
@@ -504,10 +512,10 @@ function FsPane({
                 <div
                   key={file.path}
                   data-testid={`file-row-${file.name}`}
-                  className={`flex items-center group px-3 py-1 cursor-pointer border-b border-[#0f3460]/20 transition-colors ${
+                  className={`flex items-center group px-3 py-1 cursor-pointer border-b border-border-ui/20 transition-colors ${
                     isSelectedForJob
-                      ? "bg-[#1a3a6e] hover:bg-[#1f4480]"
-                      : "hover:bg-[#1a1a2e]"
+                      ? "bg-[var(--tf-file-selected)] hover:bg-[var(--tf-file-selected-hover)]"
+                      : "hover:bg-app"
                   }`}
                   onClick={() => {
                     if (file.isDirectory) {
@@ -534,7 +542,7 @@ function FsPane({
                     {file.name}
                   </span>
                   {!file.isDirectory && file.size > 0 && (
-                    <span className="text-[9px] text-gray-600 mr-1 shrink-0">
+                    <span className="text-[9px] text-content-faint mr-1 shrink-0">
                       {file.size > 1_000_000
                         ? `${(file.size / 1_000_000).toFixed(1)}M`
                         : file.size > 1_000
@@ -543,7 +551,7 @@ function FsPane({
                     </span>
                   )}
                   {file.isDirectory ? (
-                    <span className="text-gray-600 text-[9px] hidden group-hover:block shrink-0">
+                    <span className="text-content-faint text-[9px] hidden group-hover:block shrink-0">
                       ›
                     </span>
                   ) : (
@@ -569,7 +577,7 @@ function FsPane({
                               disabled={
                                 previewing === file.path || anyJobActive
                               }
-                              className="text-[9px] px-1 py-0.5 rounded bg-[#0d2a3a] hover:bg-[#0e3d5a] disabled:opacity-50"
+                              className="text-[9px] px-1 py-0.5 rounded bg-secondary/50 hover:bg-secondary disabled:opacity-50"
                             >
                               {previewing === file.path ? "…" : "👁"}
                             </button>
@@ -581,7 +589,7 @@ function FsPane({
                                 window.terraForge.fluidnc.pauseJob();
                               }}
                               title="Pause job"
-                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
+                              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover text-white"
                             >
                               ⏸
                             </button>
@@ -592,7 +600,7 @@ function FsPane({
                                 window.terraForge.fluidnc.resumeJob();
                               }}
                               title="Resume job"
-                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] text-white"
+                              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover text-white"
                             >
                               ▶
                             </button>
@@ -608,7 +616,7 @@ function FsPane({
                                   : "Run job now"
                               }
                               disabled={isLoadingThis || anyJobActive}
-                              className="text-[9px] px-1 py-0.5 rounded bg-[#e94560] hover:bg-[#c73d56] disabled:opacity-50 text-white"
+                              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover disabled:opacity-50 text-white"
                             >
                               ▶
                             </button>
@@ -626,7 +634,7 @@ function FsPane({
                                   ? "File download not available over serial"
                                   : "Download"
                             }
-                            className="text-[9px] px-1 py-0.5 rounded bg-[#0f3460] hover:bg-[#1a4a8a] disabled:opacity-40"
+                            className="text-[9px] px-1 py-0.5 rounded bg-secondary hover:bg-secondary-hover disabled:opacity-40"
                           >
                             ↓
                           </button>
@@ -641,7 +649,7 @@ function FsPane({
                                 ? "Unavailable while a job is running"
                                 : "Delete"
                             }
-                            className="text-[9px] px-1 py-0.5 rounded bg-[#3a1a1a] hover:bg-[#6a2020] disabled:opacity-40"
+                            className="text-[9px] px-1 py-0.5 rounded bg-red-900/50 hover:bg-red-700/60 disabled:opacity-40"
                           >
                             ✕
                           </button>
@@ -664,9 +672,9 @@ function FsPane({
               }
               className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${
                 accentColor === "blue"
-                  ? "bg-[#0f3460] hover:bg-[#1a4a8a]"
-                  : "bg-[#3d1060] hover:bg-[#5a1a90]"
-              } text-gray-200`}
+                  ? "bg-[var(--tf-fs-blue-border)] hover:bg-[var(--tf-fs-blue-bg)]"
+                  : "bg-[var(--tf-fs-purple-border)] hover:bg-[var(--tf-fs-purple-bg)]"
+              } text-content`}
             >
               ↑ Upload to {path}
             </button>
@@ -750,8 +758,8 @@ export function FileBrowserPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Title */}
-      <div className="flex items-center px-3 py-2 border-b border-[#0f3460] shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div className="flex items-center px-3 py-2 border-b border-border-ui shrink-0">
+        <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           File Browser
         </span>
       </div>
@@ -788,10 +796,10 @@ export function FileBrowserPanel() {
         {bothOpen && (
           <div
             onMouseDown={onDragStart}
-            className="shrink-0 h-2 flex items-center justify-center cursor-row-resize bg-[#0a1020] hover:bg-[#0f3460] group select-none"
+            className="shrink-0 h-2 flex items-center justify-center cursor-row-resize bg-app hover:bg-secondary group select-none"
             title="Drag to resize"
           >
-            <div className="w-10 h-0.5 rounded bg-gray-700 group-hover:bg-[#e94560] transition-colors" />
+            <div className="w-10 h-0.5 rounded bg-content-faint group-hover:bg-accent transition-colors" />
           </div>
         )}
 

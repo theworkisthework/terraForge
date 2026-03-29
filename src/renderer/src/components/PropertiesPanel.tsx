@@ -156,7 +156,7 @@ export function PropertiesPanel() {
       <div className="mb-2">
         <label
           htmlFor={inputId}
-          className="block text-[10px] text-gray-400 mb-0.5"
+          className="block text-[10px] text-content-muted mb-0.5"
         >
           {label}
         </label>
@@ -167,7 +167,7 @@ export function PropertiesPanel() {
           step={step}
           min={min}
           onChange={(e) => onChange(+e.target.value)}
-          className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+          className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
         />
       </div>
     );
@@ -175,15 +175,15 @@ export function PropertiesPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b border-[#0f3460] shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div className="px-3 py-2 border-b border-border-ui shrink-0">
+        <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           Properties
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {imports.length === 0 && !gcodeToolpath ? (
-          <p className="text-xs text-gray-600 text-center py-6 px-3">
+          <p className="text-xs text-content-faint text-center py-6 px-3">
             No objects. Import an SVG.
           </p>
         ) : (
@@ -199,14 +199,20 @@ export function PropertiesPanel() {
                   fallbackFeedrate,
                 );
                 return (
-                  <div className="border-b border-[#0f3460]/30">
+                  <div className="border-b border-border-ui/30">
                     {/* Header row */}
                     <div
-                      className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-[#0f3460]/20 ${toolpathSelected ? "bg-[#0f3460]/20" : ""}`}
+                      className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-secondary/20 ${toolpathSelected ? "bg-secondary/20" : ""}`}
                       onClick={() => selectToolpath(!toolpathSelected)}
                     >
                       <button
-                        className="text-gray-500 hover:text-gray-200 text-[10px] w-4 shrink-0"
+                        aria-expanded={toolpathSelected}
+                        aria-label={
+                          toolpathSelected
+                            ? "Collapse toolpath details"
+                            : "Expand toolpath details"
+                        }
+                        className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           selectToolpath(!toolpathSelected);
@@ -216,7 +222,7 @@ export function PropertiesPanel() {
                       </button>
                       {/* G-code file icon */}
                       <svg
-                        className="shrink-0 text-[#0ea5e9]"
+                        className="shrink-0 text-sky-400"
                         width="11"
                         height="11"
                         viewBox="0 0 24 24"
@@ -233,7 +239,7 @@ export function PropertiesPanel() {
                         <polyline points="10 9 9 9 8 9" />
                       </svg>
                       <span
-                        className="flex-1 min-w-0 text-[10px] truncate text-gray-300"
+                        className="flex-1 min-w-0 text-[10px] truncate text-content"
                         title={fileName}
                       >
                         {fileName}
@@ -241,8 +247,8 @@ export function PropertiesPanel() {
                       <button
                         className={`ml-1 shrink-0 ${
                           isJobActive
-                            ? "text-gray-700 opacity-30 cursor-not-allowed"
-                            : "text-gray-600 hover:text-[#e94560]"
+                            ? "text-content-faint opacity-30 cursor-not-allowed"
+                            : "text-content-faint hover:text-accent"
                         }`}
                         title={
                           isJobActive
@@ -261,29 +267,31 @@ export function PropertiesPanel() {
 
                     {/* Expanded properties */}
                     {toolpathSelected && (
-                      <div className="pl-6 pr-3 pb-2 pt-1 border-t border-[#0f3460]/20 space-y-1">
+                      <div className="pl-6 pr-3 pb-2 pt-1 border-t border-border-ui/20 space-y-1">
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-gray-500">Size</span>
-                          <span className="text-gray-300 font-mono">
+                          <span className="text-content-faint">Size</span>
+                          <span className="text-content font-mono">
                             {formatBytes(gcodeToolpath.fileSizeBytes)}
                           </span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-gray-500">Lines</span>
-                          <span className="text-gray-300 font-mono">
+                          <span className="text-content-faint">Lines</span>
+                          <span className="text-content font-mono">
                             {gcodeToolpath.lineCount.toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-gray-500">Est. duration</span>
-                          <span className="text-gray-300 font-mono">
+                          <span className="text-content-faint">
+                            Est. duration
+                          </span>
+                          <span className="text-content font-mono">
                             {duration}
                           </span>
                         </div>
                         {gcodeToolpath.feedrate > 0 && (
                           <div className="flex justify-between text-[10px]">
-                            <span className="text-gray-500">Feedrate</span>
-                            <span className="text-gray-300 font-mono">
+                            <span className="text-content-faint">Feedrate</span>
+                            <span className="text-content font-mono">
                               {Math.round(gcodeToolpath.feedrate)} mm/min
                             </span>
                           </div>
@@ -296,12 +304,12 @@ export function PropertiesPanel() {
 
             {/* ── Groups header ("+ Add group" button) ────────────── */}
             {imports.length > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 border-b border-[#0f3460]/50">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider flex-1">
+              <div className="flex items-center gap-1 px-2 py-1 border-b border-border-ui/50">
+                <span className="text-[10px] text-content-faint uppercase tracking-wider flex-1">
                   Layers
                 </span>
                 <button
-                  className="text-gray-500 hover:text-[#e94560] text-xs leading-none px-1"
+                  className="text-content-faint hover:text-accent text-xs leading-none px-1"
                   title="Add layer group"
                   onClick={() => {
                     const n = layerGroups.length + 1;
@@ -337,7 +345,7 @@ export function PropertiesPanel() {
                   return (
                     <div
                       key={imp.id}
-                      className={`border-b border-[#0f3460]/20 ${isSelected ? "bg-[#0f3460]/20" : ""} ${draggingImportId === imp.id ? "opacity-40" : ""}`}
+                      className={`border-b border-border-ui/20 ${isSelected ? "bg-secondary/20" : ""} ${draggingImportId === imp.id ? "opacity-40" : ""}`}
                       style={{
                         ...(groupColor && !indented
                           ? { borderLeft: `3px solid ${groupColor}` }
@@ -346,12 +354,12 @@ export function PropertiesPanel() {
                     >
                       {/* Import header row */}
                       <div
-                        className={`flex items-center gap-1 py-1.5 cursor-pointer hover:bg-[#0f3460]/20 ${indented ? "pl-5 pr-2" : "px-2"}`}
+                        className={`flex items-center gap-1 py-1.5 cursor-pointer hover:bg-secondary/20 ${indented ? "pl-5 pr-2" : "px-2"}`}
                         onClick={() => selectImport(isSelected ? null : imp.id)}
                       >
                         {/* Drag handle */}
                         <span
-                          className="text-gray-700 hover:text-gray-400 shrink-0 mr-0.5 select-none"
+                          className="text-content-faint hover:text-content-muted shrink-0 mr-0.5 select-none"
                           style={{ cursor: "grab", fontSize: "10px" }}
                           title="Drag to a group"
                           draggable
@@ -369,7 +377,11 @@ export function PropertiesPanel() {
                         </span>
                         {/* Expand toggle */}
                         <button
-                          className="text-gray-500 hover:text-gray-200 text-[10px] w-4 shrink-0"
+                          aria-expanded={isExpanded}
+                          aria-label={
+                            isExpanded ? "Collapse paths" : "Expand paths"
+                          }
+                          className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleExpand(imp.id);
@@ -380,7 +392,7 @@ export function PropertiesPanel() {
 
                         {/* Visibility */}
                         <span
-                          className="text-gray-500 hover:text-gray-200 text-[10px] cursor-pointer shrink-0"
+                          className="text-content-faint hover:text-content text-[10px] cursor-pointer shrink-0"
                           title="Toggle visibility"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -395,7 +407,7 @@ export function PropertiesPanel() {
                           <input
                             autoFocus
                             value={editingName.value}
-                            className="flex-1 min-w-0 bg-[#1a1a2e] border border-[#e94560] rounded px-1 text-[10px] outline-none"
+                            className="flex-1 min-w-0 bg-app border border-accent rounded px-1 text-[10px] outline-none"
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) =>
                               setEditingName({
@@ -421,7 +433,7 @@ export function PropertiesPanel() {
                           />
                         ) : (
                           <span
-                            className="flex-1 min-w-0 text-[10px] truncate text-gray-300"
+                            className="flex-1 min-w-0 text-[10px] truncate text-content"
                             title="Double-click to rename"
                             onDoubleClick={(e) => {
                               e.stopPropagation();
@@ -432,11 +444,11 @@ export function PropertiesPanel() {
                           </span>
                         )}
 
-                        <span className="text-[9px] text-gray-600 shrink-0 ml-1">
+                        <span className="text-[9px] text-content-faint shrink-0 ml-1">
                           {imp.paths.length}p
                         </span>
                         <button
-                          className="ml-1 text-gray-600 hover:text-[#e94560] shrink-0"
+                          className="ml-1 text-content-faint hover:text-accent shrink-0"
                           title="Delete import"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -449,14 +461,14 @@ export function PropertiesPanel() {
 
                       {/* Expanded path list */}
                       {isExpanded && (
-                        <div className="pl-6 pb-1 border-t border-[#0f3460]/20">
+                        <div className="pl-6 pb-1 border-t border-border-ui/20">
                           {imp.paths.map((p) => (
                             <div
                               key={p.id}
                               className="flex items-center gap-1 py-0.5 text-[9px]"
                             >
                               <span
-                                className="text-gray-500 hover:text-gray-200 cursor-pointer"
+                                className="text-content-faint hover:text-content cursor-pointer"
                                 onClick={() =>
                                   updatePath(imp.id, p.id, {
                                     visible: !p.visible,
@@ -466,13 +478,13 @@ export function PropertiesPanel() {
                               >
                                 {p.visible ? "👁" : "○"}
                               </span>
-                              <span className="flex-1 min-w-0 text-gray-500 truncate">
+                              <span className="flex-1 min-w-0 text-content-faint truncate">
                                 {p.label ??
                                   p.layer ??
                                   `path ${p.id.slice(0, 6)}`}
                               </span>
                               <button
-                                className="text-gray-600 hover:text-[#e94560]"
+                                className="text-content-faint hover:text-accent"
                                 title="Remove path"
                                 onClick={() => removePath(imp.id, p.id)}
                               >
@@ -486,7 +498,7 @@ export function PropertiesPanel() {
                       {/* Properties form — shown when import is selected */}
                       {isSelected && (
                         <div
-                          className="px-3 pb-3 pt-2 border-t border-[#0f3460]/30"
+                          className="px-3 pb-3 pt-2 border-t border-border-ui/30"
                           onDragStart={(e) => e.stopPropagation()}
                         >
                           {(() => {
@@ -518,7 +530,7 @@ export function PropertiesPanel() {
                                 {/* Alignment row — between position and size */}
                                 {(() => {
                                   const btnCls =
-                                    "p-1 text-gray-500 hover:text-gray-100 rounded hover:bg-[#0f3460]/40 transition-colors";
+                                    "p-1 text-content-faint hover:text-content rounded hover:bg-secondary/40 transition-colors";
                                   const alignH = (x: number) =>
                                     updateImport(imp.id, {
                                       x: Math.round(x * 1000) / 1000,
@@ -556,7 +568,7 @@ export function PropertiesPanel() {
                                       >
                                         <AlignHorizontalJustifyEnd size={13} />
                                       </button>
-                                      <div className="w-px h-3 bg-[#0f3460] mx-0.5" />
+                                      <div className="w-px h-3 bg-border-ui mx-0.5" />
                                       <button
                                         className={btnCls}
                                         title={`Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`}
@@ -588,7 +600,7 @@ export function PropertiesPanel() {
                                 <div className="flex items-end gap-1 mb-0">
                                   {/* W */}
                                   <div className="flex-1 min-w-0 mb-2">
-                                    <label className="block text-[10px] text-gray-400 mb-0.5">
+                                    <label className="block text-[10px] text-content-muted mb-0.5">
                                       W (mm)
                                     </label>
                                     <input
@@ -613,15 +625,15 @@ export function PropertiesPanel() {
                                           });
                                         }
                                       }}
-                                      className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                                      className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
                                     />
                                   </div>
                                   {/* Ratio lock button */}
                                   <button
                                     className={`mb-2 p-1.5 rounded transition-colors ${
                                       ratioLocked
-                                        ? "text-[#e94560] hover:text-[#e94560] hover:bg-[#0f3460]/40"
-                                        : "text-gray-600 hover:text-gray-300 hover:bg-[#0f3460]/40"
+                                        ? "text-accent hover:text-accent hover:bg-secondary/40"
+                                        : "text-content-faint hover:text-content hover:bg-secondary/40"
                                     }`}
                                     title={
                                       ratioLocked
@@ -695,7 +707,7 @@ export function PropertiesPanel() {
                                   </button>
                                   {/* H */}
                                   <div className="flex-1 min-w-0 mb-2">
-                                    <label className="block text-[10px] text-gray-400 mb-0.5">
+                                    <label className="block text-[10px] text-content-muted mb-0.5">
                                       H (mm)
                                     </label>
                                     <input
@@ -720,7 +732,7 @@ export function PropertiesPanel() {
                                           });
                                         }
                                       }}
-                                      className="w-full bg-[#1a1a2e] border border-[#0f3460] rounded px-2 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                                      className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
                                     />
                                   </div>
                                 </div>
@@ -745,7 +757,7 @@ export function PropertiesPanel() {
                                     <div className="flex items-center gap-0.5 mb-2 -mt-1">
                                       {/* Fit to bed */}
                                       <button
-                                        className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                        className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
                                         title={`Fit to bed (scale ${Math.round(fitScale * 1000) / 1000})`}
                                         onClick={() => {
                                           setRatioLocked(true);
@@ -776,7 +788,7 @@ export function PropertiesPanel() {
                                       </button>
                                       {/* Reset to 1:1 */}
                                       <button
-                                        className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                        className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
                                         title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
                                         onClick={() => {
                                           setRatioLocked(true);
@@ -817,7 +829,7 @@ export function PropertiesPanel() {
                                 <div className="flex items-center gap-0.5 mb-2">
                                   {/* CCW — borderless icon button */}
                                   <button
-                                    className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                    className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
                                     title={`Rotate ${rotStep}° counter-clockwise`}
                                     onClick={() =>
                                       updateImport(imp.id, {
@@ -842,7 +854,7 @@ export function PropertiesPanel() {
 
                                   {/* CW — borderless icon button */}
                                   <button
-                                    className="p-1.5 text-gray-400 hover:text-gray-100 transition-colors rounded hover:bg-[#0f3460]/40"
+                                    className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
                                     title={`Rotate ${rotStep}° clockwise`}
                                     onClick={() =>
                                       updateImport(imp.id, {
@@ -868,7 +880,7 @@ export function PropertiesPanel() {
                                   {/* Step flyout trigger */}
                                   <div className="relative">
                                     <button
-                                      className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-gray-400 hover:text-gray-100 rounded hover:bg-[#0f3460]/40 transition-colors"
+                                      className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-content-muted hover:text-content rounded hover:bg-secondary/40 transition-colors"
                                       title="Change rotation step"
                                       onClick={() =>
                                         setStepFlyoutOpen((o) => !o)
@@ -897,14 +909,14 @@ export function PropertiesPanel() {
                                             setStepFlyoutOpen(false)
                                           }
                                         />
-                                        <div className="absolute bottom-full left-0 mb-1 bg-[#16213e] border border-[#0f3460] rounded shadow-xl z-20 py-0.5 min-w-[4rem]">
+                                        <div className="absolute bottom-full left-0 mb-1 bg-panel border border-border-ui rounded shadow-xl z-20 py-0.5 min-w-[4rem]">
                                           {ROT_STEPS.map((s) => (
                                             <button
                                               key={s}
                                               className={`block w-full text-left px-3 py-1 text-[10px] transition-colors ${
                                                 rotStep === s
-                                                  ? "text-gray-100 bg-[#0f3460]"
-                                                  : "text-gray-400 hover:text-gray-100 hover:bg-[#0f3460]/50"
+                                                  ? "text-content bg-secondary"
+                                                  : "text-content-muted hover:text-content hover:bg-secondary/50"
                                               }`}
                                               onClick={() => {
                                                 setRotStep(s);
@@ -923,10 +935,10 @@ export function PropertiesPanel() {
 
                                   {/* Centre-of-rotation marker toggle */}
                                   <button
-                                    className={`p-1.5 transition-colors rounded hover:bg-[#0f3460]/40 ${
+                                    className={`p-1.5 transition-colors rounded hover:bg-secondary/40 ${
                                       showCentreMarker
-                                        ? "text-[#e94560] hover:text-[#e94560]"
-                                        : "text-gray-600 hover:text-gray-300"
+                                        ? "text-accent hover:text-accent"
+                                        : "text-content-faint hover:text-content"
                                     }`}
                                     title={
                                       showCentreMarker
@@ -956,7 +968,7 @@ export function PropertiesPanel() {
 
                                   {/* Magnet — cycles through angle presets */}
                                   <button
-                                    className="p-1.5 text-gray-400 hover:text-[#e94560] transition-colors rounded hover:bg-[#0f3460]/40"
+                                    className="p-1.5 text-content-muted hover:text-accent transition-colors rounded hover:bg-secondary/40"
                                     title={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
                                     onClick={() => {
                                       const norm =
@@ -991,8 +1003,8 @@ export function PropertiesPanel() {
                                 </div>
 
                                 {/* ── Stroke width ──────────────────────────── */}
-                                <div className="mt-2 pt-2 border-t border-[#0f3460]/30">
-                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1.5">
+                                <div className="mt-2 pt-2 border-t border-border-ui/30">
+                                  <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">
                                     Stroke width
                                   </span>
                                   <div className="flex items-center gap-2">
@@ -1012,7 +1024,7 @@ export function PropertiesPanel() {
                                           Math.max(0, +e.target.value),
                                         )
                                       }
-                                      className="flex-1 accent-[#e94560]"
+                                      className="flex-1 accent-accent"
                                     />
                                     <input
                                       type="number"
@@ -1034,9 +1046,9 @@ export function PropertiesPanel() {
                                             Math.max(0, v),
                                           );
                                       }}
-                                      className="w-14 bg-[#1a1a2e] border border-[#0f3460] rounded px-1.5 py-1 text-xs text-gray-200 focus:border-[#e94560] outline-none"
+                                      className="w-14 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
                                     />
-                                    <span className="text-[10px] text-gray-500 shrink-0">
+                                    <span className="text-[10px] text-content-faint shrink-0">
                                       mm
                                     </span>
                                   </div>
@@ -1051,19 +1063,19 @@ export function PropertiesPanel() {
                                   );
                                   if (!hasFilled) return null;
                                   return (
-                                    <div className="mt-2 pt-2 border-t border-[#0f3460]/30">
+                                    <div className="mt-2 pt-2 border-t border-border-ui/30">
                                       <div className="flex items-center gap-2 mb-2">
                                         <span
                                           id={`hatch-label-${imp.id}`}
-                                          className="text-[10px] text-gray-400 uppercase tracking-wider flex-1"
+                                          className="text-[10px] text-content-muted uppercase tracking-wider flex-1"
                                         >
                                           Hatch fill
                                         </span>
                                         <button
                                           className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors ${
                                             imp.hatchEnabled
-                                              ? "bg-[#e94560]"
-                                              : "bg-[#0f3460]"
+                                              ? "bg-accent"
+                                              : "bg-secondary"
                                           }`}
                                           role="switch"
                                           aria-checked={imp.hatchEnabled}
@@ -1144,16 +1156,16 @@ export function PropertiesPanel() {
                       return (
                         <div
                           key={group.id}
-                          className="border-b border-[#0f3460]/40"
+                          className="border-b border-border-ui/40"
                         >
                           {/* Group header row */}
                           <div
                             className={`flex items-center gap-1.5 px-2 py-1 transition-colors cursor-pointer ${
                               selectedGroupId === group.id
-                                ? "bg-[#0f3460]/20 ring-1 ring-inset ring-[#0f3460]/40"
+                                ? "bg-secondary/20 ring-1 ring-inset ring-secondary/40"
                                 : isDropTarget
-                                  ? "bg-[#e94560]/15 ring-1 ring-inset ring-[#e94560]/30"
-                                  : "hover:bg-[#0f3460]/10"
+                                  ? "bg-accent/15 ring-1 ring-inset ring-accent/30"
+                                  : "hover:bg-secondary/10"
                             }`}
                             onClick={(e) => {
                               if (
@@ -1198,7 +1210,11 @@ export function PropertiesPanel() {
                           >
                             {/* Collapse toggle */}
                             <button
-                              className="text-gray-500 hover:text-gray-200 text-[10px] w-4 shrink-0"
+                              aria-expanded={!isCollapsed}
+                              aria-label={
+                                isCollapsed ? "Expand group" : "Collapse group"
+                              }
+                              className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                               onClick={() => toggleGroupCollapse(group.id)}
                             >
                               {isCollapsed ? "▸" : "▾"}
@@ -1221,7 +1237,7 @@ export function PropertiesPanel() {
                             {editingGroupName?.id === group.id ? (
                               <input
                                 type="text"
-                                className="flex-1 min-w-0 bg-transparent text-[10px] text-gray-200 border-b border-[#e94560] outline-none"
+                                className="flex-1 min-w-0 bg-transparent text-[10px] text-content border-b border-accent outline-none"
                                 value={editingGroupName.value}
                                 autoFocus
                                 onChange={(e) =>
@@ -1253,7 +1269,7 @@ export function PropertiesPanel() {
                               />
                             ) : (
                               <span
-                                className="flex-1 min-w-0 text-[10px] text-gray-200 font-medium truncate cursor-pointer"
+                                className="flex-1 min-w-0 text-[10px] text-content font-medium truncate cursor-pointer"
                                 title="Double-click to rename"
                                 onDoubleClick={() =>
                                   setEditingGroupName({
@@ -1266,12 +1282,12 @@ export function PropertiesPanel() {
                               </span>
                             )}
                             {/* Member count badge */}
-                            <span className="text-[9px] text-gray-600 shrink-0">
+                            <span className="text-[9px] text-content-faint shrink-0">
                               {members.length}
                             </span>
                             {/* Delete group */}
                             <button
-                              className="text-gray-600 hover:text-[#e94560] shrink-0"
+                              className="text-content-faint hover:text-accent shrink-0"
                               title="Delete group (layers become ungrouped)"
                               onClick={() => removeLayerGroup(group.id)}
                             >
@@ -1288,8 +1304,8 @@ export function PropertiesPanel() {
                                 <div
                                   className={`mx-3 mb-1 px-2 py-1 text-[9px] text-center border border-dashed rounded transition-colors ${
                                     isDropTarget
-                                      ? "border-[#e94560]/50 text-[#e94560]/60"
-                                      : "border-[#0f3460] text-gray-700"
+                                      ? "border-accent/50 text-accent/60"
+                                      : "border-border-ui text-content-faint"
                                   }`}
                                 >
                                   Drop layers here
@@ -1325,7 +1341,7 @@ export function PropertiesPanel() {
                       }}
                       className={
                         dragOverGroupId === "none"
-                          ? "bg-[#e94560]/5 ring-1 ring-inset ring-[#e94560]/20"
+                          ? "bg-accent/5 ring-1 ring-inset ring-accent/20"
                           : ""
                       }
                     >
@@ -1335,8 +1351,8 @@ export function PropertiesPanel() {
                         <div
                           className={`mx-2 my-1 px-2 py-1 text-[9px] text-center border border-dashed rounded transition-colors ${
                             dragOverGroupId === "none"
-                              ? "border-[#e94560]/60 text-[#e94560]/70 bg-[#e94560]/10"
-                              : "border-[#0f3460] text-gray-600"
+                              ? "border-accent/60 text-accent/70 bg-accent/10"
+                              : "border-border-ui text-content-faint"
                           }`}
                         >
                           Drop here to remove from group

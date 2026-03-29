@@ -65,8 +65,8 @@ export async function launchApp(): Promise<AppHandle> {
   const window = await electronApp.firstWindow();
   await window.waitForLoadState("domcontentloaded");
 
-  // Wait for React to hydrate — look for the brand name that Toolbar always renders
-  await window.locator("text=terraForge").first().waitFor({ timeout: 15_000 });
+  // Wait for React to hydrate — look for the machine selector that Toolbar always renders
+  await window.locator("select[aria-label='Machine selector']").first().waitFor({ timeout: 15_000 });
 
   return { electronApp, window, userDataDir };
 }
