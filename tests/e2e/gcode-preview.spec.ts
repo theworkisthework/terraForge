@@ -107,7 +107,10 @@ test.beforeAll(async () => {
   await window.reload();
   await window.waitForLoadState("domcontentloaded");
   // Wait for React to hydrate — look for the machine selector that Toolbar always renders
-  await window.locator("select[aria-label='Machine selector']").first().waitFor({ timeout: 15_000 });
+  await window
+    .locator("select[aria-label='Machine selector']")
+    .first()
+    .waitFor({ timeout: 15_000 });
 
   // ── Connect to the mocked machine ─────────────────────────────────────────
   // Select the test machine in the toolbar dropdown.
