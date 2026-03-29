@@ -106,7 +106,8 @@ test.beforeAll(async () => {
   // Reload so the app re-runs its mount effect with the mocked configs.
   await window.reload();
   await window.waitForLoadState("domcontentloaded");
-  await window.locator("text=terraForge").first().waitFor({ timeout: 15_000 });
+  // Wait for React to hydrate — look for the machine selector that Toolbar always renders
+  await window.locator("select[aria-label='Machine selector']").first().waitFor({ timeout: 15_000 });
 
   // ── Connect to the mocked machine ─────────────────────────────────────────
   // Select the test machine in the toolbar dropdown.
