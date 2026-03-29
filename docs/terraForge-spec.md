@@ -1,4 +1,4 @@
-terraForge — Master Project Specification (Updated 2026-02-26)
+﻿terraForge — Master Project Specification (Updated 2026-03-29)
 You are the primary software engineer for terraForge, a cross‑platform Electron + React application that serves as a full UI, job manager, and SVG→G‑code engine for the TerraPen pen plotter (FluidNC‑based). You must design and implement the entire application in a consistent, modular, production‑ready way.
 
 Your outputs must always follow the architecture, constraints, and definitions below. Do not invent APIs, libraries, or patterns not explicitly allowed here.
@@ -6,15 +6,15 @@ Your outputs must always follow the architecture, constraints, and definitions b
 1. Project Identity and Purpose
    terraForge is a desktop application that provides:
 
-SVG import, parsing, and manipulation
+SVG and PDF import, parsing, and manipulation
 
 SVG → G‑code conversion (linear + optional arc fitting)
 
-G‑code preview
+G‑code preview and import from local disk
 
 FluidNC machine control over Wi‑Fi and USB
 
-SD card file management
+Internal flash and SD card file management
 
 Job upload, start, pause, resume, abort
 
@@ -22,9 +22,19 @@ Console output and status monitoring
 
 Jog controls for X/Y/Z
 
-Machine configuration selection
+Machine configuration selection with multiple profiles
 
 Clear UI feedback for all background tasks, with cancellation support
+
+Layer groups for multi-pen plotting
+
+Undo/redo, copy/paste, and canvas editing
+
+Dark and light theme support
+
+Page template overlays for print-size artwork
+
+Layout save/open/close
 
 The target hardware is the TerraPen, but the app must support multiple FluidNC‑based machines via configuration profiles.
 
@@ -89,12 +99,32 @@ UI feedback (spinner or progress bar)
 
 Code
 window.terraForge = {
-fluidnc: { ... },
-serial: { ... },
-fs: { ... },
-jobs: { ... },
-config: { ... },
-tasks: { ... } // start, cancel, observe progress
+fluidnc: {
+getStatus, sendCommand,
+listFiles, listSDFiles, uploadFile, uploadGcode, downloadFile, fetchFileText, deleteFile,
+runFile, pauseJob, resumeJob, abortJob,
+connectWebSocket, disconnectWebSocket,
+onStatusUpdate, onConsoleMessage, onPing, onFirmwareInfo
+},
+serial: { listPorts, connect, disconnect, send, onData },
+fs: {
+openSvgDialog, openPdfDialog, openFileDialog, openGcodeDialog, openImportDialog,
+readFile, readFileBinary, writeFile,
+saveGcodeDialog, saveFileDialog, saveLayoutDialog, openLayoutDialog,
+chooseDirectory,
+onMenuImport, onMenuOpenLayout, onMenuSaveLayout, onMenuCloseLayout,
+setLayoutMenuState,
+loadConfigs, saveConfigs
+},
+jobs: { generateGcode },
+config: {
+getMachineConfigs, saveMachineConfig, deleteMachineConfig,
+exportConfigs, importConfigs,
+loadPageSizes, openPageSizesFile
+},
+tasks: { cancel, onTaskUpdate },
+app: { getVersion, openExternal, onMenuAbout },
+edit: { onMenuCopy, onMenuCut, onMenuPaste, onMenuSelectAll, setHasSelection }
 }
 All methods must be explicitly typed.
 
@@ -104,13 +134,13 @@ All methods must be explicitly typed.
    {
    id: string
    name: string
-   bedWidth: number
-   bedHeight: number
+   bedWidth: number // mm
+   bedHeight: number // mm
    origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center"
    penType: "solenoid" | "servo" | "stepper"
    penUpCommand: string
    penDownCommand: string
-   feedrate: number
+   feedrate: number // mm/min
    connection: {
    type: "wifi" | "usb"
    host?: string
@@ -119,20 +149,80 @@ All methods must be explicitly typed.
    serialPath?: string
    }
    }
-   VectorObject
+   SvgPath (sub-object within SvgImport — one per SVG path element)
    Code
    {
    id: string
+   d: string // path d-string in SVG user-unit coordinate space (absolute)
+   svgSource: string // original element outerHTML
+   visible: boolean
+   label?: string // human-readable display name
+   layer?: string // group/layer name from closest ancestor with an id
+   hasFill?: boolean // true if the original shape had a visible fill
+   outlineVisible?: boolean // false to suppress stroke without hiding hatch
+   hatchLines?: string[] // synthesised hatch-fill line d-strings
+   }
+   SvgImport (primary canvas model — replaces VectorObject as the canvas unit)
+   Code
+   {
+   id: string
+   name: string // display name, defaults to filename without extension
+   paths: SvgPath[] // all paths extracted from the import
+   x: number // bed position of SVG bottom-left corner (mm)
+   y: number
+   scale: number // uniform scale (SVG user units → mm)
+   scaleX?: number // per-axis scale when ratio lock is OFF
+   scaleY?: number
+   rotation: number // degrees
+   visible: boolean
+   svgWidth: number // SVG viewBox dimensions in user units
+   svgHeight: number
+   viewBoxX: number // viewBox origin (for non-zero viewBox offsets)
+   viewBoxY: number
+   hatchEnabled?: boolean
+   hatchSpacingMM?: number
+   hatchAngleDeg?: number
+   strokeWidthMM?: number // preview stroke width (does not affect G-code)
+   }
+   VectorObject (flattened representation passed to the G-code worker)
+   Code
+   {
+   id: string
+   svgSource: string
    path: string // absolute SVG path d string
-   svgSource: string // original SVG element tag name
-   x: number // import X position on bed (mm)
-   y: number // import Y position on bed (mm)
+   x: number
+   y: number
    scale: number
+   scaleX?: number
+   scaleY?: number
    rotation: number
    visible: boolean
    originalWidth: number // SVG viewBox width in user units
-   originalHeight: number // SVG viewBox height in user units
+   originalHeight: number
    layer?: string
+   }
+   LayerGroup
+   Code
+   {
+   id: string
+   name: string // user-visible name; also used as G-code filename base
+   color: string // CSS hex colour, e.g. "#e94560"
+   importIds: string[] // SvgImport.id values belonging to this group
+   }
+   PageSize / PageTemplate
+   Code
+   // PageSize — named paper/page dimension pair in portrait orientation
+   { id: string; name: string; widthMM: number; heightMM: number }
+   // PageTemplate — the active overlay shown on the canvas
+   { sizeId: string; landscape: boolean; marginMM: number }
+   CanvasLayout (saved/loaded as .tforge JSON)
+   Code
+   {
+   tfVersion: number
+   savedAt: string
+   imports: SvgImport[]
+   layerGroups?: LayerGroup[]
+   pageTemplate?: PageTemplate | null
    }
    Job
    Code
@@ -143,11 +233,29 @@ All methods must be explicitly typed.
    machineId: string
    createdAt: number
    }
+   GcodeOptions
+   Code
+   {
+   arcFitting: boolean // scaffold only — worker always uses linear segments
+   arcTolerance: number // mm
+   optimisePaths: boolean // nearest-neighbour reorder
+   joinPaths: boolean // experimental: merge endpoints within joinTolerance
+   joinTolerance: number // mm gap threshold (default 0.2)
+   liftPenAtEnd: boolean // send penUpCommand after the last stroke
+   returnToHome: boolean // send G0 X0 Y0 at end of job
+   customStartGcode: string // inserted after preamble, before paths
+   customEndGcode: string // appended after lift/return
+   pageClip?: { // when a page template is active — clips output to printable area
+   widthMM: number
+   heightMM: number
+   marginMM: number
+   }
+   }
    BackgroundTask
    Code
    {
    id: string
-   type: "svg-parse" | "gcode-generate" | "file-upload" | "file-download" | "file-delete" | "job-start" | "ws-connect"
+   type: "svg-parse" | "gcode-generate" | "gcode-preview" | "file-upload" | "file-download" | "file-delete" | "job-start" | "ws-connect"
    label: string // human-readable description shown in the toast
    progress: number | null // 0–100 or null for indeterminate
    status: "running" | "completed" | "cancelled" | "error"
@@ -203,20 +311,35 @@ Pen down for drawing
 
 Pen up at end
 
-Path Optimisation
-A nearest-neighbour optimiser is available as an alternative generation mode:
+G-code Options Dialog
+Clicking "Generate G-code" opens a modal dialog with independently-toggled options before generation begins:
 
-User invokes "Generate & optimise" from the split-button dropdown
+Optimise paths — nearest-neighbour reorder to minimise rapid travel
+Join nearby paths — (experimental) merge path endpoints within configurable tolerance (default 0.2 mm)
+Upload to SD card — direct upload to machine after generation
+Save to computer — native save dialog
+At least one output must be selected; a pre-generation validation enforces this.
+All four settings plus the join tolerance are persisted in localStorage under `terraforge.gcodePrefs`.
+
+Path Optimisation (nearest-neighbour)
+When "Optimise paths" is enabled:
 
 Worker collects all subpaths from all visible objects into a single pool
 
-Subpaths are reordered greedily from the current pen position (0,0) to minimise total rapid travel distance
+Subpaths are reordered greedily from current pen position to minimise total rapid travel (O(n√n) spatial-grid approach)
 
-Output is a flat sequence (no per-object grouping)
+Output is a flat optimised sequence (no per-object grouping)
 
-Optimisation flag and mode are recorded in the G-code header comment
+Optimisation flag is recorded in the G-code header comment
 
 The save-dialog default filename appends `_opt` when optimisation is active
+
+Bed Clipping
+The Liang-Barsky line clipper (`clipSubpathsToRect`) removes any path segments that fall outside the machine bed (or page-clip area when a page template is active).
+
+Custom G-code Hooks
+`GcodeOptions.customStartGcode` is inserted after the preamble and before the first path.
+`GcodeOptions.customEndGcode` is appended after the final pen-lift and return-home moves.
 
 Save Filename
 The default filename in the native save dialog is derived from the import name(s):
@@ -285,7 +408,15 @@ Connect to /ws
 
 Receive console output and status updates
 
-Must reconnect automatically
+Auto-reconnect with exponential backoff (3 s → 60 s, doubles on failure, caps at 60 s)
+
+Each reconnect attempt uses a unique generation counter to invalidate stale event handlers
+
+HTTP 503 responses accelerate the backoff
+
+WebSocket port re-probed via `[ESP800]` on each reconnect attempt
+
+Intentional disconnect sends a clean WebSocket close code 1000 so the ESP32 WebSocket slot is freed immediately
 
 Serial
 USB serial must support:
@@ -303,66 +434,128 @@ UI must show progress when available (upload size, download size)
 
 8. UI Requirements
    Canvas
-   Shows bed grid based on machine config
+   Shows bed grid based on machine config (10 mm minor / 50 mm major gridlines)
 
-Shows imported vectors
+X/Y ruler overlays with adaptive tick density; origin highlighted in red
+
+Zoom level badge; fit-to-view button and Ctrl+0 shortcut
+
+Scroll-wheel zoom (centred at cursor); Space+drag pan; middle-mouse-button drag pan
+
+Shows imported vectors with configurable stroke width per import
 
 Supports:
 
-drag to move
+drag to move (clamped to bed boundary)
 
-handles to scale
+8-handle bounding box for scaling; aspect ratio lock / unlock per axis
 
-numeric input for position/scale
+rotation handle (drag-to-rotate) and numeric angle input with preset shortcuts
 
-rotation (if enabled)
+numeric X/Y position, W/H dimension inputs
+
+fit-to-bed and 1:1 scale shortcuts
+
+Escape to deselect; Delete/Backspace to remove selection
+
+Ctrl+A to select all (cycles: all -> first single -> all; group transforms applied)
+
+Ctrl+Z / Ctrl+Shift+Z for 50-step undo/redo
+
+Ctrl+C / Ctrl+X / Ctrl+V for in-memory copy/cut/paste (positionally-offset clone, auto-numbered names)
+
+Pen position crosshair -- WCO-corrected, constant screen size, rendered in green
+
+Live plot-progress overlay -- completed cut segments in red, rapids in orange
+
+Page template overlay (non-interactive; renders below imports)
 
 Panels
-Left: SD card file browser
+Left: dual-pane filesystem browser (internal flash + SD card, independently collapsible)
 
-Center: canvas
+Center: canvas with floating toast stack (top-right) and floating draggable jog panel
 
-Right: object properties
+Right: properties panel
 
 Bottom: console + job progress
 
+Properties Panel
+Import name (inline rename on double-click)
+
+X/Y position, W/H dimensions, scale, rotation (with +-5/+-15/+-45 degree presets and snap to 45 degree increments)
+
+Aspect ratio lock (padlock), fit-to-bed, 1:1 reset shortcuts
+
+Per-import visibility toggle; expandable path list; per-path visibility and delete
+
+Hatch fill -- enable/disable, spacing (mm), angle (degrees); auto-regenerates on scale change
+
+Stroke width -- configurable mm value; synced across layer group members
+
+Centre marker toggle
+
+G-code toolpath properties -- filename, size, line count, feedrate, estimated job duration
+
+Layer group management -- add, rename, delete, colour picker, drag to assign imports, collapse/expand
+
 Jog Controls
-Circular jog panel with 0.1 / 1 / 10 / 100 mm increments
+Floating draggable panel (fixed-position overlay); drag handle at top; position preserved within the session
 
-Z control:
+XY direction pad (3x3 grid of direction buttons)
 
-solenoid = up/down
+Step size selector: 0.1 / 1 / 10 / 100 mm
 
-servo/stepper = slider
+Configurable feedrate input
+
+Go-to-origin button (G0 X0 Y0)
+
+Z jog -- solenoid pen type sends configured penUpCommand/penDownCommand; servo/stepper uses incremental $J=G91 G21 Z+-dist F{feedrate} jog
+
+Homing button ($H), Set Zero button (G10 L20 P1 X0 Y0 Z0)
 
 Job Control
-Upload G‑code to SD
+Upload G-code to SD (or run local file -- auto-uploads on job start if source is "local")
 
-Choose folder
+Start job (disabled until valid G-code file selected; file validated by extension)
 
-Start job
+Pause/Resume/Abort
 
-Pause/resume
+Job progress bar (line number / total lines from Ln: status field)
 
-Abort
-
-Show progress %
+Indeterminate progress animation when no line count available
 
 Background Task UX
-All long‑running operations must:
+All long-running operations must:
 
 show a progress bar when progress is measurable
 
 show a spinner when progress is unknown
 
-expose a “Cancel” button
+expose a "Cancel" button
 
 update the UI immediately when cancelled
 
 cleanly terminate the worker or task
 
-9. Behavioural Constraints
-   Never invent FluidNC endpoints
+Toast stack -- fixed 280 px wide; auto-dismiss completed/cancelled after 8 s; errors persist until manually dismissed; error toasts show the error message as a second line
+
+Theme
+Dark and light themes -- Moon/Sun toggle button in toolbar; persists to localStorage under terraforge-theme
+
+Layout Management
+Save layout (Ctrl+S) -- saves imports, layer groups, page template, and canvas settings to a .tforge JSON file
+
+Open layout (Ctrl+O) -- restores a saved layout
+
+Close layout -- confirmation prompt before discarding unsaved changes
+
+Page Templates
+Built-in page sizes: A2, A3, A4, A5, A6, Letter, Legal, Tabloid; user-customisable via page-sizes.json in app userData
+
+Landscape toggle; configurable margin (mm); non-interactive overlay on canvas
+
+Page clip -- when active, G-code output is clipped to the page printable area instead of the full bed 9. Behavioural Constraints
+Never invent FluidNC endpoints
 
 Never block the renderer
 

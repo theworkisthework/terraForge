@@ -1,6 +1,6 @@
 # terraForge — User Guide
 
-> **Version:** 1.0 · **Date:** 2026-02-28
+> **Version:** 1.1 · **Date:** 2026-03-29
 > This guide covers all currently implemented features of terraForge.
 
 ---
@@ -11,17 +11,19 @@
 2. [Application Layout](#2-application-layout)
 3. [First-Time Setup — Machine Configuration](#3-first-time-setup--machine-configuration)
 4. [Connecting to Your Machine](#4-connecting-to-your-machine)
-5. [Importing SVG Files](#5-importing-svg-files)
+5. [Importing Files](#5-importing-files)
 6. [Working on the Canvas](#6-working-on-the-canvas)
 7. [The Properties Panel](#7-the-properties-panel)
-8. [Generating G-code](#8-generating-g-code)
-9. [The File Browser](#9-the-file-browser)
-10. [Running a Job](#10-running-a-job)
-11. [Jog Controls](#11-jog-controls)
-12. [Console & Alarm Handling](#12-console--alarm-handling)
-13. [Background Tasks](#13-background-tasks)
-14. [Keyboard Shortcuts](#14-keyboard-shortcuts)
-15. [Troubleshooting](#15-troubleshooting)
+8. [Layer Groups](#8-layer-groups)
+9. [Generating G-code](#9-generating-g-code)
+10. [The File Browser](#10-the-file-browser)
+11. [Running a Job](#11-running-a-job)
+12. [Jog Controls](#12-jog-controls)
+13. [Console & Alarm Handling](#13-console--alarm-handling)
+14. [Background Tasks](#14-background-tasks)
+15. [Layout Management & Page Templates](#15-layout-management--page-templates)
+16. [Keyboard Shortcuts](#16-keyboard-shortcuts)
+17. [Troubleshooting](#17-troubleshooting)
 
 ---
 
@@ -29,45 +31,26 @@
 
 terraForge is a desktop application for controlling FluidNC-based pen plotters — especially the **TerraPen**. It lets you:
 
-- Import SVG artwork and position it on the machine bed
-- Convert SVG paths to G-code, with optional path optimisation to minimise pen travel
+- Import **SVG** and **PDF** artwork and position it on the machine bed
+- Convert SVG/PDF paths to G-code, with optional path optimisation to minimise pen travel
 - Preview G-code toolpaths on the canvas before plotting
-- Upload files to and manage your machine's SD card
+- Import G-code files from your computer and run them directly
+- Upload files to and manage your machine's SD card (internal flash and SD card)
 - Start, pause, resume, and abort jobs
 - Jog the machine and send raw commands via the console
+- Organise imports into **layer groups** for multi-pen plotting
+- **Undo/redo** and **copy/paste** canvas objects
+- **Save and reopen layouts** (.tforge files)
+- **Page template overlays** for print-size artwork
+- Toggle between **dark and light themes**
 
-terraForge communicates with FluidNC over **Wi-Fi (WebSocket + HTTP REST)** or **USB serial**.
+terraForge communicates with FluidNC over **Wi-Fi (WebSocket + HTTP REST)** or **USB serial**. The WebSocket connection auto-reconnects with exponential back-off if the link drops.
 
 ---
 
 ## 2. Application Layout
 
-> 📸 **Screenshot:** Full application window showing all panels
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  TOOLBAR                                                                    │
-│  [terraForge] [Machine ▼] [Connect]  [Import SVG] [Import G-code]          │
-│              [Generate G-code ▾]   [Home] [Jog]          [● Connected] [⚙] │
-├──────────────┬──────────────────────────────────────┬───────────────────────┤
-│              │                                      │                       │
-│  FILE        │         CANVAS                       │  PROPERTIES           │
-│  BROWSER     │                                      │                       │
-│              │   ┌────────────────────────┐         │  ▸ logo (3p)  👁  ✕   │
-│  ▾ INTERNAL  │   │  bed grid              │    [+]  │    X: 10 mm           │
-│  ▾ SDCARD    │   │                        │    [−]  │    Y: 20 mm           │
-│              │   │   [SVG paths here]     │    [⊡]  │    W: 80 mm           │
-│  /           │   │                        │         │    H: 60 mm           │
-│  config.yaml │   │                        │         │    Scale: 1.000       │
-│  logo.gcode  │   └────────────────────────┘         │                       │
-│              │         ← bed ←             125%     │                       │
-├──────────────┴──────────────────────────────────────┴───────────────────────┤
-│  CONSOLE                                             │  JOB                 │
-│  > [Idle] X:0.00 Y:0.00 Z:0.00           [Clear]   │  📄 logo.gcode        │
-│  ok                                                  │  [▶ Start job]       │
-│  > _                                    [Send]      │                       │
-└─────────────────────────────────────────────────────┴───────────────────────┘
-```
+![Full application window showing all panels](../docs/resources/01-full-app.png)
 
 ### Panel Summary
 
@@ -91,11 +74,11 @@ Before you can connect, you need to create at least one **machine configuration 
 
 Click the **⚙** (gear) button at the far right of the toolbar.
 
-> 📸 **Screenshot:** Settings button highlighted in toolbar
+![Settings button highlighted in toolbar](../docs/resources/02-settings-btn.png)
 
 ### Creating Your First Profile
 
-> 📸 **Screenshot:** Machine Configurations dialog — empty state
+![Machine Configurations dialog](../docs/resources/03-machine-config-empty.png)
 
 1. Click **+ New** in the sidebar.
 2. Fill in the **General** section:
@@ -136,7 +119,7 @@ Click the **⚙** (gear) button at the far right of the toolbar.
 
 8. Click **Close**.
 
-> 📸 **Screenshot:** Completed machine config form
+![Completed machine config form](../docs/resources/04-machine-config-completed.png)
 
 ### Managing Multiple Profiles
 
@@ -163,7 +146,7 @@ Click the **⚙** (gear) button at the far right of the toolbar.
    - **WS port override** — leave blank for FluidNC 4.x (auto-detected). Enter `81` only for older ESP3D-based firmware
 4. Click **Connect** in the toolbar.
 
-> 📸 **Screenshot:** Toolbar showing Connect button and spinner while connecting
+![Toolbar showing Connect button](../docs/resources/05-toolbar-connect.png)
 
 The connection status indicator (top-right of toolbar) shows:
 
@@ -188,9 +171,11 @@ Click **Disconnect** in the toolbar. The machine selector and config editing are
 
 ---
 
-## 5. Importing SVG Files
+## 5. Importing Files
 
-### Supported Elements
+### Importing SVG Files
+
+#### Supported Elements
 
 terraForge converts these SVG elements to plottable paths at import time:
 
@@ -204,11 +189,11 @@ terraForge converts these SVG elements to plottable paths at import time:
 | `<polyline>` |                                                             |
 | `<polygon>`  | Auto-closed                                                 |
 
-### How to Import
+#### How to Import
 
 Click **Import SVG** in the toolbar. A file dialog opens filtered to `.svg` files. Select your file.
 
-> 📸 **Screenshot:** Canvas after importing an SVG — shape visible on bed grid
+![Canvas after importing an SVG — shape visible on bed grid](../docs/resources/06-canvas-after-import.png)
 
 terraForge:
 
@@ -218,7 +203,7 @@ terraForge:
 4. Displays the import at position (0, 0) on the bed (bottom-left corner).
 5. Shows a toast notification on completion.
 
-### Physical Size Handling
+#### Physical Size Handling
 
 | SVG unit        | Conversion           |
 | --------------- | -------------------- |
@@ -233,11 +218,32 @@ If the SVG has no physical units, 1 SVG user unit = 1 mm.
 
 ---
 
+### Importing PDF Files
+
+Click **Import PDF** in the toolbar. A dialog opens filtered to `.pdf` files.
+
+terraForge extracts vector paths from each page using the page’s PDF operator list. Supported operators: moveTo, lineTo, curveTo (all three PDF curve variants), closePath, and rectangle.
+
+**What gets imported:**
+
+- Vector art, technical drawings, paths created by Inkscape, Illustrator, etc.
+- Each page with vector content becomes a separate import named `filename_p1`, `filename_p2`, …
+- Pages with no vector content are silently skipped
+- Raster images embedded in the PDF are ignored
+
+**Scale:** PDF coordinates are in points. terraForge applies `25.4 ÷ 72 ≈ 0.353 mm/pt` so the imported paths appear at their correct real-world physical size.
+
+### Importing G-code Files
+
+Click **Import G-code** in the toolbar. A dialog opens filtered to all recognised G-code extensions (`.gcode`, `.nc`, `.g`, `.gc`, `.gco`, `.ngc`, `.ncc`, `.cnc`, `.tap`). The file is read from your local disk, parsed, and displayed as a toolpath overlay on the canvas. It is automatically queued as the job file (labelled 🖥 with “(local — will upload)”). When you click **Start job**, terraForge uploads it to the SD card root first, then runs it.
+
+---
+
 ## 6. Working on the Canvas
 
 ### Canvas Overview
 
-> 📸 **Screenshot:** Canvas with SVG import selected, showing bounding box and handles
+![Canvas with SVG import selected, showing bounding box and handles](../docs/resources/07-canvas-selected.png)
 
 The canvas shows:
 
@@ -246,6 +252,10 @@ The canvas shows:
 - **Rulers** — X ruler (bottom edge for bottom-left origin, top edge for top-left), Y ruler (left edge); adaptive tick density; origin labelled in red
 - **Imported objects** — shown in blue; selected object shown in brighter blue with a red dashed bounding box
 - **G-code toolpath overlay** — rapids in dashed grey, cuts in solid blue
+
+### Dark / Light Theme
+
+Click the **🌙 / ☀️** (Moon / Sun) button at the right end of the toolbar to toggle between dark and light themes. The preference is remembered across sessions.
 
 ### Zoom and Pan
 
@@ -263,19 +273,19 @@ The **zoom % badge** (bottom-left of canvas) shows the current zoom level.
 
 The **⊡ (fit to view)** button highlights red when the view is actively fitted. The bed re-fits automatically on window resize while in fitted mode.
 
-> 📸 **Screenshot:** Canvas overlay controls (zoom buttons, fit button, zoom % badge)
+![Canvas overlay controls — zoom buttons, fit button, zoom % badge](../docs/resources/08-canvas-overlay.png)
 
 ### Moving an Object
 
 Click and drag any part of an imported SVG to move it. The object is clamped so its far edge cannot leave the bed boundary.
 
-> 📸 **Screenshot:** Object being dragged, showing clamping at bed edge
+![Object being dragged near bed edge](../docs/resources/09-canvas-dragging.png)
 
 ### Scaling an Object
 
 Click an object to select it. Eight **circular handles** appear at the corners and midpoints of the bounding box. Drag any handle to scale uniformly. Scaling is clamped to the bed boundary.
 
-> 📸 **Screenshot:** Selected object with scale handles visible
+![Selected object with scale handles visible](../docs/resources/10-canvas-scale-handles.png)
 
 Cursor changes match the handle position:
 
@@ -285,6 +295,12 @@ Cursor changes match the handle position:
 | Midpoints (t, b)         | Vertical resize   |
 | Midpoints (l, r)         | Horizontal resize |
 
+### Rotating an Object
+
+A **rotation handle** (filled circle) appears above the top-centre of the bounding box when an object is selected. Drag it to rotate freely. The bounding box and all eight scale handles track the rotation.
+
+For precise angles, use the **Rotation** numeric input in the Properties panel. Rotation snaps automatically to 0° / 45° / 90° / 135° / 180° / 225° / 270° / 315° when within 3° of a preset.
+
 ### Deleting an Object
 
 Select the object and press **Delete** or **Backspace**, or click the **✕** button that appears near the top-right corner of the selected object's bounding box.
@@ -292,6 +308,29 @@ Select the object and press **Delete** or **Backspace**, or click the **✕** bu
 ### Deselecting
 
 Press **Escape**, or click an empty area of the canvas.
+
+### Selecting Multiple Objects
+
+Press **Ctrl+A** to select all imports simultaneously. All objects show grouped bounding boxes and can be moved, scaled, or rotated together around the group centroid. Press **Ctrl+A** again to cycle: all selected → first single selected → all. Press **Escape** to deselect everything.
+
+### Undo and Redo
+
+terraForge maintains up to **50 undo steps** for canvas changes (move, scale, rotate, delete, paste). Each gesture that produces a real change is recorded as one step; trivial clicks are not.
+
+| Shortcut         | Action                  |
+| ---------------- | ----------------------- |
+| **Ctrl+Z**       | Undo last canvas change |
+| **Ctrl+Shift+Z** | Redo                    |
+
+### Copy, Cut, and Paste
+
+| Shortcut   | Action                                                                 |
+| ---------- | ---------------------------------------------------------------------- |
+| **Ctrl+C** | Copy selected import (stays on canvas)                                 |
+| **Ctrl+X** | Cut (copy and remove from canvas)                                      |
+| **Ctrl+V** | Paste — creates a positionally-offset clone with an auto-numbered name |
+
+Pasted objects get names like `logo copy`, `logo copy (2)`, etc.
 
 ### G-code Toolpath on Canvas
 
@@ -302,13 +341,26 @@ When a G-code file is loaded for preview (from the File Browser or Import G-code
 
 Click the toolpath to select it. A blue dashed bounding box appears. Press **Delete** or click the **✕** button on the toolpath to remove the preview.
 
+### Live Plot Progress
+
+During an active job, the canvas shows a real-time progress overlay on top of the toolpath:
+
+- **Red lines** — cut moves the machine has already completed
+- **Orange lines** — rapid moves already traversed
+
+The overlay tracks the machine’s reported work position, projecting it onto the nearest G-code segment so the trace stays on the correct path even with sparse position updates.
+
+### Pen Position Crosshair
+
+A green **✛ crosshair** tracks the machine’s current work position on the canvas whenever a connection is active — even when no job is running. It is WCO-corrected (work-coordinate offset applied) and renders at a fixed screen size so it stays visible at any zoom level.
+
 ---
 
 ## 7. The Properties Panel
 
-The Properties panel (right side) lists all imported SVG objects.
+The Properties panel (right side) lists all imported SVG objects and, when a toolpath is loaded, also shows G-code details.
 
-> 📸 **Screenshot:** Properties panel showing one expanded import with path list
+![Properties panel showing an import with path list](../docs/resources/11-properties-expanded.png)
 
 ### Import Row
 
@@ -324,17 +376,73 @@ Each import shows:
 
 Click an import row to select it and reveal the numeric editors:
 
-| Field      | Description                                                            |
-| ---------- | ---------------------------------------------------------------------- |
-| **X (mm)** | Horizontal position of the import's left edge                          |
-| **Y (mm)** | Vertical position of the import's bottom edge                          |
-| **W (mm)** | Width in mm; changing width recalculates scale (aspect ratio locked)   |
-| **H (mm)** | Height in mm; changing height recalculates scale (aspect ratio locked) |
-| **Scale**  | Uniform scale factor (1 = 100%)                                        |
+| Field        | Description                                      |
+| ------------ | ------------------------------------------------ |
+| **X (mm)**   | Horizontal position of the import’s left edge    |
+| **Y (mm)**   | Vertical position of the import’s bottom edge    |
+| **W (mm)**   | Width in mm; changing width recalculates scale   |
+| **H (mm)**   | Height in mm; changing height recalculates scale |
+| **Scale**    | Uniform scale factor (1 = 100%)                  |
+| **Rotation** | Angle in degrees; type or use CCW/CW buttons     |
 
-All fields clamp to the bed boundary automatically.
+All position/size fields clamp to the bed boundary automatically.
 
-> 📸 **Screenshot:** Properties panel with numeric fields visible for a selected import
+![Properties panel with numeric fields visible for a selected import](../docs/resources/12-properties-numeric.png)
+
+### Aspect Ratio Lock
+
+The **🔒 padlock** icon between the W and H fields controls aspect ratio:
+
+- **Locked (default):** W and H change together via a shared scale factor. Drag handles also maintain the ratio.
+- **Unlocked:** W and H can be set independently, storing separate `scaleX` / `scaleY` values. Drag handles restore uniform scale when you next resize.
+
+### Scale Shortcuts
+
+Two buttons appear below the Scale input:
+
+- **⊞ Fit to bed** — scales the import as large as possible while keeping it within the bed boundary, then repositions it at the bed origin.
+- **⊟ 1:1 reset** — restores scale to 1 (1 SVG user unit = 1 mm).
+
+### Rotation Controls
+
+| Control              | Action                                                             |
+| -------------------- | ------------------------------------------------------------------ |
+| **Angle input**      | Type any value; press Enter or click away to apply                 |
+| **CCW / CW buttons** | Rotate counter-clockwise / clockwise by the configured step amount |
+| **Step flyout**      | Click the step label to choose ±5° / ±15° / ±45°                   |
+| **Snap**             | Rotation snaps to 0°/45°/90°…315° when within 3° of a preset       |
+
+### Stroke Width
+
+The **Stroke width** field sets the canvas preview stroke thickness in mm. This affects how thick paths appear on screen only — it does **not** change G-code output. When the import belongs to a layer group, the new stroke width is applied to all other imports in that group automatically.
+
+### Centre Marker
+
+Ticking **Centre marker** displays a crosshair (+) at the geometric centre of the selected import. The marker renders at a constant screen size at all zoom levels.
+
+### Hatch Fill
+
+Hatch fill generates evenly-spaced parallel lines across closed filled shapes — useful when the pen can only draw strokes and you want to shade an area.
+
+| Field       | Description                                                  |
+| ----------- | ------------------------------------------------------------ |
+| **Enable**  | Checkbox — generates hatch lines and includes them in G-code |
+| **Spacing** | Distance between hatch lines (mm, default 2 mm)              |
+| **Angle**   | Angle of hatch lines in degrees (default 45°)                |
+
+Hatch lines are regenerated automatically when you scale the import so physical spacing is always preserved.
+
+### G-code Toolpath Properties
+
+When a G-code toolpath is selected on the canvas (loaded from the File Browser or via Import G-code), the Properties panel shows:
+
+| Field             | Description                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| **Filename**      | Source file name                                                                          |
+| **Size**          | File size (B / KB / MB)                                                                   |
+| **Lines**         | Total G-code line count                                                                   |
+| **Feedrate**      | First `F` command in the file (mm/min)                                                    |
+| **Est. duration** | Estimated plot time (path length ÷ feedrate) — shown as `15 s`, `3 m 45 s`, or `1 h 22 m` |
 
 ### Per-Path Controls
 
@@ -346,60 +454,115 @@ Expand an import (▸) to see its individual paths. For each path:
 
 ---
 
-## 8. Generating G-code
+## 8. Layer Groups
 
-### Standard Generation
+Layer groups organise imports by pen — ideal for multi-pen or multi-colour plots where each pen traces a different set of paths.
 
-1. Import one or more SVGs and position them on the bed.
-2. Click **Generate G-code** in the toolbar (red button, centre).
-3. A progress toast appears in the top-right of the canvas.
+![Properties panel showing layer groups](../docs/resources/13-layer-groups.png)
 
-> 📸 **Screenshot:** Generate G-code button and dropdown caret
+### Creating a Group
 
-**If connected to the machine:** The G-code is uploaded directly to the SD card root. The uploaded file is automatically selected as the queued job — **Start job** is immediately ready.
+Click **+ Add group** at the bottom of the Properties panel sidebar. A new group appears with a default name and colour.
 
-**If not connected:** A native save dialog opens. The default filename is derived from the import name(s):
+### Renaming and Colour
 
-- Single import: `logo.gcode`
-- Multiple imports: `logo+2.gcode` (first name + count of others)
+Click the group name to edit it inline. Click the colour swatch to choose a new colour. The colour is used as the stroke tint for all member imports on the canvas.
 
-### Path-Optimised Generation
+### Assigning Imports to a Group
 
-Click the **▾** caret on the right side of the Generate G-code button to reveal **Generate & optimise**.
+Drag any import row from the ungrouped list into a group header. Drag it back out to ungroup it.
 
-> 📸 **Screenshot:** Split-button dropdown showing "Generate & optimise"
+### Group Selection and Transforms
 
-The optimiser:
+Click a group header row to select the entire group. Drag, scale, and rotate operations apply to all members simultaneously, transforming around the group centroid.
 
-1. Collects all visible sub-paths from all imports into a single pool.
-2. Reorders them greedily (nearest-neighbour from the current pen position, starting at 0,0) to minimise total rapid travel distance.
-3. Outputs a flat sequence — no per-object grouping.
+### Generating G-code Per Group
 
-Optimised filenames append `_opt`:
-
-- `logo_opt.gcode`
-- `logo+2_opt.gcode`
-
-### G-code Header
-
-Every generated file includes a header comment with:
-
-- Machine name and bed dimensions
-- Origin setting
-- Whether path optimisation was applied
-- Generation timestamp
-
-### Cancelling Generation
-
-While generation is running, a progress toast appears. Click the **✕** on the toast to cancel. The worker stops immediately and the toast changes to "G-code cancelled."
+When layer groups are defined, you can generate a separate G-code file for each group from the G-code options dialog. Each file is named after the group (e.g. `red_layer.gcode`, `blue_layer.gcode`). Imports not assigned to any group are collected into a single additional file.
 
 ---
 
-## 9. The File Browser
+## 9. Generating G-code
 
-The left panel contains two collapsible sections: **INTERNAL** (FluidNC internal flash) and **SDCARD** (SD card).
+### The G-code Options Dialog
 
-> 📸 **Screenshot:** File Browser showing both sections, SDCARD expanded with files
+1. Import one or more SVGs and position them on the bed.
+2. Click **Generate G-code** in the toolbar.
+3. The dialog opens with three collapsible sections: **Paths**, **Options**, and **Output**.
+
+#### Paths section
+
+![G-code Options dialog — Paths section expanded](../docs/resources/14a-gcode-paths.png)
+
+| Option                | Description                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| **Optimise paths**    | Nearest-neighbour reorder of all sub-paths to minimise total rapid travel  |
+| **Join nearby paths** | (Experimental) Merge path endpoints within the tolerance to skip pen lifts |
+
+When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.2 mm). Consecutive sub-paths whose endpoint-to-start-point gap is within this tolerance are merged, eliminating the pen-up / rapid / pen-down cycle between nearly-touching strokes.
+
+#### Options section
+
+![G-code Options dialog — Options section expanded](../docs/resources/14b-gcode-options-section.png)
+
+| Option              | Description                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| **Lift pen at end** | Send the pen-up command after the last stroke (recommended)                         |
+| **Return to home**  | Rapid to origin (X0 Y0) after the job finishes                                      |
+| **Page clipping**   | Clip G-code to the page/margin boundary (only shown when a page template is active) |
+| **Custom G-code**   | Sub-collapsible for custom start/end G-code blocks inserted around the job          |
+
+#### Output section
+
+![G-code Options dialog — Output section expanded](../docs/resources/14c-gcode-output.png)
+
+| Option                        | Description                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| **Upload to SD card**         | Upload the generated file to the machine SD card root after generation        |
+| **Save to computer**          | Open a native save dialog after generation                                    |
+| **Export one file per group** | Generate a separate G-code file for each layer group (multi-colour pen plots) |
+
+- At least one output (**Upload** or **Save**) must be selected; the **Generate** button is disabled otherwise.
+- When **Upload to SD card** is selected and a machine is connected, the uploaded file is automatically selected as the queued job — **Start job** is immediately ready.
+- When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
+
+### Persisted Preferences
+
+All four dialog settings (including join-paths tolerance) are saved in `localStorage` and restored on the next session. Defaults: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
+
+### Path Optimisation
+
+When **Optimise paths** is enabled:
+
+1. All visible sub-paths from all imports are collected into a single pool.
+2. They are reordered greedily (nearest-neighbour from the current pen position) to minimise total rapid travel.
+3. Output is a flat sequence — no per-object grouping.
+
+Optimised filenames append `_opt`: `logo_opt.gcode`, `logo+2_opt.gcode`.
+
+### Save Filename
+
+The default filename in the save dialog is derived from the import name(s):
+
+- Single import: `logo.gcode`
+- Multiple imports: `logo+2.gcode` (first name + count of others)
+- Optimised: `logo_opt.gcode` / `logo+2_opt.gcode`
+
+### G-code Header
+
+Every generated file includes a header comment with machine name, bed dimensions, origin setting, optimisation flags, and a generation timestamp.
+
+### Cancelling Generation
+
+While generation is running, a progress toast appears. Click the **✕** on the toast to cancel. The worker stops immediately.
+
+---
+
+## 10. The File Browser
+
+The left panel contains two collapsible sections: **INTERNAL** (FluidNC internal flash) and **SDCARD** (SD card). Each section can be independently expanded or collapsed.
+
+![File Browser showing both Internal and SD card sections](../docs/resources/15-file-browser.png)
 
 ### Navigation
 
@@ -420,7 +583,7 @@ For each file in the listing:
 | **↓ button**                 | Download file to local disk                                      |
 | **✕ button**                 | Delete file from the machine                                     |
 
-> 📸 **Screenshot:** File row with action buttons
+![File Browser panel with action buttons](../docs/resources/16-file-row-buttons.png)
 
 **Download dialogs:**
 
@@ -433,17 +596,19 @@ Click the **↑ Upload** button in a section header to open a native file dialog
 
 Upload progress is shown in the toast stack. Uploads can be cancelled via the toast's ✕ button.
 
+**Auto-refresh:** The file listing refreshes automatically after an upload, and also whenever FluidNC emits a `[MSG:Files changed]` console message.
+
 ### Importing G-code from Your Computer
 
-Click **Import G-code** in the toolbar. A dialog opens filtered to all recognised G-code extensions. The file is read from your local disk, parsed, and displayed as a toolpath overlay on the canvas. It is automatically queued as the job file (labelled 🖥 with "(local — will upload)"). When you click **Start job**, terraForge uploads it to the SD card root first, then runs it.
+See [§5 Importing Files](#5-importing-files) for details on importing G-code from your local disk.
 
 ---
 
-## 10. Running a Job
+## 11. Running a Job
 
 The **Job** section lives at the right side of the bottom panel.
 
-> 📸 **Screenshot:** Job panel showing selected file and Start button
+![Job panel showing selected file and Start Job button](../docs/resources/17-job-panel.png)
 
 ### Selecting a Job File
 
@@ -462,7 +627,7 @@ Click **▶ Start job**. Button is disabled unless a valid G-code file is select
 
 ### During a Job
 
-> 📸 **Screenshot:** Job panel during a running job with progress bar
+![Job panel during a running job](../docs/resources/18-job-running.png)
 
 | Control      | Action                                                     |
 | ------------ | ---------------------------------------------------------- |
@@ -482,34 +647,39 @@ The progress bar disappears. The machine returns to **Idle** state (visible in t
 
 ---
 
-## 11. Jog Controls
+## 12. Jog Controls
 
 Click **Jog** in the toolbar to open the jog panel. The panel floats as an overlay and can be **dragged anywhere on screen** by its grey drag handle at the top.
 
-> 📸 **Screenshot:** Floating jog panel
+![Floating Jog Controls panel](../docs/resources/19-jog-panel.png)
 
 ### Step Size
 
 Select a step increment: **0.1 / 1 / 10 / 100** mm. The active step is highlighted red.
 
-### XY Jogging
-
-```
-      [ ▲ Y+ ]
-[ ◄ X- ] [ ⌂ ] [ X+ ► ]
-      [ Y- ▼ ]
-```
+### Postion
 
 - **▲▼◄►** — jog the corresponding axis by the selected step.
 - **⌂** — rapid move to origin (G0 X0 Y0).
 
-### Z Jogging
+### Pen
 
-**Z+** and **Z-** buttons jog the Z axis by the selected step.
+**Pen Up** and **Pen Down** buttons jog the pen axis by the selected step.
+
+- **Solenoid pen type:** Z+ sends the configured `penUpCommand`; Z− sends `penDownCommand`.
+- **Servo / Stepper pen type:** Uses incremental jog commands (`$J=G91 G21 Z±dist F{feedrate}`).
 
 ### Feedrate
 
 The **Feedrate mm/min** input controls the speed for all jog moves. Default is 3000 mm/min.
+
+### Homing
+
+Click **Home ($H)** in the jog panel (or the **Home** button in the main toolbar) to run the FluidNC homing cycle. Make sure the bed is clear before homing.
+
+### Set Zero
+
+Click **Set Zero** in the jog panel to declare the current machine position as the work-coordinate zero (`G10 L20 P1 X0 Y0 Z0`). This is equivalent to "set work position to 0" without physically moving.
 
 ### Closing the Jog Panel
 
@@ -517,11 +687,11 @@ Click the **✕** on the panel, or click **Jog** again in the toolbar.
 
 ---
 
-## 12. Console & Alarm Handling
+## 13. Console & Alarm Handling
 
 The console occupies the left portion of the bottom panel.
 
-> 📸 **Screenshot:** Console panel showing output and command input
+![Console panel showing output and command input](../docs/resources/20-console-panel.png)
 
 ### Output Log
 
@@ -551,7 +721,7 @@ When the machine enters **Alarm** state, the state badge becomes a pulsing red b
 
 Click it to send `$X` (alarm clear / unlock). Use this after homing errors, limit-switch trips, or soft-limit violations.
 
-> 📸 **Screenshot:** Console header with pulsing ALARM button
+![Console panel header area](../docs/resources/21-console-alarm.png)
 
 ### Firmware Restart
 
@@ -574,19 +744,13 @@ Click **Clear** in the console header to wipe the output log.
 
 ---
 
-## 13. Background Tasks
+## 14. Background Tasks
 
 All long-running operations appear as **toast notifications** stacked in the top-right corner of the canvas.
 
-> 📸 **Screenshot:** Toast stack with one running task and one completed task
+![Toast stack with a running task notification](../docs/resources/22-toast-stack.png)
 
 ### Toast Anatomy
-
-```
-┌─────────────────────────────────┐
-│ [▓▓▓░░░] 45%  Generating G-code │ ✕ │
-└─────────────────────────────────┘
-```
 
 | Element              | Description                                        |
 | -------------------- | -------------------------------------------------- |
@@ -615,24 +779,79 @@ All long-running operations appear as **toast notifications** stacked in the top
 
 ---
 
-## 14. Keyboard Shortcuts
+## 15. Layout Management & Page Templates
 
-| Shortcut               | Action                             |
-| ---------------------- | ---------------------------------- |
-| `Space` (hold)         | Enter pan mode; drag to pan        |
-| Middle-mouse drag      | Pan canvas                         |
-| Mouse wheel            | Zoom canvas (centred on cursor)    |
-| `Ctrl`+`Shift`+`+`     | Zoom in                            |
-| `Ctrl`+`Shift`+`-`     | Zoom out                           |
-| `Ctrl`+`0`             | Fit bed to viewport                |
-| `Delete` / `Backspace` | Delete selected import or toolpath |
-| `Escape`               | Deselect everything                |
+### Saving a Layout
+
+A **layout** captures all your canvas work: imported SVGs, layer groups, positions, scales, rotations, the active page template, and the queued toolpath reference. Layouts are saved as `.tforge` JSON files.
+
+Press **Ctrl+S** or choose **File → Save Layout**. A save dialog opens. Choose a location and filename.
+
+> **Tip:** Save regularly while designing a complex multi-pen plot.
+
+### Opening a Layout
+
+Press **Ctrl+O** or choose **File → Open Layout**. Select a `.tforge` file. The current canvas is replaced with the saved state.
+
+### Closing a Layout
+
+Choose **File → Close Layout**. If you have imports on the canvas, a confirmation dialog appears before clearing.
+
+### Page Templates
+
+A page template overlays a paper-size boundary on the canvas as a visual guide for print-size artwork. The overlay is non-interactive and renders below your imports.
+
+**Built-in page sizes:**
+
+| Size    | Dimensions (portrait) |
+| ------- | --------------------- |
+| A2      | 420 × 594 mm          |
+| A3      | 297 × 420 mm          |
+| A4      | 210 × 297 mm          |
+| A5      | 148 × 210 mm          |
+| A6      | 105 × 148 mm          |
+| Letter  | 215.9 × 279.4 mm      |
+| Legal   | 215.9 × 355.6 mm      |
+| Tabloid | 279.4 × 431.8 mm      |
+
+Available options per template:
+
+- **Landscape** — swap width and height.
+- **Margin** — add an inset boundary inside the page outline.
+
+**Page clip:** When a page template is active, G-code output can be clipped to the printable area (page minus margin) instead of the full machine bed.
+
+**Custom page sizes:** Edit `page-sizes.json` in the app config directory. Choose **File → Open page sizes file** to open it in your system editor.
+
+---
+
+## 16. Keyboard Shortcuts
+
+| Shortcut               | Action                                         |
+| ---------------------- | ---------------------------------------------- |
+| `Space` (hold)         | Enter pan mode; drag to pan                    |
+| Middle-mouse drag      | Pan canvas                                     |
+| Mouse wheel            | Zoom canvas (centred on cursor)                |
+| `Ctrl`+`Shift`+`+`     | Zoom in                                        |
+| `Ctrl`+`Shift`+`-`     | Zoom out                                       |
+| `Ctrl`+`0`             | Fit bed to viewport                            |
+| `Ctrl`+`A`             | Select all imports (cycles: all → first → all) |
+| `Ctrl`+`Z`             | Undo last canvas change                        |
+| `Ctrl`+`Shift`+`Z`     | Redo                                           |
+| `Ctrl`+`C`             | Copy selected import                           |
+| `Ctrl`+`X`             | Cut selected import                            |
+| `Ctrl`+`V`             | Paste                                          |
+| `Ctrl`+`I`             | Import SVG                                     |
+| `Ctrl`+`O`             | Open layout                                    |
+| `Ctrl`+`S`             | Save layout                                    |
+| `Delete` / `Backspace` | Delete selected import or toolpath             |
+| `Escape`               | Deselect everything                            |
 
 > **Note:** Shortcuts are inactive when the cursor is in a text input.
 
 ---
 
-## 15. Troubleshooting
+## 17. Troubleshooting
 
 ### Connection Issues
 
@@ -651,7 +870,8 @@ All long-running operations appear as **toast notifications** stacked in the top
 **Machine goes offline mid-job:**
 
 - terraForge detects the WebSocket drop after 15 seconds of no ping.
-- There is currently no auto-reconnect; you must click **Disconnect**, then **Connect** again.
+- The connection automatically attempts to reconnect with exponential back-off (starts at 3 seconds, doubles each attempt, caps at 60 seconds). Watch the connection indicator — it will cycling to “Connecting…” while retrying.
+- If automatic reconnection does not succeed, click **Disconnect**, then **Connect** manually.
 
 ---
 

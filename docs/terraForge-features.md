@@ -172,6 +172,42 @@
 - [x] Expandable path list — each import row has a ▸/▾ toggle to show/hide the individual paths it contains, with layer/group names or short IDs
 - [x] Per-path visibility toggle — each path within an import can be shown/hidden independently; hidden paths are excluded from G-code output
 - [x] Remove individual paths — ✕ button per path deletes it from the import without removing the whole import
+- [x] **Rotation controls** — numeric angle input in Properties panel; CCW / CW shortcut buttons; ±5° / ±15° / ±45° preset buttons; configurable step-size flyout; rotation snaps to the nearest 0° / 45° / 90° / 135° / 180° / 225° / 270° / 315° preset when within 3° of one
+- [x] **Position (X/Y) inputs** — explicit mm coordinate inputs in Properties panel, clamped to bed bounds; synced with canvas drag
+- [x] **Stroke width per import** — configurable pen stroke width in mm; when the import belongs to a layer group the new stroke width is synced across all imports in that group automatically
+- [x] **Centre marker toggle** — checkbox shows/hides a crosshair (+) at the geometric centre of the selected import or toolpath; rendered at screen-constant size so it stays visible at any zoom
+- [x] **Hatch fill controls** — per-import enable/disable checkbox; configurable spacing (mm) and angle (degrees); hatch lines are auto-regenerated when the import is scaled so physical spacing is preserved; hatch paths are included in G-code output as ordinary strokes
+- [x] **G-code toolpath properties** — when a toolpath is selected the Properties panel shows: filename, file size (B / KB / MB), total line count, feedrate extracted from the first `F` word, and estimated job duration (see Estimated job time below)
+
+### Layer Groups
+
+- [x] Named, colour-coded layer groups for multi-pen / multi-colour workflows — add, rename, and delete groups; assign a colour used as the canvas stroke tint for all member imports
+- [x] Drag imports into / out of groups in the Properties panel sidebar
+- [x] Collapse / expand groups in the Properties panel
+- [x] Group move / scale / rotate — selecting a group transforms all member imports together around the group centroid
+- [x] G-code generation per group — `toVectorObjectsForGroup()` and `toVectorObjectsUngrouped()` allow generating separate G-code files for each pen layer
+- [x] Stroke width synced across group — changing stroke width on any member propagates to all imports in the same group
+
+### Copy / Paste
+
+- [x] Copy (Ctrl+C) / Cut (Ctrl+X) / Paste (Ctrl+V) for imports — in-memory clipboard; paste produces a positionally-offset clone with an auto-numbered name (e.g. `logo copy`, `logo copy (2)`)
+- [x] Native Electron Edit menu wires up Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Cut, Copy, Paste, Select All with standard accelerators
+
+### Undo / Redo
+
+- [x] 50-step undo/redo history in `canvasStore`; canvas gestures (drag, rotate, scale) call `snapshotForGesture()` at mousedown and `commitGesture()` on mouseup — trivial interactions that produce no change are discarded so the stack is never polluted; redo stack is cleared on any new edit
+
+### Layout Management
+
+- [x] **Save layout** — saves all imports, layer groups, toolpath reference, and canvas settings to a user-chosen `.json` file via a native save dialog
+- [x] **Open layout** — restores a previously saved layout including imports, groups, and toolpath references via a native open dialog
+- [x] **Close layout** — `CloseLayoutDialog` confirmation prompt before discarding unsaved changes; accessible from the File menu
+
+### Page Templates
+
+- [x] Built-in page sizes: A2, A3, A4, A5, A6, Letter, Legal, Tabloid — loaded from `~/.config/terraForge/page-sizes.json` with built-in defaults
+- [x] Page template overlay on canvas — shows the selected paper boundary as a visual reference for print-size artwork; overlay is non-interactive and renders below imports
+- [x] "Open page sizes file" shortcut in menu opens the JSON config file for user customisation
 
 ### Architecture
 
@@ -192,10 +228,10 @@
 
 - [x] **Rotation** — rotation handle (filled circle above the top-centre edge of the selection box) supports drag-to-rotate; bounding box and all 8 scale handles track the rotated position; rotation numeric input in the Properties panel; rotation is applied in G-code output via `transformPt` in `gcodeEngine.ts`
 - [x] **Canvas zoom / pan** — scroll-to-zoom (mouse wheel), Space+drag pan, middle-mouse-button drag pan, +/− overlay buttons, keyboard shortcuts (Ctrl+Shift++/−)
-- [ ] **Snap to grid** — no grid snapping when dragging
-- [ ] **Undo / redo** — no history stack
+- [ ] **Snap to grid** — no grid snapping when dragging (rotation snap to 45° increments IS implemented; see Rotation controls in Properties Panel above)
+- [x] **Undo / redo** — 50-step history stack in `canvasStore`; see Undo / Redo section above
 - [x] **Canvas ruler / dimension overlay** — screen-space X/Y rulers with adaptive tick density, mm labels, and origin highlighted in red
-- [ ] **Multi-select** — can only select one import at a time
+- [x] **Multi-select** — Ctrl+A selects all imports simultaneously; repeated Ctrl+A cycles: all → first single → all; grouped move / scale / rotate applies to all selected objects around the group centroid; individual Ctrl+click multi-select and rubber-band marquee selection are not yet implemented
 - [x] **Live plot progress on canvas** - completed segments coloured red (cuts) and orange (rapids) overlay the toolpath exactly; progress is tracked by projecting the machine's reported WPos onto the nearest G-code segment rather than tracing raw coordinates, so the overlay stays on the path even with sparse position samples; partial segment progress is shown mid-segment; accumulates incrementally; resets on new job start or toolpath change
 - [x] **Pen position crosshair** — Lucide Crosshair icon tracks the current work position in real-time whenever the machine is connected; WCO-corrected (prefers WPos: from FluidNC status, falls back to MPos − tracked WCO offset so Set Zero use-cases work correctly); rendered as a constant-size screen-space overlay in green with a subtle glow so it stays visible at any zoom level over complex drawings
 
@@ -216,7 +252,7 @@
 
 ### Machine Control
 
-- [ ] **Auto-reconnect on WebSocket drop** — watchdog detects the loss, but reconnection must be manual
+- [x] **Auto-reconnect on WebSocket drop** — exponential back-off starting at 3 s, doubling each attempt up to 60 s; each reconnect attempt gets a unique generation counter to invalidate stale event handlers; HTTP 503 responses accelerate the back-off; WebSocket port re-detected from `[ESP800]` on each attempt; intentional disconnect sends close code 1000 to avoid wedging the ESP32's WebSocket slot
 - [ ] **Serial streaming** — streaming G-code line-by-line over USB serial is not implemented; current serial API only sends individual commands
 - [ ] **Bluetooth connection** — FluidNC supports Bluetooth; `MachineConfig.connection` type could be extended to `"wifi" | "usb" | "bluetooth"`
 - [x] **Homing sequence button** (`$H`) — in main toolbar, disabled when not connected
@@ -237,12 +273,12 @@
 
 ### UX / Polish
 
-- [ ] **Keyboard shortcut map** — no help panel, but the following shortcuts ARE implemented: Space+drag=pan, middle-mouse=pan, Ctrl+0=fit-to-view, Ctrl+Shift++/−=zoom, Delete/Backspace=remove selection, Escape=deselect
+- [ ] **Keyboard shortcut map** — no dedicated help panel, but the following shortcuts ARE implemented: Space+drag=pan, middle-mouse=pan, Ctrl+0=fit-to-view, Ctrl+Shift++/−=zoom, Delete/Backspace=remove selection, Escape=deselect, Ctrl+Z=undo, Ctrl+Shift+Z=redo, Ctrl+A=select all, Ctrl+C=copy, Ctrl+X=cut, Ctrl+V=paste, Ctrl+I=import SVG, Ctrl+O=open layout, Ctrl+S=save layout
 - [ ] **First-run onboarding wizard** — no guidance for new users to set up a machine config
 - [ ] **Recent files list**
 - [x] **Notifications for completed/cancelled/failed tasks** — toast stack with auto-dismiss for completed/cancelled (8 s) and persistent display for errors
 - [x] **Error detail in task toasts** — errored tasks show the error string as a second line below the label
-- [ ] **Dark / light theme toggle**
+- [x] **Dark / light theme toggle** — Moon / Sun icon button in the toolbar; `useThemeStore` with `toggleTheme()` / `setTheme()`; applies `dark` / `light` class to `<html>` element immediately; persisted across sessions in `localStorage` under `terraforge-theme`
 - [x] **Zoom-to-fit** button (⊡) in canvas overlay centres and scales the bed to fill the viewport; Ctrl+0 keyboard shortcut; button highlights red when actively fitted; re-fits automatically on window resize
 - [ ] **Print / export canvas as image**
 
@@ -259,7 +295,7 @@
 - [ ] **Gamepad / joystick input for jog**
 - [ ] **Machine status history chart** (position over time)
 - [ ] **FluidNC config file editor** (edit `config.yaml` in-app)
-- [ ] **Estimated job time** (total path length ÷ feedrate)
+- [x] **Estimated job time** — shown in the Properties panel when a G-code toolpath is selected; computed as `(totalCutDistance / feedrate) + (totalRapidDistance / rapidRate)` where `rapidRate = min(feedrate × 5, 10 000 mm/min)`; formatted as `15 s`, `3 m 45 s`, or `1 h 22 m`; feedrate extracted from the first `F` word in the file; distances accumulated during `parseGcode`
 - [ ] **Crash / alarm detection with auto-pause**
 - [ ] **Tool/pen preset library**
 - [ ] **SVG optimisation before import** (remove duplicate nodes, merge short segments)
