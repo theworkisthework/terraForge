@@ -1350,7 +1350,7 @@ export function Toolbar({
         <button
           onClick={handleConnect}
           disabled={!activeConfigId || isConnecting}
-          className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors flex items-center gap-1.5"
+          className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors text-white flex items-center gap-1.5"
         >
           {isConnecting ? (
             <>
@@ -1397,7 +1397,7 @@ export function Toolbar({
       <button
         onClick={() => setShowGcodeDialog(true)}
         disabled={generating || imports.length === 0}
-        className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors"
+        className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors text-white"
         title="Choose generation options then generate G-code"
       >
         {generating ? "Generating…" : "Generate G-code"}
@@ -1543,7 +1543,7 @@ export function Toolbar({
       {/* Jog toggle */}
       <button
         onClick={onToggleJog}
-        className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-accent" : "bg-secondary hover:bg-secondary-hover"}`}
+        className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-accent text-white" : "bg-secondary hover:bg-secondary-hover text-content"}`}
       >
         Jog
       </button>
