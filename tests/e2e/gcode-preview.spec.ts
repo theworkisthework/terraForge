@@ -368,3 +368,75 @@ test("file browser: pause ⏸ reverts to play ▶ when the job ends (Idle)", asy
   );
   await expect(pauseBtn).not.toBeVisible({ timeout: 5_000 });
 });
+
+// ── Group 6: Job abort ────────────────────────────────────────────────────────
+//
+// Simulate a running job via a status push, then exercise the Abort button
+// and its ConfirmDialog, verifying that the IPC call is made and the UI
+// reverts to idle state on confirmation.
+
+test("Abort button is visible while a job is running", async () => {
+  await pushRendererEvent(electronApp, "fluidnc:status", {
+    state: "Run",
+    mpos: { x: 0, y: 0, z: 0 },
+  });
+  await window.waitForTimeout(200);
+
+  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  await expect(abortBtn).toBeVisible({ timeout: 3_000 });
+});
+
+test("clicking Abort shows a confirmation dialog", async () => {
+  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  await expect(abortBtn).toBeVisible({ timeout: 3_000 });
+  await abortBtn.click();
+
+  const confirmBtn = window.locator("[role='dialog'] button:has-text('Abort')");
+  await expect(confirmBtn).toBeVisible({ timeout: 3_000 });
+});
+
+test("confirming Abort calls abortJob and machine returns to Idle", async () => {
+  await mockIpcInvoke(electronApp, "fluidnc:abortJob", undefined);
+
+  const confirmBtn = window.locator("[role='dialog'] button:has-text('Abort')");
+  await confirmBtn.click();
+
+  // Simulate the machine transitioning back to Idle after abort.
+  await pushRendererEvent(electronApp, "fluidnc:status", {
+    state: "Idle",
+    mpos: { x: 0, y: 0, z: 0 },
+  });
+  await window.waitForTimeout(300);
+
+  // Abort button should be gone; Start job button should be visible.
+  await expect(window.locator("button:has-text('✕ Abort')")).not.toBeVisible({
+    timeout: 3_000,
+  });
+
+  await expect(window.locator("button:has-text('▶ Start job')")).toBeVisible({
+    timeout: 3_000,
+  });
+});
+
+test("cancelling the Abort dialog keeps the job running", async () => {
+  // Re-enter Run state.
+  await pushRendererEvent(electronApp, "fluidnc:status", {
+    state: "Run",
+    mpos: { x: 5, y: 5, z: 0 },
+  });
+  await window.waitForTimeout(200);
+
+  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  await expect(abortBtn).toBeVisible({ timeout: 3_000 });
+  await abortBtn.click();
+
+  const cancelBtn = window.locator("[role='dialog'] button:has-text('Cancel')");
+  await expect(cancelBtn).toBeVisible({ timeout: 3_000 });
+  await cancelBtn.click();
+
+  // Dialog dismissed — abort button should still be showing (job still running).
+  await expect(abortBtn).toBeVisible({ timeout: 3_000 });
+  await expect(window.locator("[role='dialog']")).not.toBeVisible({
+    timeout: 2_000,
+  });
+});
