@@ -54,15 +54,15 @@ terraForge communicates with FluidNC over **Wi-Fi (WebSocket + HTTP REST)** or *
 
 ### Panel Summary
 
-| Area             | Location         | Purpose                                              |
-| ---------------- | ---------------- | ---------------------------------------------------- |
-| **Toolbar**      | Top              | Connect, import, generate, home, jog, settings       |
-| **File Browser** | Left (240 px)    | Browse FluidNC internal filesystem and SD card       |
-| **Canvas**       | Centre           | Visualise the bed, SVG imports, and G-code toolpaths |
-| **Properties**   | Right (256 px)   | Position, scale, and manage imported objects         |
-| **Console**      | Bottom-left      | Real-time FluidNC output; send raw commands          |
-| **Job**          | Bottom-right     | Start/pause/resume/abort; job progress bar           |
-| **Toast stack**  | Canvas top-right | Background task progress and notifications           |
+| Area                   | Location         | Purpose                                              |
+| ---------------------- | ---------------- | ---------------------------------------------------- |
+| **Toolbar**            | Top              | Connect, import, generate, home, jog, settings       |
+| **File Browser**       | Left (240 px)    | Browse FluidNC internal filesystem and SD card       |
+| **Canvas**             | Centre           | Visualise the bed, SVG imports, and G-code toolpaths |
+| **Properties**         | Right (256 px)   | Position, scale, and manage imported objects         |
+| **Console**            | Bottom-left      | Real-time FluidNC output; send raw commands          |
+| **Job**                | Bottom-right     | Start/pause/resume/abort; job progress bar           |
+| **Notification stack** | Canvas top-right | Background task progress and notifications           |
 
 ---
 
@@ -156,7 +156,7 @@ The connection status indicator (top-right of toolbar) shows:
 | 🟢 Green dot + "Connected"       | Connected, WebSocket live              |
 | 🟡 Amber pulsing + "Connecting…" | Connected but WebSocket not yet active |
 
-If connection fails, a red error toast appears with the error message.
+If connection fails, a red error notification appears with the error message.
 
 ### USB Serial Connection
 
@@ -201,7 +201,7 @@ terraForge:
 2. Resolves all `transform` attributes (including Inkscape layer matrices) and bakes them into absolute path coordinates.
 3. Normalises path coordinates so the object's origin is at its top-left corner.
 4. Displays the import at position (0, 0) on the bed (bottom-left corner).
-5. Shows a toast notification on completion.
+5. Shows a notification message on completion.
 
 #### Physical Size Handling
 
@@ -554,7 +554,7 @@ Every generated file includes a header comment with machine name, bed dimensions
 
 ### Cancelling Generation
 
-While generation is running, a progress toast appears. Click the **✕** on the toast to cancel. The worker stops immediately.
+While generation is running, a progress notification appears. Click the **✕** on the notification to cancel. The worker stops immediately.
 
 ---
 
@@ -594,7 +594,7 @@ For each file in the listing:
 
 Click the **↑ Upload** button in a section header to open a native file dialog (unrestricted file types). The file is uploaded to the current directory. The listing refreshes automatically after upload.
 
-Upload progress is shown in the toast stack. Uploads can be cancelled via the toast's ✕ button.
+Upload progress is shown in the notification stack. Uploads can be cancelled via the notification's ✕ button.
 
 **Auto-refresh:** The file listing refreshes automatically after an upload, and also whenever FluidNC emits a `[MSG:Files changed]` console message.
 
@@ -623,7 +623,7 @@ A warning appears if the selected file is not a recognised G-code extension.
 Click **▶ Start job**. Button is disabled unless a valid G-code file is selected and the machine is connected.
 
 - **SD card file** — runs immediately via the FluidNC `/run` endpoint.
-- **Local file (🖥)** — uploads to the SD card root first, then runs. Upload progress is shown in the toast stack.
+- **Local file (🖥)** — uploads to the SD card root first, then runs. Upload progress is shown in the notification stack.
 
 ### During a Job
 
@@ -746,20 +746,20 @@ Click **Clear** in the console header to wipe the output log.
 
 ## 14. Background Tasks
 
-All long-running operations appear as **toast notifications** stacked in the top-right corner of the canvas.
+All long-running operations appear as **notifications** stacked in the top-right corner of the canvas.
 
-![Toast stack with a running task notification](../docs/resources/22-toast-stack.png)
+![Notification stack with a running task notification](../docs/resources/22-toast-stack.png)
 
-### Toast Anatomy
+### Notification Anatomy
 
-| Element              | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| **Spinner**          | Shown when progress % is unknown (indeterminate)   |
-| **Progress bar + %** | Shown when progress is measurable                  |
-| **✓ green**          | Task completed successfully                        |
-| **✕ red**            | Task cancelled by user                             |
-| **! red**            | Task failed — error detail shown on a second line  |
-| **✕ button**         | Cancel a running task, or dismiss a finished toast |
+| Element              | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| **Spinner**          | Shown when progress % is unknown (indeterminate)          |
+| **Progress bar + %** | Shown when progress is measurable                         |
+| **✓ green**          | Task completed successfully                               |
+| **✕ red**            | Task cancelled by user                                    |
+| **! red**            | Task failed — error detail shown on a second line         |
+| **✕ button**         | Cancel a running task, or dismiss a finished notification |
 
 ### Auto-dismiss
 
@@ -855,7 +855,7 @@ Available options per template:
 
 ### Connection Issues
 
-**"Connection failed" toast:**
+**"Connection failed" notification:**
 
 - Check that the FluidNC controller is powered and on the same Wi-Fi network.
 - Try using the IP address instead of `fluidnc.local` (mDNS can be unreliable on some networks).
