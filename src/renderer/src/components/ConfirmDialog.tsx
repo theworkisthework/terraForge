@@ -55,9 +55,11 @@ export function ConfirmDialog({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className={`bg-panel border rounded-lg shadow-2xl w-[320px] flex flex-col overflow-hidden ${
-        variant === "warning" ? "border-orange-500/50" : "border-border-ui"
-      }`}>
+      <div
+        className={`bg-panel border rounded-lg shadow-2xl w-[320px] flex flex-col overflow-hidden ${
+          variant === "warning" ? "border-orange-500/50" : "border-border-ui"
+        }`}
+      >
         {variant === "warning" && (
           <div className="flex items-center gap-2 px-5 py-3 bg-orange-500/10 border-b border-orange-500/30">
             <span className="text-orange-400 text-base leading-none">⚠</span>
@@ -67,33 +69,33 @@ export function ConfirmDialog({
           </div>
         )}
         <div className="p-5 flex flex-col gap-4">
-        <h2
-          id="confirm-dialog-title"
-          className="text-content font-semibold text-base tracking-wide"
-        >
-          {title}
-        </h2>
-
-        <p className="text-sm text-content leading-relaxed whitespace-pre-wrap">
-          {message}
-        </p>
-
-        <div className="flex gap-2 justify-end mt-1">
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
-            >
-              {cancelLabel}
-            </button>
-          )}
-          <button
-            onClick={onConfirm}
-            className="px-3 py-1.5 text-sm rounded transition-colors text-white bg-accent hover:bg-accent-hover"
+          <h2
+            id="confirm-dialog-title"
+            className="text-content font-semibold text-base tracking-wide"
           >
-            {confirmLabel}
-          </button>
-        </div>
+            {title}
+          </h2>
+
+          <p className="text-sm text-content leading-relaxed whitespace-pre-wrap">
+            {message}
+          </p>
+
+          <div className="flex gap-2 justify-end mt-1">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
+              >
+                {cancelLabel}
+              </button>
+            )}
+            <button
+              onClick={onConfirm}
+              className="px-3 py-1.5 text-sm rounded transition-colors text-white bg-accent hover:bg-accent-hover"
+            >
+              {confirmLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>
