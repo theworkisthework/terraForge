@@ -63,10 +63,9 @@ export function ConsolePanel() {
       {showRestartConfirm && (
         <ConfirmDialog
           title="Restart Firmware?"
-          message={
-            "Restart firmware?\n\nThis reboots the controller (ESP32 restart). The connection will drop and you will need to reconnect."
-          }
+          message="This reboots the controller (ESP32 restart). The connection will drop and you will need to reconnect."
           confirmLabel="Restart"
+          variant="warning"
           onConfirm={doFirmwareReset}
           onCancel={() => setShowRestartConfirm(false)}
         />
@@ -112,9 +111,9 @@ export function ConsolePanel() {
                 onClick={handleFirmwareReset}
                 disabled={resetting || showRestartConfirm}
                 title="Restart firmware (ESP32 reboot) — use when controller is stuck"
-                className="text-xs px-2 py-0.5 rounded bg-orange-950 text-orange-400 hover:bg-orange-800 hover:text-white disabled:opacity-50 transition-colors"
+                className="text-xs px-2 py-0.5 rounded bg-secondary hover:bg-secondary-hover text-content-muted disabled:opacity-50 transition-colors"
               >
-                {resetting ? "Restarting…" : "⚠ Restart FW"}
+                {resetting ? "Restarting…" : "Restart FW"}
               </button>
             )}
             <button

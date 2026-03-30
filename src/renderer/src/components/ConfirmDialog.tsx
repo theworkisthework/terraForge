@@ -22,6 +22,8 @@ interface Props {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** "warning" adds an orange icon bar and styles the confirm button in orange. */
+  variant?: "default" | "warning";
   onConfirm: () => void;
   /** When omitted the Cancel button is hidden — dialog acts as a single-button alert. */
   onCancel?: () => void;
@@ -32,6 +34,7 @@ export function ConfirmDialog({
   message,
   confirmLabel = "OK",
   cancelLabel = "Cancel",
+  variant = "default",
   onConfirm,
   onCancel,
 }: Props) {
@@ -52,10 +55,21 @@ export function ConfirmDialog({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[320px] p-5 flex flex-col gap-4">
+      <div className={`bg-panel border rounded-lg shadow-2xl w-[320px] flex flex-col overflow-hidden ${
+        variant === "warning" ? "border-orange-500/50" : "border-border-ui"
+      }`}>
+        {variant === "warning" && (
+          <div className="flex items-center gap-2 px-5 py-3 bg-orange-500/10 border-b border-orange-500/30">
+            <span className="text-orange-400 text-base leading-none">⚠</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-orange-400">
+              Warning
+            </span>
+          </div>
+        )}
+        <div className="p-5 flex flex-col gap-4">
         <h2
           id="confirm-dialog-title"
-          className="text-white font-semibold text-base tracking-wide"
+          className="text-content font-semibold text-base tracking-wide"
         >
           {title}
         </h2>
@@ -75,10 +89,11 @@ export function ConfirmDialog({
           )}
           <button
             onClick={onConfirm}
-            className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hover transition-colors text-white"
+            className="px-3 py-1.5 text-sm rounded transition-colors text-white bg-accent hover:bg-accent-hover"
           >
             {confirmLabel}
           </button>
+        </div>
         </div>
       </div>
     </div>
