@@ -12,6 +12,7 @@
 - [x] Rounded-rect support (`rx`/`ry` attributes)
 - [x] Physical size detection from SVG `width`/`height` attributes — handles `mm`, `cm`, `in`, `pt`, `pc`, `px`/unitless (96 DPI), so imported SVGs appear at their correct real-world scale by default
 - [x] ViewBox offset support — SVGs with non-zero viewBox origins render correctly
+- [x] **SVG sub-layer detection** — `<g>` elements that carry an explicit `display` style declaration (e.g. Inkscape sub-layers) are detected at import time and stored as `SvgLayer[]` on the `SvgImport`; initial visibility mirrors the source SVG (`display:none` layers start hidden); each path records the id of its containing layer; the Properties panel groups paths under collapsible layer rows, with per-layer visibility toggle and per-path expand; paths not inside any detected layer group appear in an ungrouped section below; layer visibility is respected by `toVectorObjects()` so hidden layers are excluded from G-code generation
 - [x] Grouped import model: one `SvgImport` per file containing `SvgPath[]`, paths preserve relative positions
 - [x] Per-import x/y position on bed (mm) — clamped so the object's far edge stays within bed bounds
 - [x] Per-import uniform scale
