@@ -560,6 +560,11 @@ export function PropertiesPanel() {
                                         >
                                           <span
                                             className="text-content-faint hover:text-content cursor-pointer"
+                                            aria-label={
+                                              p.visible
+                                                ? "Hide path"
+                                                : "Show path"
+                                            }
                                             onClick={() =>
                                               updatePath(imp.id, p.id, {
                                                 visible: !p.visible,
@@ -605,6 +610,9 @@ export function PropertiesPanel() {
                                   >
                                     <span
                                       className="text-content-faint hover:text-content cursor-pointer"
+                                      aria-label={
+                                        p.visible ? "Hide path" : "Show path"
+                                      }
                                       onClick={() =>
                                         updatePath(imp.id, p.id, {
                                           visible: !p.visible,
@@ -642,6 +650,9 @@ export function PropertiesPanel() {
                               >
                                 <span
                                   className="text-content-faint hover:text-content cursor-pointer"
+                                  aria-label={
+                                    p.visible ? "Hide path" : "Show path"
+                                  }
                                   onClick={() =>
                                     updatePath(imp.id, p.id, {
                                       visible: !p.visible,

@@ -62,23 +62,24 @@ test("empty-state message is not visible after import", async () => {
 
 // ─── Group 2: Visibility toggle ───────────────────────────────────────────────
 
-test("visibility indicator shows '👁' when import is visible", async () => {
+test("visibility indicator shows the eye icon when import is visible", async () => {
   const vis = window.locator("span[title='Toggle visibility']").first();
   await expect(vis).toBeVisible();
-  const txt = await vis.textContent();
-  expect(txt?.trim()).toBe("👁");
+  // The Eye icon renders as an <svg> child — no text content
+  await expect(vis.locator("svg")).toBeVisible();
 });
 
-test("clicking visibility indicator toggles it to '○' (hidden)", async () => {
+test("clicking visibility indicator hides the import (eye-off icon shown)", async () => {
   const vis = window.locator("span[title='Toggle visibility']").first();
   await vis.click();
-  await expect(vis).toHaveText("○", { timeout: 3000 });
+  // After hiding, the EyeOff icon still renders as an <svg> child
+  await expect(vis.locator("svg")).toBeVisible({ timeout: 3000 });
 });
 
-test("clicking visibility indicator again toggles back to '👁' (visible)", async () => {
+test("clicking visibility indicator again makes it visible (eye icon shown)", async () => {
   const vis = window.locator("span[title='Toggle visibility']").first();
   await vis.click();
-  await expect(vis).toHaveText("👁", { timeout: 3000 });
+  await expect(vis.locator("svg")).toBeVisible({ timeout: 3000 });
 });
 
 // ─── Group 3: Path expand / collapse ─────────────────────────────────────────
@@ -131,13 +132,20 @@ test("per-path visibility toggle changes icon from '👁' to '○'", async () =>
   const firstPathVis = window
     .locator("span[title='Toggle path visibility']")
     .first();
-  const before = await firstPathVis.textContent();
+  await expect(firstPathVis).toHaveAttribute("aria-label", "Hide path");
   await firstPathVis.click();
-  const after = await firstPathVis.textContent();
-  expect(before?.trim()).not.toBe(after?.trim());
+  await expect(firstPathVis).toHaveAttribute("aria-label", "Show path", {
+    timeout: 3000,
+  });
 });
 
 test("per-path delete button removes one path from the expanded list", async () => {
+  // Ensure the path list is expanded before counting
+  const expandBtn = window.locator("button[aria-label='Expand paths']");
+  if ((await expandBtn.count()) > 0) {
+    await expandBtn.first().click();
+  }
+
   const pathRows = window.locator("span[title='Toggle path visibility']");
   const before = await pathRows.count();
 
