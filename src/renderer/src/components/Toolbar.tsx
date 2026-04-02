@@ -562,6 +562,25 @@ export function Toolbar({
         // positions (fixes Inkscape layer/group transforms).
         const matrix = getAccumulatedTransform(el);
         const d = applyMatrixToPathD(rawD, matrix);
+
+        // Skip paths whose bounding box has no intersection with the SVG
+        // viewport (viewBox rectangle in root user-unit space).  This mirrors
+        // the browser's default overflow:hidden clipping at the SVG boundary,
+        // so terraForge shows exactly the same content as a browser does.
+        const pathBounds = computePathsBounds([d]);
+        if (pathBounds) {
+          const vbMaxX = viewBoxX + svgWidth;
+          const vbMaxY = viewBoxY + svgHeight;
+          if (
+            pathBounds.minX > vbMaxX ||
+            pathBounds.maxX < viewBoxX ||
+            pathBounds.minY > vbMaxY ||
+            pathBounds.maxY < viewBoxY
+          ) {
+            return [];
+          }
+        }
+
         fillFlags.push(getEffectiveFill(el) !== null);
         const hasFill = fillFlags[fillFlags.length - 1];
         const outlineVisible = hasVisibleStroke(el);
