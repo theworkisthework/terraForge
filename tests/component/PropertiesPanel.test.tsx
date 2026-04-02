@@ -79,7 +79,7 @@ describe("PropertiesPanel", () => {
     const imp = createSvgImport({ name: "vis-test", visible: true });
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
-    const eyeIcon = screen.getByText("👁");
+    const eyeIcon = screen.getByTitle("Toggle visibility");
     await userEvent.click(eyeIcon);
     expect(useCanvasStore.getState().imports[0].visible).toBe(false);
   });
@@ -103,8 +103,8 @@ describe("PropertiesPanel", () => {
     const imp = createSvgImport({ paths: [p1, p2], name: "multi" });
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
-    // Click the expand button (▸)
-    const expandBtn = screen.getByText("▸");
+    // Click the expand button
+    const expandBtn = screen.getByRole("button", { name: "Expand paths" });
     await userEvent.click(expandBtn);
     expect(screen.getByText("layer1")).toBeInTheDocument();
     expect(screen.getByText("layer2")).toBeInTheDocument();
@@ -118,11 +118,9 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
     // Expand first
-    await userEvent.click(screen.getByText("▸"));
-    // Toggle path visibility (second eye, the first is the import's)
-    const allEyes = screen.getAllByText("👁");
-    // Last eye is the path's visibility toggle
-    await userEvent.click(allEyes[allEyes.length - 1]);
+    await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
+    // Toggle path visibility
+    await userEvent.click(screen.getByTitle("Toggle path visibility"));
     expect(useCanvasStore.getState().imports[0].paths[0].visible).toBe(false);
   });
 
@@ -135,7 +133,7 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
     // Expand
-    await userEvent.click(screen.getByText("▸"));
+    await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
     expect(screen.getByText("remove")).toBeInTheDocument();
     // Click the Remove path button for "remove" path
     const removeBtns = screen.getAllByTitle("Remove path");
@@ -362,8 +360,10 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Stats are initially hidden (not selected)
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
-    // Click the collapse toggle button (▸ = collapsed)
-    await userEvent.click(screen.getByText("▸"));
+    // Click the expand toggle button
+    await userEvent.click(
+      screen.getByRole("button", { name: "Expand toolpath details" }),
+    );
     expect(useCanvasStore.getState().toolpathSelected).toBe(true);
     expect(screen.getByText("Lines")).toBeInTheDocument();
   });
@@ -378,8 +378,10 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Stats are visible while selected
     expect(screen.getByText("Lines")).toBeInTheDocument();
-    // Click the expand toggle button (▾ = expanded/selected)
-    await userEvent.click(screen.getByText("▾"));
+    // Click the collapse toggle button
+    await userEvent.click(
+      screen.getByRole("button", { name: "Collapse toolpath details" }),
+    );
     expect(useCanvasStore.getState().toolpathSelected).toBe(false);
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
   });
