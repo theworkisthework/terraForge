@@ -175,6 +175,7 @@
 - [x] Remove individual paths — ✕ button per path deletes it from the import without removing the whole import
 - [x] **Rotation controls** — numeric angle input in Properties panel; CCW / CW shortcut buttons; ±5° / ±15° / ±45° preset buttons; configurable step-size flyout; rotation snaps to the nearest 0° / 45° / 90° / 135° / 180° / 225° / 270° / 315° preset when within 3° of one
 - [x] **Position (X/Y) inputs** — explicit mm coordinate inputs in Properties panel, clamped to bed bounds; synced with canvas drag
+- [x] **Template-aware alignment controls** — alignment buttons can target either the full machine bed (default) or, when a page template is active, the page boundary / margin boundary; the Properties panel includes an "Align to template" checkbox plus Page/Margin radio selector
 - [x] **Stroke width per import** — configurable pen stroke width in mm; when the import belongs to a layer group the new stroke width is synced across all imports in that group automatically
 - [x] **Centre marker toggle** — checkbox shows/hides a crosshair (+) at the geometric centre of the selected import or toolpath; rendered at screen-constant size so it stays visible at any zoom
 - [x] **Hatch fill controls** — per-import enable/disable checkbox; configurable spacing (mm) and angle (degrees); hatch lines are auto-regenerated when the import is scaled so physical spacing is preserved; hatch paths are included in G-code output as ordinary strokes

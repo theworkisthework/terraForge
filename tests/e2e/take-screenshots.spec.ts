@@ -721,13 +721,24 @@ test("22-toast-stack — toast notification during G-code generation", async () 
     .waitFor({ timeout: 5_000 });
 
   // Click Generate (no save / upload needed — just trigger the worker)
-  // Uncheck "Upload to SD card" first so the task completes without an IPC call
+  // Uncheck "Upload to SD card" first so the task completes without an SD-upload IPC call
   const uploadCheckbox = window.locator(
     "label:has-text('Upload to SD card') input[type='checkbox']",
   );
   if (await uploadCheckbox.isChecked()) {
     await uploadCheckbox.uncheck();
   }
+
+  // Ensure "Save to computer" is checked so neitherOutput stays false and the
+  // Generate button remains enabled. Mock the save dialog to return "" (cancel)
+  // so no native dialog appears and no file write is triggered.
+  const saveCheckbox = window.locator(
+    "label:has-text('Save to computer') input[type='checkbox']",
+  );
+  if (!(await saveCheckbox.isChecked())) {
+    await saveCheckbox.check();
+  }
+  await mockIpcInvoke(electronApp, "fs:saveGcodeDialog", "");
 
   const dialogGenerateBtn = window
     .locator("button")

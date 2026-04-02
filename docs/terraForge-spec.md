@@ -492,6 +492,8 @@ Import name (inline rename on double-click)
 
 X/Y position, W/H dimensions, scale, rotation (with +-5/+-15/+-45 degree presets and snap to 45 degree increments)
 
+Alignment controls: left/center/right and top/center/bottom align buttons target machine bed by default; when a page template is active, an "Align to template" checkbox with Page/Margin selector switches alignment bounds to the selected page template rectangle or its margin inset rectangle
+
 Aspect ratio lock (padlock), fit-to-bed, 1:1 reset shortcuts
 
 Per-import visibility toggle; expandable path list; per-path visibility and delete

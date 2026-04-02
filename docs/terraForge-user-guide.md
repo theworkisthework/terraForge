@@ -390,6 +390,16 @@ All position/size fields clamp to the bed boundary automatically.
 
 ![Properties panel with numeric fields visible for a selected import](../docs/resources/12-properties-numeric.png)
 
+### Alignment Controls
+
+The alignment icon row (left/center/right and top/center/bottom) aligns the selected import within a chosen frame:
+
+- **Bed (default):** aligns to the full machine bed extents.
+- **Template mode:** enable **Align to template** to switch alignment to the active page template.
+- **Page / Margin target:** choose **Page** to align to the page rectangle, or **Margin** to align to the inset printable rectangle.
+
+If no page template is selected, **Align to template** is disabled and alignment stays bed-based.
+
 ### Aspect Ratio Lock
 
 The **🔒 padlock** icon between the W and H fields controls aspect ratio:
