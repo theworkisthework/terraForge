@@ -79,6 +79,8 @@ export function PropertiesPanel() {
   const selectGroup = useCanvasStore((s) => s.selectGroup);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const machineStatus = useMachineStore((s) => s.status);
+  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
+  const pageSizes = useCanvasStore((s) => s.pageSizes);
   const isJobActive =
     machineStatus?.state === "Run" || machineStatus?.state === "Hold";
 
@@ -118,6 +120,10 @@ export function PropertiesPanel() {
     });
   const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
   const [ratioLocked, setRatioLocked] = useState(true);
+  const [templateAlignEnabled, setTemplateAlignEnabled] = useState(false);
+  const [templateAlignTarget, setTemplateAlignTarget] = useState<
+    "page" | "margin"
+  >("page");
 
   /** Returns the group id that the given import belongs to, or null. */
   const importGroupId = (importId: string): string | null =>
@@ -702,6 +708,13 @@ export function PropertiesPanel() {
                             const cfg = activeConfig();
                             const bedW = cfg?.bedWidth ?? 220;
                             const bedH = cfg?.bedHeight ?? 200;
+                            const activePageSize = pageTemplate
+                              ? pageSizes.find(
+                                  (ps) => ps.id === pageTemplate.sizeId,
+                                )
+                              : null;
+                            const canAlignToTemplate =
+                              !!pageTemplate && !!activePageSize;
                             return (
                               <>
                                 {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
@@ -724,6 +737,61 @@ export function PropertiesPanel() {
                                 {(() => {
                                   const btnCls =
                                     "p-1 text-content-faint hover:text-content rounded hover:bg-secondary/40 transition-colors";
+                                  const useTemplateBounds =
+                                    templateAlignEnabled && canAlignToTemplate;
+                                  const pageW = activePageSize
+                                    ? pageTemplate!.landscape
+                                      ? activePageSize.heightMM
+                                      : activePageSize.widthMM
+                                    : bedW;
+                                  const pageH = activePageSize
+                                    ? pageTemplate!.landscape
+                                      ? activePageSize.widthMM
+                                      : activePageSize.heightMM
+                                    : bedH;
+                                  const inset = useTemplateBounds
+                                    ? templateAlignTarget === "margin"
+                                      ? Math.min(
+                                          Math.max(
+                                            pageTemplate?.marginMM ?? 20,
+                                            0,
+                                          ),
+                                          pageW / 2,
+                                          pageH / 2,
+                                        )
+                                      : 0
+                                    : 0;
+                                  const minX = useTemplateBounds ? inset : 0;
+                                  const maxX = useTemplateBounds
+                                    ? pageW - inset
+                                    : bedW;
+                                  const minY = useTemplateBounds ? inset : 0;
+                                  const maxY = useTemplateBounds
+                                    ? pageH - inset
+                                    : bedH;
+                                  const frameName = useTemplateBounds
+                                    ? templateAlignTarget === "margin"
+                                      ? "margin"
+                                      : "page"
+                                    : "bed";
+                                  const leftTitle = useTemplateBounds
+                                    ? `Align left edge to ${frameName} left (X = ${Math.round(minX * 10) / 10})`
+                                    : "Align left edge to bed left (X = 0)";
+                                  const centerHTitle = useTemplateBounds
+                                    ? `Centre horizontally (${frameName}) (X = ${Math.round((minX + (maxX - minX - objW) / 2) * 10) / 10} mm)`
+                                    : `Centre horizontally (X = ${Math.round(((bedW - objW) / 2) * 10) / 10} mm)`;
+                                  const rightTitle = useTemplateBounds
+                                    ? `Align right edge to ${frameName} right (X = ${Math.round((maxX - objW) * 10) / 10} mm)`
+                                    : `Align right edge to bed right (X = ${Math.round((bedW - objW) * 10) / 10} mm)`;
+                                  const topTitle = useTemplateBounds
+                                    ? `Align top edge to ${frameName} top (Y = ${Math.round((maxY - objH) * 10) / 10} mm)`
+                                    : `Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`;
+                                  const centerVTitle = useTemplateBounds
+                                    ? `Centre vertically (${frameName}) (Y = ${Math.round((minY + (maxY - minY - objH) / 2) * 10) / 10} mm)`
+                                    : `Centre vertically (Y = ${Math.round(((bedH - objH) / 2) * 10) / 10} mm)`;
+                                  const bottomTitle = useTemplateBounds
+                                    ? `Align bottom edge to ${frameName} bottom (Y = ${Math.round(minY * 10) / 10} mm)`
+                                    : "Align bottom edge to bed bottom (Y = 0)";
                                   const alignH = (x: number) =>
                                     updateImport(imp.id, {
                                       x: Math.round(x * 1000) / 1000,
@@ -733,58 +801,128 @@ export function PropertiesPanel() {
                                       y: Math.round(y * 1000) / 1000,
                                     });
                                   return (
-                                    <div className="flex items-center gap-0.5 mb-2">
-                                      <button
-                                        className={btnCls}
-                                        title="Align left edge to bed left (X = 0)"
-                                        onClick={() => alignH(0)}
-                                      >
-                                        <AlignHorizontalJustifyStart
-                                          size={13}
-                                        />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Centre horizontally (X = ${Math.round(((bedW - objW) / 2) * 10) / 10} mm)`}
-                                        onClick={() =>
-                                          alignH((bedW - objW) / 2)
-                                        }
-                                      >
-                                        <AlignHorizontalJustifyCenter
-                                          size={13}
-                                        />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Align right edge to bed right (X = ${Math.round((bedW - objW) * 10) / 10} mm)`}
-                                        onClick={() => alignH(bedW - objW)}
-                                      >
-                                        <AlignHorizontalJustifyEnd size={13} />
-                                      </button>
-                                      <div className="w-px h-3 bg-border-ui mx-0.5" />
-                                      <button
-                                        className={btnCls}
-                                        title={`Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`}
-                                        onClick={() => alignV(bedH - objH)}
-                                      >
-                                        <AlignVerticalJustifyStart size={13} />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Centre vertically (Y = ${Math.round(((bedH - objH) / 2) * 10) / 10} mm)`}
-                                        onClick={() =>
-                                          alignV((bedH - objH) / 2)
-                                        }
-                                      >
-                                        <AlignVerticalJustifyCenter size={13} />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title="Align bottom edge to bed bottom (Y = 0)"
-                                        onClick={() => alignV(0)}
-                                      >
-                                        <AlignVerticalJustifyEnd size={13} />
-                                      </button>
+                                    <div className="mb-2">
+                                      <div className="flex items-center gap-0.5">
+                                        <button
+                                          className={btnCls}
+                                          title={leftTitle}
+                                          onClick={() => alignH(minX)}
+                                        >
+                                          <AlignHorizontalJustifyStart
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={centerHTitle}
+                                          onClick={() =>
+                                            alignH(
+                                              minX + (maxX - minX - objW) / 2,
+                                            )
+                                          }
+                                        >
+                                          <AlignHorizontalJustifyCenter
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={rightTitle}
+                                          onClick={() => alignH(maxX - objW)}
+                                        >
+                                          <AlignHorizontalJustifyEnd
+                                            size={13}
+                                          />
+                                        </button>
+                                        <div className="w-px h-3 bg-border-ui mx-0.5" />
+                                        <button
+                                          className={btnCls}
+                                          title={topTitle}
+                                          onClick={() => alignV(maxY - objH)}
+                                        >
+                                          <AlignVerticalJustifyStart
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={centerVTitle}
+                                          onClick={() =>
+                                            alignV(
+                                              minY + (maxY - minY - objH) / 2,
+                                            )
+                                          }
+                                        >
+                                          <AlignVerticalJustifyCenter
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={bottomTitle}
+                                          onClick={() => alignV(minY)}
+                                        >
+                                          <AlignVerticalJustifyEnd size={13} />
+                                        </button>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <label className="inline-flex items-center gap-1 text-[10px] text-content-muted">
+                                          <input
+                                            type="checkbox"
+                                            checked={templateAlignEnabled}
+                                            disabled={!canAlignToTemplate}
+                                            onChange={(e) =>
+                                              setTemplateAlignEnabled(
+                                                e.target.checked,
+                                              )
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Align to template
+                                        </label>
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[10px] ${templateAlignEnabled && canAlignToTemplate ? "text-content-muted" : "text-content-faint"}`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name="align-template-target"
+                                            value="page"
+                                            checked={
+                                              templateAlignTarget === "page"
+                                            }
+                                            disabled={
+                                              !templateAlignEnabled ||
+                                              !canAlignToTemplate
+                                            }
+                                            onChange={() =>
+                                              setTemplateAlignTarget("page")
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Page
+                                        </label>
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[10px] ${templateAlignEnabled && canAlignToTemplate ? "text-content-muted" : "text-content-faint"}`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name="align-template-target"
+                                            value="margin"
+                                            checked={
+                                              templateAlignTarget === "margin"
+                                            }
+                                            disabled={
+                                              !templateAlignEnabled ||
+                                              !canAlignToTemplate
+                                            }
+                                            onChange={() =>
+                                              setTemplateAlignTarget("margin")
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Margin
+                                        </label>
+                                      </div>
                                     </div>
                                   );
                                 })()}

@@ -18,6 +18,7 @@ beforeEach(() => {
     selectedPathId: null,
     gcodeToolpath: null,
     toolpathSelected: false,
+    pageTemplate: null,
   });
   useMachineStore.setState({
     configs: [],
@@ -266,6 +267,51 @@ describe("PropertiesPanel", () => {
       screen.getByTitle("Align bottom edge to bed bottom (Y = 0)"),
     );
     expect(useCanvasStore.getState().imports[0].y).toBe(0);
+  });
+
+  it("template alignment checkbox is disabled when no page template is selected", () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    expect(screen.getByLabelText("Align to template")).toBeDisabled();
+  });
+
+  it("aligns to page bounds when template align is enabled with page target", async () => {
+    setupAlignmentFixture();
+    useCanvasStore.setState({
+      pageTemplate: {
+        sizeId: "a4",
+        landscape: false,
+        marginMM: 20,
+      },
+    });
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByLabelText("Align to template"));
+    await userEvent.click(
+      screen.getByTitle("Align right edge to page right (X = 110 mm)"),
+    );
+
+    expect(useCanvasStore.getState().imports[0].x).toBe(110);
+  });
+
+  it("aligns to margin bounds when template align is enabled with margin target", async () => {
+    setupAlignmentFixture();
+    useCanvasStore.setState({
+      pageTemplate: {
+        sizeId: "a4",
+        landscape: false,
+        marginMM: 20,
+      },
+    });
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByLabelText("Align to template"));
+    await userEvent.click(screen.getByLabelText("Margin"));
+    await userEvent.click(
+      screen.getByTitle("Align left edge to margin left (X = 20)"),
+    );
+
+    expect(useCanvasStore.getState().imports[0].x).toBe(20);
   });
 
   // ── G-code toolpath panel ──────────────────────────────────────────────────
