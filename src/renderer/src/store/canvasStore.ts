@@ -75,6 +75,12 @@ interface CanvasState {
     pathId: string,
     patch: Partial<SvgPath>,
   ) => void;
+  /** Toggle visibility of a single layer within an import. */
+  updateImportLayer: (
+    importId: string,
+    layerId: string,
+    visible: boolean,
+  ) => void;
   removePath: (importId: string, pathId: string) => void;
   /** Whether the G-code toolpath is currently selected on the canvas. */
   toolpathSelected: boolean;
@@ -283,6 +289,14 @@ export const useCanvasStore = create<CanvasState>()(
           if (path) Object.assign(path, patch);
         }),
 
+      updateImportLayer: (importId, layerId, visible) =>
+        set((state) => {
+          const imp = state.imports.find((i) => i.id === importId);
+          if (!imp?.layers) return;
+          const layer = imp.layers.find((l) => l.id === layerId);
+          if (layer) layer.visible = visible;
+        }),
+
       removePath: (importId, pathId) =>
         set((state) => {
           const imp = state.imports.find((i) => i.id === importId);
@@ -393,9 +407,14 @@ export const useCanvasStore = create<CanvasState>()(
       toVectorObjects: (): VectorObject[] =>
         get()
           .imports.filter((imp) => imp.visible)
-          .flatMap((imp) =>
-            imp.paths
-              .filter((p) => p.visible)
+          .flatMap((imp) => {
+            const hiddenLayerIds = imp.layers
+              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
+              : null;
+            const layerVisible = (p: SvgPath) =>
+              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
+            return imp.paths
+              .filter((p) => p.visible && layerVisible(p))
               .flatMap((p): VectorObject[] => {
                 const base: VectorObject = {
                   id: p.id,
@@ -423,8 +442,8 @@ export const useCanvasStore = create<CanvasState>()(
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
-              }),
-          ),
+              });
+          }),
 
       setPlotProgress: (cuts, rapids) =>
         set((state) => {
@@ -666,9 +685,14 @@ export const useCanvasStore = create<CanvasState>()(
         const groupImportIds = new Set(group.importIds);
         return imports
           .filter((imp) => imp.visible && groupImportIds.has(imp.id))
-          .flatMap((imp) =>
-            imp.paths
-              .filter((p) => p.visible)
+          .flatMap((imp) => {
+            const hiddenLayerIds = imp.layers
+              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
+              : null;
+            const layerVisible = (p: SvgPath) =>
+              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
+            return imp.paths
+              .filter((p) => p.visible && layerVisible(p))
               .flatMap((p): VectorObject[] => {
                 const base: VectorObject = {
                   id: p.id,
@@ -696,8 +720,8 @@ export const useCanvasStore = create<CanvasState>()(
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
-              }),
-          );
+              });
+          });
       },
 
       toVectorObjectsUngrouped: () => {
@@ -705,9 +729,14 @@ export const useCanvasStore = create<CanvasState>()(
         const allGroupedIds = new Set(layerGroups.flatMap((g) => g.importIds));
         return imports
           .filter((imp) => imp.visible && !allGroupedIds.has(imp.id))
-          .flatMap((imp) =>
-            imp.paths
-              .filter((p) => p.visible)
+          .flatMap((imp) => {
+            const hiddenLayerIds = imp.layers
+              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
+              : null;
+            const layerVisible = (p: SvgPath) =>
+              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
+            return imp.paths
+              .filter((p) => p.visible && layerVisible(p))
               .flatMap((p): VectorObject[] => {
                 const base: VectorObject = {
                   id: p.id,
@@ -735,8 +764,8 @@ export const useCanvasStore = create<CanvasState>()(
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
-              }),
-          );
+              });
+          });
       },
     };
   }),

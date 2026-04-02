@@ -76,7 +76,8 @@ export interface SvgPath {
   visible: boolean;
   /** Human-readable display name for this path */
   label?: string;
-  /** Layer/group name derived from closest ancestor with an id */
+  /** Id of the `SvgLayer` (within the parent `SvgImport.layers`) that this path
+   *  belongs to, or undefined for paths not inside a detected layer group. */
   layer?: string;
   /** Whether the original shape had a visible fill colour (used to regenerate hatch) */
   hasFill?: boolean;
@@ -87,6 +88,16 @@ export interface SvgPath {
    *  Rendered and emitted for G-code alongside the outline.  Toggled as a unit
    *  with the parent path's `visible` flag. */
   hatchLines?: string[];
+}
+
+/** A logical sub-layer within an imported SVG (e.g. an Inkscape layer group). */
+export interface SvgLayer {
+  /** Matches the HTML `id` of the source `<g>` element */
+  id: string;
+  /** Human-readable label (from `inkscape:label`, element id, or class) */
+  name: string;
+  /** Whether paths in this layer are currently visible on the canvas */
+  visible: boolean;
 }
 
 /** Default hatch spacing in mm — used on import and as the UI default. */
@@ -132,6 +143,10 @@ export interface SvgImport {
   /** Preview stroke width in mm — controls how thick paths appear on the canvas.
    *  Does not affect G-code output. Defaults to DEFAULT_STROKE_WIDTH_MM. */
   strokeWidthMM?: number;
+  /** Logical layers detected from the source SVG (e.g. Inkscape sub-layers).
+   *  Each `SvgPath.layer` is the `id` of its containing `SvgLayer`.
+   *  Absent for SVGs with no detectable layer groups. */
+  layers?: SvgLayer[];
 }
 
 // ─── Page Templates ──────────────────────────────────────────────────────────

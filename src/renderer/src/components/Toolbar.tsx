@@ -12,6 +12,7 @@ import {
   type GcodeOptions,
   type SvgImport,
   type SvgPath,
+  type SvgLayer,
   type CanvasLayout,
   type PageTemplate,
   DEFAULT_HATCH_SPACING_MM,
@@ -31,6 +32,51 @@ import {
 import { generateHatchPaths } from "../utils/hatchFill";
 import { parseGcode } from "../utils/gcodeParser";
 import { importPdf } from "../utils/pdfImport";
+
+// ─── SVG layer detection helpers ─────────────────────────────────────────────
+
+/**
+ * Returns true when the element's inline `style` attribute explicitly sets
+ * `display` to some value (e.g. `display:none` or `display:inline`).
+ */
+function hasExplicitDisplay(el: Element): boolean {
+  return /\bdisplay\s*:/.test(el.getAttribute("style") ?? "");
+}
+
+function isDisplayNone(el: Element): boolean {
+  return /display\s*:\s*none/.test(el.getAttribute("style") ?? "");
+}
+
+/**
+ * Derive a human-readable name for a detected layer `<g>` element.
+ * Prefers `inkscape:label`, then `id`, then `class`, then a positional fallback.
+ */
+function getLayerName(g: Element, index: number): string {
+  const inkLabel =
+    g.getAttribute("inkscape:label") ??
+    g.getAttributeNS("http://www.inkscape.org/namespaces/inkscape", "label");
+  if (inkLabel?.trim()) return inkLabel.trim();
+  if (g.id) return g.id;
+  const cls = g.getAttribute("class");
+  if (cls?.trim()) return cls.trim();
+  return `Layer ${index + 1}`;
+}
+
+/**
+ * Walk up from `el` and return the `id` of the nearest ancestor that is a
+ * tracked layer group, or `undefined` if none exists.
+ */
+function findContainingLayerId(
+  el: Element,
+  layerGroupIds: Set<string>,
+): string | undefined {
+  let cur = el.parentElement;
+  while (cur && cur.tagName.toLowerCase() !== "svg") {
+    if (cur.id && layerGroupIds.has(cur.id)) return cur.id;
+    cur = cur.parentElement;
+  }
+  return undefined;
+}
 
 // ─── Effective fill/stroke detection ─────────────────────────────────────────
 // Helper: extract a single CSS property value from an inline style string.
@@ -462,11 +508,47 @@ export function Toolbar({
           .pop()
           ?.replace(/\.[^.]+$/, "") ?? "import";
 
+      // ── Detect logical layer groups ─────────────────────────────────────
+      // A <g> element is treated as a layer group when it carries an explicit
+      // `display` declaration in its inline style (e.g. Inkscape sub-layers)
+      // and is not inside a non-rendering context (defs, clipPath, mask…).
+      const layerGroupEls = Array.from(doc.querySelectorAll("g")).filter(
+        (g) =>
+          !g.closest("defs, clipPath, mask, symbol") && hasExplicitDisplay(g),
+      );
+      const layers: SvgLayer[] = layerGroupEls.map((g, i) => ({
+        id: g.id || `layer_${i}`,
+        name: getLayerName(g, i),
+        visible: !isDisplayNone(g),
+      }));
+      // Ensure every layer group has an id so findContainingLayerId can match it.
+      layerGroupEls.forEach((g, i) => {
+        if (!g.id) g.id = `layer_${i}`;
+      });
+      const layerGroupIds = new Set(layers.map((l) => l.id));
+
+      // Collect all shape elements, skipping only those inside hidden ancestors
+      // that are NOT tracked layer groups.  Paths inside hidden layer groups
+      // are still collected — their visibility is managed per-layer in the UI.
       const els = Array.from(
         doc.querySelectorAll(
           "path, rect, circle, ellipse, line, polyline, polygon",
         ),
-      );
+      ).filter((el) => {
+        let cur = el.parentElement;
+        while (cur && cur.tagName.toLowerCase() !== "svg") {
+          if (isDisplayNone(cur)) {
+            // Hidden layer group — allowed; layer visibility controls it.
+            if (cur.id && layerGroupIds.has(cur.id)) {
+              cur = cur.parentElement;
+              continue;
+            }
+            return false; // hidden non-layer ancestor — skip
+          }
+          cur = cur.parentElement;
+        }
+        return true;
+      });
 
       // Track which elements have a visible fill so we can generate hatch lines
       // for them after coordinates are normalized.
@@ -511,10 +593,7 @@ export function Toolbar({
             hasFill,
             outlineVisible,
             label,
-            layer:
-              (el.closest("[id]:not(svg)") as Element | null)?.id ??
-              el.id ??
-              undefined,
+            layer: findContainingLayerId(el, layerGroupIds),
           },
         ];
       });
@@ -586,6 +665,7 @@ export function Toolbar({
         hatchEnabled: true,
         hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
         hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+        layers: layers.length > 0 ? layers : undefined,
       };
 
       addImport(imp);

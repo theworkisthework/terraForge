@@ -13,6 +13,10 @@ import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
+  EyeOff,
+  Eye,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
@@ -57,6 +61,7 @@ export function PropertiesPanel() {
   const removeImport = useCanvasStore((s) => s.removeImport);
   const updateImport = useCanvasStore((s) => s.updateImport);
   const updatePath = useCanvasStore((s) => s.updatePath);
+  const updateImportLayer = useCanvasStore((s) => s.updateImportLayer);
   const removePath = useCanvasStore((s) => s.removePath);
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
@@ -91,6 +96,18 @@ export function PropertiesPanel() {
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     new Set(),
   );
+  // Sub-layers within an import are collapsed by default; key = "importId:layerId"
+  const [expandedLayerKeys, setExpandedLayerKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const toggleLayerCollapse = (importId: string, layerId: string) => {
+    const key = `${importId}:${layerId}`;
+    setExpandedLayerKeys((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
   const [rotStep, setRotStep] = useState<RotStep>(45);
 
   const toggleGroupCollapse = (id: string) =>
@@ -218,7 +235,11 @@ export function PropertiesPanel() {
                           selectToolpath(!toolpathSelected);
                         }}
                       >
-                        {toolpathSelected ? "▾" : "▸"}
+                        {toolpathSelected ? (
+                          <ChevronDown size={10} />
+                        ) : (
+                          <ChevronRight size={10} />
+                        )}
                       </button>
                       {/* G-code file icon */}
                       <svg
@@ -387,7 +408,11 @@ export function PropertiesPanel() {
                             toggleExpand(imp.id);
                           }}
                         >
-                          {isExpanded ? "▾" : "▸"}
+                          {isExpanded ? (
+                            <ChevronDown size={10} />
+                          ) : (
+                            <ChevronRight size={10} />
+                          )}
                         </button>
 
                         {/* Visibility */}
@@ -399,7 +424,11 @@ export function PropertiesPanel() {
                             updateImport(imp.id, { visible: !imp.visible });
                           }}
                         >
-                          {imp.visible ? "👁" : "○"}
+                          {imp.visible ? (
+                            <Eye size={10} />
+                          ) : (
+                            <EyeOff size={10} />
+                          )}
                         </span>
 
                         {/* Editable name */}
@@ -459,39 +488,188 @@ export function PropertiesPanel() {
                         </button>
                       </div>
 
-                      {/* Expanded path list */}
+                      {/* Expanded path / layer list */}
                       {isExpanded && (
                         <div className="pl-6 pb-1 border-t border-border-ui/20">
-                          {imp.paths.map((p) => (
-                            <div
-                              key={p.id}
-                              className="flex items-center gap-1 py-0.5 text-[9px]"
-                            >
-                              <span
-                                className="text-content-faint hover:text-content cursor-pointer"
-                                onClick={() =>
-                                  updatePath(imp.id, p.id, {
-                                    visible: !p.visible,
-                                  })
-                                }
-                                title="Toggle path visibility"
+                          {imp.layers && imp.layers.length > 0 ? (
+                            // ── Layered view: group paths under their layer ──
+                            <>
+                              {imp.layers.map((layer) => {
+                                const layerPaths = imp.paths.filter(
+                                  (p) => p.layer === layer.id,
+                                );
+                                const layerKey = `${imp.id}:${layer.id}`;
+                                const isLayerExpanded =
+                                  expandedLayerKeys.has(layerKey);
+                                return (
+                                  <div key={layer.id}>
+                                    {/* Layer row */}
+                                    <div className="flex items-center gap-1 py-0.5 text-[9px]">
+                                      <button
+                                        className="text-content-faint hover:text-content text-[9px] w-3 shrink-0"
+                                        title={
+                                          isLayerExpanded
+                                            ? "Collapse layer"
+                                            : "Expand layer"
+                                        }
+                                        onClick={() =>
+                                          toggleLayerCollapse(imp.id, layer.id)
+                                        }
+                                      >
+                                        {isLayerExpanded ? (
+                                          <ChevronDown size={10} />
+                                        ) : (
+                                          <ChevronRight size={10} />
+                                        )}
+                                      </button>
+                                      <span
+                                        className="text-content-faint hover:text-content cursor-pointer"
+                                        onClick={() =>
+                                          updateImportLayer(
+                                            imp.id,
+                                            layer.id,
+                                            !layer.visible,
+                                          )
+                                        }
+                                        title="Toggle layer visibility"
+                                      >
+                                        {layer.visible ? (
+                                          <Eye size={9} />
+                                        ) : (
+                                          <EyeOff size={9} />
+                                        )}
+                                      </span>
+                                      <span
+                                        className="flex-1 min-w-0 text-[9px] font-medium text-content-muted truncate cursor-pointer"
+                                        onClick={() =>
+                                          toggleLayerCollapse(imp.id, layer.id)
+                                        }
+                                      >
+                                        {layer.name}
+                                      </span>
+                                      <span className="text-[8px] text-content-faint shrink-0">
+                                        {layerPaths.length}p
+                                      </span>
+                                    </div>
+                                    {/* Paths within this layer — only when expanded */}
+                                    {isLayerExpanded &&
+                                      layerPaths.map((p) => (
+                                        <div
+                                          key={p.id}
+                                          className="pl-3 flex items-center gap-1 py-0.5 text-[9px]"
+                                        >
+                                          <span
+                                            className="text-content-faint hover:text-content cursor-pointer"
+                                            onClick={() =>
+                                              updatePath(imp.id, p.id, {
+                                                visible: !p.visible,
+                                              })
+                                            }
+                                            title="Toggle path visibility"
+                                          >
+                                            {p.visible ? (
+                                              <Eye size={9} />
+                                            ) : (
+                                              <EyeOff size={9} />
+                                            )}
+                                          </span>
+                                          <span className="flex-1 min-w-0 text-content-faint truncate">
+                                            {p.label ??
+                                              `path ${p.id.slice(0, 6)}`}
+                                          </span>
+                                          <button
+                                            className="text-content-faint hover:text-accent"
+                                            title="Remove path"
+                                            onClick={() =>
+                                              removePath(imp.id, p.id)
+                                            }
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                  </div>
+                                );
+                              })}
+                              {/* Paths not assigned to any detected layer */}
+                              {imp.paths
+                                .filter(
+                                  (p) =>
+                                    !p.layer ||
+                                    !imp.layers!.some((l) => l.id === p.layer),
+                                )
+                                .map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center gap-1 py-0.5 text-[9px]"
+                                  >
+                                    <span
+                                      className="text-content-faint hover:text-content cursor-pointer"
+                                      onClick={() =>
+                                        updatePath(imp.id, p.id, {
+                                          visible: !p.visible,
+                                        })
+                                      }
+                                      title="Toggle path visibility"
+                                    >
+                                      {p.visible ? (
+                                        <Eye size={9} />
+                                      ) : (
+                                        <EyeOff size={9} />
+                                      )}
+                                    </span>
+                                    <span className="flex-1 min-w-0 text-content-faint truncate">
+                                      {p.label ??
+                                        p.layer ??
+                                        `path ${p.id.slice(0, 6)}`}
+                                    </span>
+                                    <button
+                                      className="text-content-faint hover:text-accent"
+                                      title="Remove path"
+                                      onClick={() => removePath(imp.id, p.id)}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                            </>
+                          ) : (
+                            // ── Flat view: no layers detected ──
+                            imp.paths.map((p) => (
+                              <div
+                                key={p.id}
+                                className="flex items-center gap-1 py-0.5 text-[9px]"
                               >
-                                {p.visible ? "👁" : "○"}
-                              </span>
-                              <span className="flex-1 min-w-0 text-content-faint truncate">
-                                {p.label ??
-                                  p.layer ??
-                                  `path ${p.id.slice(0, 6)}`}
-                              </span>
-                              <button
-                                className="text-content-faint hover:text-accent"
-                                title="Remove path"
-                                onClick={() => removePath(imp.id, p.id)}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
+                                <span
+                                  className="text-content-faint hover:text-content cursor-pointer"
+                                  onClick={() =>
+                                    updatePath(imp.id, p.id, {
+                                      visible: !p.visible,
+                                    })
+                                  }
+                                  title="Toggle path visibility"
+                                >
+                                  {p.visible ? (
+                                    <Eye size={9} />
+                                  ) : (
+                                    <EyeOff size={9} />
+                                  )}
+                                </span>
+                                <span className="flex-1 min-w-0 text-content-faint truncate">
+                                  {p.label ??
+                                    p.layer ??
+                                    `path ${p.id.slice(0, 6)}`}
+                                </span>
+                                <button
+                                  className="text-content-faint hover:text-accent"
+                                  title="Remove path"
+                                  onClick={() => removePath(imp.id, p.id)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))
+                          )}
                         </div>
                       )}
 
@@ -1217,7 +1395,11 @@ export function PropertiesPanel() {
                               className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                               onClick={() => toggleGroupCollapse(group.id)}
                             >
-                              {isCollapsed ? "▸" : "▾"}
+                              {isCollapsed ? (
+                                <ChevronRight size={10} />
+                              ) : (
+                                <ChevronDown size={10} />
+                              )}
                             </button>
                             {/* Color swatch / picker */}
                             <input
