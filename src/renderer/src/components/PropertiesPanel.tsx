@@ -376,7 +376,7 @@ export function PropertiesPanel() {
                       {/* Import header row */}
                       <div
                         className={`flex items-center gap-1 py-1.5 cursor-pointer hover:bg-secondary/20 ${indented ? "pl-5 pr-2" : "px-2"}`}
-                        onClick={() => selectImport(isSelected ? null : imp.id)}
+                        onClick={() => selectImport(imp.id)}
                       >
                         {/* Drag handle */}
                         <span
