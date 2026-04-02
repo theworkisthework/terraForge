@@ -198,7 +198,7 @@ export function PropertiesPanel() {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {imports.length === 0 && !gcodeToolpath ? (
           <p className="text-xs text-content-faint text-center py-6 px-3">
             No objects. Import an SVG.
@@ -405,6 +405,7 @@ export function PropertiesPanel() {
                           className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
+                            selectImport(imp.id);
                             toggleExpand(imp.id);
                           }}
                         >
@@ -490,7 +491,10 @@ export function PropertiesPanel() {
 
                       {/* Expanded path / layer list */}
                       {isExpanded && (
-                        <div className="pl-6 pb-1 border-t border-border-ui/20">
+                        <div
+                          className="pl-6 pr-2 pb-1 border-t border-border-ui/20"
+                          onClick={() => selectImport(imp.id)}
+                        >
                           {imp.layers && imp.layers.length > 0 ? (
                             // ── Layered view: group paths under their layer ──
                             <>
@@ -1196,7 +1200,7 @@ export function PropertiesPanel() {
                                   <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">
                                     Stroke width
                                   </span>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 pr-1">
                                     <input
                                       type="range"
                                       aria-label="Stroke width"
