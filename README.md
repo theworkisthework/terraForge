@@ -12,7 +12,7 @@ Import SVG and PDF artwork, position it on the machine bed, generate optimised G
 
 ### File Import
 
-- **SVG** — full shape support (`path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`), physical unit detection (`mm`, `cm`, `in`, `pt`, `pc`, `px`), and `transform` attribute resolution (including Inkscape layer matrices)
+- **SVG** — full shape support (`path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`), physical unit detection (`mm`, `cm`, `in`, `pt`, `pc`, `px`), `transform` attribute resolution (including Inkscape layer matrices), and **sub-layer detection** — Inkscape-style `<g>` layers are imported as collapsible sub-layers in the Properties panel, preserving the original SVG visibility state with per-layer toggle controls
 - **PDF** — vector path extraction from all pages; physical scale preserved (`25.4 ÷ 72 mm/pt`)
 - **G-code** — import local `.gcode`/`.nc`/`.g` files for canvas preview and direct plotting
 

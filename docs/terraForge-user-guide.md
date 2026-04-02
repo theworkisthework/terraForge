@@ -200,8 +200,9 @@ terraForge:
 1. Reads the SVG's physical size (`width`/`height` attributes with units: `mm`, `cm`, `in`, `pt`, `pc`, `px`). The import appears at **correct real-world scale** by default.
 2. Resolves all `transform` attributes (including Inkscape layer matrices) and bakes them into absolute path coordinates.
 3. Normalises path coordinates so the object's origin is at its top-left corner.
-4. Displays the import at position (0, 0) on the bed (bottom-left corner).
-5. Shows a notification message on completion.
+4. **Detects sub-layers** — `<g>` elements with an explicit `display` style (e.g. Inkscape layers) become collapsible sub-layers in the Properties panel. Their initial visibility matches the source SVG.
+5. Displays the import at position (0, 0) on the bed (bottom-left corner).
+6. Shows a notification message on completion.
 
 #### Physical Size Handling
 
@@ -366,8 +367,8 @@ The Properties panel (right side) lists all imported SVG objects and, when a too
 
 Each import shows:
 
-- **▸ / ▾** — expand/collapse the path list
-- **👁 / ○** — toggle visibility (hidden imports are excluded from G-code)
+- ![collapsed](../docs/resources/chevron-right.png) / ![expanded](../docs/resources/chevron-down.png) — expand/collapse the path list
+- ![visible](../docs/resources/eye.png) / ![hidden](../docs/resources/eye-off.png) — toggle visibility (hidden imports are excluded from G-code)
 - **Name** — double-click to rename inline (Enter to confirm, Escape to cancel). The name is used as the G-code save filename.
 - **Np** — path count
 - **✕** — delete the entire import
@@ -388,6 +389,16 @@ Click an import row to select it and reveal the numeric editors:
 All position/size fields clamp to the bed boundary automatically.
 
 ![Properties panel with numeric fields visible for a selected import](../docs/resources/12-properties-numeric.png)
+
+### Alignment Controls
+
+The alignment icon row (left/center/right and top/center/bottom) aligns the selected import within a chosen frame:
+
+- **Bed (default):** aligns to the full machine bed extents.
+- **Template mode:** enable **Align to template** to switch alignment to the active page template.
+- **Page / Margin target:** choose **Page** to align to the page rectangle, or **Margin** to align to the inset printable rectangle.
+
+If no page template is selected, **Align to template** is disabled and alignment stays bed-based.
 
 ### Aspect Ratio Lock
 
@@ -446,11 +457,34 @@ When a G-code toolpath is selected on the canvas (loaded from the File Browser o
 
 ### Per-Path Controls
 
-Expand an import (▸) to see its individual paths. For each path:
+Expand an import (![collapsed](../docs/resources/chevron-right.PNG)) to see its paths. The view adapts depending on whether the source SVG contained detectable sub-layers:
 
-- **👁 / ○** — show/hide the path. Hidden paths are excluded from G-code.
-- **Name** — layer/group id from the SVG, or a short UUID
+#### Layered view (SVG had sub-layers)
+
+Paths are organised under their source layer. Each **layer row** shows:
+
+- ![collapsed](../docs/resources/chevron-right.PNG) / ![expanded](../docs/resources/chevron-down.png) — expand/collapse the paths within that layer (collapsed by default)
+- ![visible](../docs/resources/eye.png) / ![hidden](../docs/resources/eye-off.png) — toggle visibility for **all paths in the layer**. Layers that were hidden in the source SVG start in the hidden state.
+- **Name** — the layer label (from `inkscape:label`, the element `id`, or a positional fallback)
+- **Np** — number of paths in the layer
+
+Expand a layer row to see its individual paths. For each path:
+
+- ![visible](../docs/resources/eye.png) / ![hidden](../docs/resources/eye-off.png) — show/hide this path independently of its layer
+- **Name** — path label or short id
 - **✕** — remove only this path from the import
+
+Paths that do not belong to any detected layer are listed below the layer rows.
+
+#### Flat view (no sub-layers detected)
+
+All paths are listed directly. For each path:
+
+- ![visible](../docs/resources/eye.png) / ![hidden](../docs/resources/eye-off.png) — show/hide the path. Hidden paths are excluded from G-code.
+- **Name** — label from the SVG, or a short UUID
+- **✕** — remove only this path from the import
+
+Layer (and path) visibility is respected when generating G-code — hidden layers and hidden paths are excluded automatically.
 
 ---
 

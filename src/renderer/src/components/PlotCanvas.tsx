@@ -1101,7 +1101,12 @@ export function PlotCanvas() {
   const importPath2DCacheRef = useRef(
     new Map<
       string,
-      { pathsRef: SvgImport["paths"]; outline: Path2D; hatch: Path2D }
+      {
+        pathsRef: SvgImport["paths"];
+        layersRef: SvgImport["layers"];
+        outline: Path2D;
+        hatch: Path2D;
+      }
     >(),
   );
 
@@ -1198,17 +1203,36 @@ export function PlotCanvas() {
           if (!imp.visible) continue;
           // Build or retrieve combined Path2D objects for this import.
           let impCache = importPath2DCacheRef.current.get(imp.id);
-          if (!impCache || impCache.pathsRef !== imp.paths) {
+          if (
+            !impCache ||
+            impCache.pathsRef !== imp.paths ||
+            impCache.layersRef !== imp.layers
+          ) {
+            // Paths whose layer is tracked and hidden should not be drawn.
+            const hiddenLayerIds = imp.layers
+              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
+              : null;
+            const isLayerVisible = (p: (typeof imp.paths)[number]) =>
+              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
             const outlineD = imp.paths
-              .filter((p) => p.visible && p.outlineVisible !== false)
+              .filter(
+                (p) =>
+                  p.visible && p.outlineVisible !== false && isLayerVisible(p),
+              )
               .map((p) => p.d)
               .join(" ");
             const hatchD = imp.paths
-              .filter((p) => p.visible && (p.hatchLines?.length ?? 0) > 0)
+              .filter(
+                (p) =>
+                  p.visible &&
+                  (p.hatchLines?.length ?? 0) > 0 &&
+                  isLayerVisible(p),
+              )
               .flatMap((p) => p.hatchLines!)
               .join(" ");
             impCache = {
               pathsRef: imp.paths,
+              layersRef: imp.layers,
               outline: new Path2D(outlineD),
               hatch: new Path2D(hatchD),
             };

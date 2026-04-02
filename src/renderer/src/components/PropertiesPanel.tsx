@@ -13,6 +13,10 @@ import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
+  EyeOff,
+  Eye,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
@@ -57,6 +61,7 @@ export function PropertiesPanel() {
   const removeImport = useCanvasStore((s) => s.removeImport);
   const updateImport = useCanvasStore((s) => s.updateImport);
   const updatePath = useCanvasStore((s) => s.updatePath);
+  const updateImportLayer = useCanvasStore((s) => s.updateImportLayer);
   const removePath = useCanvasStore((s) => s.removePath);
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
@@ -74,6 +79,8 @@ export function PropertiesPanel() {
   const selectGroup = useCanvasStore((s) => s.selectGroup);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const machineStatus = useMachineStore((s) => s.status);
+  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
+  const pageSizes = useCanvasStore((s) => s.pageSizes);
   const isJobActive =
     machineStatus?.state === "Run" || machineStatus?.state === "Hold";
 
@@ -91,6 +98,18 @@ export function PropertiesPanel() {
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     new Set(),
   );
+  // Sub-layers within an import are collapsed by default; key = "importId:layerId"
+  const [expandedLayerKeys, setExpandedLayerKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const toggleLayerCollapse = (importId: string, layerId: string) => {
+    const key = `${importId}:${layerId}`;
+    setExpandedLayerKeys((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
   const [rotStep, setRotStep] = useState<RotStep>(45);
 
   const toggleGroupCollapse = (id: string) =>
@@ -101,6 +120,10 @@ export function PropertiesPanel() {
     });
   const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
   const [ratioLocked, setRatioLocked] = useState(true);
+  const [templateAlignEnabled, setTemplateAlignEnabled] = useState(false);
+  const [templateAlignTarget, setTemplateAlignTarget] = useState<
+    "page" | "margin"
+  >("page");
 
   /** Returns the group id that the given import belongs to, or null. */
   const importGroupId = (importId: string): string | null =>
@@ -181,7 +204,7 @@ export function PropertiesPanel() {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {imports.length === 0 && !gcodeToolpath ? (
           <p className="text-xs text-content-faint text-center py-6 px-3">
             No objects. Import an SVG.
@@ -218,7 +241,11 @@ export function PropertiesPanel() {
                           selectToolpath(!toolpathSelected);
                         }}
                       >
-                        {toolpathSelected ? "▾" : "▸"}
+                        {toolpathSelected ? (
+                          <ChevronDown size={10} />
+                        ) : (
+                          <ChevronRight size={10} />
+                        )}
                       </button>
                       {/* G-code file icon */}
                       <svg
@@ -355,7 +382,7 @@ export function PropertiesPanel() {
                       {/* Import header row */}
                       <div
                         className={`flex items-center gap-1 py-1.5 cursor-pointer hover:bg-secondary/20 ${indented ? "pl-5 pr-2" : "px-2"}`}
-                        onClick={() => selectImport(isSelected ? null : imp.id)}
+                        onClick={() => selectImport(imp.id)}
                       >
                         {/* Drag handle */}
                         <span
@@ -384,10 +411,15 @@ export function PropertiesPanel() {
                           className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
+                            selectImport(imp.id);
                             toggleExpand(imp.id);
                           }}
                         >
-                          {isExpanded ? "▾" : "▸"}
+                          {isExpanded ? (
+                            <ChevronDown size={10} />
+                          ) : (
+                            <ChevronRight size={10} />
+                          )}
                         </button>
 
                         {/* Visibility */}
@@ -399,7 +431,11 @@ export function PropertiesPanel() {
                             updateImport(imp.id, { visible: !imp.visible });
                           }}
                         >
-                          {imp.visible ? "👁" : "○"}
+                          {imp.visible ? (
+                            <Eye size={10} />
+                          ) : (
+                            <EyeOff size={10} />
+                          )}
                         </span>
 
                         {/* Editable name */}
@@ -459,39 +495,202 @@ export function PropertiesPanel() {
                         </button>
                       </div>
 
-                      {/* Expanded path list */}
+                      {/* Expanded path / layer list */}
                       {isExpanded && (
-                        <div className="pl-6 pb-1 border-t border-border-ui/20">
-                          {imp.paths.map((p) => (
-                            <div
-                              key={p.id}
-                              className="flex items-center gap-1 py-0.5 text-[9px]"
-                            >
-                              <span
-                                className="text-content-faint hover:text-content cursor-pointer"
-                                onClick={() =>
-                                  updatePath(imp.id, p.id, {
-                                    visible: !p.visible,
-                                  })
-                                }
-                                title="Toggle path visibility"
+                        <div
+                          className="pl-6 pr-2 pb-1 border-t border-border-ui/20"
+                          onClick={() => selectImport(imp.id)}
+                        >
+                          {imp.layers && imp.layers.length > 0 ? (
+                            // ── Layered view: group paths under their layer ──
+                            <>
+                              {imp.layers.map((layer) => {
+                                const layerPaths = imp.paths.filter(
+                                  (p) => p.layer === layer.id,
+                                );
+                                const layerKey = `${imp.id}:${layer.id}`;
+                                const isLayerExpanded =
+                                  expandedLayerKeys.has(layerKey);
+                                return (
+                                  <div key={layer.id}>
+                                    {/* Layer row */}
+                                    <div className="flex items-center gap-1 py-0.5 text-[9px]">
+                                      <button
+                                        className="text-content-faint hover:text-content text-[9px] w-3 shrink-0"
+                                        title={
+                                          isLayerExpanded
+                                            ? "Collapse layer"
+                                            : "Expand layer"
+                                        }
+                                        onClick={() =>
+                                          toggleLayerCollapse(imp.id, layer.id)
+                                        }
+                                      >
+                                        {isLayerExpanded ? (
+                                          <ChevronDown size={10} />
+                                        ) : (
+                                          <ChevronRight size={10} />
+                                        )}
+                                      </button>
+                                      <span
+                                        className="text-content-faint hover:text-content cursor-pointer"
+                                        onClick={() =>
+                                          updateImportLayer(
+                                            imp.id,
+                                            layer.id,
+                                            !layer.visible,
+                                          )
+                                        }
+                                        title="Toggle layer visibility"
+                                      >
+                                        {layer.visible ? (
+                                          <Eye size={9} />
+                                        ) : (
+                                          <EyeOff size={9} />
+                                        )}
+                                      </span>
+                                      <span
+                                        className="flex-1 min-w-0 text-[9px] font-medium text-content-muted truncate cursor-pointer"
+                                        onClick={() =>
+                                          toggleLayerCollapse(imp.id, layer.id)
+                                        }
+                                      >
+                                        {layer.name}
+                                      </span>
+                                      <span className="text-[8px] text-content-faint shrink-0">
+                                        {layerPaths.length}p
+                                      </span>
+                                    </div>
+                                    {/* Paths within this layer — only when expanded */}
+                                    {isLayerExpanded &&
+                                      layerPaths.map((p) => (
+                                        <div
+                                          key={p.id}
+                                          className="pl-3 flex items-center gap-1 py-0.5 text-[9px]"
+                                        >
+                                          <span
+                                            className="text-content-faint hover:text-content cursor-pointer"
+                                            aria-label={
+                                              p.visible
+                                                ? "Hide path"
+                                                : "Show path"
+                                            }
+                                            onClick={() =>
+                                              updatePath(imp.id, p.id, {
+                                                visible: !p.visible,
+                                              })
+                                            }
+                                            title="Toggle path visibility"
+                                          >
+                                            {p.visible ? (
+                                              <Eye size={9} />
+                                            ) : (
+                                              <EyeOff size={9} />
+                                            )}
+                                          </span>
+                                          <span className="flex-1 min-w-0 text-content-faint truncate">
+                                            {p.label ??
+                                              `path ${p.id.slice(0, 6)}`}
+                                          </span>
+                                          <button
+                                            className="text-content-faint hover:text-accent"
+                                            title="Remove path"
+                                            onClick={() =>
+                                              removePath(imp.id, p.id)
+                                            }
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                  </div>
+                                );
+                              })}
+                              {/* Paths not assigned to any detected layer */}
+                              {imp.paths
+                                .filter(
+                                  (p) =>
+                                    !p.layer ||
+                                    !imp.layers!.some((l) => l.id === p.layer),
+                                )
+                                .map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center gap-1 py-0.5 text-[9px]"
+                                  >
+                                    <span
+                                      className="text-content-faint hover:text-content cursor-pointer"
+                                      aria-label={
+                                        p.visible ? "Hide path" : "Show path"
+                                      }
+                                      onClick={() =>
+                                        updatePath(imp.id, p.id, {
+                                          visible: !p.visible,
+                                        })
+                                      }
+                                      title="Toggle path visibility"
+                                    >
+                                      {p.visible ? (
+                                        <Eye size={9} />
+                                      ) : (
+                                        <EyeOff size={9} />
+                                      )}
+                                    </span>
+                                    <span className="flex-1 min-w-0 text-content-faint truncate">
+                                      {p.label ??
+                                        p.layer ??
+                                        `path ${p.id.slice(0, 6)}`}
+                                    </span>
+                                    <button
+                                      className="text-content-faint hover:text-accent"
+                                      title="Remove path"
+                                      onClick={() => removePath(imp.id, p.id)}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                            </>
+                          ) : (
+                            // ── Flat view: no layers detected ──
+                            imp.paths.map((p) => (
+                              <div
+                                key={p.id}
+                                className="flex items-center gap-1 py-0.5 text-[9px]"
                               >
-                                {p.visible ? "👁" : "○"}
-                              </span>
-                              <span className="flex-1 min-w-0 text-content-faint truncate">
-                                {p.label ??
-                                  p.layer ??
-                                  `path ${p.id.slice(0, 6)}`}
-                              </span>
-                              <button
-                                className="text-content-faint hover:text-accent"
-                                title="Remove path"
-                                onClick={() => removePath(imp.id, p.id)}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
+                                <span
+                                  className="text-content-faint hover:text-content cursor-pointer"
+                                  aria-label={
+                                    p.visible ? "Hide path" : "Show path"
+                                  }
+                                  onClick={() =>
+                                    updatePath(imp.id, p.id, {
+                                      visible: !p.visible,
+                                    })
+                                  }
+                                  title="Toggle path visibility"
+                                >
+                                  {p.visible ? (
+                                    <Eye size={9} />
+                                  ) : (
+                                    <EyeOff size={9} />
+                                  )}
+                                </span>
+                                <span className="flex-1 min-w-0 text-content-faint truncate">
+                                  {p.label ??
+                                    p.layer ??
+                                    `path ${p.id.slice(0, 6)}`}
+                                </span>
+                                <button
+                                  className="text-content-faint hover:text-accent"
+                                  title="Remove path"
+                                  onClick={() => removePath(imp.id, p.id)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))
+                          )}
                         </div>
                       )}
 
@@ -509,6 +708,13 @@ export function PropertiesPanel() {
                             const cfg = activeConfig();
                             const bedW = cfg?.bedWidth ?? 220;
                             const bedH = cfg?.bedHeight ?? 200;
+                            const activePageSize = pageTemplate
+                              ? pageSizes.find(
+                                  (ps) => ps.id === pageTemplate.sizeId,
+                                )
+                              : null;
+                            const canAlignToTemplate =
+                              !!pageTemplate && !!activePageSize;
                             return (
                               <>
                                 {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
@@ -531,6 +737,61 @@ export function PropertiesPanel() {
                                 {(() => {
                                   const btnCls =
                                     "p-1 text-content-faint hover:text-content rounded hover:bg-secondary/40 transition-colors";
+                                  const useTemplateBounds =
+                                    templateAlignEnabled && canAlignToTemplate;
+                                  const pageW = activePageSize
+                                    ? pageTemplate!.landscape
+                                      ? activePageSize.heightMM
+                                      : activePageSize.widthMM
+                                    : bedW;
+                                  const pageH = activePageSize
+                                    ? pageTemplate!.landscape
+                                      ? activePageSize.widthMM
+                                      : activePageSize.heightMM
+                                    : bedH;
+                                  const inset = useTemplateBounds
+                                    ? templateAlignTarget === "margin"
+                                      ? Math.min(
+                                          Math.max(
+                                            pageTemplate?.marginMM ?? 20,
+                                            0,
+                                          ),
+                                          pageW / 2,
+                                          pageH / 2,
+                                        )
+                                      : 0
+                                    : 0;
+                                  const minX = useTemplateBounds ? inset : 0;
+                                  const maxX = useTemplateBounds
+                                    ? pageW - inset
+                                    : bedW;
+                                  const minY = useTemplateBounds ? inset : 0;
+                                  const maxY = useTemplateBounds
+                                    ? pageH - inset
+                                    : bedH;
+                                  const frameName = useTemplateBounds
+                                    ? templateAlignTarget === "margin"
+                                      ? "margin"
+                                      : "page"
+                                    : "bed";
+                                  const leftTitle = useTemplateBounds
+                                    ? `Align left edge to ${frameName} left (X = ${Math.round(minX * 10) / 10})`
+                                    : "Align left edge to bed left (X = 0)";
+                                  const centerHTitle = useTemplateBounds
+                                    ? `Centre horizontally (${frameName}) (X = ${Math.round((minX + (maxX - minX - objW) / 2) * 10) / 10} mm)`
+                                    : `Centre horizontally (X = ${Math.round(((bedW - objW) / 2) * 10) / 10} mm)`;
+                                  const rightTitle = useTemplateBounds
+                                    ? `Align right edge to ${frameName} right (X = ${Math.round((maxX - objW) * 10) / 10} mm)`
+                                    : `Align right edge to bed right (X = ${Math.round((bedW - objW) * 10) / 10} mm)`;
+                                  const topTitle = useTemplateBounds
+                                    ? `Align top edge to ${frameName} top (Y = ${Math.round((maxY - objH) * 10) / 10} mm)`
+                                    : `Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`;
+                                  const centerVTitle = useTemplateBounds
+                                    ? `Centre vertically (${frameName}) (Y = ${Math.round((minY + (maxY - minY - objH) / 2) * 10) / 10} mm)`
+                                    : `Centre vertically (Y = ${Math.round(((bedH - objH) / 2) * 10) / 10} mm)`;
+                                  const bottomTitle = useTemplateBounds
+                                    ? `Align bottom edge to ${frameName} bottom (Y = ${Math.round(minY * 10) / 10} mm)`
+                                    : "Align bottom edge to bed bottom (Y = 0)";
                                   const alignH = (x: number) =>
                                     updateImport(imp.id, {
                                       x: Math.round(x * 1000) / 1000,
@@ -540,58 +801,128 @@ export function PropertiesPanel() {
                                       y: Math.round(y * 1000) / 1000,
                                     });
                                   return (
-                                    <div className="flex items-center gap-0.5 mb-2">
-                                      <button
-                                        className={btnCls}
-                                        title="Align left edge to bed left (X = 0)"
-                                        onClick={() => alignH(0)}
-                                      >
-                                        <AlignHorizontalJustifyStart
-                                          size={13}
-                                        />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Centre horizontally (X = ${Math.round(((bedW - objW) / 2) * 10) / 10} mm)`}
-                                        onClick={() =>
-                                          alignH((bedW - objW) / 2)
-                                        }
-                                      >
-                                        <AlignHorizontalJustifyCenter
-                                          size={13}
-                                        />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Align right edge to bed right (X = ${Math.round((bedW - objW) * 10) / 10} mm)`}
-                                        onClick={() => alignH(bedW - objW)}
-                                      >
-                                        <AlignHorizontalJustifyEnd size={13} />
-                                      </button>
-                                      <div className="w-px h-3 bg-border-ui mx-0.5" />
-                                      <button
-                                        className={btnCls}
-                                        title={`Align top edge to bed top (Y = ${Math.round((bedH - objH) * 10) / 10} mm)`}
-                                        onClick={() => alignV(bedH - objH)}
-                                      >
-                                        <AlignVerticalJustifyStart size={13} />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title={`Centre vertically (Y = ${Math.round(((bedH - objH) / 2) * 10) / 10} mm)`}
-                                        onClick={() =>
-                                          alignV((bedH - objH) / 2)
-                                        }
-                                      >
-                                        <AlignVerticalJustifyCenter size={13} />
-                                      </button>
-                                      <button
-                                        className={btnCls}
-                                        title="Align bottom edge to bed bottom (Y = 0)"
-                                        onClick={() => alignV(0)}
-                                      >
-                                        <AlignVerticalJustifyEnd size={13} />
-                                      </button>
+                                    <div className="mb-2">
+                                      <div className="flex items-center gap-0.5">
+                                        <button
+                                          className={btnCls}
+                                          title={leftTitle}
+                                          onClick={() => alignH(minX)}
+                                        >
+                                          <AlignHorizontalJustifyStart
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={centerHTitle}
+                                          onClick={() =>
+                                            alignH(
+                                              minX + (maxX - minX - objW) / 2,
+                                            )
+                                          }
+                                        >
+                                          <AlignHorizontalJustifyCenter
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={rightTitle}
+                                          onClick={() => alignH(maxX - objW)}
+                                        >
+                                          <AlignHorizontalJustifyEnd
+                                            size={13}
+                                          />
+                                        </button>
+                                        <div className="w-px h-3 bg-border-ui mx-0.5" />
+                                        <button
+                                          className={btnCls}
+                                          title={topTitle}
+                                          onClick={() => alignV(maxY - objH)}
+                                        >
+                                          <AlignVerticalJustifyStart
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={centerVTitle}
+                                          onClick={() =>
+                                            alignV(
+                                              minY + (maxY - minY - objH) / 2,
+                                            )
+                                          }
+                                        >
+                                          <AlignVerticalJustifyCenter
+                                            size={13}
+                                          />
+                                        </button>
+                                        <button
+                                          className={btnCls}
+                                          title={bottomTitle}
+                                          onClick={() => alignV(minY)}
+                                        >
+                                          <AlignVerticalJustifyEnd size={13} />
+                                        </button>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <label className="inline-flex items-center gap-1 text-[10px] text-content-muted">
+                                          <input
+                                            type="checkbox"
+                                            checked={templateAlignEnabled}
+                                            disabled={!canAlignToTemplate}
+                                            onChange={(e) =>
+                                              setTemplateAlignEnabled(
+                                                e.target.checked,
+                                              )
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Align to template
+                                        </label>
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[10px] ${templateAlignEnabled && canAlignToTemplate ? "text-content-muted" : "text-content-faint"}`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name="align-template-target"
+                                            value="page"
+                                            checked={
+                                              templateAlignTarget === "page"
+                                            }
+                                            disabled={
+                                              !templateAlignEnabled ||
+                                              !canAlignToTemplate
+                                            }
+                                            onChange={() =>
+                                              setTemplateAlignTarget("page")
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Page
+                                        </label>
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[10px] ${templateAlignEnabled && canAlignToTemplate ? "text-content-muted" : "text-content-faint"}`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name="align-template-target"
+                                            value="margin"
+                                            checked={
+                                              templateAlignTarget === "margin"
+                                            }
+                                            disabled={
+                                              !templateAlignEnabled ||
+                                              !canAlignToTemplate
+                                            }
+                                            onChange={() =>
+                                              setTemplateAlignTarget("margin")
+                                            }
+                                            className="accent-accent"
+                                          />
+                                          Margin
+                                        </label>
+                                      </div>
                                     </div>
                                   );
                                 })()}
@@ -1007,7 +1338,7 @@ export function PropertiesPanel() {
                                   <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">
                                     Stroke width
                                   </span>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex min-w-0 items-center gap-2 pr-1">
                                     <input
                                       type="range"
                                       aria-label="Stroke width"
@@ -1024,7 +1355,7 @@ export function PropertiesPanel() {
                                           Math.max(0, +e.target.value),
                                         )
                                       }
-                                      className="flex-1 accent-accent"
+                                      className="min-w-0 flex-1 accent-accent"
                                     />
                                     <input
                                       type="number"
@@ -1046,9 +1377,9 @@ export function PropertiesPanel() {
                                             Math.max(0, v),
                                           );
                                       }}
-                                      className="w-14 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
+                                      className="w-14 shrink-0 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
                                     />
-                                    <span className="text-[10px] text-content-faint shrink-0">
+                                    <span className="w-6 shrink-0 text-right text-[10px] text-content-faint">
                                       mm
                                     </span>
                                   </div>
@@ -1217,7 +1548,11 @@ export function PropertiesPanel() {
                               className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
                               onClick={() => toggleGroupCollapse(group.id)}
                             >
-                              {isCollapsed ? "▸" : "▾"}
+                              {isCollapsed ? (
+                                <ChevronRight size={10} />
+                              ) : (
+                                <ChevronDown size={10} />
+                              )}
                             </button>
                             {/* Color swatch / picker */}
                             <input

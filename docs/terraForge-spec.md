@@ -157,10 +157,17 @@ All methods must be explicitly typed.
    svgSource: string // original element outerHTML
    visible: boolean
    label?: string // human-readable display name
-   layer?: string // group/layer name from closest ancestor with an id
+   layer?: string // id of the containing SvgLayer within the parent SvgImport.layers; undefined for paths not inside a detected layer group
    hasFill?: boolean // true if the original shape had a visible fill
    outlineVisible?: boolean // false to suppress stroke without hiding hatch
    hatchLines?: string[] // synthesised hatch-fill line d-strings
+   }
+   SvgLayer (logical sub-layer within an SvgImport — e.g. an Inkscape layer group)
+   Code
+   {
+   id: string // matches the HTML id of the source <g> element
+   name: string // human-readable label (inkscape:label, id, class, or positional fallback)
+   visible: boolean // initial value mirrors the SVG source (display:none → false); toggled in UI
    }
    SvgImport (primary canvas model — replaces VectorObject as the canvas unit)
    Code
@@ -183,6 +190,7 @@ All methods must be explicitly typed.
    hatchSpacingMM?: number
    hatchAngleDeg?: number
    strokeWidthMM?: number // preview stroke width (does not affect G-code)
+   layers?: SvgLayer[] // logical sub-layers detected from the source SVG; absent when none found
    }
    VectorObject (flattened representation passed to the G-code worker)
    Code
@@ -483,6 +491,8 @@ Properties Panel
 Import name (inline rename on double-click)
 
 X/Y position, W/H dimensions, scale, rotation (with +-5/+-15/+-45 degree presets and snap to 45 degree increments)
+
+Alignment controls: left/center/right and top/center/bottom align buttons target machine bed by default; when a page template is active, an "Align to template" checkbox with Page/Margin selector switches alignment bounds to the selected page template rectangle or its margin inset rectangle
 
 Aspect ratio lock (padlock), fit-to-bed, 1:1 reset shortcuts
 

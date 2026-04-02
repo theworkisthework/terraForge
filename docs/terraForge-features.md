@@ -12,6 +12,7 @@
 - [x] Rounded-rect support (`rx`/`ry` attributes)
 - [x] Physical size detection from SVG `width`/`height` attributes — handles `mm`, `cm`, `in`, `pt`, `pc`, `px`/unitless (96 DPI), so imported SVGs appear at their correct real-world scale by default
 - [x] ViewBox offset support — SVGs with non-zero viewBox origins render correctly
+- [x] **SVG sub-layer detection** — `<g>` elements that carry an explicit `display` style declaration (e.g. Inkscape sub-layers) are detected at import time and stored as `SvgLayer[]` on the `SvgImport`; initial visibility mirrors the source SVG (`display:none` layers start hidden); each path records the id of its containing layer; the Properties panel groups paths under collapsible layer rows, with per-layer visibility toggle and per-path expand; paths not inside any detected layer group appear in an ungrouped section below; layer visibility is respected by `toVectorObjects()` so hidden layers are excluded from G-code generation
 - [x] Grouped import model: one `SvgImport` per file containing `SvgPath[]`, paths preserve relative positions
 - [x] Per-import x/y position on bed (mm) — clamped so the object's far edge stays within bed bounds
 - [x] Per-import uniform scale
@@ -174,6 +175,7 @@
 - [x] Remove individual paths — ✕ button per path deletes it from the import without removing the whole import
 - [x] **Rotation controls** — numeric angle input in Properties panel; CCW / CW shortcut buttons; ±5° / ±15° / ±45° preset buttons; configurable step-size flyout; rotation snaps to the nearest 0° / 45° / 90° / 135° / 180° / 225° / 270° / 315° preset when within 3° of one
 - [x] **Position (X/Y) inputs** — explicit mm coordinate inputs in Properties panel, clamped to bed bounds; synced with canvas drag
+- [x] **Template-aware alignment controls** — alignment buttons can target either the full machine bed (default) or, when a page template is active, the page boundary / margin boundary; the Properties panel includes an "Align to template" checkbox plus Page/Margin radio selector
 - [x] **Stroke width per import** — configurable pen stroke width in mm; when the import belongs to a layer group the new stroke width is synced across all imports in that group automatically
 - [x] **Centre marker toggle** — checkbox shows/hides a crosshair (+) at the geometric centre of the selected import or toolpath; rendered at screen-constant size so it stays visible at any zoom
 - [x] **Hatch fill controls** — per-import enable/disable checkbox; configurable spacing (mm) and angle (degrees); hatch lines are auto-regenerated when the import is scaled so physical spacing is preserved; hatch paths are included in G-code output as ordinary strokes

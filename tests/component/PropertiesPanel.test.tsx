@@ -18,6 +18,7 @@ beforeEach(() => {
     selectedPathId: null,
     gcodeToolpath: null,
     toolpathSelected: false,
+    pageTemplate: null,
   });
   useMachineStore.setState({
     configs: [],
@@ -79,7 +80,7 @@ describe("PropertiesPanel", () => {
     const imp = createSvgImport({ name: "vis-test", visible: true });
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
-    const eyeIcon = screen.getByText("👁");
+    const eyeIcon = screen.getByTitle("Toggle visibility");
     await userEvent.click(eyeIcon);
     expect(useCanvasStore.getState().imports[0].visible).toBe(false);
   });
@@ -103,8 +104,8 @@ describe("PropertiesPanel", () => {
     const imp = createSvgImport({ paths: [p1, p2], name: "multi" });
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
-    // Click the expand button (▸)
-    const expandBtn = screen.getByText("▸");
+    // Click the expand button
+    const expandBtn = screen.getByRole("button", { name: "Expand paths" });
     await userEvent.click(expandBtn);
     expect(screen.getByText("layer1")).toBeInTheDocument();
     expect(screen.getByText("layer2")).toBeInTheDocument();
@@ -118,11 +119,9 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
     // Expand first
-    await userEvent.click(screen.getByText("▸"));
-    // Toggle path visibility (second eye, the first is the import's)
-    const allEyes = screen.getAllByText("👁");
-    // Last eye is the path's visibility toggle
-    await userEvent.click(allEyes[allEyes.length - 1]);
+    await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
+    // Toggle path visibility
+    await userEvent.click(screen.getByTitle("Toggle path visibility"));
     expect(useCanvasStore.getState().imports[0].paths[0].visible).toBe(false);
   });
 
@@ -135,7 +134,7 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
     // Expand
-    await userEvent.click(screen.getByText("▸"));
+    await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
     expect(screen.getByText("remove")).toBeInTheDocument();
     // Click the Remove path button for "remove" path
     const removeBtns = screen.getAllByTitle("Remove path");
@@ -270,6 +269,51 @@ describe("PropertiesPanel", () => {
     expect(useCanvasStore.getState().imports[0].y).toBe(0);
   });
 
+  it("template alignment checkbox is disabled when no page template is selected", () => {
+    setupAlignmentFixture();
+    render(<PropertiesPanel />);
+    expect(screen.getByLabelText("Align to template")).toBeDisabled();
+  });
+
+  it("aligns to page bounds when template align is enabled with page target", async () => {
+    setupAlignmentFixture();
+    useCanvasStore.setState({
+      pageTemplate: {
+        sizeId: "a4",
+        landscape: false,
+        marginMM: 20,
+      },
+    });
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByLabelText("Align to template"));
+    await userEvent.click(
+      screen.getByTitle("Align right edge to page right (X = 110 mm)"),
+    );
+
+    expect(useCanvasStore.getState().imports[0].x).toBe(110);
+  });
+
+  it("aligns to margin bounds when template align is enabled with margin target", async () => {
+    setupAlignmentFixture();
+    useCanvasStore.setState({
+      pageTemplate: {
+        sizeId: "a4",
+        landscape: false,
+        marginMM: 20,
+      },
+    });
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByLabelText("Align to template"));
+    await userEvent.click(screen.getByLabelText("Margin"));
+    await userEvent.click(
+      screen.getByTitle("Align left edge to margin left (X = 20)"),
+    );
+
+    expect(useCanvasStore.getState().imports[0].x).toBe(20);
+  });
+
   // ── G-code toolpath panel ──────────────────────────────────────────────────
 
   it("shows gcode entry when a toolpath is loaded", () => {
@@ -362,8 +406,10 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Stats are initially hidden (not selected)
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
-    // Click the collapse toggle button (▸ = collapsed)
-    await userEvent.click(screen.getByText("▸"));
+    // Click the expand toggle button
+    await userEvent.click(
+      screen.getByRole("button", { name: "Expand toolpath details" }),
+    );
     expect(useCanvasStore.getState().toolpathSelected).toBe(true);
     expect(screen.getByText("Lines")).toBeInTheDocument();
   });
@@ -378,8 +424,10 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Stats are visible while selected
     expect(screen.getByText("Lines")).toBeInTheDocument();
-    // Click the expand toggle button (▾ = expanded/selected)
-    await userEvent.click(screen.getByText("▾"));
+    // Click the collapse toggle button
+    await userEvent.click(
+      screen.getByRole("button", { name: "Collapse toolpath details" }),
+    );
     expect(useCanvasStore.getState().toolpathSelected).toBe(false);
     expect(screen.queryByText("Lines")).not.toBeInTheDocument();
   });

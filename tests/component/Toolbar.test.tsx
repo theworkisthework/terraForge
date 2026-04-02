@@ -1072,6 +1072,51 @@ describe("Toolbar", () => {
       });
     });
 
+    it("imports all layer paths with layer metadata; hidden layers marked not visible", async () => {
+      // Two layers: one hidden (display:none), one visible (display:inline).
+      // All paths are imported — visibility is managed via SvgLayer metadata.
+      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <g id="hidden-layer" style="display:none">
+          <path d="M 0,0 L 50,50" stroke="red" fill="none" />
+          <rect x="10" y="10" width="30" height="30" stroke="blue" fill="none" />
+        </g>
+        <g id="visible-layer" style="display:inline">
+          <path d="M 10,10 L 90,90" stroke="black" fill="none" />
+        </g>
+      </svg>`;
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/layers.svg");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(svgXml);
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports.length).toBe(1);
+      });
+      const imp = useCanvasStore.getState().imports[0];
+
+      // All 3 shapes are imported — hidden-layer paths are not discarded.
+      expect(imp.paths).toHaveLength(3);
+
+      // The import should carry layer metadata.
+      expect(imp.layers).toBeDefined();
+      expect(imp.layers).toHaveLength(2);
+
+      const hiddenLayer = imp.layers!.find((l) => l.id === "hidden-layer");
+      const visibleLayer = imp.layers!.find((l) => l.id === "visible-layer");
+      expect(hiddenLayer?.visible).toBe(false);
+      expect(visibleLayer?.visible).toBe(true);
+
+      // Paths should reference the correct layer id.
+      const hiddenPaths = imp.paths.filter((p) => p.layer === "hidden-layer");
+      const visiblePaths = imp.paths.filter((p) => p.layer === "visible-layer");
+      expect(hiddenPaths).toHaveLength(2);
+      expect(visiblePaths).toHaveLength(1);
+    });
+
     it("shows error task when SVG has no vector paths", async () => {
       const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
         <text x="10" y="50">Hello</text>
