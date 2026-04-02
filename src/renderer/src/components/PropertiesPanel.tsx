@@ -1200,7 +1200,7 @@ export function PropertiesPanel() {
                                   <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">
                                     Stroke width
                                   </span>
-                                  <div className="flex items-center gap-2 pr-1">
+                                  <div className="flex min-w-0 items-center gap-2 pr-1">
                                     <input
                                       type="range"
                                       aria-label="Stroke width"
@@ -1217,7 +1217,7 @@ export function PropertiesPanel() {
                                           Math.max(0, +e.target.value),
                                         )
                                       }
-                                      className="flex-1 accent-accent"
+                                      className="min-w-0 flex-1 accent-accent"
                                     />
                                     <input
                                       type="number"
@@ -1239,9 +1239,9 @@ export function PropertiesPanel() {
                                             Math.max(0, v),
                                           );
                                       }}
-                                      className="w-14 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
+                                      className="w-14 shrink-0 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
                                     />
-                                    <span className="text-[10px] text-content-faint shrink-0">
+                                    <span className="w-6 shrink-0 text-right text-[10px] text-content-faint">
                                       mm
                                     </span>
                                   </div>
