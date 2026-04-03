@@ -194,6 +194,20 @@ function getEffectiveStrokeColor(el: Element): string | undefined {
   return normalizeImportedColor(stroke);
 }
 
+function getLayerStrokeColor(g: Element): string | undefined {
+  const own = getEffectiveStrokeColor(g);
+  if (own) return own;
+
+  // In many authoring tools, layer groups do not carry an explicit stroke;
+  // child paths define it. Use the first drawable descendant stroke as a
+  // best-effort source color for the logical layer.
+  const shape = g.querySelector(
+    "path, rect, circle, ellipse, line, polyline, polygon",
+  );
+  if (!shape) return undefined;
+  return getEffectiveStrokeColor(shape);
+}
+
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
 function parseSvgLengthMM(val: string | null | undefined): number | null {
@@ -562,7 +576,7 @@ export function Toolbar({
         id: g.id || `layer_${i}`,
         name: getLayerName(g, i),
         visible: !isDisplayNone(g),
-        sourceStrokeColor: getEffectiveStrokeColor(g),
+        sourceStrokeColor: getLayerStrokeColor(g),
       }));
       // Ensure every layer group has an id so findContainingLayerId can match it.
       layerGroupEls.forEach((g, i) => {
