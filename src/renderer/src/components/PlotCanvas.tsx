@@ -64,7 +64,8 @@ function getOutlineColor(baseColor: string, isSelected: boolean): string {
   if (baseColor === DEFAULT_OUTLINE_COLOR) {
     return isSelected ? DEFAULT_OUTLINE_COLOR_SELECTED : DEFAULT_OUTLINE_COLOR;
   }
-  if (isSelected && isHexColor(baseColor)) return scaleHexColor(baseColor, 1.35);
+  if (isSelected && isHexColor(baseColor))
+    return scaleHexColor(baseColor, 1.35);
   return baseColor;
 }
 
@@ -1243,11 +1244,16 @@ export function PlotCanvas() {
 
             const layerStrokeById = new Map<string, string>();
             for (const l of imp.layers ?? []) {
-              if (l.sourceStrokeColor) layerStrokeById.set(l.id, l.sourceStrokeColor);
+              if (l.sourceStrokeColor)
+                layerStrokeById.set(l.id, l.sourceStrokeColor);
             }
 
-            const getPathBaseColor = (p: (typeof imp.paths)[number]): string => {
-              const layerColor = p.layer ? layerStrokeById.get(p.layer) : undefined;
+            const getPathBaseColor = (
+              p: (typeof imp.paths)[number],
+            ): string => {
+              const layerColor = p.layer
+                ? layerStrokeById.get(p.layer)
+                : undefined;
               return layerColor || p.sourceStrokeColor || DEFAULT_OUTLINE_COLOR;
             };
 
