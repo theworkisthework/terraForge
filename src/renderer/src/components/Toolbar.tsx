@@ -174,6 +174,26 @@ function hasVisibleStroke(el: Element): boolean {
   return true;
 }
 
+function normalizeImportedColor(raw: string): string | undefined {
+  const c = raw.trim();
+  if (!c) return undefined;
+  const lower = c.toLowerCase();
+  if (
+    lower === "none" ||
+    lower === "transparent" ||
+    lower === "inherit" ||
+    lower.startsWith("url(")
+  ) {
+    return undefined;
+  }
+  return c;
+}
+
+function getEffectiveStrokeColor(el: Element): string | undefined {
+  const stroke = resolveInheritedProp(el, "stroke");
+  return normalizeImportedColor(stroke);
+}
+
 // ─── SVG length → mm conversion ─────────────────────────────────────────────────
 // Handles unit suffixes from the SVG spec; unitless / px → 96 DPI
 function parseSvgLengthMM(val: string | null | undefined): number | null {
@@ -542,6 +562,7 @@ export function Toolbar({
         id: g.id || `layer_${i}`,
         name: getLayerName(g, i),
         visible: !isDisplayNone(g),
+        sourceStrokeColor: getEffectiveStrokeColor(g),
       }));
       // Ensure every layer group has an id so findContainingLayerId can match it.
       layerGroupEls.forEach((g, i) => {
@@ -635,6 +656,7 @@ export function Toolbar({
             outlineVisible,
             label,
             layer: findContainingLayerId(el, layerGroupIds),
+            sourceStrokeColor: getEffectiveStrokeColor(el),
           },
         ];
       });
