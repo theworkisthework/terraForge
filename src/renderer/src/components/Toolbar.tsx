@@ -43,8 +43,31 @@ function hasExplicitDisplay(el: Element): boolean {
   return /\bdisplay\s*:/.test(el.getAttribute("style") ?? "");
 }
 
+/**
+ * Returns true when the element is explicitly marked as an Inkscape layer
+ * (`inkscape:groupmode="layer"`).
+ */
+function hasInkscapeLayerMarker(el: Element): boolean {
+  const ns = "http://www.inkscape.org/namespaces/inkscape";
+  return (
+    (el.getAttribute("inkscape:groupmode") ??
+      el.getAttributeNS(ns, "groupmode")) === "layer"
+  );
+}
+
+/**
+ * A `<g>` is a logical SVG sub-layer when it either has explicit display
+ * styling (legacy behaviour) or an Inkscape layer marker.
+ */
+function isLayerGroup(el: Element): boolean {
+  return hasExplicitDisplay(el) || hasInkscapeLayerMarker(el);
+}
+
 function isDisplayNone(el: Element): boolean {
-  return /display\s*:\s*none/.test(el.getAttribute("style") ?? "");
+  const styleHidden = /display\s*:\s*none/.test(el.getAttribute("style") ?? "");
+  const attrHidden =
+    (el.getAttribute("display") ?? "").trim().toLowerCase() === "none";
+  return styleHidden || attrHidden;
 }
 
 /**
@@ -513,8 +536,7 @@ export function Toolbar({
       // `display` declaration in its inline style (e.g. Inkscape sub-layers)
       // and is not inside a non-rendering context (defs, clipPath, mask…).
       const layerGroupEls = Array.from(doc.querySelectorAll("g")).filter(
-        (g) =>
-          !g.closest("defs, clipPath, mask, symbol") && hasExplicitDisplay(g),
+        (g) => !g.closest("defs, clipPath, mask, symbol") && isLayerGroup(g),
       );
       const layers: SvgLayer[] = layerGroupEls.map((g, i) => ({
         id: g.id || `layer_${i}`,

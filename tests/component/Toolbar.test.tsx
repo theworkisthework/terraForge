@@ -1117,6 +1117,68 @@ describe("Toolbar", () => {
       expect(visiblePaths).toHaveLength(1);
     });
 
+    it("detects Inkscape layer groups via inkscape:groupmode and maps layer ids", async () => {
+      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <g id="layer-a" inkscape:groupmode="layer" inkscape:label="Layer A">
+          <path d="M 0,0 L 50,50" stroke="red" fill="none" />
+        </g>
+        <g id="layer-b" inkscape:groupmode="layer" inkscape:label="Layer B">
+          <path d="M 10,10 L 90,90" stroke="blue" fill="none" />
+        </g>
+      </svg>`;
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/inkscape-layers.svg");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(svgXml);
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports.length).toBe(1);
+      });
+
+      const imp = useCanvasStore.getState().imports[0];
+      expect(imp.layers).toBeDefined();
+      expect(imp.layers).toHaveLength(2);
+
+      const layerA = imp.layers!.find((l) => l.id === "layer-a");
+      const layerB = imp.layers!.find((l) => l.id === "layer-b");
+      expect(layerA?.name).toBe("Layer A");
+      expect(layerB?.name).toBe("Layer B");
+      expect(layerA?.visible).toBe(true);
+      expect(layerB?.visible).toBe(true);
+
+      expect(imp.paths.filter((p) => p.layer === "layer-a")).toHaveLength(1);
+      expect(imp.paths.filter((p) => p.layer === "layer-b")).toHaveLength(1);
+    });
+
+    it("does not treat plain groups without markers as layers", async () => {
+      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <g id="plain-group">
+          <path d="M 0,0 L 50,50" stroke="red" fill="none" />
+        </g>
+      </svg>`;
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/plain-group.svg");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(svgXml);
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports.length).toBe(1);
+      });
+
+      const imp = useCanvasStore.getState().imports[0];
+      expect(imp.layers).toBeUndefined();
+      expect(imp.paths).toHaveLength(1);
+      expect(imp.paths[0].layer).toBeUndefined();
+    });
+
     it("shows error task when SVG has no vector paths", async () => {
       const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
         <text x="10" y="50">Hello</text>
