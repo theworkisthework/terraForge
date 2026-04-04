@@ -1,0 +1,241 @@
+name: PR Build (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to build
+        required: true
+        type: number
+      build_windows:
+        description: Build Windows installer (.exe)
+        required: true
+        default: true
+        type: boolean
+      build_macos:
+        description: Build macOS DMG (.dmg)
+        required: true
+        default: false
+        type: boolean
+      build_linux:
+        description: Build Linux AppImage (.AppImage)
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_ref: ${{ steps.pr.outputs.pr_ref }}
+    steps:
+      - name: Validate OS selection
+        shell: bash
+        run: |
+          if [[ "${{ inputs.build_windows }}" != "true" && "${{ inputs.build_macos }}" != "true" && "${{ inputs.build_linux }}" != "true" ]]; then
+            echo "Select at least one OS."
+            exit 1
+          fi
+
+      - name: Validate PR and compute ref
+        id: pr
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER)
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            })
+            core.info(`Building PR #${pr.number}: ${pr.title}`)
+            core.setOutput("pr_ref", `refs/pull/${prNumber}/head`)
+
+  build-windows:
+    if: ${{ inputs.build_windows }}
+    needs: precheck
+    runs-on: windows-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.meta.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.precheck.outputs.pr_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm i
+
+      - name: Build Windows package
+        run: npm run dist:win
+
+      - name: Artifact metadata
+        id: meta
+        shell: bash
+        run: echo "name=pr-${{ inputs.pr_number }}-windows-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Windows artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos:
+    if: ${{ inputs.build_macos }}
+    needs: precheck
+    runs-on: macos-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.meta.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.precheck.outputs.pr_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm i
+
+      - name: Build macOS package
+        run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Artifact metadata
+        id: meta
+        shell: bash
+        run: echo "name=pr-${{ inputs.pr_number }}-macos-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload macOS artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  build-linux:
+    if: ${{ inputs.build_linux }}
+    needs: precheck
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.meta.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.precheck.outputs.pr_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
+      - name: Install dependencies
+        run: npm i
+
+      - name: Build Linux package
+        run: npm run dist:linux
+
+      - name: Artifact metadata
+        id: meta
+        shell: bash
+        run: echo "name=pr-${{ inputs.pr_number }}-linux-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+  comment-on-pr:
+    name: Comment Artifact Links On PR
+    needs: [precheck, build-windows, build-macos, build-linux]
+    if: ${{ always() && needs.precheck.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post comment
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER)
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const runId = process.env.GITHUB_RUN_ID
+
+            const rows = []
+
+            const addRow = (label, result, id, name) => {
+              if (result === "skipped") {
+                rows.push(`- ${label}: not selected`)
+                return
+              }
+              if (result !== "success" || !id) {
+                rows.push(`- ${label}: failed or no artifact`)
+                return
+              }
+              const url = `https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${id}`
+              rows.push(`- ${label}: [${name}](${url})`)
+            }
+
+            addRow(
+              "Windows",
+              "${{ needs.build-windows.result }}",
+              "${{ needs.build-windows.outputs.artifact_id }}",
+              "${{ needs.build-windows.outputs.artifact_name }}"
+            )
+            addRow(
+              "macOS",
+              "${{ needs.build-macos.result }}",
+              "${{ needs.build-macos.outputs.artifact_id }}",
+              "${{ needs.build-macos.outputs.artifact_name }}"
+            )
+            addRow(
+              "Linux",
+              "${{ needs.build-linux.result }}",
+              "${{ needs.build-linux.outputs.artifact_id }}",
+              "${{ needs.build-linux.outputs.artifact_name }}"
+            )
+
+            const body = [
+              "PR build artifacts are ready:",
+              "",
+              ...rows,
+              "",
+              "These artifacts are temporary and are deleted automatically when the PR is closed."
+            ].join("\n")
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body
+            })
