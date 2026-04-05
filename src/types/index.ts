@@ -62,6 +62,13 @@ export interface VectorObject {
   originalHeight: number;
   /** Layer / group name from source SVG */
   layer?: string;
+  /**
+   * Set on hatch-fill line VOs only.  The value is the `id` of the parent
+   * outline VO whose shape boundary was used to clip this hatch line.  Used
+   * by the G-code worker to re-clip hatch lines against a rounded boundary
+   * when the round-corners option is active.
+   */
+  hatchParentId?: string;
 }
 
 // ─── SVG Import Model ─────────────────────────────────────────────────────────
@@ -230,6 +237,9 @@ export interface GcodeOptions {
   optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel
   joinPaths: boolean; // [experimental] connect endpoints within joinTolerance to skip pen up/down
   joinTolerance: number; // mm — max gap between path end and next path start to join (default 0.2)
+  roundCorners: boolean; // smooth sharp turns by replacing vertices with corner arcs
+  roundCornerAngle: number; // degrees — turns sharper than this are rounded (default 45)
+  roundCornerRadius: number; // mm — target fillet radius for rounded corners (default 0.3)
   liftPenAtEnd: boolean; // send penUpCommand after the last stroke (default true)
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
   customStartGcode: string; // raw G-code lines inserted after the preamble, before paths

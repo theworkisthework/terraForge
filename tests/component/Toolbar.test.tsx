@@ -546,7 +546,7 @@ describe("Toolbar", () => {
       // Tolerance input is always rendered
       expect(screen.getByText("Tolerance")).toBeInTheDocument();
       // The number input should be disabled while join is off
-      const toleranceInput = screen.getByRole("spinbutton");
+      const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
       expect(toleranceInput).toBeDisabled();
     });
 
@@ -559,7 +559,7 @@ describe("Toolbar", () => {
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );
-      const toleranceInput = screen.getByRole("spinbutton");
+      const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
       expect(toleranceInput).not.toBeDisabled();
     });
 
