@@ -14,9 +14,9 @@ You can add drag-knife support cleanly as a new G-code mode, but it needs geomet
 
 ### What Already Works For “Cut Only Some Layers”
 
-- Your first-pass assumption is valid today: generation already respects visibility at import, layer, and path level in canvasStore.ts:407, canvasStore.ts:681, and canvasStore.ts:727.
-- Layer/path visibility controls are already exposed in PropertiesPanel.tsx:504.
-- Per-group export already exists (useful for tool/process separation) in GcodeOptionsDialog.tsx:479 and Toolbar.tsx:1284.
+- Your first-pass assumption is valid today: generation already respects visibility at import, layer, and path level in `canvasStore.ts:407`, `canvasStore.ts:681`, and `canvasStore.ts:727`.
+- Layer/path visibility controls are already exposed in `PropertiesPanel.tsx:504`.
+- Per-group export already exists (useful for tool/process separation) in `GcodeOptionsDialog.tsx:479` and `Toolbar.tsx:1284`.
 
 ### Key Things To Consider
 
@@ -32,12 +32,12 @@ You can add drag-knife support cleanly as a new G-code mode, but it needs geomet
 1. Data model / options
 
 - Extend shared G-code options in index.ts:227 with a drag-knife block, for example:
-- enabled
-- bladeOffsetMM
-- cornerThresholdDeg
-- overcutMM
-- swivelFeedrateMMMin
-- useLeadInOut plus leadInMM/leadOutMM
+- `enabled`
+- `bladeOffsetMM`
+- `cornerThresholdDeg`
+- `overcutMM`
+- `swivelFeedrateMMMin`
+- `useLeadInOut` plus `leadInMM`/`leadOutMM`
 
 2. UI options and persistence
 
