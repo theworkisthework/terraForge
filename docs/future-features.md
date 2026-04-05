@@ -31,7 +31,7 @@ You can add drag-knife support cleanly as a new G-code mode, but it needs geomet
 
 1. Data model / options
 
-- Extend shared G-code options in index.ts:227 with a drag-knife block, for example:
+- Extend shared G-code options in `index.ts:227` with a drag-knife block, for example:
 - `enabled`
 - `bladeOffsetMM`
 - `cornerThresholdDeg`
@@ -61,9 +61,9 @@ You can add drag-knife support cleanly as a new G-code mode, but it needs geomet
 5. Generation logic interactions
 
 - For drag-knife mode:
-- force joinPaths false (or warn/disable)
-- optionally force optimisePaths false initially for predictability, then re-enable once validated
-- add metadata comments to header showing drag-knife params in svgWorker.ts:71
+- force `joinPaths` false (or warn/disable)
+- optionally force `optimisePaths` false initially for predictability, then re-enable once validated
+- add metadata comments to header showing drag-knife params in `svgWorker.ts:71`
 
 6. Clipping behavior
 
