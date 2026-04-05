@@ -27,6 +27,9 @@ export interface GcodePrefs {
   exportPerGroup: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
+  roundCorners: boolean;
+  roundCornerAngle: number; // degrees
+  roundCornerRadius: number; // mm
   liftPenAtEnd: boolean;
   returnToHome: boolean;
   customStartGcode: string;
@@ -47,6 +50,9 @@ const DEFAULTS: GcodePrefs = {
   exportPerGroup: false,
   joinPaths: false,
   joinTolerance: 0.2,
+  roundCorners: false,
+  roundCornerAngle: 45,
+  roundCornerRadius: 0.3,
   liftPenAtEnd: true,
   returnToHome: false,
   customStartGcode: "",
@@ -106,6 +112,20 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const setJoinTolerance = (val: string) => {
     const n = parseFloat(val);
     if (!isNaN(n) && n > 0) setPrefs((p) => ({ ...p, joinTolerance: n }));
+  };
+
+  const setRoundCornerAngle = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n >= 1 && n <= 179) {
+      setPrefs((p) => ({ ...p, roundCornerAngle: n }));
+    }
+  };
+
+  const setRoundCornerRadius = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n > 0) {
+      setPrefs((p) => ({ ...p, roundCornerRadius: n }));
+    }
   };
 
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
@@ -214,6 +234,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                       </label>
                       <input
                         type="number"
+                        aria-label="Join tolerance (mm)"
                         min="0.01"
                         max="10"
                         step="0.05"
@@ -221,6 +242,70 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                         onChange={(e) => setJoinTolerance(e.target.value)}
                         disabled={!prefs.joinPaths}
                         className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
+                      />
+                      <span className="text-xs text-content-muted">mm</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Round sharp corners ── */}
+                <div className="flex items-start gap-3 select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Round sharp corners"
+                    className="mt-0.5 accent-accent cursor-pointer flex-shrink-0"
+                    checked={prefs.roundCorners}
+                    onChange={() => toggle("roundCorners")}
+                    id="round-corners-cb"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <label
+                      htmlFor="round-corners-cb"
+                      className="cursor-pointer flex items-center gap-2"
+                    >
+                      <span className="text-sm text-content font-medium">
+                        Round sharp corners
+                      </span>
+                    </label>
+                    <div className="text-xs text-content-muted mt-0.5">
+                      Smooth corners where angle is less than the specified
+                      angle, using arcs of specified radius.
+                    </div>
+                    <div
+                      className={`flex items-center gap-2 mt-2 transition-opacity ${
+                        prefs.roundCorners
+                          ? "opacity-100"
+                          : "opacity-30 pointer-events-none"
+                      }`}
+                    >
+                      <label className="text-xs text-content-muted whitespace-nowrap">
+                        Angle
+                      </label>
+                      <input
+                        type="number"
+                        aria-label="Round corner angle (deg)"
+                        min="1"
+                        max="179"
+                        step="1"
+                        value={prefs.roundCornerAngle}
+                        onChange={(e) => setRoundCornerAngle(e.target.value)}
+                        disabled={!prefs.roundCorners}
+                        className="w-16 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
+                      />
+                      <span className="text-xs text-content-muted">deg</span>
+                      <label className="text-xs text-content-muted whitespace-nowrap ml-2">
+                        Radius
+                      </label>
+                      <input
+                        type="number"
+                        aria-label="Round corner radius (mm)"
+                        min="0.05"
+                        max="10"
+                        step="0.05"
+                        value={prefs.roundCornerRadius}
+                        onChange={(e) => setRoundCornerRadius(e.target.value)}
+                        disabled={!prefs.roundCorners}
+                        className="w-16 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
                       />
                       <span className="text-xs text-content-muted">mm</span>
                     </div>

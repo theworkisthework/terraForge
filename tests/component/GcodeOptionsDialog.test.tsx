@@ -23,11 +23,16 @@ const defaultPrefs: GcodePrefs = {
   saveLocally: false,
   joinPaths: false,
   joinTolerance: 0.2,
+  roundCorners: false,
+  roundCornerAngle: 45,
+  roundCornerRadius: 0.3,
   liftPenAtEnd: true,
   returnToHome: false,
   customStartGcode: "",
   customEndGcode: "",
   exportPerGroup: false,
+  clipMode: "none",
+  clipOffsetMM: 0,
 };
 
 beforeEach(() => {
@@ -136,6 +141,9 @@ describe("GcodeOptionsDialog", () => {
         saveLocally: false,
         joinPaths: false,
         joinTolerance: 0.2,
+        roundCorners: false,
+        roundCornerAngle: 45,
+        roundCornerRadius: 0.3,
         liftPenAtEnd: true,
         returnToHome: true,
         customStartGcode: "",
@@ -249,7 +257,7 @@ describe("GcodeOptionsDialog", () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
     await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
     const joinCb = screen.getByRole("checkbox", { name: "Join nearby paths" });
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
     expect(toleranceInput).toBeDisabled();
     await userEvent.click(joinCb);
     expect(toleranceInput).not.toBeDisabled();
@@ -261,7 +269,7 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
     fireEvent.change(toleranceInput, { target: { value: "0.5" } });
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
     expect(onConfirm).toHaveBeenCalledWith(
@@ -275,7 +283,7 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
     await userEvent.clear(toleranceInput);
     await userEvent.type(toleranceInput, "abc");
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -291,7 +299,7 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByLabelText("Join tolerance (mm)");
     await userEvent.clear(toleranceInput);
     await userEvent.type(toleranceInput, "0");
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -392,6 +400,9 @@ describe("GcodeOptionsDialog", () => {
       saveLocally: false,
       joinPaths: false,
       joinTolerance: 0.2,
+      roundCorners: false,
+      roundCornerAngle: 45,
+      roundCornerRadius: 0.3,
       liftPenAtEnd: true,
       returnToHome: false,
       customStartGcode: "",

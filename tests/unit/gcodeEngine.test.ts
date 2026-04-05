@@ -8,6 +8,8 @@ import {
   arcToBeziers,
   nearestNeighbourSort,
   joinSubpaths,
+  roundSubpathCorners,
+  clipSegmentToPolygon,
   flattenToSubpaths,
   clipSubpathsToBed,
   fmtCoord,
@@ -924,6 +926,75 @@ describe("joinSubpaths", () => {
   });
 });
 
+// ── roundSubpathCorners ──────────────────────────────────────────────────────
+
+describe("roundSubpathCorners", () => {
+  it("adds arc points when a sharp corner is below threshold", () => {
+    const sp: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    const rounded = roundSubpathCorners(sp, 120, 1);
+    expect(rounded.length).toBeGreaterThan(sp.length);
+    expect(rounded[0]).toEqual(sp[0]);
+    expect(rounded[rounded.length - 1]).toEqual(sp[sp.length - 1]);
+  });
+
+  it("keeps geometry unchanged when corner angle is above threshold", () => {
+    const sp: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    const rounded = roundSubpathCorners(sp, 45, 1);
+    expect(rounded).toEqual(sp);
+  });
+
+  it("returns unchanged path for non-positive radius", () => {
+    const sp: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    expect(roundSubpathCorners(sp, 120, 0)).toEqual(sp);
+  });
+
+  it("rounds every corner of a closed rectangle, including the seam corner", () => {
+    // A unit square closed path (start == end).
+    const sq: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ];
+    const rounded = roundSubpathCorners(sq, 120, 0.5);
+    // Result must still be a closed path.
+    expect(rounded[0]).toEqual(rounded[rounded.length - 1]);
+    // Must have more points than the original (arcs were inserted).
+    expect(rounded.length).toBeGreaterThan(sq.length);
+    // No point in the result should be exactly one of the four sharp corners —
+    // every corner should have been replaced by an arc.
+    const sharpCorners = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    for (const corner of sharpCorners) {
+      const found = rounded.some(
+        (p) =>
+          Math.abs(p.x - corner.x) < 0.01 && Math.abs(p.y - corner.y) < 0.01,
+      );
+      expect(
+        found,
+        `sharp corner (${corner.x},${corner.y}) should be gone`,
+      ).toBe(false);
+    }
+  });
+});
+
 // ── clipSubpathsToBed ─────────────────────────────────────────────────────────
 
 describe("clipSubpathsToBed", () => {
@@ -1039,5 +1110,77 @@ describe("clipSubpathsToBed", () => {
     ];
     const result = clipSubpathsToBed([sp], centerCfg);
     expect(result).toHaveLength(0);
+  });
+});
+
+// ── clipSegmentToPolygon ─────────────────────────────────────────────────────
+
+describe("clipSegmentToPolygon", () => {
+  const square: Pt[] = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+    { x: 0, y: 0 },
+  ];
+
+  it("returns full segment when entirely inside the polygon", () => {
+    const result = clipSegmentToPolygon({ x: 2, y: 5 }, { x: 8, y: 5 }, square);
+    expect(result).toHaveLength(1);
+    expect(result[0][0].x).toBeCloseTo(2);
+    expect(result[0][1].x).toBeCloseTo(8);
+  });
+
+  it("returns nothing when segment is entirely outside the polygon", () => {
+    const result = clipSegmentToPolygon(
+      { x: -5, y: 5 },
+      { x: -1, y: 5 },
+      square,
+    );
+    expect(result).toHaveLength(0);
+  });
+
+  it("clips segment extending beyond both sides of the polygon", () => {
+    const result = clipSegmentToPolygon(
+      { x: -2, y: 5 },
+      { x: 12, y: 5 },
+      square,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0][0].x).toBeCloseTo(0);
+    expect(result[0][1].x).toBeCloseTo(10);
+  });
+
+  it("clips a segment that starts inside and exits through one edge", () => {
+    const result = clipSegmentToPolygon(
+      { x: 5, y: 5 },
+      { x: 15, y: 5 },
+      square,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0][0].x).toBeCloseTo(5);
+    expect(result[0][1].x).toBeCloseTo(10);
+  });
+
+  it("handles vertex-touching intersections without leaking outside", () => {
+    const chamfered: Pt[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 8 },
+      { x: 8, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ];
+    const result = clipSegmentToPolygon(
+      { x: 7.2, y: 9.2 },
+      { x: 10, y: 10 },
+      chamfered,
+    );
+    expect(result).toHaveLength(1);
+    // Endpoint should lie on the chamfer edge from (10,8) to (8,10): x + y = 18.
+    const end = result[0][1];
+    expect(end.x + end.y).toBeCloseTo(18, 5);
+    expect(end.x).toBeLessThanOrEqual(10.001);
+    expect(end.y).toBeLessThanOrEqual(10.001);
   });
 });

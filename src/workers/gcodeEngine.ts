@@ -547,6 +547,317 @@ export function joinSubpaths(
   return result;
 }
 
+// ── Rounded-corner smoothing ────────────────────────────────────────────────
+
+const CORNER_EPS = 1e-6;
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function dist(a: Pt, b: Pt): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function leftNormal(vx: number, vy: number): Pt {
+  return { x: -vy, y: vx };
+}
+
+function cross(ax: number, ay: number, bx: number, by: number): number {
+  return ax * by - ay * bx;
+}
+
+function intersectLines(p: Pt, r: Pt, q: Pt, s: Pt): Pt | null {
+  const den = cross(r.x, r.y, s.x, s.y);
+  if (Math.abs(den) <= CORNER_EPS) return null;
+  const qpX = q.x - p.x;
+  const qpY = q.y - p.y;
+  const t = cross(qpX, qpY, s.x, s.y) / den;
+  return { x: p.x + r.x * t, y: p.y + r.y * t };
+}
+
+interface RoundedCorner {
+  entry: Pt;
+  arc: Pt[]; // excludes entry, includes exit
+}
+
+function buildRoundedCorner(
+  prev: Pt,
+  curr: Pt,
+  next: Pt,
+  thresholdDeg: number,
+  radiusMm: number,
+): RoundedCorner | null {
+  const inX = curr.x - prev.x;
+  const inY = curr.y - prev.y;
+  const outX = next.x - curr.x;
+  const outY = next.y - curr.y;
+  const inLen = Math.hypot(inX, inY);
+  const outLen = Math.hypot(outX, outY);
+  if (inLen <= CORNER_EPS || outLen <= CORNER_EPS) return null;
+
+  const inUx = inX / inLen;
+  const inUy = inY / inLen;
+  const outUx = outX / outLen;
+  const outUy = outY / outLen;
+
+  const dot = clamp(inUx * outUx + inUy * outUy, -1, 1);
+  const turnDeg = (Math.acos(dot) * 180) / Math.PI;
+  if (turnDeg >= thresholdDeg) return null;
+  if (turnDeg <= 1 || turnDeg >= 179) return null;
+
+  // Tangency distance from the vertex along each leg for a fillet of radius r.
+  const half = (turnDeg * Math.PI) / 360;
+  const tanHalf = Math.tan(half);
+  if (Math.abs(tanHalf) <= CORNER_EPS) return null;
+  let tangency = radiusMm / tanHalf;
+  const maxTangency = Math.min(inLen, outLen) * 0.49;
+  if (maxTangency <= CORNER_EPS) return null;
+  tangency = Math.min(tangency, maxTangency);
+
+  const entry: Pt = {
+    x: curr.x - inUx * tangency,
+    y: curr.y - inUy * tangency,
+  };
+  const exit: Pt = {
+    x: curr.x + outUx * tangency,
+    y: curr.y + outUy * tangency,
+  };
+
+  const turnSign = Math.sign(cross(inUx, inUy, outUx, outUy));
+  if (turnSign === 0) return null;
+
+  const leftIn = leftNormal(inUx, inUy);
+  const leftOut = leftNormal(outUx, outUy);
+  const n1: Pt = { x: leftIn.x * turnSign, y: leftIn.y * turnSign };
+  const n2: Pt = { x: leftOut.x * turnSign, y: leftOut.y * turnSign };
+
+  const center = intersectLines(entry, n1, exit, n2);
+  if (!center) return null;
+
+  const startAng = Math.atan2(entry.y - center.y, entry.x - center.x);
+  let endAng = Math.atan2(exit.y - center.y, exit.x - center.x);
+  if (turnSign > 0 && endAng < startAng) endAng += Math.PI * 2;
+  if (turnSign < 0 && endAng > startAng) endAng -= Math.PI * 2;
+
+  const sweep = endAng - startAng;
+  const segs = Math.max(2, Math.ceil(Math.abs(sweep) / ((Math.PI / 180) * 12)));
+  const arc: Pt[] = [];
+  const r = Math.hypot(entry.x - center.x, entry.y - center.y);
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    const a = startAng + sweep * t;
+    arc.push({ x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r });
+  }
+
+  return { entry, arc };
+}
+
+function roundSubpathCornersOpen(
+  subpath: Subpath,
+  thresholdDeg: number,
+  radiusMm: number,
+): Subpath {
+  if (subpath.length < 3) return subpath.slice();
+  const out: Subpath = [subpath[0]];
+
+  for (let i = 1; i < subpath.length - 1; i++) {
+    const prev = subpath[i - 1];
+    const curr = subpath[i];
+    const next = subpath[i + 1];
+    const rounded = buildRoundedCorner(
+      prev,
+      curr,
+      next,
+      thresholdDeg,
+      radiusMm,
+    );
+
+    if (!rounded) {
+      out.push(curr);
+      continue;
+    }
+
+    const last = out[out.length - 1];
+    if (dist(last, rounded.entry) <= CORNER_EPS) {
+      out[out.length - 1] = rounded.entry;
+    } else {
+      out.push(rounded.entry);
+    }
+    out.push(...rounded.arc);
+  }
+
+  out.push(subpath[subpath.length - 1]);
+  return out;
+}
+
+/**
+ * Smooths sharp polyline vertices by replacing eligible corners with
+ * short circular arcs. The corner is rounded when the turn angle is below
+ * `angleThresholdDeg`.
+ */
+export function roundSubpathCorners(
+  subpath: Subpath,
+  angleThresholdDeg: number,
+  radiusMm: number,
+): Subpath {
+  if (subpath.length < 3) return subpath.slice();
+  if (!Number.isFinite(radiusMm) || radiusMm <= 0) return subpath.slice();
+  const threshold = clamp(angleThresholdDeg, 1, 179);
+
+  const closed = dist(subpath[0], subpath[subpath.length - 1]) <= CORNER_EPS;
+  if (!closed) {
+    return roundSubpathCornersOpen(subpath, threshold, radiusMm);
+  }
+
+  // Closed loop: process every corner using wrap-around indexing so no corner
+  // is ever left unrounded because it happened to be the seam point.
+  if (subpath.length < 4) return subpath.slice();
+  const core = subpath.slice(0, -1); // strip duplicate closing point
+  const k = core.length;
+  if (k < 3) return subpath.slice();
+
+  const out: Pt[] = [];
+  for (let i = 0; i < k; i++) {
+    const prev = core[(i - 1 + k) % k];
+    const curr = core[i];
+    const next = core[(i + 1) % k];
+    const rounded = buildRoundedCorner(prev, curr, next, threshold, radiusMm);
+    if (!rounded) {
+      out.push(curr);
+    } else {
+      if (
+        out.length > 0 &&
+        dist(out[out.length - 1], rounded.entry) <= CORNER_EPS
+      ) {
+        out[out.length - 1] = rounded.entry;
+      } else {
+        out.push(rounded.entry);
+      }
+      out.push(...rounded.arc);
+    }
+  }
+  if (out.length > 0) out.push({ ...out[0] });
+  return out;
+}
+
+// ── Hatch re-clip ─────────────────────────────────────────────────────────────
+
+/** Ray-casting point-in-polygon test using the even-odd rule. */
+function pointInPolygon(x: number, y: number, poly: Subpath): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x,
+      yi = poly[i].y;
+    const xj = poly[j].x,
+      yj = poly[j].y;
+    if (yi !== yj && yi > y !== yj > y) {
+      const xInt = ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (x < xInt) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointOnSegment(p: Pt, a: Pt, b: Pt, eps: number): boolean {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const apx = p.x - a.x;
+  const apy = p.y - a.y;
+  const crossVal = Math.abs(abx * apy - aby * apx);
+  if (crossVal > eps) return false;
+  const dotVal = apx * abx + apy * aby;
+  if (dotVal < -eps) return false;
+  const abLenSq = abx * abx + aby * aby;
+  if (dotVal - abLenSq > eps) return false;
+  return true;
+}
+
+function pointOnPolygonEdge(p: Pt, poly: Subpath, eps: number): boolean {
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    if (pointOnSegment(p, a, b, eps)) return true;
+  }
+  return false;
+}
+
+/**
+ * Clips a straight line segment (p1→p2) against a closed polygon using the
+ * even-odd fill rule.  Returns the sub-segments of p1→p2 that lie inside the
+ * polygon.  Used to re-clip pre-computed hatch lines against a rounded outline
+ * boundary after corner-rounding has been applied.
+ */
+export function clipSegmentToPolygon(
+  p1: Pt,
+  p2: Pt,
+  polygon: Subpath,
+): Subpath[] {
+  if (polygon.length < 3) return [[p1, p2]];
+
+  // Accept both closed (first==last) and open polygon rings.
+  const ring =
+    dist(polygon[0], polygon[polygon.length - 1]) <= CORNER_EPS
+      ? polygon.slice(0, -1)
+      : polygon.slice();
+  if (ring.length < 3) return [[p1, p2]];
+
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  if (Math.hypot(dx, dy) < CORNER_EPS) return [];
+
+  // Collect all t-values (0..1 along the segment) where the segment crosses a
+  // polygon edge, then evaluate even-odd membership for each interval midpoint.
+  const ts: number[] = [0, 1];
+  for (let i = 0; i < ring.length; i++) {
+    const q1 = ring[i];
+    const q2 = ring[(i + 1) % ring.length];
+    const ex = q2.x - q1.x;
+    const ey = q2.y - q1.y;
+    const denom = dx * ey - dy * ex;
+    if (Math.abs(denom) < CORNER_EPS) continue; // parallel edges
+    const fx = q1.x - p1.x;
+    const fy = q1.y - p1.y;
+    const t = (fx * ey - fy * ex) / denom;
+    const s = (fx * dy - fy * dx) / denom;
+    if (
+      t > -CORNER_EPS &&
+      t < 1 + CORNER_EPS &&
+      s > -CORNER_EPS &&
+      s < 1 + CORNER_EPS
+    ) {
+      ts.push(clamp(t, 0, 1));
+    }
+  }
+
+  ts.sort((a, b) => a - b);
+
+  // De-duplicate near-identical crossings (common at polygon vertices).
+  const uniqTs: number[] = [];
+  for (const t of ts) {
+    if (uniqTs.length === 0 || Math.abs(t - uniqTs[uniqTs.length - 1]) > 1e-7) {
+      uniqTs.push(t);
+    }
+  }
+
+  const result: Subpath[] = [];
+  for (let i = 0; i < uniqTs.length - 1; i++) {
+    if (uniqTs[i + 1] - uniqTs[i] < CORNER_EPS) continue;
+    const tmid = (uniqTs[i] + uniqTs[i + 1]) / 2;
+    const mid: Pt = { x: p1.x + tmid * dx, y: p1.y + tmid * dy };
+    if (
+      pointInPolygon(mid.x, mid.y, ring) ||
+      pointOnPolygonEdge(mid, ring, 1e-7)
+    ) {
+      result.push([
+        { x: p1.x + uniqTs[i] * dx, y: p1.y + uniqTs[i] * dy },
+        { x: p1.x + uniqTs[i + 1] * dx, y: p1.y + uniqTs[i + 1] * dy },
+      ]);
+    }
+  }
+  return result;
+}
+
 // ── Main flattener ────────────────────────────────────────────────────────────
 
 export function flattenToSubpaths(

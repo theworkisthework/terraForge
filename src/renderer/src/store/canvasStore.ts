@@ -439,6 +439,7 @@ export const useCanvasStore = create<CanvasState>()(
                     id: `${p.id}-h${i}`,
                     svgSource: "",
                     path: hl,
+                    hatchParentId: p.id,
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
@@ -717,6 +718,7 @@ export const useCanvasStore = create<CanvasState>()(
                     id: `${p.id}-h${i}`,
                     svgSource: "",
                     path: hl,
+                    hatchParentId: p.id,
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
@@ -761,6 +763,7 @@ export const useCanvasStore = create<CanvasState>()(
                     id: `${p.id}-h${i}`,
                     svgSource: "",
                     path: hl,
+                    hatchParentId: p.id,
                   }),
                 );
                 return [...outlineVOs, ...hatchVOs];
