@@ -2,6 +2,12 @@
 
 Things we may wish to explore in the future. Do not use this as part of the context for existing work.
 
+## Index
+
+- [Vinyl/paper cutter/drag knife](#vinylpaper-cutterdrag-knife)
+- [Inkjet print head](#inkjet-print-head)
+- [3D print head](#3d-print-head)
+
 ## Vinyl/paper cutter/drag knife
 
 You can add drag-knife support cleanly as a new G-code mode, but it needs geometry compensation in the worker, not just different start/end commands.
