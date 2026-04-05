@@ -79,6 +79,8 @@ export interface SvgPath {
   /** Id of the `SvgLayer` (within the parent `SvgImport.layers`) that this path
    *  belongs to, or undefined for paths not inside a detected layer group. */
   layer?: string;
+  /** Source stroke colour resolved at import time (including inherited styles). */
+  sourceStrokeColor?: string;
   /** Whether the original shape had a visible fill colour (used to regenerate hatch) */
   hasFill?: boolean;
   /** Whether the outline should be plotted. False for shapes with no visible stroke.
@@ -98,6 +100,8 @@ export interface SvgLayer {
   name: string;
   /** Whether paths in this layer are currently visible on the canvas */
   visible: boolean;
+  /** Source stroke colour resolved from the layer group, if present. */
+  sourceStrokeColor?: string;
 }
 
 /** Default hatch spacing in mm — used on import and as the UI default. */

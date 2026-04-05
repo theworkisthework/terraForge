@@ -51,6 +51,33 @@ function scaleHexColor(hex: string, factor: number): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
+const DEFAULT_OUTLINE_COLOR = "#3a6aaa";
+const DEFAULT_OUTLINE_COLOR_SELECTED = "#60a0ff";
+const DEFAULT_HATCH_COLOR = "#2a5a8a";
+const DEFAULT_HATCH_COLOR_SELECTED = "#4a88cc";
+
+function isHexColor(color: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(color);
+}
+
+function getOutlineColor(baseColor: string, isSelected: boolean): string {
+  if (baseColor === DEFAULT_OUTLINE_COLOR) {
+    return isSelected ? DEFAULT_OUTLINE_COLOR_SELECTED : DEFAULT_OUTLINE_COLOR;
+  }
+  if (isSelected && isHexColor(baseColor))
+    return scaleHexColor(baseColor, 1.35);
+  return baseColor;
+}
+
+function getHatchColor(baseColor: string, isSelected: boolean): string {
+  if (baseColor === DEFAULT_OUTLINE_COLOR) {
+    return isSelected ? DEFAULT_HATCH_COLOR_SELECTED : DEFAULT_HATCH_COLOR;
+  }
+  if (isSelected) return baseColor;
+  if (isHexColor(baseColor)) return scaleHexColor(baseColor, 0.65);
+  return baseColor;
+}
+
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1095,17 +1122,17 @@ export function PlotCanvas() {
   // every viewport update).
   const toolpathCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Cache of combined Path2D geometry per import, keyed by import ID.
-  // Invalidated when imp.paths reference changes (immer creates a new array on
-  // any mutation). Two entries per import: outline strokes + hatch lines.
+  // Cache of Path2D geometry per import, keyed by import ID.
+  // Invalidated when imp.paths or imp.layers references change (immer creates
+  // new arrays on mutation).
   const importPath2DCacheRef = useRef(
     new Map<
       string,
       {
         pathsRef: SvgImport["paths"];
         layersRef: SvgImport["layers"];
-        outline: Path2D;
-        hatch: Path2D;
+        outlineByColor: Array<{ color: string; path: Path2D }>;
+        hatchByColor: Array<{ color: string; path: Path2D }>;
       }
     >(),
   );
@@ -1201,7 +1228,7 @@ export function PlotCanvas() {
         }
         for (const imp of imports) {
           if (!imp.visible) continue;
-          // Build or retrieve combined Path2D objects for this import.
+          // Build or retrieve color-bucketed Path2D objects for this import.
           let impCache = importPath2DCacheRef.current.get(imp.id);
           if (
             !impCache ||
@@ -1214,27 +1241,49 @@ export function PlotCanvas() {
               : null;
             const isLayerVisible = (p: (typeof imp.paths)[number]) =>
               !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
-            const outlineD = imp.paths
-              .filter(
-                (p) =>
-                  p.visible && p.outlineVisible !== false && isLayerVisible(p),
-              )
-              .map((p) => p.d)
-              .join(" ");
-            const hatchD = imp.paths
-              .filter(
-                (p) =>
-                  p.visible &&
-                  (p.hatchLines?.length ?? 0) > 0 &&
-                  isLayerVisible(p),
-              )
-              .flatMap((p) => p.hatchLines!)
-              .join(" ");
+
+            const layerStrokeById = new Map<string, string>();
+            for (const l of imp.layers ?? []) {
+              if (l.sourceStrokeColor)
+                layerStrokeById.set(l.id, l.sourceStrokeColor);
+            }
+
+            const getPathBaseColor = (
+              p: (typeof imp.paths)[number],
+            ): string => {
+              const layerColor = p.layer
+                ? layerStrokeById.get(p.layer)
+                : undefined;
+              return layerColor || p.sourceStrokeColor || DEFAULT_OUTLINE_COLOR;
+            };
+
+            const outlineDByColor = new Map<string, string[]>();
+            const hatchDByColor = new Map<string, string[]>();
+
+            for (const p of imp.paths) {
+              if (!p.visible || !isLayerVisible(p)) continue;
+              const baseColor = getPathBaseColor(p);
+              if (p.outlineVisible !== false) {
+                const arr = outlineDByColor.get(baseColor) ?? [];
+                arr.push(p.d);
+                outlineDByColor.set(baseColor, arr);
+              }
+              if ((p.hatchLines?.length ?? 0) > 0) {
+                const arr = hatchDByColor.get(baseColor) ?? [];
+                arr.push(...(p.hatchLines ?? []));
+                hatchDByColor.set(baseColor, arr);
+              }
+            }
+
             impCache = {
               pathsRef: imp.paths,
               layersRef: imp.layers,
-              outline: new Path2D(outlineD),
-              hatch: new Path2D(hatchD),
+              outlineByColor: Array.from(outlineDByColor.entries()).map(
+                ([color, ds]) => ({ color, path: new Path2D(ds.join(" ")) }),
+              ),
+              hatchByColor: Array.from(hatchDByColor.entries()).map(
+                ([color, ds]) => ({ color, path: new Path2D(ds.join(" ")) }),
+              ),
             };
             importPath2DCacheRef.current.set(imp.id, impCache);
           }
@@ -1275,31 +1324,42 @@ export function PlotCanvas() {
           ctx.setLineDash([]);
           // Outline paths — use group colour when assigned, otherwise default blue
           const groupColor = groupColorMap.get(imp.id);
-          const outlineColor = groupColor
-            ? isImpSelected
-              ? scaleHexColor(groupColor, 1.35)
-              : groupColor
-            : isImpSelected
-              ? "#60a0ff"
-              : "#3a6aaa";
-          const hatchColor = groupColor
-            ? isImpSelected
-              ? groupColor
-              : scaleHexColor(groupColor, 0.65)
-            : isImpSelected
-              ? "#4a88cc"
-              : "#2a5a8a";
-          ctx.strokeStyle = outlineColor;
           ctx.lineWidth =
             ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * MM_TO_PX) /
             avgImpScale;
-          ctx.stroke(impCache.outline);
+          if (groupColor) {
+            const outlineColor = isImpSelected
+              ? scaleHexColor(groupColor, 1.35)
+              : groupColor;
+            ctx.strokeStyle = outlineColor;
+            for (const b of impCache.outlineByColor) {
+              ctx.stroke(b.path);
+            }
+          } else {
+            for (const b of impCache.outlineByColor) {
+              ctx.strokeStyle = getOutlineColor(b.color, isImpSelected);
+              ctx.stroke(b.path);
+            }
+          }
+
           // Hatch fill lines
-          ctx.strokeStyle = hatchColor;
           ctx.lineWidth =
             ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * 0.5 * MM_TO_PX) /
             avgImpScale;
-          ctx.stroke(impCache.hatch);
+          if (groupColor) {
+            const hatchColor = isImpSelected
+              ? groupColor
+              : scaleHexColor(groupColor, 0.65);
+            ctx.strokeStyle = hatchColor;
+            for (const b of impCache.hatchByColor) {
+              ctx.stroke(b.path);
+            }
+          } else {
+            for (const b of impCache.hatchByColor) {
+              ctx.strokeStyle = getHatchColor(b.color, isImpSelected);
+              ctx.stroke(b.path);
+            }
+          }
           ctx.restore();
         }
       }

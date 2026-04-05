@@ -1120,10 +1120,10 @@ describe("Toolbar", () => {
     it("detects Inkscape layer groups via inkscape:groupmode and maps layer ids", async () => {
       const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="100mm" height="100mm" viewBox="0 0 100 100">
         <g id="layer-a" inkscape:groupmode="layer" inkscape:label="Layer A">
-          <path d="M 0,0 L 50,50" stroke="red" fill="none" />
+          <path d="M 0,0 L 50,50" stroke="#ff0000" fill="none" />
         </g>
         <g id="layer-b" inkscape:groupmode="layer" inkscape:label="Layer B">
-          <path d="M 10,10 L 90,90" stroke="blue" fill="none" />
+          <path d="M 10,10 L 90,90" stroke="#0000ff" fill="none" />
         </g>
       </svg>`;
       (
@@ -1152,6 +1152,41 @@ describe("Toolbar", () => {
 
       expect(imp.paths.filter((p) => p.layer === "layer-a")).toHaveLength(1);
       expect(imp.paths.filter((p) => p.layer === "layer-b")).toHaveLength(1);
+
+      expect(layerA?.sourceStrokeColor).toBe("#ff0000");
+      expect(layerB?.sourceStrokeColor).toBe("#0000ff");
+      expect(
+        imp.paths.find((p) => p.layer === "layer-a")?.sourceStrokeColor,
+      ).toBe("#ff0000");
+      expect(
+        imp.paths.find((p) => p.layer === "layer-b")?.sourceStrokeColor,
+      ).toBe("#0000ff");
+    });
+
+    it("captures inherited stroke colors from ancestor groups", async () => {
+      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <g id="outer" stroke="#112233">
+          <g id="inner">
+            <path d="M 0,0 L 50,50" fill="none" />
+          </g>
+        </g>
+      </svg>`;
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/inherited-stroke.svg");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(svgXml);
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports.length).toBe(1);
+      });
+
+      const imp = useCanvasStore.getState().imports[0];
+      expect(imp.paths).toHaveLength(1);
+      expect(imp.paths[0].sourceStrokeColor).toBe("#112233");
     });
 
     it("does not treat plain groups without markers as layers", async () => {
