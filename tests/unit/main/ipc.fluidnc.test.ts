@@ -61,7 +61,7 @@ describe("registerFluidncIpcHandlers", () => {
     const taskManager = {
       create: vi.fn(),
       update: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn((id: string) => ({ id })),
       complete: vi.fn(),
       fail: vi.fn(),
     };
@@ -120,6 +120,20 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.fluidnc.abortJob).not.toHaveBeenCalled();
   });
 
+  it("calls FluidNC pause/resume/abort on wifi transport", async () => {
+    const deps = buildDeps();
+    deps.setCurrentType("wifi");
+
+    await mocks.handlers.get("fluidnc:pauseJob")?.();
+    await mocks.handlers.get("fluidnc:resumeJob")?.();
+    await mocks.handlers.get("fluidnc:abortJob")?.();
+
+    expect(deps.fluidnc.pauseJob).toHaveBeenCalledTimes(1);
+    expect(deps.fluidnc.resumeJob).toHaveBeenCalledTimes(1);
+    expect(deps.fluidnc.abortJob).toHaveBeenCalledTimes(1);
+    expect(deps.serial.sendRealtime).not.toHaveBeenCalled();
+  });
+
   it("updates connection state for websocket connect and disconnect", async () => {
     const deps = buildDeps();
 
@@ -148,5 +162,108 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.serial.stopStatusPolling).toHaveBeenCalled();
     expect(deps.setConnectionType).toHaveBeenCalledWith(null);
     expect(deps.serial.disconnect).toHaveBeenCalled();
+  });
+
+  it("reports task progress and completion for uploadGcode", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockImplementation(
+      async (
+        _localPath: string,
+        _remotePath: string,
+        onProgress: (progress: number) => void,
+      ) => {
+        onProgress(50);
+      },
+    );
+
+    await mocks.handlers.get("fluidnc:uploadGcode")?.(
+      {},
+      "task-1",
+      "G1 X10",
+      "/sd/job.gcode",
+    );
+
+    expect(deps.taskManager.create).toHaveBeenCalledWith(
+      "task-1",
+      "file-upload",
+      "Uploading job.gcode",
+    );
+    expect(deps.fluidnc.uploadFile).toHaveBeenCalledWith(
+      expect.stringContaining("job.gcode"),
+      "/sd/job.gcode",
+      expect.any(Function),
+      "job.gcode",
+    );
+    expect(deps.taskManager.update).toHaveBeenCalledWith("task-1", {
+      progress: 50,
+    });
+    expect(deps.taskManager.complete).toHaveBeenCalledWith("task-1");
+    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-1" });
+  });
+
+  it("marks uploadGcode failures and rethrows the error", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockRejectedValue(new Error("upload failed"));
+
+    await expect(
+      mocks.handlers.get("fluidnc:uploadGcode")?.(
+        {},
+        "task-2",
+        "G1 X10",
+        "/sd/job.gcode",
+      ),
+    ).rejects.toThrow("upload failed");
+
+    expect(deps.taskManager.fail).toHaveBeenCalledWith(
+      "task-2",
+      "Error: upload failed",
+    );
+    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-2" });
+  });
+
+  it("tracks uploadFile and downloadFile task progress paths", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockImplementation(
+      async (
+        _localPath: string,
+        _remotePath: string,
+        onProgress: (progress: number) => void,
+      ) => {
+        onProgress(25);
+      },
+    );
+    deps.fluidnc.downloadFile.mockImplementation(
+      async (
+        _remotePath: string,
+        _localPath: string,
+        _filesystem: string | undefined,
+        onProgress: (progress: number) => void,
+      ) => {
+        onProgress(75);
+      },
+    );
+
+    await mocks.handlers.get("fluidnc:uploadFile")?.(
+      {},
+      "task-3",
+      "local.gcode",
+      "/sd/remote.gcode",
+    );
+    await mocks.handlers.get("fluidnc:downloadFile")?.(
+      {},
+      "task-4",
+      "/sd/remote.gcode",
+      "downloaded.gcode",
+      "sdcard",
+    );
+
+    expect(deps.taskManager.update).toHaveBeenCalledWith("task-3", {
+      progress: 25,
+    });
+    expect(deps.taskManager.update).toHaveBeenCalledWith("task-4", {
+      progress: 75,
+    });
+    expect(deps.taskManager.complete).toHaveBeenCalledWith("task-3");
+    expect(deps.taskManager.complete).toHaveBeenCalledWith("task-4");
   });
 });

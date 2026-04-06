@@ -75,6 +75,46 @@ describe("registerConfigIpcHandlers", () => {
     expect(saveConfigs).toHaveBeenCalledWith([updated]);
   });
 
+  it("appends a new machine config when the id does not exist", async () => {
+    const existing = makeConfig("cfg-1", "Original");
+    const created = makeConfig("cfg-2", "Created");
+    const loadConfigs = vi.fn().mockResolvedValue([existing]);
+    const saveConfigs = vi.fn().mockResolvedValue(undefined);
+
+    registerConfigIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadConfigs,
+      saveConfigs,
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      pageSizesPath: join(tempDir, "page-sizes.json"),
+      builtInPageSizes: [],
+    });
+
+    await mocks.handlers.get("config:saveMachineConfig")?.({}, created);
+
+    expect(saveConfigs).toHaveBeenCalledWith([existing, created]);
+  });
+
+  it("deletes a machine config by id", async () => {
+    const cfg1 = makeConfig("cfg-1", "One");
+    const cfg2 = makeConfig("cfg-2", "Two");
+    const loadConfigs = vi.fn().mockResolvedValue([cfg1, cfg2]);
+    const saveConfigs = vi.fn().mockResolvedValue(undefined);
+
+    registerConfigIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadConfigs,
+      saveConfigs,
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      pageSizesPath: join(tempDir, "page-sizes.json"),
+      builtInPageSizes: [],
+    });
+
+    await mocks.handlers.get("config:deleteMachineConfig")?.({}, "cfg-1");
+
+    expect(saveConfigs).toHaveBeenCalledWith([cfg2]);
+  });
+
   it("imports configs with dedupe by id and normalized name", async () => {
     const existing = makeConfig("existing-id", "Alpha Plotter");
     const incoming = [
@@ -118,6 +158,55 @@ describe("registerConfigIpcHandlers", () => {
       "new-2",
       "new-3",
     ]);
+  });
+
+  it("exports configs to the selected file", async () => {
+    const exportedPath = join(tempDir, "export.json");
+    const loadConfigs = vi
+      .fn()
+      .mockResolvedValue([makeConfig("cfg-1", "Exported")]);
+    mocks.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: exportedPath,
+    });
+
+    registerConfigIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadConfigs,
+      saveConfigs: vi.fn().mockResolvedValue(undefined),
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      pageSizesPath: join(tempDir, "page-sizes.json"),
+      builtInPageSizes: [],
+    });
+
+    const result = await mocks.handlers.get("config:exportConfigs")?.();
+
+    expect(result).toBe(exportedPath);
+    const payload = JSON.parse(await readFile(exportedPath, "utf-8"));
+    expect(payload.terraForge).toBe("machine-configs");
+    expect(payload.configs).toHaveLength(1);
+  });
+
+  it("throws for invalid import JSON", async () => {
+    const importFilePath = join(tempDir, "invalid.json");
+    await writeFile(importFilePath, "{not json", "utf-8");
+    mocks.showOpenDialog.mockResolvedValue({
+      canceled: false,
+      filePaths: [importFilePath],
+    });
+
+    registerConfigIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadConfigs: vi.fn().mockResolvedValue([]),
+      saveConfigs: vi.fn().mockResolvedValue(undefined),
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      pageSizesPath: join(tempDir, "page-sizes.json"),
+      builtInPageSizes: [],
+    });
+
+    await expect(
+      mocks.handlers.get("config:importConfigs")?.(),
+    ).rejects.toThrow("Not a valid JSON file.");
   });
 
   it("creates page-sizes file on open if it does not exist", async () => {
