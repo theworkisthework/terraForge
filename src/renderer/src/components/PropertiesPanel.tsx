@@ -29,6 +29,7 @@ import { ImportPathsList } from "../features/properties-panel/components/ImportP
 import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
+import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -1159,15 +1160,9 @@ export function PropertiesPanel() {
                               {members.map((imp) => renderImport(imp, true))}
                               {/* Drop hint when group is empty */}
                               {members.length === 0 && (
-                                <div
-                                  className={`mx-3 mb-1 px-2 py-1 text-[9px] text-center border border-dashed rounded transition-colors ${
-                                    isDropTarget
-                                      ? "border-accent/50 text-accent/60"
-                                      : "border-border-ui text-content-faint"
-                                  }`}
-                                >
-                                  Drop layers here
-                                </div>
+                                <EmptyGroupDropHint
+                                  isDropTarget={isDropTarget}
+                                />
                               )}
                             </div>
                           )}
