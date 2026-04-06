@@ -22,33 +22,10 @@ import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import type { GcodeToolpath } from "../utils/gcodeParser";
 import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m < 60) return `${m}m ${s}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
-
-function estimateDuration(tp: GcodeToolpath, fallbackFeedrate: number): string {
-  const fr = tp.feedrate > 0 ? tp.feedrate : fallbackFeedrate;
-  if (fr <= 0 || (tp.totalCutDistance === 0 && tp.totalRapidDistance === 0)) {
-    return "—";
-  }
-  // Rapid moves run at approximately 5× the job feedrate, capped at 10 000 mm/min
-  const rapidRate = Math.min(fr * 5, 10000);
-  const totalSec = Math.round(
-    (tp.totalCutDistance / fr + tp.totalRapidDistance / rapidRate) * 60,
-  );
-  return formatDuration(totalSec);
-}
+import {
+  estimateDuration,
+  formatBytes,
+} from "../features/properties-panel/utils/toolpathMetrics";
 
 const ROT_STEPS = [1, 5, 15, 30, 45] as const;
 type RotStep = (typeof ROT_STEPS)[number];
