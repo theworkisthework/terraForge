@@ -3,6 +3,8 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { readFile, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
+import { registerAppLifecycleHandlers } from "./bootstrap/lifecycle";
+import { createMainWindow, getMainWindow, safeSend } from "./bootstrap/window";
 import { FluidNCClient } from "../machine/fluidnc";
 import { SerialClient } from "../machine/serial";
 import { TaskManager } from "../tasks/taskManager";
@@ -15,50 +17,6 @@ import type {
   RemoteFile,
   BackgroundTask,
 } from "../types";
-
-// ─── Window Management ────────────────────────────────────────────────────────
-
-let mainWindow: BrowserWindow | null = null;
-
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    show: false,
-    backgroundColor: "#1a1a2e",
-    icon: join(
-      __dirname,
-      process.platform === "win32"
-        ? "../../build/icon.ico"
-        : process.platform === "darwin"
-          ? "../../build/icon.icns"
-          : "../../build/icon.png",
-    ),
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
-
-  if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-  } else {
-    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-  }
-}
-
-// ─── App Lifecycle ────────────────────────────────────────────────────────────
 
 // ─── Application Menu ─────────────────────────────────────────────────────────────────────
 
@@ -227,24 +185,16 @@ ipcMain.on("menu:setEditMenuState", (_e, hasSelection: boolean) => {
   if (copy) copy.enabled = hasSelection;
 });
 
-app.whenReady().then(() => {
-  createWindow();
-  buildApplicationMenu();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
-
-// Gracefully close the FluidNC WebSocket before the process exits so the
-// machine receives a proper WS close frame instead of a TCP RST.  A TCP RST
-// (from os-level socket teardown on process kill) can wedge the ESP32's WS
-// server slot, requiring a power cycle to recover.
-app.on("before-quit", () => {
-  fluidnc.disconnectWebSocket();
+registerAppLifecycleHandlers({
+  createMainWindow,
+  onReady: buildApplicationMenu,
+  // Gracefully close the FluidNC WebSocket before the process exits so the
+  // machine receives a proper WS close frame instead of a TCP RST.  A TCP RST
+  // (from os-level socket teardown on process kill) can wedge the ESP32's WS
+  // server slot, requiring a power cycle to recover.
+  onBeforeQuit: () => {
+    fluidnc.disconnectWebSocket();
+  },
 });
 
 // ─── Singletons ───────────────────────────────────────────────────────────────
@@ -255,18 +205,6 @@ const taskManager = new TaskManager();
 
 // Tracks which transport is currently active so IPC handlers can route correctly.
 let connectionType: "wifi" | "serial" | null = null;
-
-// Guard against sending to a webContents that has been destroyed (e.g. the
-// window closed during the before-quit flush of FluidNC events).
-function safeSend(channel: string, ...args: unknown[]): void {
-  if (
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    mainWindow.webContents.isDestroyed()
-  )
-    return;
-  mainWindow.webContents.send(channel, ...args);
-}
 
 // ─── Push events to renderer ──────────────────────────────────────────────────
 
@@ -399,6 +337,7 @@ ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
 });
 
 ipcMain.handle("config:exportConfigs", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
     title: "Export Machine Configs",
@@ -417,6 +356,7 @@ ipcMain.handle("config:exportConfigs", async () => {
 });
 
 ipcMain.handle("config:importConfigs", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return { added: 0, skipped: 0 };
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import Machine Configs",
@@ -711,6 +651,7 @@ ipcMain.handle("serial:send", (_e, data: string) => serial.send(data));
 // ─── IPC Handlers — File System ───────────────────────────────────────────────
 
 ipcMain.handle("fs:openSvgDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import SVG",
@@ -721,6 +662,7 @@ ipcMain.handle("fs:openSvgDialog", async () => {
 });
 
 ipcMain.handle("fs:openPdfDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import PDF",
@@ -731,6 +673,7 @@ ipcMain.handle("fs:openPdfDialog", async () => {
 });
 
 ipcMain.handle("fs:openFileDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Select File to Upload",
@@ -740,6 +683,7 @@ ipcMain.handle("fs:openFileDialog", async () => {
 });
 
 ipcMain.handle("fs:openImportDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import File",
@@ -783,6 +727,7 @@ ipcMain.handle("fs:openImportDialog", async () => {
 });
 
 ipcMain.handle("fs:openGcodeDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Import G-code",
@@ -821,6 +766,7 @@ ipcMain.handle("fs:writeFile", (_e, filePath: string, content: string) =>
 );
 
 ipcMain.handle("fs:saveGcodeDialog", async (_e, defaultName: string) => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
     title: "Save G-code",
@@ -831,6 +777,7 @@ ipcMain.handle("fs:saveGcodeDialog", async (_e, defaultName: string) => {
 });
 
 ipcMain.handle("fs:saveFileDialog", async (_e, defaultName: string) => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
     title: "Save File",
@@ -840,6 +787,7 @@ ipcMain.handle("fs:saveFileDialog", async (_e, defaultName: string) => {
 });
 
 ipcMain.handle("fs:saveLayoutDialog", async (_e, defaultName: string) => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
     title: "Save Canvas Layout",
@@ -850,6 +798,7 @@ ipcMain.handle("fs:saveLayoutDialog", async (_e, defaultName: string) => {
 });
 
 ipcMain.handle("fs:openLayoutDialog", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Open Canvas Layout",
@@ -860,6 +809,7 @@ ipcMain.handle("fs:openLayoutDialog", async () => {
 });
 
 ipcMain.handle("fs:chooseDirectory", async () => {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Choose folder for G-code files",
