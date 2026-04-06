@@ -140,6 +140,7 @@ Checklist:
 - [x] Move page-template bounds calculation to utilities. (completed: resolvePageBounds)
 - [x] Move drag/drop and edit-name logic to hooks. (completed: useImportDragDrop + usePanelNameEditing)
 - [x] Move import-row prop wiring to hooks. (completed: useImportRowRenderer)
+- [x] Move add-group naming/colour logic to hooks. (completed: useAddLayerGroup)
 - [ ] Preserve current store API contracts.
 
 ### 3) Toolbar Decomposition
