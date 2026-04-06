@@ -5,6 +5,7 @@ import type {
   PageTemplate,
   SvgImport,
 } from "../../../../../types";
+import { resolvePageBounds } from "../utils/pageBounds";
 import type { RotStep } from "../utils/rotation";
 import { GroupedImportsSection } from "./GroupedImportsSection";
 import { ImportRowCard } from "./ImportRowCard";
@@ -163,20 +164,12 @@ export function ImportsByGroupList({
   onCommitGroupRename,
   onCancelGroupRename,
 }: ImportsByGroupListProps) {
-  const activePageSize = pageTemplate
-    ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
-    : null;
-  const canAlignToTemplate = !!pageTemplate && !!activePageSize;
-  const pageW = activePageSize
-    ? pageTemplate!.landscape
-      ? activePageSize.heightMM
-      : activePageSize.widthMM
-    : bedW;
-  const pageH = activePageSize
-    ? pageTemplate!.landscape
-      ? activePageSize.widthMM
-      : activePageSize.heightMM
-    : bedH;
+  const { pageW, pageH, canAlignToTemplate, marginMM } = resolvePageBounds({
+    bedW,
+    bedH,
+    pageTemplate,
+    pageSizes,
+  });
 
   const renderImport = (imp: SvgImport, indented: boolean) => {
     const isSelected = imp.id === selectedImportId;
@@ -202,7 +195,7 @@ export function ImportsByGroupList({
         bedH={bedH}
         pageW={pageW}
         pageH={pageH}
-        marginMM={pageTemplate?.marginMM ?? 20}
+        marginMM={marginMM}
         canAlignToTemplate={canAlignToTemplate}
         templateAlignEnabled={templateAlignEnabled}
         templateAlignTarget={templateAlignTarget}
