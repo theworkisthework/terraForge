@@ -1,5 +1,7 @@
 import { v4 as uuid } from "uuid";
+import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
+import { selectImportActionsCanvasState } from "../../../store/canvasStoreSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
 import {
@@ -30,11 +32,9 @@ import {
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
-  const addImport = useCanvasStore((s) => s.addImport);
+  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath } =
+    useCanvasStore(useShallow(selectImportActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
   /**

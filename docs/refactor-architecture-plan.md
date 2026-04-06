@@ -281,7 +281,7 @@ Current sprint focus:
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
-- [ ] Start selector/callsite migration for `canvasStore.ts`
+- [ ] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
 
 Done this sprint:
 
@@ -305,6 +305,7 @@ Done this sprint:
 - [x] Extract `clipboardSlice`, `undoRedoSlice`, and `layerGroupSlice` from `canvasStore.ts`
 - [x] Extract `importSlice` and complete `canvasStore.ts` slice composition
 - [x] Add focused tests for extracted canvas-store services and slices
+- [x] Start grouped selector migration for `canvasStore.ts` consumers
 
 ## Progress Log
 
@@ -333,6 +334,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted `store/canvasStore/slices/selectionSlice.ts` and composed it into `canvasStore.ts`; `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` remain green (105/105).
 - 2026-04-06: Extracted `store/canvasStore/services/clipboard.ts`, `store/canvasStore/slices/clipboardSlice.ts`, `store/canvasStore/slices/undoRedoSlice.ts`, and `store/canvasStore/slices/layerGroupSlice.ts`; preserved API compatibility by re-exporting `generateCopyName` from `canvasStore.ts`; validation remains green with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
 - 2026-04-06: Extracted `store/canvasStore/slices/importSlice.ts`, leaving `canvasStore.ts` as slice composition plus `pushUndo` wiring; added focused tests for `pageTemplateSlice`, `toolpathSlice`, `selectionSlice`, `clipboard` service, `clipboardSlice`, `undoRedoSlice`, `layerGroupSlice`, and `importSlice`; validation remains green with `npm.cmd run typecheck`, focused slice/service tests, and `tests/unit/stores/canvasStore.test.ts` (105/105).
+- 2026-04-06: Started grouped selector migration for `canvasStore.ts` consumers by adding `store/canvasStoreSelectors.ts` and moving `Toolbar.tsx`, `GcodeOptionsDialog.tsx`, `useImportActions.ts`, `useLayoutActions.ts`, `useJobActions.ts`, and `usePropertiesPanelStoreBindings.ts` to shallow selector subscriptions; validation passes with `npm.cmd run typecheck`, the full `runTests` suite (170/170), and `tests/unit/stores/canvasStore.test.ts` (105/105).
 
 ## Update Rule
 

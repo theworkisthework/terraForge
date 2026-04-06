@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
+import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
+import { selectJobActionsCanvasState } from "../../../store/canvasStoreSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
 import { parseGcode } from "../../../utils/gcodeParser";
@@ -13,19 +15,17 @@ export function useJobActions() {
   const setConnected = useMachineStore((s) => s.setConnected);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
 
-  const imports = useCanvasStore((s) => s.imports);
-  const layerGroups = useCanvasStore((s) => s.layerGroups);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const pageSizes = useCanvasStore((s) => s.pageSizes);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
-  const toVectorObjectsForGroup = useCanvasStore(
-    (s) => s.toVectorObjectsForGroup,
-  );
-  const toVectorObjectsUngrouped = useCanvasStore(
-    (s) => s.toVectorObjectsUngrouped,
-  );
+  const {
+    imports,
+    layerGroups,
+    pageTemplate,
+    pageSizes,
+    setGcodeToolpath,
+    setGcodeSource,
+    selectToolpath,
+    toVectorObjectsForGroup,
+    toVectorObjectsUngrouped,
+  } = useCanvasStore(useShallow(selectJobActionsCanvasState));
 
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);

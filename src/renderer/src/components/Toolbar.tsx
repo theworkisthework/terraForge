@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { PenLine, Moon, Sun } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { selectToolbarCanvasState } from "../store/canvasStoreSelectors";
 import { useThemeStore } from "../store/themeStore";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";
@@ -29,21 +31,23 @@ export function Toolbar({
   const wsLive = useMachineStore((s) => s.wsLive);
   const fwInfo = useMachineStore((s) => s.fwInfo);
 
-  const imports = useCanvasStore((s) => s.imports);
-  const selectedImportId = useCanvasStore((s) => s.selectedImportId);
-  const clearImports = useCanvasStore((s) => s.clearImports);
-  const copyImport = useCanvasStore((s) => s.copyImport);
-  const cutImport = useCanvasStore((s) => s.cutImport);
-  const pasteImport = useCanvasStore((s) => s.pasteImport);
-  const selectAllImports = useCanvasStore((s) => s.selectAllImports);
-  const clipboardImport = useCanvasStore((s) => s.clipboardImport);
-  const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
-  const undo = useCanvasStore((s) => s.undo);
-  const redo = useCanvasStore((s) => s.redo);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const setPageTemplate = useCanvasStore((s) => s.setPageTemplate);
-  const pageSizes = useCanvasStore((s) => s.pageSizes);
-  const setPageSizes = useCanvasStore((s) => s.setPageSizes);
+  const {
+    imports,
+    selectedImportId,
+    clearImports,
+    copyImport,
+    cutImport,
+    pasteImport,
+    selectAllImports,
+    clipboardImport,
+    allImportsSelected,
+    undo,
+    redo,
+    pageTemplate,
+    setPageTemplate,
+    pageSizes,
+    setPageSizes,
+  } = useCanvasStore(useShallow(selectToolbarCanvasState));
 
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);

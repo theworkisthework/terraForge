@@ -11,8 +11,10 @@
  */
 
 import React, { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { selectGcodeOptionsDialogCanvasState } from "../store/canvasStoreSelectors";
 import {
   loadGcodePrefs,
   saveGcodePrefs,
@@ -41,8 +43,9 @@ interface Props {
 
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
-  const layerGroupCount = useCanvasStore((s) => s.layerGroups.length);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
+  const { layerGroupCount, pageTemplate } = useCanvasStore(
+    useShallow(selectGcodeOptionsDialogCanvasState),
+  );
   const [prefs, setPrefs] = useState<GcodePrefs>(loadGcodePrefs);
   const [pathsOpen, setPathsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);

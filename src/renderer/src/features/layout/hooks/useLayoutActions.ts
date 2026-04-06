@@ -1,16 +1,15 @@
 import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
+import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
+import { selectLayoutActionsCanvasState } from "../../../store/canvasStoreSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { type CanvasLayout } from "../../../../../types";
 
 /** Orchestrates save, load, and close operations for canvas layout files. */
 export function useLayoutActions() {
-  const imports = useCanvasStore((s) => s.imports);
-  const layerGroups = useCanvasStore((s) => s.layerGroups);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const loadLayout = useCanvasStore((s) => s.loadLayout);
-  const clearImports = useCanvasStore((s) => s.clearImports);
+  const { imports, layerGroups, pageTemplate, loadLayout, clearImports } =
+    useCanvasStore(useShallow(selectLayoutActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const [showCloseDialog, setShowCloseDialog] = useState(false);
