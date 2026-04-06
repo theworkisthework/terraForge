@@ -31,6 +31,7 @@ import { GroupHeaderRow } from "../features/properties-panel/components/GroupHea
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
+import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -70,14 +71,6 @@ export function PropertiesPanel() {
   const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [editingName, setEditingName] = useState<{
-    id: string;
-    value: string;
-  } | null>(null);
-  const [editingGroupName, setEditingGroupName] = useState<{
-    id: string;
-    value: string;
-  } | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     new Set(),
   );
@@ -128,6 +121,22 @@ export function PropertiesPanel() {
     assignImportToGroup,
     importGroupId,
     setCollapsedGroupIds,
+  });
+
+  const {
+    editingName,
+    editingGroupName,
+    startImportRename,
+    changeImportRename,
+    commitImportRename,
+    cancelImportRename,
+    startGroupRename,
+    changeGroupRename,
+    commitGroupRename,
+    cancelGroupRename,
+  } = usePanelNameEditing({
+    updateImport,
+    updateLayerGroup,
   });
 
   /**
@@ -245,19 +254,10 @@ export function PropertiesPanel() {
                         onToggleVisibility={(importId, visible) =>
                           updateImport(importId, { visible })
                         }
-                        onStartRename={(importId, currentName) =>
-                          setEditingName({ id: importId, value: currentName })
-                        }
-                        onEditingNameChange={(nextValue) =>
-                          setEditingName((prev) =>
-                            prev ? { ...prev, value: nextValue } : prev,
-                          )
-                        }
-                        onCommitName={(importId, nextName) => {
-                          updateImport(importId, { name: nextName });
-                          setEditingName(null);
-                        }}
-                        onCancelName={() => setEditingName(null)}
+                        onStartRename={startImportRename}
+                        onEditingNameChange={changeImportRename}
+                        onCommitName={commitImportRename}
+                        onCancelName={cancelImportRename}
                         onDeleteImport={removeImport}
                         onDragStart={handleImportDragStart}
                         onDragEnd={handleImportDragEnd}
@@ -1118,24 +1118,12 @@ export function PropertiesPanel() {
                             onUpdateGroupColor={(groupId, color) =>
                               updateLayerGroup(groupId, { color })
                             }
-                            onStartEditName={(groupId, currentName) =>
-                              setEditingGroupName({
-                                id: groupId,
-                                value: currentName,
-                              })
+                            onStartEditName={startGroupRename}
+                            onEditingNameChange={changeGroupRename}
+                            onCommitName={(groupId, nextValue) =>
+                              commitGroupRename(groupId, nextValue, group.name)
                             }
-                            onEditingNameChange={(nextValue) =>
-                              setEditingGroupName((prev) =>
-                                prev ? { ...prev, value: nextValue } : prev,
-                              )
-                            }
-                            onCommitName={(groupId, nextValue) => {
-                              updateLayerGroup(groupId, {
-                                name: nextValue.trim() || group.name,
-                              });
-                              setEditingGroupName(null);
-                            }}
-                            onCancelEditName={() => setEditingGroupName(null)}
+                            onCancelEditName={cancelGroupRename}
                             onRemoveGroup={removeLayerGroup}
                           />
 
