@@ -105,8 +105,8 @@ Extract from `src/renderer/src/components/PropertiesPanel.tsx`:
 
 Checklist:
 
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header extracted)
-- [ ] Move formatting/estimation helpers to utilities.
+- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField extracted)
+- [x] Move formatting/estimation helpers to utilities.
 - [ ] Move drag/drop and edit-name logic to hooks.
 - [ ] Preserve current store API contracts.
 
@@ -251,6 +251,7 @@ Current sprint focus:
 
 - [x] Refactor `GcodeOptionsDialog.tsx`
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header extracted)
+- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField extracted)
 - [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
 
@@ -262,6 +263,8 @@ Done this sprint:
 - [x] Extract PropertiesPanel toolpath metrics helpers (`formatBytes`, `formatDuration`, `estimateDuration`)
 - [x] Extract PropertiesPanel `ToolpathSection` component
 - [x] Extract PropertiesPanel `LayersHeader` component
+- [x] Extract PropertiesPanel `NumberField` component and rotation constants
+- [x] Extract PropertiesPanel `EmptyState` component
 
 ## Progress Log
 
@@ -275,6 +278,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted `PropertiesPanel` toolpath metric helpers to `features/properties-panel/utils/toolpathMetrics.ts`; targeted panel tests remain 74/74 passing.
 - 2026-04-06: Extracted `PropertiesPanel` toolpath UI to `features/properties-panel/components/ToolpathSection.tsx`; targeted panel tests remain 74/74 passing.
 - 2026-04-06: Extracted `PropertiesPanel` layers header UI to `features/properties-panel/components/LayersHeader.tsx`; targeted panel tests remain 74/74 passing.
+- 2026-04-06: Extracted `PropertiesPanel` shared `NumberField` and rotation constants (`features/properties-panel/components/NumberField.tsx`, `features/properties-panel/utils/rotation.ts`); targeted panel tests remain 74/74 passing.
+- 2026-04-06: Extracted `PropertiesPanel` empty-state UI to `features/properties-panel/components/EmptyState.tsx`; targeted panel tests remain 74/74 passing.
 
 ## Update Rule
 

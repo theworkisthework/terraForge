@@ -23,10 +23,13 @@ import { useMachineStore } from "../store/machineStore";
 import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
-
-const ROT_STEPS = [1, 5, 15, 30, 45] as const;
-type RotStep = (typeof ROT_STEPS)[number];
-const ROT_PRESETS = [0, 45, 90, 135, 180, 225, 270, 315] as const;
+import { NumberField } from "../features/properties-panel/components/NumberField";
+import { EmptyState } from "../features/properties-panel/components/EmptyState";
+import {
+  ROT_PRESETS,
+  ROT_STEPS,
+  type RotStep,
+} from "../features/properties-panel/utils/rotation";
 
 export function PropertiesPanel() {
   const imports = useCanvasStore((s) => s.imports);
@@ -140,38 +143,6 @@ export function PropertiesPanel() {
       return next;
     });
 
-  const numField = (
-    label: string,
-    value: number,
-    onChange: (v: number) => void,
-    step = 1,
-    min?: number,
-  ) => {
-    const inputId = `numfield-${label
-      .replace(/[^a-zA-Z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .toLowerCase()}`;
-    return (
-      <div className="mb-2">
-        <label
-          htmlFor={inputId}
-          className="block text-[10px] text-content-muted mb-0.5"
-        >
-          {label}
-        </label>
-        <input
-          id={inputId}
-          type="number"
-          value={Math.round(value * 1000) / 1000}
-          step={step}
-          min={min}
-          onChange={(e) => onChange(+e.target.value)}
-          className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
-        />
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-border-ui shrink-0">
@@ -182,9 +153,7 @@ export function PropertiesPanel() {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {imports.length === 0 && !gcodeToolpath ? (
-          <p className="text-xs text-content-faint text-center py-6 px-3">
-            No objects. Import an SVG.
-          </p>
+          <EmptyState message="No objects. Import an SVG." />
         ) : (
           <>
             {/* ── G-code toolpath entry ──────────────────────────────── */}
@@ -579,18 +548,18 @@ export function PropertiesPanel() {
                               <>
                                 {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
                                 <div className="grid grid-cols-2 gap-2 mb-0">
-                                  {numField(
-                                    "X (mm)",
-                                    imp.x,
-                                    (v) => updateImport(imp.id, { x: v }),
-                                    0.5,
-                                  )}
-                                  {numField(
-                                    "Y (mm)",
-                                    imp.y,
-                                    (v) => updateImport(imp.id, { y: v }),
-                                    0.5,
-                                  )}
+                                  <NumberField
+                                    label="X (mm)"
+                                    value={imp.x}
+                                    onChange={(v) => updateImport(imp.id, { x: v })}
+                                    step={0.5}
+                                  />
+                                  <NumberField
+                                    label="Y (mm)"
+                                    value={imp.y}
+                                    onChange={(v) => updateImport(imp.id, { y: v })}
+                                    step={0.5}
+                                  />
                                 </div>
 
                                 {/* Alignment row — between position and size */}
@@ -928,16 +897,17 @@ export function PropertiesPanel() {
                                   </div>
                                 </div>
                                 {/* Scale — full width */}
-                                {numField(
-                                  "Scale",
-                                  imp.scale,
-                                  (v) =>
+                                <NumberField
+                                  label="Scale"
+                                  value={imp.scale}
+                                  onChange={(v) =>
                                     updateImport(imp.id, {
                                       scale: Math.max(0.001, v),
-                                    }),
-                                  0.05,
-                                  0.001,
-                                )}
+                                    })
+                                  }
+                                  step={0.05}
+                                  min={0.001}
+                                />
                                 {/* Scale shortcut row: fit to bed | 1:1 reset */}
                                 {(() => {
                                   const fitScale = Math.min(
@@ -1010,12 +980,14 @@ export function PropertiesPanel() {
                                   );
                                 })()}
                                 {/* Rotation — full width */}
-                                {numField(
-                                  "Rotation (°)",
-                                  imp.rotation,
-                                  (v) => updateImport(imp.id, { rotation: v }),
-                                  1,
-                                )}
+                                <NumberField
+                                  label="Rotation (°)"
+                                  value={imp.rotation}
+                                  onChange={(v) =>
+                                    updateImport(imp.id, { rotation: v })
+                                  }
+                                  step={1}
+                                />
                                 {/* Rotation shortcut row: CCW | CW | step flyout | magnet cycle */}
                                 <div className="flex items-center gap-0.5 mb-2">
                                   {/* CCW — borderless icon button */}
@@ -1291,10 +1263,10 @@ export function PropertiesPanel() {
                                       </div>
                                       {imp.hatchEnabled && (
                                         <div>
-                                          {numField(
-                                            "Spacing (mm)",
-                                            imp.hatchSpacingMM,
-                                            (v) => {
+                                          <NumberField
+                                            label="Spacing (mm)"
+                                            value={imp.hatchSpacingMM}
+                                            onChange={(v) => {
                                               if (Number.isFinite(v))
                                                 applyHatch(
                                                   imp.id,
@@ -1302,14 +1274,14 @@ export function PropertiesPanel() {
                                                   imp.hatchAngleDeg,
                                                   true,
                                                 );
-                                            },
-                                            0.1,
-                                            0.1,
-                                          )}
-                                          {numField(
-                                            "Angle (°)",
-                                            imp.hatchAngleDeg,
-                                            (v) => {
+                                            }}
+                                            step={0.1}
+                                            min={0.1}
+                                          />
+                                          <NumberField
+                                            label="Angle (°)"
+                                            value={imp.hatchAngleDeg}
+                                            onChange={(v) => {
                                               if (Number.isFinite(v))
                                                 applyHatch(
                                                   imp.id,
@@ -1317,9 +1289,9 @@ export function PropertiesPanel() {
                                                   ((v % 180) + 180) % 180,
                                                   true,
                                                 );
-                                            },
-                                            5,
-                                          )}
+                                            }}
+                                            step={5}
+                                          />
                                         </div>
                                       )}
                                     </div>
