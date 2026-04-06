@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, (...args: any[]) => void>();
@@ -27,6 +27,8 @@ vi.mock("electron", () => ({
 import { registerAppLifecycleHandlers } from "../../../src/main/bootstrap/lifecycle";
 
 describe("registerAppLifecycleHandlers", () => {
+  const originalPlatform = process.platform;
+
   beforeEach(() => {
     mocks.handlers.clear();
     mocks.whenReady.mockClear();
@@ -35,6 +37,20 @@ describe("registerAppLifecycleHandlers", () => {
     mocks.getAllWindows.mockReturnValue([]);
     mocks.on.mockClear();
   });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
+  function setPlatform(platform: NodeJS.Platform): void {
+    Object.defineProperty(process, "platform", {
+      value: platform,
+      configurable: true,
+    });
+  }
 
   it("creates the main window on app ready and runs onReady callback", async () => {
     const createMainWindow = vi.fn();
@@ -64,6 +80,7 @@ describe("registerAppLifecycleHandlers", () => {
 
   it("quits on window-all-closed and runs onBeforeQuit callback", async () => {
     const onBeforeQuit = vi.fn();
+    setPlatform("win32");
 
     registerAppLifecycleHandlers({
       createMainWindow: vi.fn(),
@@ -76,5 +93,18 @@ describe("registerAppLifecycleHandlers", () => {
 
     expect(mocks.quit).toHaveBeenCalledTimes(1);
     expect(onBeforeQuit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not quit on window-all-closed on macOS", async () => {
+    setPlatform("darwin");
+
+    registerAppLifecycleHandlers({
+      createMainWindow: vi.fn(),
+    });
+    await Promise.resolve();
+
+    mocks.handlers.get("window-all-closed")?.();
+
+    expect(mocks.quit).not.toHaveBeenCalled();
   });
 });
