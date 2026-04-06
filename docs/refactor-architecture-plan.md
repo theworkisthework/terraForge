@@ -156,7 +156,7 @@ Extract from `src/renderer/src/components/Toolbar.tsx`:
 
 Checklist:
 
-- [ ] Move SVG import helpers to `features/imports/services/`.
+- [x] Move SVG import helpers to `features/imports/services/`. (completed: `svgImportHelpers.ts`)
 - [ ] Move command orchestration to hooks.
 - [ ] Keep `Toolbar.tsx` focused on composition and bindings.
 
