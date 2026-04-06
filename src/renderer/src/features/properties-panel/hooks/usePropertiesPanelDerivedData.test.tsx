@@ -1,6 +1,10 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { LayerGroup, MachineConfig, MachineStatus } from "../../../../../types";
+import type {
+  LayerGroup,
+  MachineConfig,
+  MachineStatus,
+} from "../../../../../types";
 import { usePropertiesPanelDerivedData } from "./usePropertiesPanelDerivedData";
 
 const group1: LayerGroup = {
@@ -54,7 +58,12 @@ describe("usePropertiesPanelDerivedData", () => {
     const { result } = renderHook(() =>
       usePropertiesPanelDerivedData({
         layerGroups: [],
-        machineStatus: { raw: "<Idle>", state: "Idle", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 } },
+        machineStatus: {
+          raw: "<Idle>",
+          state: "Idle",
+          mpos: { x: 0, y: 0, z: 0 },
+          wpos: { x: 0, y: 0, z: 0 },
+        },
         activeConfig: () => undefined,
         gcodeSource: null,
       }),

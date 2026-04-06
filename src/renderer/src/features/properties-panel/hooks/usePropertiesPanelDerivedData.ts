@@ -1,5 +1,9 @@
 import { useCallback } from "react";
-import type { LayerGroup, MachineConfig, MachineStatus } from "../../../../../types";
+import type {
+  LayerGroup,
+  MachineConfig,
+  MachineStatus,
+} from "../../../../../types";
 
 interface GcodeSourceInfo {
   path: string;
@@ -22,7 +26,8 @@ export function usePropertiesPanelDerivedData({
 }: UsePropertiesPanelDerivedDataArgs) {
   const importGroupId = useCallback(
     (importId: string): string | null =>
-      layerGroups.find((group) => group.importIds.includes(importId))?.id ?? null,
+      layerGroups.find((group) => group.importIds.includes(importId))?.id ??
+      null,
     [layerGroups],
   );
 
