@@ -551,13 +551,17 @@ export function PropertiesPanel() {
                                   <NumberField
                                     label="X (mm)"
                                     value={imp.x}
-                                    onChange={(v) => updateImport(imp.id, { x: v })}
+                                    onChange={(v) =>
+                                      updateImport(imp.id, { x: v })
+                                    }
                                     step={0.5}
                                   />
                                   <NumberField
                                     label="Y (mm)"
                                     value={imp.y}
-                                    onChange={(v) => updateImport(imp.id, { y: v })}
+                                    onChange={(v) =>
+                                      updateImport(imp.id, { y: v })
+                                    }
                                     step={0.5}
                                   />
                                 </div>
