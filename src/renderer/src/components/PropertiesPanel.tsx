@@ -26,6 +26,7 @@ import { LayersHeader } from "../features/properties-panel/components/LayersHead
 import { NumberField } from "../features/properties-panel/components/NumberField";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { PathRow } from "../features/properties-panel/components/PathRow";
+import { LayerRow } from "../features/properties-panel/components/LayerRow";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -344,53 +345,22 @@ export function PropertiesPanel() {
                                 return (
                                   <div key={layer.id}>
                                     {/* Layer row */}
-                                    <div className="flex items-center gap-1 py-0.5 text-[9px]">
-                                      <button
-                                        className="text-content-faint hover:text-content text-[9px] w-3 shrink-0"
-                                        title={
-                                          isLayerExpanded
-                                            ? "Collapse layer"
-                                            : "Expand layer"
-                                        }
-                                        onClick={() =>
-                                          toggleLayerCollapse(imp.id, layer.id)
-                                        }
-                                      >
-                                        {isLayerExpanded ? (
-                                          <ChevronDown size={10} />
-                                        ) : (
-                                          <ChevronRight size={10} />
-                                        )}
-                                      </button>
-                                      <span
-                                        className="text-content-faint hover:text-content cursor-pointer"
-                                        onClick={() =>
-                                          updateImportLayer(
-                                            imp.id,
-                                            layer.id,
-                                            !layer.visible,
-                                          )
-                                        }
-                                        title="Toggle layer visibility"
-                                      >
-                                        {layer.visible ? (
-                                          <Eye size={9} />
-                                        ) : (
-                                          <EyeOff size={9} />
-                                        )}
-                                      </span>
-                                      <span
-                                        className="flex-1 min-w-0 text-[9px] font-medium text-content-muted truncate cursor-pointer"
-                                        onClick={() =>
-                                          toggleLayerCollapse(imp.id, layer.id)
-                                        }
-                                      >
-                                        {layer.name}
-                                      </span>
-                                      <span className="text-[8px] text-content-faint shrink-0">
-                                        {layerPaths.length}p
-                                      </span>
-                                    </div>
+                                    <LayerRow
+                                      name={layer.name}
+                                      visible={layer.visible}
+                                      pathCount={layerPaths.length}
+                                      expanded={isLayerExpanded}
+                                      onToggleExpanded={() =>
+                                        toggleLayerCollapse(imp.id, layer.id)
+                                      }
+                                      onToggleVisible={() =>
+                                        updateImportLayer(
+                                          imp.id,
+                                          layer.id,
+                                          !layer.visible,
+                                        )
+                                      }
+                                    />
                                     {/* Paths within this layer — only when expanded */}
                                     {isLayerExpanded &&
                                       layerPaths.map((p) => (

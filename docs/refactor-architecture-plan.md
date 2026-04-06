@@ -120,6 +120,7 @@ Checklist:
 
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField extracted)
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow extracted)
+- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow extracted)
 - [x] Move formatting/estimation helpers to utilities.
 - [ ] Move drag/drop and edit-name logic to hooks.
 - [ ] Preserve current store API contracts.
@@ -266,6 +267,7 @@ Current sprint focus:
 - [x] Refactor `GcodeOptionsDialog.tsx`
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
+- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
 - [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
 
@@ -281,6 +283,7 @@ Done this sprint:
 - [x] Extract PropertiesPanel `EmptyState` component
 - [x] Add focused tests for extracted `gcode-options` and `properties-panel` components
 - [x] Extract PropertiesPanel `PathRow` component with co-located tests
+- [x] Extract PropertiesPanel `LayerRow` component with co-located tests
 
 ## Progress Log
 
@@ -300,6 +303,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Adopted hybrid test layout for extracted components by relocating focused tests to co-located files under `src/renderer/src/features/**` and enabling `src/**/*.test.{ts,tsx}` in Vitest include patterns.
 - 2026-04-06: Split co-located aggregate extracted tests into per-component files for discoverability (`PathsSection.test.tsx`, `OptionsSection.test.tsx`, `OutputSection.test.tsx`, `CustomGcodeSection.test.tsx`, `ToolpathSection.test.tsx`, `LayersHeader.test.tsx`, `NumberField.test.tsx`, `EmptyState.test.tsx`).
 - 2026-04-06: Extracted reusable path item UI into `features/properties-panel/components/PathRow.tsx` and replaced repeated path-row blocks in `PropertiesPanel`; `PathRow.test.tsx` and `PropertiesPanel.test.tsx` pass (76/76 total in run).
+- 2026-04-06: Extracted reusable layer header row UI into `features/properties-panel/components/LayerRow.tsx` and replaced inline layer-row block in `PropertiesPanel`; `LayerRow.test.tsx` and `PropertiesPanel.test.tsx` pass (76/76 total in run).
 
 ## Update Rule
 
