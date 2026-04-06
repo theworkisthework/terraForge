@@ -189,10 +189,10 @@ Split `src/main/index.ts` into:
 
 Checklist:
 
-- [ ] Extract window creation and lifecycle wiring.
-- [ ] Extract application menu construction.
-- [ ] Extract IPC handlers by domain and register centrally.
-- [ ] Keep existing IPC channel names unchanged.
+- [x] Extract window creation and lifecycle wiring.
+- [x] Extract application menu construction.
+- [x] Extract IPC handlers by domain and register centrally.
+- [x] Keep existing IPC channel names unchanged.
 
 ### 6) FluidNC Client Modularization
 
@@ -269,7 +269,7 @@ Checklist:
 
 ### Phase 5: Main + Machine + Worker Modularization
 
-- [ ] Split Electron main process modules.
+- [x] Split Electron main process modules.
 - [ ] Split FluidNC client internals.
 - [ ] Split gcodeEngine pipeline.
 
@@ -342,6 +342,12 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Migrated `FileBrowserPanel.tsx`, `JobControls.tsx`, and `usePlotProgress.ts` to grouped `canvasStore` selectors; validation passes with `npm.cmd run typecheck`, `tests/component/FileBrowserPanel.test.tsx` (31/31), `tests/component/JobControls.test.tsx` (22/22), and `tests/unit/usePlotProgress.test.tsx` (19/19).
 - 2026-04-06: Completed renderer-wide `canvasStore` callsite migration to grouped selectors; `grep` confirms remaining `useCanvasStore(...)` consumers all route through named selector helpers in `store/canvasStoreSelectors.ts`.
 - 2026-04-06: Reorganized the selector layer from single-file `store/canvasStoreSelectors.ts` into feature-grouped modules under `store/canvasSelectors/` with a barrel export; validation passes with `npm.cmd run typecheck` and the full `runTests` suite (170/170).
+- 2026-04-06: Extracted Electron main bootstrap/window responsibilities from `src/main/index.ts` to `src/main/bootstrap/window.ts` and `src/main/bootstrap/lifecycle.ts`; corrected output-path resolution for electron-vite flattened bundle; launch e2e (`tests/e2e/launch.spec.ts`) passes 21/21.
+- 2026-04-06: Extracted menu construction and menu-state IPC listeners to `src/main/menu/applicationMenu.ts`; validation passes with `npm.cmd run typecheck`, `npm.cmd run build`, and launch e2e 21/21.
+- 2026-04-06: Extracted app/config/tasks/jobs IPC registration to `src/main/ipc/app.ts`, `src/main/ipc/config.ts`, `src/main/ipc/tasks.ts`, and `src/main/ipc/jobs.ts`; kept channel names stable and validated with typecheck/build/launch e2e.
+- 2026-04-06: Extracted remaining transport and file IPC registration to `src/main/ipc/fluidnc.ts` and `src/main/ipc/fs.ts`; `src/main/index.ts` now acts as composition root; launch e2e remains 21/21.
+- 2026-04-06: Extracted push-event forwarding to `src/main/events/pushEvents.ts` and machine/page-size persistence to `src/main/config/persistence.ts`; promoted defaults/constants out of `src/main/index.ts` and validated with `npm.cmd run typecheck` plus launch e2e 21/21.
+- 2026-04-06: Completed main-process polish pass with barrel exports (`src/main/ipc/index.ts`, `src/main/events/index.ts`, `src/main/config/index.ts`), FS dialog filter de-duplication, and persistence default cloning safeguards; typecheck and launch e2e remain green (21/21).
 
 ## Update Rule
 
