@@ -6,7 +6,7 @@
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
 import { useState } from "react";
-import { Lock, Unlock } from "lucide-react";
+import { DimensionsRow } from "../features/properties-panel/components/DimensionsRow";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import {
@@ -364,106 +364,19 @@ export function PropertiesPanel() {
                                   }
                                 />
 
-                                {/* W / H — flex row with lock button between the two inputs */}
-                                <div className="flex items-end gap-1 mb-0">
-                                  {/* W */}
-                                  <div className="flex-1 min-w-0 mb-2">
-                                    <label className="block text-[10px] text-content-muted mb-0.5">
-                                      W (mm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(objW * 1000) / 1000}
-                                      step={0.5}
-                                      min={0.001}
-                                      onChange={(e) => {
-                                        const v = Math.max(
-                                          0.001,
-                                          +e.target.value,
-                                        );
-                                        if (ratioLocked) {
-                                          updateImport(imp.id, {
-                                            scale: v / imp.svgWidth,
-                                            scaleX: undefined,
-                                            scaleY: undefined,
-                                          });
-                                        } else {
-                                          updateImport(imp.id, {
-                                            scaleX: v / imp.svgWidth,
-                                          });
-                                        }
-                                      }}
-                                      className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
-                                    />
-                                  </div>
-                                  {/* Ratio lock button */}
-                                  <button
-                                    className={`mb-2 p-1.5 rounded transition-colors ${
-                                      ratioLocked
-                                        ? "text-accent hover:text-accent hover:bg-secondary/40"
-                                        : "text-content-faint hover:text-content hover:bg-secondary/40"
-                                    }`}
-                                    title={
-                                      ratioLocked
-                                        ? "Ratio locked — click to unlock"
-                                        : "Ratio unlocked — click to lock"
-                                    }
-                                    onClick={() => {
-                                      if (ratioLocked) {
-                                        // Unlock: split into independent scaleX/scaleY (currently identical)
-                                        setRatioLocked(false);
-                                        updateImport(imp.id, {
-                                          scaleX: imp.scaleX ?? imp.scale,
-                                          scaleY: imp.scaleY ?? imp.scale,
-                                        });
-                                      } else {
-                                        // Lock: snap back to uniform scale based on current W
-                                        setRatioLocked(true);
-                                        updateImport(imp.id, {
-                                          scale: imp.scaleX ?? imp.scale,
-                                          scaleX: undefined,
-                                          scaleY: undefined,
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    {ratioLocked ? (
-                                      <Lock size={12} strokeWidth={2} />
-                                    ) : (
-                                      <Unlock size={12} strokeWidth={2} />
-                                    )}
-                                  </button>
-                                  {/* H */}
-                                  <div className="flex-1 min-w-0 mb-2">
-                                    <label className="block text-[10px] text-content-muted mb-0.5">
-                                      H (mm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(objH * 1000) / 1000}
-                                      step={0.5}
-                                      min={0.001}
-                                      onChange={(e) => {
-                                        const v = Math.max(
-                                          0.001,
-                                          +e.target.value,
-                                        );
-                                        if (ratioLocked) {
-                                          updateImport(imp.id, {
-                                            scale: v / imp.svgHeight,
-                                            scaleX: undefined,
-                                            scaleY: undefined,
-                                          });
-                                        } else {
-                                          updateImport(imp.id, {
-                                            scaleY: v / imp.svgHeight,
-                                          });
-                                        }
-                                      }}
-                                      className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
-                                    />
-                                  </div>
-                                </div>
+                                <DimensionsRow
+                                  objW={objW}
+                                  objH={objH}
+                                  svgWidth={imp.svgWidth}
+                                  svgHeight={imp.svgHeight}
+                                  ratioLocked={ratioLocked}
+                                  currentScaleX={imp.scaleX ?? imp.scale}
+                                  currentScaleY={imp.scaleY ?? imp.scale}
+                                  onUpdate={(changes) =>
+                                    updateImport(imp.id, changes)
+                                  }
+                                  onRatioLockedChange={setRatioLocked}
+                                />
                                 {/* Scale — full width */}
                                 <NumberField
                                   label="Scale"
