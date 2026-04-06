@@ -347,6 +347,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted remaining transport and file IPC registration to `src/main/ipc/fluidnc.ts` and `src/main/ipc/fs.ts`; `src/main/index.ts` now acts as composition root; launch e2e remains 21/21.
 - 2026-04-06: Extracted push-event forwarding to `src/main/events/pushEvents.ts` and machine/page-size persistence to `src/main/config/persistence.ts`; promoted defaults/constants out of `src/main/index.ts` and validated with `npm.cmd run typecheck` plus launch e2e 21/21.
 - 2026-04-06: Completed main-process polish pass with barrel exports (`src/main/ipc/index.ts`, `src/main/events/index.ts`, `src/main/config/index.ts`), FS dialog filter de-duplication, and persistence default cloning safeguards; typecheck and launch e2e remain green (21/21).
+- 2026-04-06: Added focused main-process unit tests for extracted modules: `tests/unit/main/ipc.config.test.ts`, `tests/unit/main/ipc.fluidnc.test.ts`, and `tests/unit/main/persistence.test.ts`; targeted run passes 10/10 and `npm.cmd run typecheck` remains green.
 
 ## Update Rule
 

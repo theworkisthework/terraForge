@@ -17,6 +17,7 @@ export default defineConfig({
     },
     // Node environment for main-process tests
     environmentMatchGlobs: [
+      ["tests/unit/main/**", "node"],
       ["tests/unit/taskManager*", "node"],
       ["tests/unit/fluidnc*", "node"],
       ["tests/unit/serial*", "node"],
