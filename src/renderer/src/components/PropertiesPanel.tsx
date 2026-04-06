@@ -5,8 +5,7 @@
 // Permission to use, copy, modify, and/or distribute this software for any purpose
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
-import { useCanvasStore } from "../store/canvasStore";
-import { useMachineStore } from "../store/machineStore";
+import { usePropertiesPanelStoreBindings } from "../features/properties-panel/hooks/usePropertiesPanelStoreBindings";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
@@ -20,33 +19,41 @@ import { usePropertiesPanelDerivedData } from "../features/properties-panel/hook
 import { useSyncedStrokeWidth } from "../features/properties-panel/hooks/useSyncedStrokeWidth";
 
 export function PropertiesPanel() {
-  const imports = useCanvasStore((s) => s.imports);
-  const selectedImportId = useCanvasStore((s) => s.selectedImportId);
-  const selectImport = useCanvasStore((s) => s.selectImport);
-  const removeImport = useCanvasStore((s) => s.removeImport);
-  const updateImport = useCanvasStore((s) => s.updateImport);
-  const updatePath = useCanvasStore((s) => s.updatePath);
-  const updateImportLayer = useCanvasStore((s) => s.updateImportLayer);
-  const removePath = useCanvasStore((s) => s.removePath);
-  const applyHatch = useCanvasStore((s) => s.applyHatch);
-  const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
-  const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
-  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
-  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
-  const layerGroups = useCanvasStore((s) => s.layerGroups);
-  const addLayerGroup = useCanvasStore((s) => s.addLayerGroup);
-  const removeLayerGroup = useCanvasStore((s) => s.removeLayerGroup);
-  const updateLayerGroup = useCanvasStore((s) => s.updateLayerGroup);
-  const assignImportToGroup = useCanvasStore((s) => s.assignImportToGroup);
-  const selectedGroupId = useCanvasStore((s) => s.selectedGroupId);
-  const selectGroup = useCanvasStore((s) => s.selectGroup);
-  const activeConfig = useMachineStore((s) => s.activeConfig);
-  const machineStatus = useMachineStore((s) => s.status);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const pageSizes = useCanvasStore((s) => s.pageSizes);
+  // ── Store subscriptions ─────────────────────────────────────────────────
+  // All canvas and machine store state/actions needed by this panel.
+  const {
+    imports,
+    selectedImportId,
+    selectImport,
+    removeImport,
+    updateImport,
+    updatePath,
+    updateImportLayer,
+    removePath,
+    applyHatch,
+    showCentreMarker,
+    toggleCentreMarker,
+    gcodeToolpath,
+    gcodeSource,
+    setGcodeToolpath,
+    toolpathSelected,
+    selectToolpath,
+    layerGroups,
+    addLayerGroup,
+    removeLayerGroup,
+    updateLayerGroup,
+    assignImportToGroup,
+    selectedGroupId,
+    selectGroup,
+    pageTemplate,
+    pageSizes,
+    activeConfig,
+    machineStatus,
+  } = usePropertiesPanelStoreBindings();
+
+  // ── Derived values ───────────────────────────────────────────────────────
+  // Computes isJobActive, bed dimensions, feedrate fallback, toolpath file
+  // name, and a helper function that maps an import id to its group id.
   const {
     importGroupId,
     isJobActive,
@@ -61,6 +68,9 @@ export function PropertiesPanel() {
     gcodeSource,
   });
 
+  // ── Expansion / collapse state ───────────────────────────────────────────
+  // Tracks which import rows are expanded, which layer groups are collapsed,
+  // and which per-import layer sections are open.
   const {
     expandedIds,
     collapsedGroupIds,
@@ -70,6 +80,10 @@ export function PropertiesPanel() {
     toggleGroupCollapse,
     toggleLayerCollapse,
   } = usePanelExpansionState();
+
+  // ── Inspector interaction state ──────────────────────────────────────────
+  // Owns local UI state for the import inspector: rotation step, step-picker
+  // flyout visibility, W/H ratio lock, and template-align mode + target.
   const {
     rotStep,
     stepFlyoutOpen,
@@ -84,6 +98,8 @@ export function PropertiesPanel() {
     selectRotStep,
   } = useInspectorInteractionState();
 
+  // ── Drag-and-drop ────────────────────────────────────────────────────────
+  // Handles dragging imports between layer groups and into the ungrouped zone.
   const {
     draggingImportId,
     dragOverGroupId,
@@ -102,6 +118,8 @@ export function PropertiesPanel() {
     setCollapsedGroupIds,
   });
 
+  // ── Inline rename editing ────────────────────────────────────────────────
+  // Manages the double-click-to-rename flow for both imports and layer groups.
   const {
     editingName,
     editingGroupName,
@@ -118,6 +136,9 @@ export function PropertiesPanel() {
     updateLayerGroup,
   });
 
+  // ── Stroke-width sync ────────────────────────────────────────────────────
+  // When a stroke width changes on one import, propagates the value to all
+  // siblings in the same layer group (or all ungrouped imports if ungrouped).
   const syncStrokeWidth = useSyncedStrokeWidth({
     imports,
     layerGroups,
@@ -125,6 +146,8 @@ export function PropertiesPanel() {
     updateImport,
   });
 
+  // ── Add layer group ──────────────────────────────────────────────────────
+  // Returns a callback that creates a new named + coloured layer group.
   const handleAddLayerGroup = useAddLayerGroup({
     groupCount: layerGroups.length,
     addLayerGroup,
@@ -132,6 +155,7 @@ export function PropertiesPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Panel heading */}
       <div className="px-3 py-2 border-b border-border-ui shrink-0">
         <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           Properties
@@ -140,10 +164,11 @@ export function PropertiesPanel() {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {imports.length === 0 && !gcodeToolpath ? (
+          // Nothing loaded yet
           <EmptyState message="No objects. Import an SVG." />
         ) : (
           <>
-            {/* ── G-code toolpath entry ──────────────────────────────── */}
+            {/* G-code toolpath row — shown when a .gcode file has been loaded */}
             {gcodeToolpath && (
               <ToolpathSection
                 toolpath={gcodeToolpath}
@@ -156,12 +181,15 @@ export function PropertiesPanel() {
               />
             )}
 
+            {/* "Layers" section heading + add-group button */}
             <LayersHeader
               show={imports.length > 0}
               onAddGroup={handleAddLayerGroup}
             />
 
-            {/* ── Layer groups (collapsible) + ungrouped imports ──────── */}
+            {/* All imports, organised into collapsible layer groups.
+                Each import row expands to show its inspector (position,
+                dimensions, rotation, stroke, hatch, alignment). */}
             {imports.length > 0 && (
               <ImportsByGroupList
                 imports={imports}
