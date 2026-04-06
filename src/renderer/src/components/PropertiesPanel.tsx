@@ -26,6 +26,7 @@ import { EmptyGroupDropHint } from "../features/properties-panel/components/Empt
 import { HatchFillSection } from "../features/properties-panel/components/HatchFillSection";
 import { AlignmentControls } from "../features/properties-panel/components/AlignmentControls";
 import { TransformShortcuts } from "../features/properties-panel/components/TransformShortcuts";
+import { StrokeWidthSection } from "../features/properties-panel/components/StrokeWidthSection";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import {
@@ -622,57 +623,13 @@ export function PropertiesPanel() {
                                     updateImport(imp.id, { rotation: next });
                                   }}
                                 />
-                                {/* ── Stroke width ──────────────────────────── */}
-                                <div className="mt-2 pt-2 border-t border-border-ui/30">
-                                  <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">
-                                    Stroke width
-                                  </span>
-                                  <div className="flex min-w-0 items-center gap-2 pr-1">
-                                    <input
-                                      type="range"
-                                      aria-label="Stroke width"
-                                      min={0}
-                                      max={10}
-                                      step={0.1}
-                                      value={
-                                        imp.strokeWidthMM ??
-                                        DEFAULT_STROKE_WIDTH_MM
-                                      }
-                                      onChange={(e) =>
-                                        syncStrokeWidth(
-                                          imp.id,
-                                          Math.max(0, +e.target.value),
-                                        )
-                                      }
-                                      className="min-w-0 flex-1 accent-accent"
-                                    />
-                                    <input
-                                      type="number"
-                                      aria-label="Stroke width value"
-                                      min={0}
-                                      max={10}
-                                      step={0.1}
-                                      value={
-                                        Math.round(
-                                          (imp.strokeWidthMM ??
-                                            DEFAULT_STROKE_WIDTH_MM) * 1000,
-                                        ) / 1000
-                                      }
-                                      onChange={(e) => {
-                                        const v = e.target.valueAsNumber;
-                                        if (Number.isFinite(v) && v >= 0)
-                                          syncStrokeWidth(
-                                            imp.id,
-                                            Math.max(0, v),
-                                          );
-                                      }}
-                                      className="w-14 shrink-0 bg-app border border-border-ui rounded px-1.5 py-1 text-xs text-content focus:border-accent outline-none"
-                                    />
-                                    <span className="w-6 shrink-0 text-right text-[10px] text-content-faint">
-                                      mm
-                                    </span>
-                                  </div>
-                                </div>
+                                <StrokeWidthSection
+                                  strokeWidthMM={imp.strokeWidthMM}
+                                  defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM}
+                                  onChangeStrokeWidth={(value) =>
+                                    syncStrokeWidth(imp.id, value)
+                                  }
+                                />
 
                                 <HatchFillSection
                                   imp={imp}
