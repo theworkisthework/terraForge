@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { EmptyState } from "../../src/renderer/src/features/properties-panel/components/EmptyState";
+import { EmptyState } from "./EmptyState";
 
 describe("EmptyState", () => {
   it("renders the provided message", () => {

@@ -22,7 +22,10 @@ Break down oversized files into focused modules, functions, and React components
 
 ## Testing Rule For Extractions
 
-- For every extracted component, add or update a dedicated component test file in `tests/component/` in the same PR.
+- Use a hybrid test layout:
+  - co-located tests for extracted/presentational components (`src/**/ComponentName.test.tsx`)
+  - centralized tests for integration/flow behavior (`tests/component/`)
+- For every extracted component, add or update a dedicated component test in the same PR (prefer co-located).
 - Keep parent/component integration tests, but do not rely on them as the only verification for extracted UI units.
 - Minimum expectations per extracted component:
   - render behavior
@@ -291,6 +294,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted `PropertiesPanel` shared `NumberField` and rotation constants (`features/properties-panel/components/NumberField.tsx`, `features/properties-panel/utils/rotation.ts`); targeted panel tests remain 74/74 passing.
 - 2026-04-06: Extracted `PropertiesPanel` empty-state UI to `features/properties-panel/components/EmptyState.tsx`; targeted panel tests remain 74/74 passing.
 - 2026-04-06: Added extracted-component test suites (`tests/component/GcodeOptionsSections.test.tsx`, `tests/component/PropertiesPanelExtractedComponents.test.tsx`, `tests/component/EmptyState.test.tsx`); focused batch passes 11/11.
+- 2026-04-06: Adopted hybrid test layout for extracted components by relocating focused tests to co-located files under `src/renderer/src/features/**` and enabling `src/**/*.test.{ts,tsx}` in Vitest include patterns.
+- 2026-04-06: Split co-located aggregate extracted tests into per-component files for discoverability (`PathsSection.test.tsx`, `OptionsSection.test.tsx`, `OutputSection.test.tsx`, `CustomGcodeSection.test.tsx`, `ToolpathSection.test.tsx`, `LayersHeader.test.tsx`, `NumberField.test.tsx`, `EmptyState.test.tsx`).
 
 ## Update Rule
 
