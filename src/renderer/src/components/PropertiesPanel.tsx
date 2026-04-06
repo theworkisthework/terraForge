@@ -11,12 +11,10 @@ import { useMachineStore } from "../store/machineStore";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
-import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
-import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
-import { ImportPropertiesForm } from "../features/properties-panel/components/ImportPropertiesForm";
+import { ImportRowCard } from "../features/properties-panel/components/ImportRowCard";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import { type RotStep } from "../features/properties-panel/utils/rotation";
@@ -232,103 +230,69 @@ export function PropertiesPanel() {
                     : bedH;
 
                   return (
-                    <div
+                    <ImportRowCard
                       key={imp.id}
-                      className={`border-b border-border-ui/20 ${isSelected ? "bg-secondary/20" : ""} ${draggingImportId === imp.id ? "opacity-40" : ""}`}
-                      style={{
-                        ...(groupColor && !indented
-                          ? { borderLeft: `3px solid ${groupColor}` }
-                          : {}),
+                      imp={imp}
+                      indented={indented}
+                      isSelected={isSelected}
+                      isExpanded={isExpanded}
+                      isDragging={draggingImportId === imp.id}
+                      groupColor={groupColor}
+                      expandedLayerKeys={expandedLayerKeys}
+                      isEditingName={editingName?.id === imp.id}
+                      editingNameValue={
+                        editingName?.id === imp.id
+                          ? editingName.value
+                          : imp.name
+                      }
+                      bedW={bedW}
+                      bedH={bedH}
+                      pageW={pageW}
+                      pageH={pageH}
+                      marginMM={pageTemplate?.marginMM ?? 20}
+                      canAlignToTemplate={canAlignToTemplate}
+                      templateAlignEnabled={templateAlignEnabled}
+                      templateAlignTarget={templateAlignTarget}
+                      ratioLocked={ratioLocked}
+                      rotStep={rotStep}
+                      stepFlyoutOpen={stepFlyoutOpen}
+                      showCentreMarker={showCentreMarker}
+                      onSelectImport={selectImport}
+                      onToggleExpand={toggleExpand}
+                      onToggleVisibility={(importId, visible) =>
+                        updateImport(importId, { visible })
+                      }
+                      onStartRename={startImportRename}
+                      onEditingNameChange={changeImportRename}
+                      onCommitName={commitImportRename}
+                      onCancelName={cancelImportRename}
+                      onDeleteImport={removeImport}
+                      onDragStart={handleImportDragStart}
+                      onDragEnd={handleImportDragEnd}
+                      onToggleLayerCollapse={toggleLayerCollapse}
+                      onUpdateLayerVisibility={(importId, layerId, visible) =>
+                        updateImportLayer(importId, layerId, visible)
+                      }
+                      onUpdatePathVisibility={(importId, pathId, visible) =>
+                        updatePath(importId, pathId, { visible })
+                      }
+                      onRemovePath={removePath}
+                      onUpdate={(changes) => updateImport(imp.id, changes)}
+                      onTemplateAlignEnabledChange={setTemplateAlignEnabled}
+                      onTemplateAlignTargetChange={setTemplateAlignTarget}
+                      onRatioLockedChange={setRatioLocked}
+                      onToggleStepFlyout={() => setStepFlyoutOpen((o) => !o)}
+                      onCloseStepFlyout={() => setStepFlyoutOpen(false)}
+                      onSelectRotStep={(s) => {
+                        setRotStep(s);
+                        setStepFlyoutOpen(false);
                       }}
-                    >
-                      <ImportHeaderRow
-                        imp={imp}
-                        indented={indented}
-                        isExpanded={isExpanded}
-                        isEditingName={editingName?.id === imp.id}
-                        editingNameValue={
-                          editingName?.id === imp.id
-                            ? editingName.value
-                            : imp.name
-                        }
-                        onSelectImport={selectImport}
-                        onToggleExpand={toggleExpand}
-                        onToggleVisibility={(importId, visible) =>
-                          updateImport(importId, { visible })
-                        }
-                        onStartRename={startImportRename}
-                        onEditingNameChange={changeImportRename}
-                        onCommitName={commitImportRename}
-                        onCancelName={cancelImportRename}
-                        onDeleteImport={removeImport}
-                        onDragStart={handleImportDragStart}
-                        onDragEnd={handleImportDragEnd}
-                      />
-
-                      {/* Expanded path / layer list */}
-                      {isExpanded && (
-                        <ImportPathsList
-                          imp={imp}
-                          expandedLayerKeys={expandedLayerKeys}
-                          onSelectImport={selectImport}
-                          onToggleLayerCollapse={toggleLayerCollapse}
-                          onUpdateLayerVisibility={(
-                            importId,
-                            layerId,
-                            visible,
-                          ) => updateImportLayer(importId, layerId, visible)}
-                          onUpdatePathVisibility={(importId, pathId, visible) =>
-                            updatePath(importId, pathId, { visible })
-                          }
-                          onRemovePath={removePath}
-                        />
-                      )}
-
-                      {/* Properties form — shown when import is selected */}
-                      {isSelected && (
-                        <div
-                          className="px-3 pb-3 pt-2 border-t border-border-ui/30"
-                          onDragStart={(e) => e.stopPropagation()}
-                        >
-                          <ImportPropertiesForm
-                            imp={imp}
-                            bedW={bedW}
-                            bedH={bedH}
-                            pageW={pageW}
-                            pageH={pageH}
-                            marginMM={pageTemplate?.marginMM ?? 20}
-                            canAlignToTemplate={canAlignToTemplate}
-                            templateAlignEnabled={templateAlignEnabled}
-                            templateAlignTarget={templateAlignTarget}
-                            ratioLocked={ratioLocked}
-                            rotStep={rotStep}
-                            stepFlyoutOpen={stepFlyoutOpen}
-                            showCentreMarker={showCentreMarker}
-                            onUpdate={(changes) =>
-                              updateImport(imp.id, changes)
-                            }
-                            onTemplateAlignEnabledChange={
-                              setTemplateAlignEnabled
-                            }
-                            onTemplateAlignTargetChange={setTemplateAlignTarget}
-                            onRatioLockedChange={setRatioLocked}
-                            onToggleStepFlyout={() =>
-                              setStepFlyoutOpen((o) => !o)
-                            }
-                            onCloseStepFlyout={() => setStepFlyoutOpen(false)}
-                            onSelectRotStep={(s) => {
-                              setRotStep(s);
-                              setStepFlyoutOpen(false);
-                            }}
-                            onToggleCentreMarker={toggleCentreMarker}
-                            onChangeStrokeWidth={(value) =>
-                              syncStrokeWidth(imp.id, value)
-                            }
-                            onApplyHatch={applyHatch}
-                          />
-                        </div>
-                      )}
-                    </div>
+                      onToggleCentreMarker={toggleCentreMarker}
+                      onChangeStrokeWidth={(value) =>
+                        syncStrokeWidth(imp.id, value)
+                      }
+                      onApplyHatch={applyHatch}
+                    />
                   );
                 }; // end renderImport
 
