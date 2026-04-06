@@ -16,6 +16,7 @@ import { useInspectorInteractionState } from "../features/properties-panel/hooks
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelExpansionState } from "../features/properties-panel/hooks/usePanelExpansionState";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
+import { usePropertiesPanelDerivedData } from "../features/properties-panel/hooks/usePropertiesPanelDerivedData";
 import { useSyncedStrokeWidth } from "../features/properties-panel/hooks/useSyncedStrokeWidth";
 
 export function PropertiesPanel() {
@@ -46,13 +47,19 @@ export function PropertiesPanel() {
   const machineStatus = useMachineStore((s) => s.status);
   const pageTemplate = useCanvasStore((s) => s.pageTemplate);
   const pageSizes = useCanvasStore((s) => s.pageSizes);
-  const isJobActive =
-    machineStatus?.state === "Run" || machineStatus?.state === "Hold";
-  const cfg = activeConfig();
-  const fallbackFeedrate = cfg?.feedrate ?? 300;
-  const bedW = cfg?.bedWidth ?? 220;
-  const bedH = cfg?.bedHeight ?? 200;
-  const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";
+  const {
+    importGroupId,
+    isJobActive,
+    fallbackFeedrate,
+    bedW,
+    bedH,
+    toolpathFileName,
+  } = usePropertiesPanelDerivedData({
+    layerGroups,
+    machineStatus,
+    activeConfig,
+    gcodeSource,
+  });
 
   const {
     expandedIds,
@@ -76,10 +83,6 @@ export function PropertiesPanel() {
     closeStepFlyout,
     selectRotStep,
   } = useInspectorInteractionState();
-
-  /** Returns the group id that the given import belongs to, or null. */
-  const importGroupId = (importId: string): string | null =>
-    layerGroups.find((g) => g.importIds.includes(importId))?.id ?? null;
 
   const {
     draggingImportId,
