@@ -25,6 +25,7 @@ import { ToolpathSection } from "../features/properties-panel/components/Toolpat
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { NumberField } from "../features/properties-panel/components/NumberField";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
+import { PathRow } from "../features/properties-panel/components/PathRow";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -393,44 +394,23 @@ export function PropertiesPanel() {
                                     {/* Paths within this layer — only when expanded */}
                                     {isLayerExpanded &&
                                       layerPaths.map((p) => (
-                                        <div
+                                        <PathRow
                                           key={p.id}
-                                          className="pl-3 flex items-center gap-1 py-0.5 text-[9px]"
-                                        >
-                                          <span
-                                            className="text-content-faint hover:text-content cursor-pointer"
-                                            aria-label={
-                                              p.visible
-                                                ? "Hide path"
-                                                : "Show path"
-                                            }
-                                            onClick={() =>
-                                              updatePath(imp.id, p.id, {
-                                                visible: !p.visible,
-                                              })
-                                            }
-                                            title="Toggle path visibility"
-                                          >
-                                            {p.visible ? (
-                                              <Eye size={9} />
-                                            ) : (
-                                              <EyeOff size={9} />
-                                            )}
-                                          </span>
-                                          <span className="flex-1 min-w-0 text-content-faint truncate">
-                                            {p.label ??
-                                              `path ${p.id.slice(0, 6)}`}
-                                          </span>
-                                          <button
-                                            className="text-content-faint hover:text-accent"
-                                            title="Remove path"
-                                            onClick={() =>
-                                              removePath(imp.id, p.id)
-                                            }
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
+                                          label={
+                                            p.label ??
+                                            `path ${p.id.slice(0, 6)}`
+                                          }
+                                          visible={p.visible}
+                                          indented
+                                          onToggleVisibility={() =>
+                                            updatePath(imp.id, p.id, {
+                                              visible: !p.visible,
+                                            })
+                                          }
+                                          onRemove={() =>
+                                            removePath(imp.id, p.id)
+                                          }
+                                        />
                                       ))}
                                   </div>
                                 );
@@ -443,81 +423,41 @@ export function PropertiesPanel() {
                                     !imp.layers!.some((l) => l.id === p.layer),
                                 )
                                 .map((p) => (
-                                  <div
+                                  <PathRow
                                     key={p.id}
-                                    className="flex items-center gap-1 py-0.5 text-[9px]"
-                                  >
-                                    <span
-                                      className="text-content-faint hover:text-content cursor-pointer"
-                                      aria-label={
-                                        p.visible ? "Hide path" : "Show path"
-                                      }
-                                      onClick={() =>
-                                        updatePath(imp.id, p.id, {
-                                          visible: !p.visible,
-                                        })
-                                      }
-                                      title="Toggle path visibility"
-                                    >
-                                      {p.visible ? (
-                                        <Eye size={9} />
-                                      ) : (
-                                        <EyeOff size={9} />
-                                      )}
-                                    </span>
-                                    <span className="flex-1 min-w-0 text-content-faint truncate">
-                                      {p.label ??
-                                        p.layer ??
-                                        `path ${p.id.slice(0, 6)}`}
-                                    </span>
-                                    <button
-                                      className="text-content-faint hover:text-accent"
-                                      title="Remove path"
-                                      onClick={() => removePath(imp.id, p.id)}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
+                                    label={
+                                      p.label ??
+                                      p.layer ??
+                                      `path ${p.id.slice(0, 6)}`
+                                    }
+                                    visible={p.visible}
+                                    onToggleVisibility={() =>
+                                      updatePath(imp.id, p.id, {
+                                        visible: !p.visible,
+                                      })
+                                    }
+                                    onRemove={() => removePath(imp.id, p.id)}
+                                  />
                                 ))}
                             </>
                           ) : (
                             // ── Flat view: no layers detected ──
                             imp.paths.map((p) => (
-                              <div
+                              <PathRow
                                 key={p.id}
-                                className="flex items-center gap-1 py-0.5 text-[9px]"
-                              >
-                                <span
-                                  className="text-content-faint hover:text-content cursor-pointer"
-                                  aria-label={
-                                    p.visible ? "Hide path" : "Show path"
-                                  }
-                                  onClick={() =>
-                                    updatePath(imp.id, p.id, {
-                                      visible: !p.visible,
-                                    })
-                                  }
-                                  title="Toggle path visibility"
-                                >
-                                  {p.visible ? (
-                                    <Eye size={9} />
-                                  ) : (
-                                    <EyeOff size={9} />
-                                  )}
-                                </span>
-                                <span className="flex-1 min-w-0 text-content-faint truncate">
-                                  {p.label ??
-                                    p.layer ??
-                                    `path ${p.id.slice(0, 6)}`}
-                                </span>
-                                <button
-                                  className="text-content-faint hover:text-accent"
-                                  title="Remove path"
-                                  onClick={() => removePath(imp.id, p.id)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
+                                label={
+                                  p.label ??
+                                  p.layer ??
+                                  `path ${p.id.slice(0, 6)}`
+                                }
+                                visible={p.visible}
+                                onToggleVisibility={() =>
+                                  updatePath(imp.id, p.id, {
+                                    visible: !p.visible,
+                                  })
+                                }
+                                onRemove={() => removePath(imp.id, p.id)}
+                              />
                             ))
                           )}
                         </div>
