@@ -20,13 +20,16 @@ import {
 } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
-import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
+import {
+  DEFAULT_HATCH_ANGLE_DEG,
+  DEFAULT_HATCH_SPACING_MM,
+  DEFAULT_STROKE_WIDTH_MM,
+} from "../../../types";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { NumberField } from "../features/properties-panel/components/NumberField";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
-import { PathRow } from "../features/properties-panel/components/PathRow";
-import { LayerRow } from "../features/properties-panel/components/LayerRow";
+import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -328,109 +331,21 @@ export function PropertiesPanel() {
 
                       {/* Expanded path / layer list */}
                       {isExpanded && (
-                        <div
-                          className="pl-6 pr-2 pb-1 border-t border-border-ui/20"
-                          onClick={() => selectImport(imp.id)}
-                        >
-                          {imp.layers && imp.layers.length > 0 ? (
-                            // ── Layered view: group paths under their layer ──
-                            <>
-                              {imp.layers.map((layer) => {
-                                const layerPaths = imp.paths.filter(
-                                  (p) => p.layer === layer.id,
-                                );
-                                const layerKey = `${imp.id}:${layer.id}`;
-                                const isLayerExpanded =
-                                  expandedLayerKeys.has(layerKey);
-                                return (
-                                  <div key={layer.id}>
-                                    {/* Layer row */}
-                                    <LayerRow
-                                      name={layer.name}
-                                      visible={layer.visible}
-                                      pathCount={layerPaths.length}
-                                      expanded={isLayerExpanded}
-                                      onToggleExpanded={() =>
-                                        toggleLayerCollapse(imp.id, layer.id)
-                                      }
-                                      onToggleVisible={() =>
-                                        updateImportLayer(
-                                          imp.id,
-                                          layer.id,
-                                          !layer.visible,
-                                        )
-                                      }
-                                    />
-                                    {/* Paths within this layer — only when expanded */}
-                                    {isLayerExpanded &&
-                                      layerPaths.map((p) => (
-                                        <PathRow
-                                          key={p.id}
-                                          label={
-                                            p.label ??
-                                            `path ${p.id.slice(0, 6)}`
-                                          }
-                                          visible={p.visible}
-                                          indented
-                                          onToggleVisibility={() =>
-                                            updatePath(imp.id, p.id, {
-                                              visible: !p.visible,
-                                            })
-                                          }
-                                          onRemove={() =>
-                                            removePath(imp.id, p.id)
-                                          }
-                                        />
-                                      ))}
-                                  </div>
-                                );
-                              })}
-                              {/* Paths not assigned to any detected layer */}
-                              {imp.paths
-                                .filter(
-                                  (p) =>
-                                    !p.layer ||
-                                    !imp.layers!.some((l) => l.id === p.layer),
-                                )
-                                .map((p) => (
-                                  <PathRow
-                                    key={p.id}
-                                    label={
-                                      p.label ??
-                                      p.layer ??
-                                      `path ${p.id.slice(0, 6)}`
-                                    }
-                                    visible={p.visible}
-                                    onToggleVisibility={() =>
-                                      updatePath(imp.id, p.id, {
-                                        visible: !p.visible,
-                                      })
-                                    }
-                                    onRemove={() => removePath(imp.id, p.id)}
-                                  />
-                                ))}
-                            </>
-                          ) : (
-                            // ── Flat view: no layers detected ──
-                            imp.paths.map((p) => (
-                              <PathRow
-                                key={p.id}
-                                label={
-                                  p.label ??
-                                  p.layer ??
-                                  `path ${p.id.slice(0, 6)}`
-                                }
-                                visible={p.visible}
-                                onToggleVisibility={() =>
-                                  updatePath(imp.id, p.id, {
-                                    visible: !p.visible,
-                                  })
-                                }
-                                onRemove={() => removePath(imp.id, p.id)}
-                              />
-                            ))
-                          )}
-                        </div>
+                        <ImportPathsList
+                          imp={imp}
+                          expandedLayerKeys={expandedLayerKeys}
+                          onSelectImport={selectImport}
+                          onToggleLayerCollapse={toggleLayerCollapse}
+                          onUpdateLayerVisibility={(
+                            importId,
+                            layerId,
+                            visible,
+                          ) => updateImportLayer(importId, layerId, visible)}
+                          onUpdatePathVisibility={(importId, pathId, visible) =>
+                            updatePath(importId, pathId, { visible })
+                          }
+                          onRemovePath={removePath}
+                        />
                       )}
 
                       {/* Properties form — shown when import is selected */}
@@ -1160,8 +1075,10 @@ export function PropertiesPanel() {
                                           onClick={() =>
                                             applyHatch(
                                               imp.id,
-                                              imp.hatchSpacingMM,
-                                              imp.hatchAngleDeg,
+                                              imp.hatchSpacingMM ??
+                                                DEFAULT_HATCH_SPACING_MM,
+                                              imp.hatchAngleDeg ??
+                                                DEFAULT_HATCH_ANGLE_DEG,
                                               !imp.hatchEnabled,
                                             )
                                           }
@@ -1179,13 +1096,17 @@ export function PropertiesPanel() {
                                         <div>
                                           <NumberField
                                             label="Spacing (mm)"
-                                            value={imp.hatchSpacingMM}
+                                            value={
+                                              imp.hatchSpacingMM ??
+                                              DEFAULT_HATCH_SPACING_MM
+                                            }
                                             onChange={(v) => {
                                               if (Number.isFinite(v))
                                                 applyHatch(
                                                   imp.id,
                                                   Math.max(0.1, v),
-                                                  imp.hatchAngleDeg,
+                                                  imp.hatchAngleDeg ??
+                                                    DEFAULT_HATCH_ANGLE_DEG,
                                                   true,
                                                 );
                                             }}
@@ -1194,12 +1115,16 @@ export function PropertiesPanel() {
                                           />
                                           <NumberField
                                             label="Angle (°)"
-                                            value={imp.hatchAngleDeg}
+                                            value={
+                                              imp.hatchAngleDeg ??
+                                              DEFAULT_HATCH_ANGLE_DEG
+                                            }
                                             onChange={(v) => {
                                               if (Number.isFinite(v))
                                                 applyHatch(
                                                   imp.id,
-                                                  imp.hatchSpacingMM,
+                                                  imp.hatchSpacingMM ??
+                                                    DEFAULT_HATCH_SPACING_MM,
                                                   ((v % 180) + 180) % 180,
                                                   true,
                                                 );
