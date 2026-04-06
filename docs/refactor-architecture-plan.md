@@ -124,18 +124,8 @@ Extract from `src/renderer/src/components/PropertiesPanel.tsx`:
 
 Checklist:
 
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection + AlignmentControls extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection + AlignmentControls + TransformShortcuts extracted)
-- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection + AlignmentControls + TransformShortcuts + StrokeWidthSection + DimensionsRow + ImportRowCard + ImportsByGroupList + GroupedImportsSection + UngroupedImportsSection extracted)
+- [x] Create section components and move JSX blocks. (completed: ToolpathSection, LayersHeader, NumberField, PathRow, LayerRow, ImportPathsList, ImportHeaderRow, GroupHeaderRow, UngroupedDropZone, EmptyGroupDropHint, HatchFillSection, AlignmentControls, TransformShortcuts, StrokeWidthSection, DimensionsRow, ImportRowCard, ImportsByGroupList, GroupedImportsSection, UngroupedImportsSection)
+- [x] Extract panel layout wrappers. (completed: PanelContainer, PanelHeading, PanelScrollBody)
 - [x] Move formatting/estimation helpers to utilities.
 - [x] Move page-template bounds calculation to utilities. (completed: resolvePageBounds)
 - [x] Move drag/drop and edit-name logic to hooks. (completed: useImportDragDrop + usePanelNameEditing)
@@ -146,7 +136,7 @@ Checklist:
 - [x] Move inspector interaction state to hooks. (completed: useInspectorInteractionState)
 - [x] Move panel-level derived machine/toolpath/group lookup data to hooks. (completed: usePropertiesPanelDerivedData)
 - [x] Move store subscriptions to hooks. (completed: usePropertiesPanelStoreBindings)
-- [ ] Preserve current store API contracts.
+- [x] Preserve current store API contracts. (validated 2026-04-06 via `npm.cmd run typecheck` and focused PropertiesPanel/component/hook tests)
 
 ### 3) Toolbar Decomposition
 
