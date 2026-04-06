@@ -6,6 +6,7 @@
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
 import { useState } from "react";
+import { Lock, Unlock } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import {
@@ -426,49 +427,9 @@ export function PropertiesPanel() {
                                     }}
                                   >
                                     {ratioLocked ? (
-                                      // Lucide lock icon
-                                      <svg
-                                        width="12"
-                                        height="12"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      >
-                                        <rect
-                                          width="18"
-                                          height="11"
-                                          x="3"
-                                          y="11"
-                                          rx="2"
-                                          ry="2"
-                                        />
-                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                      </svg>
+                                      <Lock size={12} strokeWidth={2} />
                                     ) : (
-                                      // Lucide unlock icon
-                                      <svg
-                                        width="12"
-                                        height="12"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      >
-                                        <rect
-                                          width="18"
-                                          height="11"
-                                          x="3"
-                                          y="11"
-                                          rx="2"
-                                          ry="2"
-                                        />
-                                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                                      </svg>
+                                      <Unlock size={12} strokeWidth={2} />
                                     )}
                                   </button>
                                   {/* H */}

@@ -57,14 +57,14 @@ export function TransformShortcuts({
             title={`Fit to bed (scale ${Math.round(fitScale * 1000) / 1000})`}
             onClick={onFitToBed}
           >
-            <Maximize2 size={14} />
+            <Maximize2 size={14} strokeWidth={2} />
           </button>
           <button
             className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
             title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
             onClick={onResetScale}
           >
-            <Minimize2 size={14} />
+            <Minimize2 size={14} strokeWidth={2} />
           </button>
         </div>
       )}
@@ -76,7 +76,7 @@ export function TransformShortcuts({
             title={`Rotate ${rotStep}° counter-clockwise`}
             onClick={onRotateCcw}
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={14} strokeWidth={2} />
           </button>
 
           <button
@@ -84,7 +84,7 @@ export function TransformShortcuts({
             title={`Rotate ${rotStep}° clockwise`}
             onClick={onRotateCw}
           >
-            <RotateCw size={14} />
+            <RotateCw size={14} strokeWidth={2} />
           </button>
 
           <div className="relative">
@@ -134,7 +134,7 @@ export function TransformShortcuts({
             }
             onClick={onToggleCentreMarker}
           >
-            <Crosshair size={14} />
+            <Crosshair size={14} strokeWidth={2} />
           </button>
 
           <button
@@ -142,7 +142,7 @@ export function TransformShortcuts({
             title={snapPresetTitle}
             onClick={onSnapToNextPreset}
           >
-            <Magnet size={14} />
+            <Magnet size={14} strokeWidth={2} />
           </button>
         </div>
       )}
