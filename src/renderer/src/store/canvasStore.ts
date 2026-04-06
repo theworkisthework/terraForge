@@ -3,16 +3,23 @@ import { immer } from "zustand/middleware/immer";
 import { v4 as uuid } from "uuid";
 import {
   type SvgImport,
-  type SvgPath,
-  type VectorObject,
   type LayerGroup,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
-import { generateHatchPaths } from "../utils/hatchFill";
 import type { CanvasState } from "./canvasStore/types";
 import { createPageTemplateSlice } from "./canvasStore/slices/pageTemplateSlice";
+import { createSelectionSlice } from "./canvasStore/slices/selectionSlice";
 import { createToolpathSlice } from "./canvasStore/slices/toolpathSlice";
+import {
+  applyImportHatch,
+  regenerateImportHatching,
+} from "./canvasStore/services/hatching";
+import {
+  vectorObjectsForGroup,
+  vectorObjectsForImports,
+  vectorObjectsUngrouped,
+} from "./canvasStore/services/vectorObjects";
 
 // ─── Clipboard helpers ────────────────────────────────────────────────────────
 
@@ -63,15 +70,11 @@ export const useCanvasStore = create<CanvasState>()(
     return {
       ...createToolpathSlice(set, get),
       ...createPageTemplateSlice(set, get),
+      ...createSelectionSlice(set, get),
       imports: [],
       undoStack: [],
       redoStack: [],
-      selectedImportId: null,
-      selectedPathId: null,
-      allImportsSelected: false,
-      selectedGroupId: null,
       clipboardImport: null,
-      toolpathSelected: false,
       layerGroups: [],
 
       addImport: (imp) => {
@@ -119,27 +122,7 @@ export const useCanvasStore = create<CanvasState>()(
             imp.hatchEnabled &&
             ("scale" in patch || "scaleX" in patch || "scaleY" in patch)
           ) {
-            const effectiveScale = Math.sqrt(
-              (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
-            );
-            const spacingMM = imp.hatchSpacingMM ?? DEFAULT_HATCH_SPACING_MM;
-            const angleDeg = imp.hatchAngleDeg ?? DEFAULT_HATCH_ANGLE_DEG;
-            if (
-              effectiveScale > 0 &&
-              Number.isFinite(effectiveScale) &&
-              spacingMM > 0 &&
-              Number.isFinite(angleDeg)
-            ) {
-              const spacingUnits = spacingMM / effectiveScale;
-              for (const p of imp.paths) {
-                if (!p.hasFill) {
-                  p.hatchLines = undefined;
-                  continue;
-                }
-                const lines = generateHatchPaths(p.d, spacingUnits, angleDeg);
-                p.hatchLines = lines.length ? lines : undefined;
-              }
-            }
+            regenerateImportHatching(imp);
           }
         }),
 
@@ -165,37 +148,6 @@ export const useCanvasStore = create<CanvasState>()(
           if (!imp) return;
           imp.paths = imp.paths.filter((p) => p.id !== pathId);
           if (state.selectedPathId === pathId) state.selectedPathId = null;
-        }),
-
-      selectImport: (id) =>
-        set((state) => {
-          state.selectedImportId = id;
-          state.selectedPathId = null;
-          state.allImportsSelected = false;
-          state.selectedGroupId = null;
-          // Selecting an SVG import clears toolpath selection (and vice-versa).
-          if (id !== null) state.toolpathSelected = false;
-        }),
-
-      selectGroup: (id) =>
-        set((state) => {
-          state.selectedGroupId = id;
-          state.selectedImportId = null;
-          state.selectedPathId = null;
-          state.allImportsSelected = false;
-          state.toolpathSelected = false;
-        }),
-
-      selectToolpath: (selected) =>
-        set((state) => {
-          state.toolpathSelected = selected;
-          // Selecting the toolpath clears any SVG import selection.
-          if (selected) {
-            state.selectedImportId = null;
-            state.selectedPathId = null;
-            state.allImportsSelected = false;
-            state.selectedGroupId = null;
-          }
         }),
 
       clearImports: () => {
@@ -233,102 +185,13 @@ export const useCanvasStore = create<CanvasState>()(
         return imports.find((i) => i.id === selectedImportId);
       },
 
-      toVectorObjects: (): VectorObject[] =>
-        get()
-          .imports.filter((imp) => imp.visible)
-          .flatMap((imp) => {
-            const hiddenLayerIds = imp.layers
-              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
-              : null;
-            const layerVisible = (p: SvgPath) =>
-              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
-            return imp.paths
-              .filter((p) => p.visible && layerVisible(p))
-              .flatMap((p): VectorObject[] => {
-                const base: VectorObject = {
-                  id: p.id,
-                  svgSource: p.svgSource,
-                  path: p.d,
-                  x: imp.x,
-                  y: imp.y,
-                  scale: imp.scale,
-                  scaleX: imp.scaleX,
-                  scaleY: imp.scaleY,
-                  rotation: imp.rotation,
-                  visible: true,
-                  originalWidth: imp.svgWidth,
-                  originalHeight: imp.svgHeight,
-                  layer: p.layer,
-                };
-                const outlineVOs: VectorObject[] =
-                  p.outlineVisible !== false ? [base] : [];
-                const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
-                  (hl, i): VectorObject => ({
-                    ...base,
-                    id: `${p.id}-h${i}`,
-                    svgSource: "",
-                    path: hl,
-                  }),
-                );
-                return [...outlineVOs, ...hatchVOs];
-              });
-          }),
+      toVectorObjects: () => vectorObjectsForImports(get().imports),
 
       applyHatch: (importId, spacingMM, angleDeg, enabled) =>
         set((state) => {
           const imp = state.imports.find((i) => i.id === importId);
           if (!imp) return;
-
-          // Sanitize incoming values before persisting to avoid storing NaN/Infinity
-          // (which can arrive transiently from <input type="number"> while editing).
-          const safeSpacing =
-            Number.isFinite(spacingMM) && spacingMM > 0
-              ? spacingMM
-              : imp.hatchSpacingMM;
-          const safeAngle = Number.isFinite(angleDeg)
-            ? angleDeg
-            : imp.hatchAngleDeg;
-
-          // Persist user configuration
-          imp.hatchEnabled = enabled;
-          imp.hatchSpacingMM = safeSpacing;
-          imp.hatchAngleDeg = safeAngle;
-
-          // When non-uniform scaling is active (scaleX/scaleY set independently),
-          // use the geometric mean of the two axis scales so mm spacing is consistent
-          // regardless of which axis the user adjusted.
-          const effectiveScale = Math.sqrt(
-            (imp.scaleX ?? imp.scale) * (imp.scaleY ?? imp.scale),
-          );
-
-          // Defense in depth: only generate hatch lines when configuration is valid.
-          const spacingIsValid =
-            Number.isFinite(safeSpacing) &&
-            safeSpacing > 0 &&
-            Number.isFinite(safeAngle) &&
-            effectiveScale > 0 &&
-            Number.isFinite(effectiveScale) &&
-            enabled;
-
-          if (!spacingIsValid) {
-            // Invalid spacing/scale or hatching disabled: clear any existing hatch lines.
-            for (const p of imp.paths) {
-              p.hatchLines = undefined;
-            }
-            return;
-          }
-
-          const spacingUnits = safeSpacing / effectiveScale;
-
-          for (const p of imp.paths) {
-            if (!p.hasFill) {
-              p.hatchLines = undefined;
-              continue;
-            }
-
-            const lines = generateHatchPaths(p.d, spacingUnits, safeAngle);
-            p.hatchLines = lines.length ? lines : undefined;
-          }
+          applyImportHatch(imp, spacingMM, angleDeg, enabled);
         }),
 
       // ─── Clipboard actions ──────────────────────────────────────────────────
@@ -497,92 +360,12 @@ export const useCanvasStore = create<CanvasState>()(
 
       toVectorObjectsForGroup: (groupId) => {
         const { imports, layerGroups } = get();
-        const group = layerGroups.find((g) => g.id === groupId);
-        if (!group) return [];
-        const groupImportIds = new Set(group.importIds);
-        return imports
-          .filter((imp) => imp.visible && groupImportIds.has(imp.id))
-          .flatMap((imp) => {
-            const hiddenLayerIds = imp.layers
-              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
-              : null;
-            const layerVisible = (p: SvgPath) =>
-              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
-            return imp.paths
-              .filter((p) => p.visible && layerVisible(p))
-              .flatMap((p): VectorObject[] => {
-                const base: VectorObject = {
-                  id: p.id,
-                  svgSource: p.svgSource,
-                  path: p.d,
-                  x: imp.x,
-                  y: imp.y,
-                  scale: imp.scale,
-                  scaleX: imp.scaleX,
-                  scaleY: imp.scaleY,
-                  rotation: imp.rotation,
-                  visible: true,
-                  originalWidth: imp.svgWidth,
-                  originalHeight: imp.svgHeight,
-                  layer: p.layer,
-                };
-                const outlineVOs: VectorObject[] =
-                  p.outlineVisible !== false ? [base] : [];
-                const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
-                  (hl, i): VectorObject => ({
-                    ...base,
-                    id: `${p.id}-h${i}`,
-                    svgSource: "",
-                    path: hl,
-                  }),
-                );
-                return [...outlineVOs, ...hatchVOs];
-              });
-          });
+        return vectorObjectsForGroup(imports, layerGroups, groupId);
       },
 
       toVectorObjectsUngrouped: () => {
         const { imports, layerGroups } = get();
-        const allGroupedIds = new Set(layerGroups.flatMap((g) => g.importIds));
-        return imports
-          .filter((imp) => imp.visible && !allGroupedIds.has(imp.id))
-          .flatMap((imp) => {
-            const hiddenLayerIds = imp.layers
-              ? new Set(imp.layers.filter((l) => !l.visible).map((l) => l.id))
-              : null;
-            const layerVisible = (p: SvgPath) =>
-              !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
-            return imp.paths
-              .filter((p) => p.visible && layerVisible(p))
-              .flatMap((p): VectorObject[] => {
-                const base: VectorObject = {
-                  id: p.id,
-                  svgSource: p.svgSource,
-                  path: p.d,
-                  x: imp.x,
-                  y: imp.y,
-                  scale: imp.scale,
-                  scaleX: imp.scaleX,
-                  scaleY: imp.scaleY,
-                  rotation: imp.rotation,
-                  visible: true,
-                  originalWidth: imp.svgWidth,
-                  originalHeight: imp.svgHeight,
-                  layer: p.layer,
-                };
-                const outlineVOs: VectorObject[] =
-                  p.outlineVisible !== false ? [base] : [];
-                const hatchVOs: VectorObject[] = (p.hatchLines ?? []).map(
-                  (hl, i): VectorObject => ({
-                    ...base,
-                    id: `${p.id}-h${i}`,
-                    svgSource: "",
-                    path: hl,
-                  }),
-                );
-                return [...outlineVOs, ...hatchVOs];
-              });
-          });
+        return vectorObjectsUngrouped(imports, layerGroups);
       },
     };
   }),

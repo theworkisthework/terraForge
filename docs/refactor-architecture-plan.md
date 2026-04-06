@@ -175,7 +175,7 @@ Split `src/renderer/src/store/canvasStore.ts` into slices:
 Checklist:
 
 - [x] Define slice interfaces and shared store composition. (completed: shared `canvasStore/types.ts` plus initial `pageTemplateSlice` and `toolpathSlice` composition)
-- [ ] Move heavy conversion and hatch logic to pure services/selectors.
+- [x] Move heavy conversion and hatch logic to pure services/selectors. (completed: `services/hatching.ts` and `services/vectorObjects.ts`)
 - [ ] Add compatibility layer to avoid breaking existing callers.
 - [ ] Migrate callers to selectors incrementally.
 
@@ -300,6 +300,8 @@ Done this sprint:
 - [x] Extract `useImportActions`, `useLayoutActions`, and `useJobActions` from `Toolbar.tsx`
 - [x] Reduce `Toolbar.tsx` to composition/bindings and re-validate unit, build, and E2E flows
 - [x] Start `canvasStore.ts` slice extraction with shared slice types plus `pageTemplateSlice` and `toolpathSlice`
+- [x] Extract canvas-store vector projection and hatching logic to pure services/selectors
+- [x] Extract `selectionSlice` from `canvasStore.ts`
 
 ## Progress Log
 
@@ -324,6 +326,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted Toolbar orchestration into `features/imports/hooks/useImportActions.ts`, `features/layout/hooks/useLayoutActions.ts`, and `features/machine/hooks/useJobActions.ts`; `Toolbar.tsx` now acts primarily as composition and UI bindings.
 - 2026-04-06: Fixed post-extraction path regressions for shared types and worker resolution; validation passes with `npm.cmd run typecheck`, Toolbar unit tests (84/84), `npm.cmd run build`, `npm.cmd run test:e2e`, and the full unit suite.
 - 2026-04-06: Started `canvasStore.ts` modularization by defining shared slice interfaces in `store/canvasStore/types.ts` and extracting `pageTemplateSlice.ts` plus `toolpathSlice.ts`; validation passes with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
+- 2026-04-06: Extracted duplicated canvas-store vector projection and hatch regeneration logic to `store/canvasStore/services/vectorObjects.ts` and `store/canvasStore/services/hatching.ts`; focused `canvasStore.test.ts` still passes 105/105.
+- 2026-04-06: Extracted `store/canvasStore/slices/selectionSlice.ts` and composed it into `canvasStore.ts`; `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` remain green (105/105).
 
 ## Update Rule
 
