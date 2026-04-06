@@ -208,7 +208,7 @@ Split `src/renderer/src/components/GcodeOptionsDialog.tsx` into:
 Checklist:
 
 - [x] Extract prefs persistence and defaults.
-- [ ] Extract collapsible section UI.
+- [x] Extract collapsible section UI.
 - [x] Keep dialog behavior and keyboard controls unchanged.
 
 ## Execution Phases
@@ -221,7 +221,7 @@ Checklist:
 
 ### Phase 1: Pure Function Extraction
 
-- [ ] Extract helpers from Toolbar/Properties/GcodeOptions first.
+- [x] Extract helpers from Toolbar/Properties/GcodeOptions first.
 - [ ] Add/adjust unit tests for extracted logic.
 
 ### Phase 2: Hook Extraction
@@ -249,7 +249,7 @@ Checklist:
 
 Current sprint focus:
 
-- [ ] Refactor `GcodeOptionsDialog.tsx` (in progress: prefs/validation + Paths section extracted)
+- [x] Refactor `GcodeOptionsDialog.tsx`
 - [ ] Refactor `PropertiesPanel.tsx`
 - [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
@@ -258,6 +258,7 @@ Done this sprint:
 
 - [x] Initialize architecture refactor plan and checklist
 - [x] Start `GcodeOptionsDialog.tsx` refactor (prefs + validators extracted, behavior verified)
+- [x] Extract `OptionsSection`, `OutputSection`, and `CustomGcodeSection`
 
 ## Progress Log
 
@@ -267,6 +268,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Started `GcodeOptionsDialog` refactor by extracting prefs persistence and numeric validation helpers into `features/gcode-options`.
 - 2026-04-06: Verified `GcodeOptionsDialog` behavior parity with `npm run test -- tests/component/GcodeOptionsDialog.test.tsx` (32/32 tests passing).
 - 2026-04-06: Extracted `PathsSection` from `GcodeOptionsDialog` into `features/gcode-options/components/PathsSection.tsx`; targeted dialog tests remain 32/32 passing.
+- 2026-04-06: Extracted `OptionsSection`, `OutputSection`, and nested `CustomGcodeSection`; targeted dialog tests remain 32/32 passing.
 
 ## Update Rule
 
