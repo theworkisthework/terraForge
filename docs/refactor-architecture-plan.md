@@ -142,6 +142,7 @@ Checklist:
 - [x] Move import-row prop wiring to hooks. (completed: useImportRowRenderer)
 - [x] Move add-group naming/colour logic to hooks. (completed: useAddLayerGroup)
 - [x] Move stroke-width sync logic to hooks. (completed: useSyncedStrokeWidth)
+- [x] Move expansion/collapse state to hooks. (completed: usePanelExpansionState)
 - [ ] Preserve current store API contracts.
 
 ### 3) Toolbar Decomposition

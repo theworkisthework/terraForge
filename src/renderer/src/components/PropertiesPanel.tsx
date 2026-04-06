@@ -14,6 +14,7 @@ import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportsByGroupList } from "../features/properties-panel/components/ImportsByGroupList";
 import { useAddLayerGroup } from "../features/properties-panel/hooks/useAddLayerGroup";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
+import { usePanelExpansionState } from "../features/properties-panel/hooks/usePanelExpansionState";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import { useSyncedStrokeWidth } from "../features/properties-panel/hooks/useSyncedStrokeWidth";
 import { type RotStep } from "../features/properties-panel/utils/rotation";
@@ -54,30 +55,16 @@ export function PropertiesPanel() {
   const bedH = cfg?.bedHeight ?? 200;
   const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
-    new Set(),
-  );
-  // Sub-layers within an import are collapsed by default; key = "importId:layerId"
-  const [expandedLayerKeys, setExpandedLayerKeys] = useState<Set<string>>(
-    new Set(),
-  );
-  const toggleLayerCollapse = (importId: string, layerId: string) => {
-    const key = `${importId}:${layerId}`;
-    setExpandedLayerKeys((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
+  const {
+    expandedIds,
+    collapsedGroupIds,
+    expandedLayerKeys,
+    setCollapsedGroupIds,
+    toggleExpand,
+    toggleGroupCollapse,
+    toggleLayerCollapse,
+  } = usePanelExpansionState();
   const [rotStep, setRotStep] = useState<RotStep>(45);
-
-  const toggleGroupCollapse = (id: string) =>
-    setCollapsedGroupIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
   const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
   const [ratioLocked, setRatioLocked] = useState(true);
   const [templateAlignEnabled, setTemplateAlignEnabled] = useState(false);
@@ -134,13 +121,6 @@ export function PropertiesPanel() {
     groupCount: layerGroups.length,
     addLayerGroup,
   });
-
-  const toggleExpand = (id: string) =>
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
 
   return (
     <div className="flex flex-col h-full">
