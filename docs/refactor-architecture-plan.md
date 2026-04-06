@@ -144,6 +144,7 @@ Checklist:
 - [x] Move stroke-width sync logic to hooks. (completed: useSyncedStrokeWidth)
 - [x] Move expansion/collapse state to hooks. (completed: usePanelExpansionState)
 - [x] Move inspector interaction state to hooks. (completed: useInspectorInteractionState)
+- [x] Move panel-level derived machine/toolpath/group lookup data to hooks. (completed: usePropertiesPanelDerivedData)
 - [ ] Preserve current store API contracts.
 
 ### 3) Toolbar Decomposition
