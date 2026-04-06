@@ -5,7 +5,6 @@
 // Permission to use, copy, modify, and/or distribute this software for any purpose
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
-import { useState } from "react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
@@ -13,11 +12,11 @@ import { LayersHeader } from "../features/properties-panel/components/LayersHead
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportsByGroupList } from "../features/properties-panel/components/ImportsByGroupList";
 import { useAddLayerGroup } from "../features/properties-panel/hooks/useAddLayerGroup";
+import { useInspectorInteractionState } from "../features/properties-panel/hooks/useInspectorInteractionState";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelExpansionState } from "../features/properties-panel/hooks/usePanelExpansionState";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import { useSyncedStrokeWidth } from "../features/properties-panel/hooks/useSyncedStrokeWidth";
-import { type RotStep } from "../features/properties-panel/utils/rotation";
 
 export function PropertiesPanel() {
   const imports = useCanvasStore((s) => s.imports);
@@ -64,13 +63,19 @@ export function PropertiesPanel() {
     toggleGroupCollapse,
     toggleLayerCollapse,
   } = usePanelExpansionState();
-  const [rotStep, setRotStep] = useState<RotStep>(45);
-  const [stepFlyoutOpen, setStepFlyoutOpen] = useState(false);
-  const [ratioLocked, setRatioLocked] = useState(true);
-  const [templateAlignEnabled, setTemplateAlignEnabled] = useState(false);
-  const [templateAlignTarget, setTemplateAlignTarget] = useState<
-    "page" | "margin"
-  >("page");
+  const {
+    rotStep,
+    stepFlyoutOpen,
+    ratioLocked,
+    templateAlignEnabled,
+    templateAlignTarget,
+    setRatioLocked,
+    setTemplateAlignEnabled,
+    setTemplateAlignTarget,
+    toggleStepFlyout,
+    closeStepFlyout,
+    selectRotStep,
+  } = useInspectorInteractionState();
 
   /** Returns the group id that the given import belongs to, or null. */
   const importGroupId = (importId: string): string | null =>
@@ -197,12 +202,9 @@ export function PropertiesPanel() {
                 onTemplateAlignEnabledChange={setTemplateAlignEnabled}
                 onTemplateAlignTargetChange={setTemplateAlignTarget}
                 onRatioLockedChange={setRatioLocked}
-                onToggleStepFlyout={() => setStepFlyoutOpen((o) => !o)}
-                onCloseStepFlyout={() => setStepFlyoutOpen(false)}
-                onSelectRotStep={(s) => {
-                  setRotStep(s);
-                  setStepFlyoutOpen(false);
-                }}
+                onToggleStepFlyout={toggleStepFlyout}
+                onCloseStepFlyout={closeStepFlyout}
+                onSelectRotStep={selectRotStep}
                 onImportDragStart={handleImportDragStart}
                 onImportDragEnd={handleImportDragEnd}
                 onGroupDragOver={handleGroupDragOver}

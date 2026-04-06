@@ -143,6 +143,7 @@ Checklist:
 - [x] Move add-group naming/colour logic to hooks. (completed: useAddLayerGroup)
 - [x] Move stroke-width sync logic to hooks. (completed: useSyncedStrokeWidth)
 - [x] Move expansion/collapse state to hooks. (completed: usePanelExpansionState)
+- [x] Move inspector interaction state to hooks. (completed: useInspectorInteractionState)
 - [ ] Preserve current store API contracts.
 
 ### 3) Toolbar Decomposition
