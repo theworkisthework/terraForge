@@ -15,6 +15,7 @@ import { ImportsByGroupList } from "../features/properties-panel/components/Impo
 import { useAddLayerGroup } from "../features/properties-panel/hooks/useAddLayerGroup";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
+import { useSyncedStrokeWidth } from "../features/properties-panel/hooks/useSyncedStrokeWidth";
 import { type RotStep } from "../features/properties-panel/utils/rotation";
 
 export function PropertiesPanel() {
@@ -122,22 +123,12 @@ export function PropertiesPanel() {
     updateLayerGroup,
   });
 
-  /**
-   * Set strokeWidthMM on all imports that share the same "pen group" as the
-   * changed import.  If it belongs to a LayerGroup, all members get the same
-   * value.  If it is ungrouped, all other ungrouped imports are synced too.
-   */
-  const syncStrokeWidth = (changedId: string, widthMM: number) => {
-    const groupId = importGroupId(changedId);
-    const siblings = groupId
-      ? (layerGroups.find((g) => g.id === groupId)?.importIds ?? [])
-      : imports
-          .filter((imp) => importGroupId(imp.id) === null)
-          .map((imp) => imp.id);
-    for (const id of siblings) {
-      updateImport(id, { strokeWidthMM: widthMM });
-    }
-  };
+  const syncStrokeWidth = useSyncedStrokeWidth({
+    imports,
+    layerGroups,
+    importGroupId,
+    updateImport,
+  });
 
   const handleAddLayerGroup = useAddLayerGroup({
     groupCount: layerGroups.length,
