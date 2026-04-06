@@ -6,6 +6,9 @@
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
 import { usePropertiesPanelStoreBindings } from "../features/properties-panel/hooks/usePropertiesPanelStoreBindings";
+import { PanelHeading } from "../features/properties-panel/components/PanelHeading";
+import { PanelScrollBody } from "../features/properties-panel/components/PanelScrollBody";
+import { PanelContainer } from "../features/properties-panel/components/PanelContainer";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
@@ -154,15 +157,12 @@ export function PropertiesPanel() {
   });
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Panel heading */}
-      <div className="px-3 py-2 border-b border-border-ui shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
-          Properties
-        </span>
-      </div>
+    <PanelContainer>
+      {/* Fixed heading strip */}
+      <PanelHeading />
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      {/* Scrollable content below the heading */}
+      <PanelScrollBody>
         {imports.length === 0 && !gcodeToolpath ? (
           // Nothing loaded yet
           <EmptyState message="No objects. Import an SVG." />
@@ -256,7 +256,7 @@ export function PropertiesPanel() {
             )}
           </>
         )}
-      </div>
-    </div>
+      </PanelScrollBody>
+    </PanelContainer>
   );
 }
