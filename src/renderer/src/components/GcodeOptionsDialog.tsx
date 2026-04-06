@@ -14,71 +14,18 @@ import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import {
+  loadGcodePrefs,
+  saveGcodePrefs,
+  type GcodePrefs,
+} from "../features/gcode-options/gcodePrefs";
+import {
+  parseNonNegativeNumber,
+  parsePositiveNumber,
+} from "../features/gcode-options/gcodePrefsValidation";
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "terraforge.gcodePrefs";
-
-export interface GcodePrefs {
-  optimise: boolean;
-  uploadToSd: boolean;
-  saveLocally: boolean;
-  /** When true, generate a separate G-code file per layer group (multi-pen plots). */
-  exportPerGroup: boolean;
-  joinPaths: boolean;
-  joinTolerance: number; // mm
-  liftPenAtEnd: boolean;
-  returnToHome: boolean;
-  customStartGcode: string;
-  customEndGcode: string;
-  /** How to clip G-code when a page template is active.
-   *  "none"   — no page clip (machine bed only)
-   *  "margin" — clip to the margin boundary shown on canvas
-   *  "page"   — clip to the page edge (with optional clipOffsetMM safety inset) */
-  clipMode: "none" | "page" | "margin";
-  /** Safety inset in mm applied when clipMode is "page" (default 0). */
-  clipOffsetMM: number;
-}
-
-const DEFAULTS: GcodePrefs = {
-  optimise: true,
-  uploadToSd: true,
-  saveLocally: false,
-  exportPerGroup: false,
-  joinPaths: false,
-  joinTolerance: 0.2,
-  liftPenAtEnd: true,
-  returnToHome: false,
-  customStartGcode: "",
-  customEndGcode: "",
-  clipMode: "none",
-  clipOffsetMM: 0,
-};
-
-export function loadGcodePrefs(): GcodePrefs {
-  return loadPrefs();
-}
-
-function loadPrefs(): GcodePrefs {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<GcodePrefs>;
-      return { ...DEFAULTS, ...parsed };
-    }
-  } catch {
-    // Corrupt data — fall back to defaults
-  }
-  return { ...DEFAULTS };
-}
-
-export function saveGcodePrefs(prefs: GcodePrefs): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {
-    // Storage unavailable — non-fatal
-  }
-}
+export { loadGcodePrefs, saveGcodePrefs } from "../features/gcode-options/gcodePrefs";
+export type { GcodePrefs } from "../features/gcode-options/gcodePrefs";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -91,7 +38,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const layerGroupCount = useCanvasStore((s) => s.layerGroups.length);
   const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const [prefs, setPrefs] = useState<GcodePrefs>(loadPrefs);
+  const [prefs, setPrefs] = useState<GcodePrefs>(loadGcodePrefs);
   const [pathsOpen, setPathsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [outputOpen, setOutputOpen] = useState(true);
@@ -104,8 +51,8 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     setPrefs((p) => ({ ...p, [key]: val }));
 
   const setJoinTolerance = (val: string) => {
-    const n = parseFloat(val);
-    if (!isNaN(n) && n > 0) setPrefs((p) => ({ ...p, joinTolerance: n }));
+    const n = parsePositiveNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, joinTolerance: n }));
   };
 
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
@@ -330,8 +277,8 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                           step="0.5"
                           value={prefs.clipOffsetMM}
                           onChange={(e) => {
-                            const n = parseFloat(e.target.value);
-                            if (!isNaN(n) && n >= 0)
+                            const n = parseNonNegativeNumber(e.target.value);
+                            if (n !== null)
                               setPrefs((p) => ({ ...p, clipOffsetMM: n }));
                           }}
                           className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
