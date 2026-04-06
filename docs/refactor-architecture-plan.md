@@ -176,7 +176,7 @@ Checklist:
 
 - [x] Define slice interfaces and shared store composition. (completed: shared `canvasStore/types.ts` plus initial `pageTemplateSlice` and `toolpathSlice` composition)
 - [x] Move heavy conversion and hatch logic to pure services/selectors. (completed: `services/hatching.ts` and `services/vectorObjects.ts`)
-- [ ] Add compatibility layer to avoid breaking existing callers.
+- [x] Add compatibility layer to avoid breaking existing callers. (completed: composed `useCanvasStore` API preserved, `generateCopyName` re-export kept stable)
 - [ ] Migrate callers to selectors incrementally.
 
 ### 5) Main Process Modularization
@@ -264,7 +264,7 @@ Checklist:
 
 ### Phase 4: Store Slicing
 
-- [ ] Introduce store slices with stable external API.
+- [x] Introduce store slices with stable external API.
 - [ ] Migrate callsites gradually.
 
 ### Phase 5: Main + Machine + Worker Modularization
@@ -281,7 +281,7 @@ Current sprint focus:
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
-- [ ] Continue `canvasStore.ts` slice extraction
+- [ ] Start selector/callsite migration for `canvasStore.ts`
 
 Done this sprint:
 
@@ -302,6 +302,9 @@ Done this sprint:
 - [x] Start `canvasStore.ts` slice extraction with shared slice types plus `pageTemplateSlice` and `toolpathSlice`
 - [x] Extract canvas-store vector projection and hatching logic to pure services/selectors
 - [x] Extract `selectionSlice` from `canvasStore.ts`
+- [x] Extract `clipboardSlice`, `undoRedoSlice`, and `layerGroupSlice` from `canvasStore.ts`
+- [x] Extract `importSlice` and complete `canvasStore.ts` slice composition
+- [x] Add focused tests for extracted canvas-store services and slices
 
 ## Progress Log
 
@@ -328,6 +331,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Started `canvasStore.ts` modularization by defining shared slice interfaces in `store/canvasStore/types.ts` and extracting `pageTemplateSlice.ts` plus `toolpathSlice.ts`; validation passes with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
 - 2026-04-06: Extracted duplicated canvas-store vector projection and hatch regeneration logic to `store/canvasStore/services/vectorObjects.ts` and `store/canvasStore/services/hatching.ts`; focused `canvasStore.test.ts` still passes 105/105.
 - 2026-04-06: Extracted `store/canvasStore/slices/selectionSlice.ts` and composed it into `canvasStore.ts`; `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` remain green (105/105).
+- 2026-04-06: Extracted `store/canvasStore/services/clipboard.ts`, `store/canvasStore/slices/clipboardSlice.ts`, `store/canvasStore/slices/undoRedoSlice.ts`, and `store/canvasStore/slices/layerGroupSlice.ts`; preserved API compatibility by re-exporting `generateCopyName` from `canvasStore.ts`; validation remains green with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
+- 2026-04-06: Extracted `store/canvasStore/slices/importSlice.ts`, leaving `canvasStore.ts` as slice composition plus `pushUndo` wiring; added focused tests for `pageTemplateSlice`, `toolpathSlice`, `selectionSlice`, `clipboard` service, `clipboardSlice`, `undoRedoSlice`, `layerGroupSlice`, and `importSlice`; validation remains green with `npm.cmd run typecheck`, focused slice/service tests, and `tests/unit/stores/canvasStore.test.ts` (105/105).
 
 ## Update Rule
 
