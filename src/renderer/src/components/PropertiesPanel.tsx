@@ -24,6 +24,7 @@ import { UngroupedDropZone } from "../features/properties-panel/components/Ungro
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
 import { HatchFillSection } from "../features/properties-panel/components/HatchFillSection";
 import { AlignmentControls } from "../features/properties-panel/components/AlignmentControls";
+import { TransformShortcuts } from "../features/properties-panel/components/TransformShortcuts";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import {
@@ -513,77 +514,75 @@ export function PropertiesPanel() {
                                   step={0.05}
                                   min={0.001}
                                 />
-                                {/* Scale shortcut row: fit to bed | 1:1 reset */}
-                                {(() => {
-                                  const fitScale = Math.min(
+                                <TransformShortcuts
+                                  fitScale={Math.min(
                                     bedW / (imp.svgWidth || 1),
                                     bedH / (imp.svgHeight || 1),
-                                  );
-                                  return (
-                                    <div className="flex items-center gap-0.5 mb-2 -mt-1">
-                                      {/* Fit to bed */}
-                                      <button
-                                        className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
-                                        title={`Fit to bed (scale ${Math.round(fitScale * 1000) / 1000})`}
-                                        onClick={() => {
-                                          setRatioLocked(true);
-                                          updateImport(imp.id, {
-                                            scale: fitScale,
-                                            scaleX: undefined,
-                                            scaleY: undefined,
-                                            x: 0,
-                                            y: 0,
-                                          });
-                                        }}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                                          <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-                                          <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-                                          <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-                                        </svg>
-                                      </button>
-                                      {/* Reset to 1:1 */}
-                                      <button
-                                        className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
-                                        title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
-                                        onClick={() => {
-                                          setRatioLocked(true);
-                                          updateImport(imp.id, {
-                                            scale: 1,
-                                            scaleX: undefined,
-                                            scaleY: undefined,
-                                          });
-                                        }}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-                                          <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-                                          <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-                                          <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-                                        </svg>
-                                      </button>
-                                    </div>
-                                  );
-                                })()}
+                                  )}
+                                  rotStep={rotStep}
+                                  rotSteps={ROT_STEPS}
+                                  stepFlyoutOpen={stepFlyoutOpen}
+                                  showCentreMarker={showCentreMarker}
+                                  snapPresetTitle={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
+                                  showRotationRow={false}
+                                  onFitToBed={() => {
+                                    const fitScale = Math.min(
+                                      bedW / (imp.svgWidth || 1),
+                                      bedH / (imp.svgHeight || 1),
+                                    );
+                                    setRatioLocked(true);
+                                    updateImport(imp.id, {
+                                      scale: fitScale,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                      x: 0,
+                                      y: 0,
+                                    });
+                                  }}
+                                  onResetScale={() => {
+                                    setRatioLocked(true);
+                                    updateImport(imp.id, {
+                                      scale: 1,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                    });
+                                  }}
+                                  onRotateCcw={() =>
+                                    updateImport(imp.id, {
+                                      rotation: imp.rotation - rotStep,
+                                    })
+                                  }
+                                  onRotateCw={() =>
+                                    updateImport(imp.id, {
+                                      rotation: imp.rotation + rotStep,
+                                    })
+                                  }
+                                  onToggleStepFlyout={() =>
+                                    setStepFlyoutOpen((o) => !o)
+                                  }
+                                  onCloseStepFlyout={() =>
+                                    setStepFlyoutOpen(false)
+                                  }
+                                  onSelectRotStep={(s) => {
+                                    setRotStep(s);
+                                    setStepFlyoutOpen(false);
+                                  }}
+                                  onToggleCentreMarker={toggleCentreMarker}
+                                  onSnapToNextPreset={() => {
+                                    const norm =
+                                      ((imp.rotation % 360) + 360) % 360;
+                                    const idx = ROT_PRESETS.findIndex(
+                                      (p) => Math.abs(p - norm) < 1,
+                                    );
+                                    const next =
+                                      ROT_PRESETS[
+                                        idx < 0
+                                          ? 0
+                                          : (idx + 1) % ROT_PRESETS.length
+                                      ];
+                                    updateImport(imp.id, { rotation: next });
+                                  }}
+                                />
                                 {/* Rotation — full width */}
                                 <NumberField
                                   label="Rotation (°)"
@@ -593,183 +592,75 @@ export function PropertiesPanel() {
                                   }
                                   step={1}
                                 />
-                                {/* Rotation shortcut row: CCW | CW | step flyout | magnet cycle */}
-                                <div className="flex items-center gap-0.5 mb-2">
-                                  {/* CCW — borderless icon button */}
-                                  <button
-                                    className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
-                                    title={`Rotate ${rotStep}° counter-clockwise`}
-                                    onClick={() =>
-                                      updateImport(imp.id, {
-                                        rotation: imp.rotation - rotStep,
-                                      })
-                                    }
-                                  >
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                      <path d="M3 3v5h5" />
-                                    </svg>
-                                  </button>
-
-                                  {/* CW — borderless icon button */}
-                                  <button
-                                    className="p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
-                                    title={`Rotate ${rotStep}° clockwise`}
-                                    onClick={() =>
-                                      updateImport(imp.id, {
-                                        rotation: imp.rotation + rotStep,
-                                      })
-                                    }
-                                  >
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                                      <path d="M21 3v5h-5" />
-                                    </svg>
-                                  </button>
-
-                                  {/* Step flyout trigger */}
-                                  <div className="relative">
-                                    <button
-                                      className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-content-muted hover:text-content rounded hover:bg-secondary/40 transition-colors"
-                                      title="Change rotation step"
-                                      onClick={() =>
-                                        setStepFlyoutOpen((o) => !o)
-                                      }
-                                    >
-                                      {rotStep}°
-                                      <svg
-                                        width="10"
-                                        height="10"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      >
-                                        <path d="m6 9 6 6 6-6" />
-                                      </svg>
-                                    </button>
-                                    {stepFlyoutOpen && (
-                                      <>
-                                        {/* Invisible backdrop to close on outside click */}
-                                        <div
-                                          className="fixed inset-0 z-10"
-                                          onClick={() =>
-                                            setStepFlyoutOpen(false)
-                                          }
-                                        />
-                                        <div className="absolute bottom-full left-0 mb-1 bg-panel border border-border-ui rounded shadow-xl z-20 py-0.5 min-w-[4rem]">
-                                          {ROT_STEPS.map((s) => (
-                                            <button
-                                              key={s}
-                                              className={`block w-full text-left px-3 py-1 text-[10px] transition-colors ${
-                                                rotStep === s
-                                                  ? "text-content bg-secondary"
-                                                  : "text-content-muted hover:text-content hover:bg-secondary/50"
-                                              }`}
-                                              onClick={() => {
-                                                setRotStep(s);
-                                                setStepFlyoutOpen(false);
-                                              }}
-                                            >
-                                              {s}°
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  <span className="flex-1" />
-
-                                  {/* Centre-of-rotation marker toggle */}
-                                  <button
-                                    className={`p-1.5 transition-colors rounded hover:bg-secondary/40 ${
-                                      showCentreMarker
-                                        ? "text-accent hover:text-accent"
-                                        : "text-content-faint hover:text-content"
-                                    }`}
-                                    title={
-                                      showCentreMarker
-                                        ? "Hide centre marker"
-                                        : "Show centre marker"
-                                    }
-                                    onClick={toggleCentreMarker}
-                                  >
-                                    {/* Lucide crosshair icon */}
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <circle cx="12" cy="12" r="10" />
-                                      <line x1="22" y1="12" x2="18" y2="12" />
-                                      <line x1="6" y1="12" x2="2" y2="12" />
-                                      <line x1="12" y1="6" x2="12" y2="2" />
-                                      <line x1="12" y1="22" x2="12" y2="18" />
-                                    </svg>
-                                  </button>
-
-                                  {/* Magnet — cycles through angle presets */}
-                                  <button
-                                    className="p-1.5 text-content-muted hover:text-accent transition-colors rounded hover:bg-secondary/40"
-                                    title={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
-                                    onClick={() => {
-                                      const norm =
-                                        ((imp.rotation % 360) + 360) % 360;
-                                      const idx = ROT_PRESETS.findIndex(
-                                        (p) => Math.abs(p - norm) < 1,
-                                      );
-                                      const next =
-                                        ROT_PRESETS[
-                                          idx < 0
-                                            ? 0
-                                            : (idx + 1) % ROT_PRESETS.length
-                                        ];
-                                      updateImport(imp.id, { rotation: next });
-                                    }}
-                                  >
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3Z" />
-                                      <path d="m5 8 4 4" />
-                                      <path d="m12 15 4 4" />
-                                    </svg>
-                                  </button>
-                                </div>
-
+                                <TransformShortcuts
+                                  fitScale={Math.min(
+                                    bedW / (imp.svgWidth || 1),
+                                    bedH / (imp.svgHeight || 1),
+                                  )}
+                                  rotStep={rotStep}
+                                  rotSteps={ROT_STEPS}
+                                  stepFlyoutOpen={stepFlyoutOpen}
+                                  showCentreMarker={showCentreMarker}
+                                  snapPresetTitle={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
+                                  showScaleRow={false}
+                                  onFitToBed={() => {
+                                    const fitScale = Math.min(
+                                      bedW / (imp.svgWidth || 1),
+                                      bedH / (imp.svgHeight || 1),
+                                    );
+                                    setRatioLocked(true);
+                                    updateImport(imp.id, {
+                                      scale: fitScale,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                      x: 0,
+                                      y: 0,
+                                    });
+                                  }}
+                                  onResetScale={() => {
+                                    setRatioLocked(true);
+                                    updateImport(imp.id, {
+                                      scale: 1,
+                                      scaleX: undefined,
+                                      scaleY: undefined,
+                                    });
+                                  }}
+                                  onRotateCcw={() =>
+                                    updateImport(imp.id, {
+                                      rotation: imp.rotation - rotStep,
+                                    })
+                                  }
+                                  onRotateCw={() =>
+                                    updateImport(imp.id, {
+                                      rotation: imp.rotation + rotStep,
+                                    })
+                                  }
+                                  onToggleStepFlyout={() =>
+                                    setStepFlyoutOpen((o) => !o)
+                                  }
+                                  onCloseStepFlyout={() =>
+                                    setStepFlyoutOpen(false)
+                                  }
+                                  onSelectRotStep={(s) => {
+                                    setRotStep(s);
+                                    setStepFlyoutOpen(false);
+                                  }}
+                                  onToggleCentreMarker={toggleCentreMarker}
+                                  onSnapToNextPreset={() => {
+                                    const norm =
+                                      ((imp.rotation % 360) + 360) % 360;
+                                    const idx = ROT_PRESETS.findIndex(
+                                      (p) => Math.abs(p - norm) < 1,
+                                    );
+                                    const next =
+                                      ROT_PRESETS[
+                                        idx < 0
+                                          ? 0
+                                          : (idx + 1) % ROT_PRESETS.length
+                                      ];
+                                    updateImport(imp.id, { rotation: next });
+                                  }}
+                                />
                                 {/* ── Stroke width ──────────────────────────── */}
                                 <div className="mt-2 pt-2 border-t border-border-ui/30">
                                   <span className="text-[10px] text-content-muted uppercase tracking-wider block mb-1.5">

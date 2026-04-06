@@ -32,6 +32,12 @@ Break down oversized files into focused modules, functions, and React components
   - primary interaction callbacks
   - key conditional rendering paths
 
+## UI Icon Guideline
+
+- Prefer Lucide icon components over inline SVG paths wherever an equivalent icon exists.
+- Use named Lucide icons directly in JSX for clarity and consistency (e.g. `<RotateCcw />`, `<RotateCw />`, `<Crosshair />`, `<Magnet />`, `<ChevronDown />`).
+- Use inline SVG only when no suitable icon exists, or when a custom mark is required by product design.
+
 ## Prioritized Refactor Targets
 
 1. `src/renderer/src/components/PlotCanvas.tsx`
@@ -128,6 +134,7 @@ Checklist:
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint extracted)
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection extracted)
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection + AlignmentControls extracted)
+- [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint + HatchFillSection + AlignmentControls + TransformShortcuts extracted)
 - [x] Move formatting/estimation helpers to utilities.
 - [x] Move drag/drop and edit-name logic to hooks. (completed: useImportDragDrop + usePanelNameEditing)
 - [ ] Preserve current store API contracts.
