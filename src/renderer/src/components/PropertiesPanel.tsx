@@ -12,6 +12,7 @@ import { ToolpathSection } from "../features/properties-panel/components/Toolpat
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportsByGroupList } from "../features/properties-panel/components/ImportsByGroupList";
+import { useAddLayerGroup } from "../features/properties-panel/hooks/useAddLayerGroup";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import { type RotStep } from "../features/properties-panel/utils/rotation";
@@ -138,16 +139,10 @@ export function PropertiesPanel() {
     }
   };
 
-  const GROUP_COLORS = [
-    "#e94560",
-    "#0ea5e9",
-    "#22c55e",
-    "#f59e0b",
-    "#a855f7",
-    "#ec4899",
-    "#14b8a6",
-    "#f97316",
-  ];
+  const handleAddLayerGroup = useAddLayerGroup({
+    groupCount: layerGroups.length,
+    addLayerGroup,
+  });
 
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => {
@@ -184,13 +179,7 @@ export function PropertiesPanel() {
 
             <LayersHeader
               show={imports.length > 0}
-              onAddGroup={() => {
-                const n = layerGroups.length + 1;
-                addLayerGroup(
-                  `Group ${n}`,
-                  GROUP_COLORS[layerGroups.length % GROUP_COLORS.length],
-                );
-              }}
+              onAddGroup={handleAddLayerGroup}
             />
 
             {/* ── Layer groups (collapsible) + ungrouped imports ──────── */}
