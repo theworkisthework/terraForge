@@ -5,10 +5,10 @@ import type {
   PageTemplate,
   SvgImport,
 } from "../../../../../types";
+import { useImportRowRenderer } from "../hooks/useImportRowRenderer";
 import { resolvePageBounds } from "../utils/pageBounds";
 import type { RotStep } from "../utils/rotation";
 import { GroupedImportsSection } from "./GroupedImportsSection";
-import { ImportRowCard } from "./ImportRowCard";
 import { UngroupedImportsSection } from "./UngroupedImportsSection";
 
 interface NameEditState {
@@ -171,69 +171,50 @@ export function ImportsByGroupList({
     pageSizes,
   });
 
-  const renderImport = (imp: SvgImport, indented: boolean) => {
-    const isSelected = imp.id === selectedImportId;
-    const isExpanded = expandedIds.has(imp.id);
-    const groupId = importGroupId(imp.id);
-    const groupColor = layerGroups.find((g) => g.id === groupId)?.color ?? null;
-
-    return (
-      <ImportRowCard
-        key={imp.id}
-        imp={imp}
-        indented={indented}
-        isSelected={isSelected}
-        isExpanded={isExpanded}
-        isDragging={draggingImportId === imp.id}
-        groupColor={groupColor}
-        expandedLayerKeys={expandedLayerKeys}
-        isEditingName={editingName?.id === imp.id}
-        editingNameValue={
-          editingName?.id === imp.id ? editingName.value : imp.name
-        }
-        bedW={bedW}
-        bedH={bedH}
-        pageW={pageW}
-        pageH={pageH}
-        marginMM={marginMM}
-        canAlignToTemplate={canAlignToTemplate}
-        templateAlignEnabled={templateAlignEnabled}
-        templateAlignTarget={templateAlignTarget}
-        ratioLocked={ratioLocked}
-        rotStep={rotStep}
-        stepFlyoutOpen={stepFlyoutOpen}
-        showCentreMarker={showCentreMarker}
-        onSelectImport={onSelectImport}
-        onToggleExpand={onToggleExpand}
-        onToggleVisibility={(importId, visible) =>
-          onUpdateImport(importId, { visible })
-        }
-        onStartRename={onStartImportRename}
-        onEditingNameChange={onChangeImportRename}
-        onCommitName={onCommitImportRename}
-        onCancelName={onCancelImportRename}
-        onDeleteImport={onRemoveImport}
-        onDragStart={onImportDragStart}
-        onDragEnd={onImportDragEnd}
-        onToggleLayerCollapse={onToggleLayerCollapse}
-        onUpdateLayerVisibility={onUpdateImportLayer}
-        onUpdatePathVisibility={(importId, pathId, visible) =>
-          onUpdatePath(importId, pathId, { visible })
-        }
-        onRemovePath={onRemovePath}
-        onUpdate={(changes) => onUpdateImport(imp.id, changes)}
-        onTemplateAlignEnabledChange={onTemplateAlignEnabledChange}
-        onTemplateAlignTargetChange={onTemplateAlignTargetChange}
-        onRatioLockedChange={onRatioLockedChange}
-        onToggleStepFlyout={onToggleStepFlyout}
-        onCloseStepFlyout={onCloseStepFlyout}
-        onSelectRotStep={onSelectRotStep}
-        onToggleCentreMarker={onToggleCentreMarker}
-        onChangeStrokeWidth={(value) => onSyncStrokeWidth(imp.id, value)}
-        onApplyHatch={onApplyHatch}
-      />
-    );
-  };
+  const renderImport = useImportRowRenderer({
+    selectedImportId,
+    expandedIds,
+    expandedLayerKeys,
+    draggingImportId,
+    layerGroups,
+    editingName,
+    bedW,
+    bedH,
+    pageW,
+    pageH,
+    marginMM,
+    canAlignToTemplate,
+    templateAlignEnabled,
+    templateAlignTarget,
+    ratioLocked,
+    rotStep,
+    stepFlyoutOpen,
+    showCentreMarker,
+    importGroupId,
+    onSelectImport,
+    onToggleExpand,
+    onUpdateImport,
+    onStartImportRename,
+    onChangeImportRename,
+    onCommitImportRename,
+    onCancelImportRename,
+    onRemoveImport,
+    onImportDragStart,
+    onImportDragEnd,
+    onToggleLayerCollapse,
+    onUpdateImportLayer,
+    onUpdatePath,
+    onRemovePath,
+    onTemplateAlignEnabledChange,
+    onTemplateAlignTargetChange,
+    onRatioLockedChange,
+    onToggleStepFlyout,
+    onCloseStepFlyout,
+    onSelectRotStep,
+    onToggleCentreMarker,
+    onSyncStrokeWidth,
+    onApplyHatch,
+  });
 
   return (
     <>
