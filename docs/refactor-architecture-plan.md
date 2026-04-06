@@ -174,7 +174,7 @@ Split `src/renderer/src/store/canvasStore.ts` into slices:
 
 Checklist:
 
-- [ ] Define slice interfaces and shared store composition.
+- [x] Define slice interfaces and shared store composition. (completed: shared `canvasStore/types.ts` plus initial `pageTemplateSlice` and `toolpathSlice` composition)
 - [ ] Move heavy conversion and hatch logic to pure services/selectors.
 - [ ] Add compatibility layer to avoid breaking existing callers.
 - [ ] Migrate callers to selectors incrementally.
@@ -281,7 +281,7 @@ Current sprint focus:
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
-- [ ] Start `canvasStore.ts` slice extraction
+- [ ] Continue `canvasStore.ts` slice extraction
 
 Done this sprint:
 
@@ -299,6 +299,7 @@ Done this sprint:
 - [x] Extract `svgImportHelpers.ts` from `Toolbar.tsx` and cover all statements/branches
 - [x] Extract `useImportActions`, `useLayoutActions`, and `useJobActions` from `Toolbar.tsx`
 - [x] Reduce `Toolbar.tsx` to composition/bindings and re-validate unit, build, and E2E flows
+- [x] Start `canvasStore.ts` slice extraction with shared slice types plus `pageTemplateSlice` and `toolpathSlice`
 
 ## Progress Log
 
@@ -322,6 +323,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted Toolbar SVG import parsing helpers to `features/imports/services/svgImportHelpers.ts` and raised the helper test suite to 100% statements, branches, functions, and lines.
 - 2026-04-06: Extracted Toolbar orchestration into `features/imports/hooks/useImportActions.ts`, `features/layout/hooks/useLayoutActions.ts`, and `features/machine/hooks/useJobActions.ts`; `Toolbar.tsx` now acts primarily as composition and UI bindings.
 - 2026-04-06: Fixed post-extraction path regressions for shared types and worker resolution; validation passes with `npm.cmd run typecheck`, Toolbar unit tests (84/84), `npm.cmd run build`, `npm.cmd run test:e2e`, and the full unit suite.
+- 2026-04-06: Started `canvasStore.ts` modularization by defining shared slice interfaces in `store/canvasStore/types.ts` and extracting `pageTemplateSlice.ts` plus `toolpathSlice.ts`; validation passes with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
 
 ## Update Rule
 

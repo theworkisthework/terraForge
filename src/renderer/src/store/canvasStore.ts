@@ -6,14 +6,13 @@ import {
   type SvgPath,
   type VectorObject,
   type LayerGroup,
-  type PageSize,
-  type PageTemplate,
-  BUILT_IN_PAGE_SIZES,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
-import type { GcodeToolpath } from "../utils/gcodeParser";
 import { generateHatchPaths } from "../utils/hatchFill";
+import type { CanvasState } from "./canvasStore/types";
+import { createPageTemplateSlice } from "./canvasStore/slices/pageTemplateSlice";
+import { createToolpathSlice } from "./canvasStore/slices/toolpathSlice";
 
 // ─── Clipboard helpers ────────────────────────────────────────────────────────
 
@@ -33,133 +32,6 @@ export function generateCopyName(
   let n = 2;
   while (existingNames.includes(`${copyBase} (${n})`)) n++;
   return `${copyBase} (${n})`;
-}
-
-interface CanvasState {
-  imports: SvgImport[];
-  selectedImportId: string | null;
-  selectedPathId: string | null;
-  /** True when the user has "selected all" canvas imports (Ctrl+A). Cleared when
-   *  a single import is clicked, imports are cleared, or the toolpath is selected. */
-  allImportsSelected: boolean;
-  /** In-memory clipboard for cut/copy/paste of canvas imports. */
-  clipboardImport: SvgImport | null;
-  /** Undo stack — snapshots of the imports array before each discrete edit. Capped at 50. */
-  undoStack: SvgImport[][];
-  undo: () => void;
-  /** Redo stack — snapshots pushed by undo(). Cleared whenever a new edit is made. Capped at 50. */
-  redoStack: SvgImport[][];
-  redo: () => void;
-  gcodeToolpath: GcodeToolpath | null;
-  /** Persists the file info for the currently loaded G-code toolpath so it
-   *  can be restored into selectedJobFile when the user re-selects the toolpath
-   *  on the canvas.  source mirrors SelectedJobFile.source.
-   *  Automatically cleared when gcodeToolpath is set to null. */
-  gcodeSource: {
-    path: string;
-    name: string;
-    source: "local" | "fs" | "sd";
-  } | null;
-  showCentreMarker: boolean;
-  /** Live plot-progress overlay paths (machine-coord SVG path d strings).
-   *  Built incrementally by usePlotProgress as the machine reports its position.
-   *  Empty strings = nothing to show. */
-  plotProgressCuts: string;
-  plotProgressRapids: string;
-
-  addImport: (imp: SvgImport) => void;
-  removeImport: (id: string) => void;
-  updateImport: (id: string, patch: Partial<SvgImport>) => void;
-  updatePath: (
-    importId: string,
-    pathId: string,
-    patch: Partial<SvgPath>,
-  ) => void;
-  /** Toggle visibility of a single layer within an import. */
-  updateImportLayer: (
-    importId: string,
-    layerId: string,
-    visible: boolean,
-  ) => void;
-  removePath: (importId: string, pathId: string) => void;
-  /** Whether the G-code toolpath is currently selected on the canvas. */
-  toolpathSelected: boolean;
-  selectImport: (id: string | null) => void;
-  /** Select or deselect the G-code toolpath.  Deselects any SVG import. */
-  selectToolpath: (selected: boolean) => void;
-  clearImports: () => void;
-  /** Replace the entire imports list atomically — used by canvas layout load. */
-  loadLayout: (
-    imports: SvgImport[],
-    layerGroups?: LayerGroup[],
-    pageTemplate?: PageTemplate | null,
-  ) => void;
-  selectedImport: () => SvgImport | undefined;
-  setGcodeToolpath: (tp: GcodeToolpath | null) => void;
-  setGcodeSource: (
-    src: { path: string; name: string; source: "local" | "fs" | "sd" } | null,
-  ) => void;
-  toggleCentreMarker: () => void;
-  toVectorObjects: () => VectorObject[];
-  /** True while a G-code preview is being fetched/parsed before a job starts. */
-  gcodePreviewLoading: boolean;
-  setGcodePreviewLoading: (loading: boolean) => void;
-  /** Update the live plot-progress overlay paths. */
-  setPlotProgress: (cuts: string, rapids: string) => void;
-  /** Reset progress overlay (called when toolpath changes or job clears). */
-  clearPlotProgress: () => void;
-  /** Regenerate hatch lines for all filled paths in an import using the given settings. */
-  applyHatch: (
-    importId: string,
-    spacingMM: number,
-    angleDeg: number,
-    enabled: boolean,
-  ) => void;
-
-  // ─── Clipboard ──────────────────────────────────────────────────────────────
-  /** Copy the selected import to the in-memory clipboard without removing it. */
-  copyImport: (id: string) => void;
-  /** Copy to clipboard and remove the import from the canvas. */
-  cutImport: (id: string) => void;
-  /** Paste the clipboard import as a new copy with an offset position and generated name. */
-  pasteImport: () => void;
-  /** Select all canvas imports.  If already all-selected, cycles to the first single
-   *  import so repeated Ctrl+A is still useful. */
-  selectAllImports: () => void;
-  /** Snapshot the current imports before a gesture (drag/scale/rotate) begins.
-   *  Clears the redo stack — starting a new gesture invalidates redo history. */
-  snapshotForGesture: () => void;
-  /** Commit the gesture snapshot to the undo stack only if imports actually changed.
-   *  Discards the snapshot if nothing was modified (e.g. click without drag). */
-  commitGesture: () => void;
-
-  // ─── Page Template ────────────────────────────────────────────────────────
-  /** Active page template overlay shown on the canvas (null = none). */
-  pageTemplate: PageTemplate | null;
-  setPageTemplate: (t: PageTemplate | null) => void;
-  /** Available page sizes — loaded from IPC on startup; falls back to built-in defaults. */
-  pageSizes: PageSize[];
-  setPageSizes: (sizes: PageSize[]) => void;
-
-  // ─── Layer Groups ─────────────────────────────────────────────────────────
-  layerGroups: LayerGroup[];
-  addLayerGroup: (name: string, color: string) => void;
-  removeLayerGroup: (id: string) => void;
-  updateLayerGroup: (
-    id: string,
-    patch: Partial<Pick<LayerGroup, "name" | "color">>,
-  ) => void;
-  assignImportToGroup: (importId: string, groupId: string | null) => void;
-  /** Returns VectorObjects for only the imports belonging to the given group. */
-  toVectorObjectsForGroup: (groupId: string) => VectorObject[];
-  /** Returns VectorObjects for imports that are NOT assigned to any group. */
-  toVectorObjectsUngrouped: () => VectorObject[];
-  /** The id of the layer group currently "selected" (all members highlighted
-   *  and group OBB shown).  Null when no group is selected. */
-  selectedGroupId: string | null;
-  /** Select a layer group by id, clearing any single-import or all-import
-   *  selection.  Pass null to deselect the current group. */
-  selectGroup: (id: string | null) => void;
 }
 
 // ─── Gesture-undo stash ──────────────────────────────────────────────────────
@@ -189,6 +61,8 @@ export const useCanvasStore = create<CanvasState>()(
     };
 
     return {
+      ...createToolpathSlice(set, get),
+      ...createPageTemplateSlice(set, get),
       imports: [],
       undoStack: [],
       redoStack: [],
@@ -197,20 +71,8 @@ export const useCanvasStore = create<CanvasState>()(
       allImportsSelected: false,
       selectedGroupId: null,
       clipboardImport: null,
-      gcodeToolpath: null,
-      gcodeSource: null,
       toolpathSelected: false,
-      showCentreMarker: true,
-      plotProgressCuts: "",
-      plotProgressRapids: "",
-      gcodePreviewLoading: false,
-      pageTemplate: null,
-      pageSizes: BUILT_IN_PAGE_SIZES,
       layerGroups: [],
-      setGcodePreviewLoading: (loading) =>
-        set((state) => {
-          state.gcodePreviewLoading = loading;
-        }),
 
       addImport: (imp) => {
         pushUndo();
@@ -366,43 +228,10 @@ export const useCanvasStore = create<CanvasState>()(
           state.pageTemplate = newPageTemplate ?? null;
         });
       },
-
-      setPageTemplate: (t) =>
-        set((state) => {
-          state.pageTemplate = t;
-        }),
-
-      setPageSizes: (sizes) =>
-        set((state) => {
-          state.pageSizes = sizes;
-        }),
-
       selectedImport: () => {
         const { imports, selectedImportId } = get();
         return imports.find((i) => i.id === selectedImportId);
       },
-
-      setGcodeToolpath: (tp) =>
-        set((state) => {
-          state.gcodeToolpath = tp as GcodeToolpath;
-          // Auto-clear the stored local-file source when the toolpath is removed.
-          if (tp === null) {
-            state.gcodeSource = null;
-            state.toolpathSelected = false;
-            state.plotProgressCuts = "";
-            state.plotProgressRapids = "";
-          }
-        }),
-
-      setGcodeSource: (src) =>
-        set((state) => {
-          state.gcodeSource = src;
-        }),
-
-      toggleCentreMarker: () =>
-        set((state) => {
-          state.showCentreMarker = !state.showCentreMarker;
-        }),
 
       toVectorObjects: (): VectorObject[] =>
         get()
@@ -444,18 +273,6 @@ export const useCanvasStore = create<CanvasState>()(
                 return [...outlineVOs, ...hatchVOs];
               });
           }),
-
-      setPlotProgress: (cuts, rapids) =>
-        set((state) => {
-          state.plotProgressCuts = cuts;
-          state.plotProgressRapids = rapids;
-        }),
-
-      clearPlotProgress: () =>
-        set((state) => {
-          state.plotProgressCuts = "";
-          state.plotProgressRapids = "";
-        }),
 
       applyHatch: (importId, spacingMM, angleDeg, enabled) =>
         set((state) => {
