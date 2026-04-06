@@ -30,6 +30,7 @@ import { LayersHeader } from "../features/properties-panel/components/LayersHead
 import { NumberField } from "../features/properties-panel/components/NumberField";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
+import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -213,121 +214,45 @@ export function PropertiesPanel() {
                           : {}),
                       }}
                     >
-                      {/* Import header row */}
-                      <div
-                        className={`flex items-center gap-1 py-1.5 cursor-pointer hover:bg-secondary/20 ${indented ? "pl-5 pr-2" : "px-2"}`}
-                        onClick={() => selectImport(imp.id)}
-                      >
-                        {/* Drag handle */}
-                        <span
-                          className="text-content-faint hover:text-content-muted shrink-0 mr-0.5 select-none"
-                          style={{ cursor: "grab", fontSize: "10px" }}
-                          title="Drag to a group"
-                          draggable
-                          onDragStart={(e) => {
-                            setDraggingImportId(imp.id);
-                            e.dataTransfer.setData("text/plain", imp.id);
-                            e.dataTransfer.effectAllowed = "move";
-                          }}
-                          onDragEnd={() => {
-                            setDraggingImportId(null);
-                            setDragOverGroupId(null);
-                          }}
-                        >
-                          ⠿
-                        </span>
-                        {/* Expand toggle */}
-                        <button
-                          aria-expanded={isExpanded}
-                          aria-label={
-                            isExpanded ? "Collapse paths" : "Expand paths"
-                          }
-                          className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectImport(imp.id);
-                            toggleExpand(imp.id);
-                          }}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown size={10} />
-                          ) : (
-                            <ChevronRight size={10} />
-                          )}
-                        </button>
-
-                        {/* Visibility */}
-                        <span
-                          className="text-content-faint hover:text-content text-[10px] cursor-pointer shrink-0"
-                          title="Toggle visibility"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateImport(imp.id, { visible: !imp.visible });
-                          }}
-                        >
-                          {imp.visible ? (
-                            <Eye size={10} />
-                          ) : (
-                            <EyeOff size={10} />
-                          )}
-                        </span>
-
-                        {/* Editable name */}
-                        {editingName?.id === imp.id ? (
-                          <input
-                            autoFocus
-                            value={editingName.value}
-                            className="flex-1 min-w-0 bg-app border border-accent rounded px-1 text-[10px] outline-none"
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              setEditingName({
-                                id: imp.id,
-                                value: e.target.value,
-                              })
-                            }
-                            onBlur={() => {
-                              updateImport(imp.id, {
-                                name: editingName!.value,
-                              });
-                              setEditingName(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                updateImport(imp.id, {
-                                  name: editingName!.value,
-                                });
-                                setEditingName(null);
-                              }
-                              if (e.key === "Escape") setEditingName(null);
-                            }}
-                          />
-                        ) : (
-                          <span
-                            className="flex-1 min-w-0 text-[10px] truncate text-content"
-                            title="Double-click to rename"
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              setEditingName({ id: imp.id, value: imp.name });
-                            }}
-                          >
-                            {imp.name}
-                          </span>
-                        )}
-
-                        <span className="text-[9px] text-content-faint shrink-0 ml-1">
-                          {imp.paths.length}p
-                        </span>
-                        <button
-                          className="ml-1 text-content-faint hover:text-accent shrink-0"
-                          title="Delete import"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeImport(imp.id);
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      <ImportHeaderRow
+                        imp={imp}
+                        indented={indented}
+                        isExpanded={isExpanded}
+                        isEditingName={editingName?.id === imp.id}
+                        editingNameValue={
+                          editingName?.id === imp.id
+                            ? editingName.value
+                            : imp.name
+                        }
+                        onSelectImport={selectImport}
+                        onToggleExpand={toggleExpand}
+                        onToggleVisibility={(importId, visible) =>
+                          updateImport(importId, { visible })
+                        }
+                        onStartRename={(importId, currentName) =>
+                          setEditingName({ id: importId, value: currentName })
+                        }
+                        onEditingNameChange={(nextValue) =>
+                          setEditingName((prev) =>
+                            prev ? { ...prev, value: nextValue } : prev,
+                          )
+                        }
+                        onCommitName={(importId, nextName) => {
+                          updateImport(importId, { name: nextName });
+                          setEditingName(null);
+                        }}
+                        onCancelName={() => setEditingName(null)}
+                        onDeleteImport={removeImport}
+                        onDragStart={(e, importId) => {
+                          setDraggingImportId(importId);
+                          e.dataTransfer.setData("text/plain", importId);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDraggingImportId(null);
+                          setDragOverGroupId(null);
+                        }}
+                      />
 
                       {/* Expanded path / layer list */}
                       {isExpanded && (
