@@ -6,8 +6,7 @@ import type {
   SvgImport,
 } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
-import { EmptyGroupDropHint } from "./EmptyGroupDropHint";
-import { GroupHeaderRow } from "./GroupHeaderRow";
+import { GroupedImportsSection } from "./GroupedImportsSection";
 import { ImportRowCard } from "./ImportRowCard";
 import { UngroupedDropZone } from "./UngroupedDropZone";
 
@@ -249,57 +248,26 @@ export function ImportsByGroupList({
 
   return (
     <>
-      {layerGroups.map((group) => {
-        const members = group.importIds
-          .map((id) => imports.find((i) => i.id === id))
-          .filter(Boolean) as SvgImport[];
-        const isCollapsed = collapsedGroupIds.has(group.id);
-        const isDropTarget = dragOverGroupId === group.id;
-
-        return (
-          <div key={group.id} className="border-b border-border-ui/40">
-            <GroupHeaderRow
-              group={group}
-              isCollapsed={isCollapsed}
-              isDropTarget={isDropTarget}
-              isSelected={selectedGroupId === group.id}
-              membersCount={members.length}
-              isEditingName={editingGroupName?.id === group.id}
-              editingNameValue={
-                editingGroupName?.id === group.id
-                  ? editingGroupName.value
-                  : group.name
-              }
-              onToggleSelect={(groupId) =>
-                onSelectGroup(selectedGroupId === groupId ? null : groupId)
-              }
-              onDragOverGroup={onGroupDragOver}
-              onDragLeaveGroup={onGroupDragLeave}
-              onDropGroup={onGroupDrop}
-              onToggleCollapse={onToggleGroupCollapse}
-              onUpdateGroupColor={(groupId, color) =>
-                onUpdateLayerGroup(groupId, { color })
-              }
-              onStartEditName={onStartGroupRename}
-              onEditingNameChange={onChangeGroupRename}
-              onCommitName={(groupId, nextValue) =>
-                onCommitGroupRename(groupId, nextValue, group.name)
-              }
-              onCancelEditName={onCancelGroupRename}
-              onRemoveGroup={onRemoveLayerGroup}
-            />
-
-            {!isCollapsed && (
-              <div>
-                {members.map((imp) => renderImport(imp, true))}
-                {members.length === 0 && (
-                  <EmptyGroupDropHint isDropTarget={isDropTarget} />
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <GroupedImportsSection
+        layerGroups={layerGroups}
+        imports={imports}
+        collapsedGroupIds={collapsedGroupIds}
+        dragOverGroupId={dragOverGroupId}
+        selectedGroupId={selectedGroupId}
+        editingGroupName={editingGroupName}
+        onSelectGroup={onSelectGroup}
+        onGroupDragOver={onGroupDragOver}
+        onGroupDragLeave={onGroupDragLeave}
+        onGroupDrop={onGroupDrop}
+        onToggleGroupCollapse={onToggleGroupCollapse}
+        onUpdateLayerGroup={onUpdateLayerGroup}
+        onStartGroupRename={onStartGroupRename}
+        onChangeGroupRename={onChangeGroupRename}
+        onCommitGroupRename={onCommitGroupRename}
+        onCancelGroupRename={onCancelGroupRename}
+        onRemoveLayerGroup={onRemoveLayerGroup}
+        renderImport={renderImport}
+      />
 
       <UngroupedDropZone
         isDropTarget={dragOverGroupId === "none"}
