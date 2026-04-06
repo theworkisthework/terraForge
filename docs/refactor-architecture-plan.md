@@ -157,8 +157,8 @@ Extract from `src/renderer/src/components/Toolbar.tsx`:
 Checklist:
 
 - [x] Move SVG import helpers to `features/imports/services/`. (completed: `svgImportHelpers.ts`)
-- [ ] Move command orchestration to hooks.
-- [ ] Keep `Toolbar.tsx` focused on composition and bindings.
+- [x] Move command orchestration to hooks. (completed: `useImportActions`, `useLayoutActions`, `useJobActions`)
+- [x] Keep `Toolbar.tsx` focused on composition and bindings. (validated 2026-04-06 via `npm.cmd run typecheck`, Toolbar unit tests, `npm.cmd run build`, and `npm.cmd run test:e2e`)
 
 ### 4) canvasStore Modularization
 
@@ -281,7 +281,6 @@ Current sprint focus:
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
-- [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
 
 Done this sprint:
@@ -297,6 +296,9 @@ Done this sprint:
 - [x] Add focused tests for extracted `gcode-options` and `properties-panel` components
 - [x] Extract PropertiesPanel `PathRow` component with co-located tests
 - [x] Extract PropertiesPanel `LayerRow` component with co-located tests
+- [x] Extract `svgImportHelpers.ts` from `Toolbar.tsx` and cover all statements/branches
+- [x] Extract `useImportActions`, `useLayoutActions`, and `useJobActions` from `Toolbar.tsx`
+- [x] Reduce `Toolbar.tsx` to composition/bindings and re-validate unit, build, and E2E flows
 
 ## Progress Log
 
@@ -317,6 +319,9 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Split co-located aggregate extracted tests into per-component files for discoverability (`PathsSection.test.tsx`, `OptionsSection.test.tsx`, `OutputSection.test.tsx`, `CustomGcodeSection.test.tsx`, `ToolpathSection.test.tsx`, `LayersHeader.test.tsx`, `NumberField.test.tsx`, `EmptyState.test.tsx`).
 - 2026-04-06: Extracted reusable path item UI into `features/properties-panel/components/PathRow.tsx` and replaced repeated path-row blocks in `PropertiesPanel`; `PathRow.test.tsx` and `PropertiesPanel.test.tsx` pass (76/76 total in run).
 - 2026-04-06: Extracted reusable layer header row UI into `features/properties-panel/components/LayerRow.tsx` and replaced inline layer-row block in `PropertiesPanel`; `LayerRow.test.tsx` and `PropertiesPanel.test.tsx` pass (76/76 total in run).
+- 2026-04-06: Extracted Toolbar SVG import parsing helpers to `features/imports/services/svgImportHelpers.ts` and raised the helper test suite to 100% statements, branches, functions, and lines.
+- 2026-04-06: Extracted Toolbar orchestration into `features/imports/hooks/useImportActions.ts`, `features/layout/hooks/useLayoutActions.ts`, and `features/machine/hooks/useJobActions.ts`; `Toolbar.tsx` now acts primarily as composition and UI bindings.
+- 2026-04-06: Fixed post-extraction path regressions for shared types and worker resolution; validation passes with `npm.cmd run typecheck`, Toolbar unit tests (84/84), `npm.cmd run build`, `npm.cmd run test:e2e`, and the full unit suite.
 
 ## Update Rule
 
