@@ -1,0 +1,315 @@
+import type { DragEvent } from "react";
+import type {
+  LayerGroup,
+  PageSize,
+  PageTemplate,
+  SvgImport,
+} from "../../../../../types";
+import type { RotStep } from "../utils/rotation";
+import { EmptyGroupDropHint } from "./EmptyGroupDropHint";
+import { GroupHeaderRow } from "./GroupHeaderRow";
+import { ImportRowCard } from "./ImportRowCard";
+import { UngroupedDropZone } from "./UngroupedDropZone";
+
+interface NameEditState {
+  id: string;
+  value: string;
+}
+
+interface ImportsByGroupListProps {
+  imports: SvgImport[];
+  layerGroups: LayerGroup[];
+  selectedImportId: string | null;
+  selectedGroupId: string | null;
+  expandedIds: Set<string>;
+  collapsedGroupIds: Set<string>;
+  expandedLayerKeys: Set<string>;
+  draggingImportId: string | null;
+  dragOverGroupId: string | null;
+  showUngroupedHint: boolean;
+  bedW: number;
+  bedH: number;
+  pageTemplate: PageTemplate | null;
+  pageSizes: PageSize[];
+  templateAlignEnabled: boolean;
+  templateAlignTarget: "page" | "margin";
+  ratioLocked: boolean;
+  rotStep: RotStep;
+  stepFlyoutOpen: boolean;
+  showCentreMarker: boolean;
+  editingName: NameEditState | null;
+  editingGroupName: NameEditState | null;
+  importGroupId: (importId: string) => string | null;
+  onSelectImport: (importId: string | null) => void;
+  onSelectGroup: (groupId: string | null) => void;
+  onToggleExpand: (importId: string) => void;
+  onToggleGroupCollapse: (groupId: string) => void;
+  onToggleLayerCollapse: (importId: string, layerId: string) => void;
+  onUpdateImport: (importId: string, changes: Partial<SvgImport>) => void;
+  onUpdateImportLayer: (
+    importId: string,
+    layerId: string,
+    visible: boolean,
+  ) => void;
+  onUpdatePath: (
+    importId: string,
+    pathId: string,
+    changes: { visible?: boolean },
+  ) => void;
+  onUpdateLayerGroup: (
+    groupId: string,
+    changes: Partial<{ name: string; color: string }>,
+  ) => void;
+  onRemoveImport: (importId: string) => void;
+  onRemovePath: (importId: string, pathId: string) => void;
+  onRemoveLayerGroup: (groupId: string) => void;
+  onApplyHatch: (
+    importId: string,
+    spacingMM: number,
+    angleDeg: number,
+    enabled: boolean,
+  ) => void;
+  onSyncStrokeWidth: (importId: string, widthMM: number) => void;
+  onToggleCentreMarker: () => void;
+  onTemplateAlignEnabledChange: (v: boolean) => void;
+  onTemplateAlignTargetChange: (v: "page" | "margin") => void;
+  onRatioLockedChange: (v: boolean) => void;
+  onToggleStepFlyout: () => void;
+  onCloseStepFlyout: () => void;
+  onSelectRotStep: (s: RotStep) => void;
+  onImportDragStart: (
+    event: DragEvent<HTMLSpanElement>,
+    importId: string,
+  ) => void;
+  onImportDragEnd: () => void;
+  onGroupDragOver: (event: DragEvent<HTMLDivElement>, groupId: string) => void;
+  onGroupDragLeave: (event: DragEvent<HTMLDivElement>) => void;
+  onGroupDrop: (event: DragEvent<HTMLDivElement>, groupId: string) => void;
+  onUngroupedDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onUngroupedDragLeave: (event: DragEvent<HTMLDivElement>) => void;
+  onUngroupedDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onStartImportRename: (importId: string, currentName: string) => void;
+  onChangeImportRename: (nextValue: string) => void;
+  onCommitImportRename: (importId: string, nextName: string) => void;
+  onCancelImportRename: () => void;
+  onStartGroupRename: (groupId: string, currentName: string) => void;
+  onChangeGroupRename: (nextValue: string) => void;
+  onCommitGroupRename: (
+    groupId: string,
+    nextName: string,
+    fallbackName: string,
+  ) => void;
+  onCancelGroupRename: () => void;
+}
+
+export function ImportsByGroupList({
+  imports,
+  layerGroups,
+  selectedImportId,
+  selectedGroupId,
+  expandedIds,
+  collapsedGroupIds,
+  expandedLayerKeys,
+  draggingImportId,
+  dragOverGroupId,
+  showUngroupedHint,
+  bedW,
+  bedH,
+  pageTemplate,
+  pageSizes,
+  templateAlignEnabled,
+  templateAlignTarget,
+  ratioLocked,
+  rotStep,
+  stepFlyoutOpen,
+  showCentreMarker,
+  editingName,
+  editingGroupName,
+  importGroupId,
+  onSelectImport,
+  onSelectGroup,
+  onToggleExpand,
+  onToggleGroupCollapse,
+  onToggleLayerCollapse,
+  onUpdateImport,
+  onUpdateImportLayer,
+  onUpdatePath,
+  onUpdateLayerGroup,
+  onRemoveImport,
+  onRemovePath,
+  onRemoveLayerGroup,
+  onApplyHatch,
+  onSyncStrokeWidth,
+  onToggleCentreMarker,
+  onTemplateAlignEnabledChange,
+  onTemplateAlignTargetChange,
+  onRatioLockedChange,
+  onToggleStepFlyout,
+  onCloseStepFlyout,
+  onSelectRotStep,
+  onImportDragStart,
+  onImportDragEnd,
+  onGroupDragOver,
+  onGroupDragLeave,
+  onGroupDrop,
+  onUngroupedDragOver,
+  onUngroupedDragLeave,
+  onUngroupedDrop,
+  onStartImportRename,
+  onChangeImportRename,
+  onCommitImportRename,
+  onCancelImportRename,
+  onStartGroupRename,
+  onChangeGroupRename,
+  onCommitGroupRename,
+  onCancelGroupRename,
+}: ImportsByGroupListProps) {
+  const activePageSize = pageTemplate
+    ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+    : null;
+  const canAlignToTemplate = !!pageTemplate && !!activePageSize;
+  const pageW = activePageSize
+    ? pageTemplate!.landscape
+      ? activePageSize.heightMM
+      : activePageSize.widthMM
+    : bedW;
+  const pageH = activePageSize
+    ? pageTemplate!.landscape
+      ? activePageSize.widthMM
+      : activePageSize.heightMM
+    : bedH;
+
+  const renderImport = (imp: SvgImport, indented: boolean) => {
+    const isSelected = imp.id === selectedImportId;
+    const isExpanded = expandedIds.has(imp.id);
+    const groupId = importGroupId(imp.id);
+    const groupColor = layerGroups.find((g) => g.id === groupId)?.color ?? null;
+
+    return (
+      <ImportRowCard
+        key={imp.id}
+        imp={imp}
+        indented={indented}
+        isSelected={isSelected}
+        isExpanded={isExpanded}
+        isDragging={draggingImportId === imp.id}
+        groupColor={groupColor}
+        expandedLayerKeys={expandedLayerKeys}
+        isEditingName={editingName?.id === imp.id}
+        editingNameValue={
+          editingName?.id === imp.id ? editingName.value : imp.name
+        }
+        bedW={bedW}
+        bedH={bedH}
+        pageW={pageW}
+        pageH={pageH}
+        marginMM={pageTemplate?.marginMM ?? 20}
+        canAlignToTemplate={canAlignToTemplate}
+        templateAlignEnabled={templateAlignEnabled}
+        templateAlignTarget={templateAlignTarget}
+        ratioLocked={ratioLocked}
+        rotStep={rotStep}
+        stepFlyoutOpen={stepFlyoutOpen}
+        showCentreMarker={showCentreMarker}
+        onSelectImport={onSelectImport}
+        onToggleExpand={onToggleExpand}
+        onToggleVisibility={(importId, visible) =>
+          onUpdateImport(importId, { visible })
+        }
+        onStartRename={onStartImportRename}
+        onEditingNameChange={onChangeImportRename}
+        onCommitName={onCommitImportRename}
+        onCancelName={onCancelImportRename}
+        onDeleteImport={onRemoveImport}
+        onDragStart={onImportDragStart}
+        onDragEnd={onImportDragEnd}
+        onToggleLayerCollapse={onToggleLayerCollapse}
+        onUpdateLayerVisibility={onUpdateImportLayer}
+        onUpdatePathVisibility={(importId, pathId, visible) =>
+          onUpdatePath(importId, pathId, { visible })
+        }
+        onRemovePath={onRemovePath}
+        onUpdate={(changes) => onUpdateImport(imp.id, changes)}
+        onTemplateAlignEnabledChange={onTemplateAlignEnabledChange}
+        onTemplateAlignTargetChange={onTemplateAlignTargetChange}
+        onRatioLockedChange={onRatioLockedChange}
+        onToggleStepFlyout={onToggleStepFlyout}
+        onCloseStepFlyout={onCloseStepFlyout}
+        onSelectRotStep={onSelectRotStep}
+        onToggleCentreMarker={onToggleCentreMarker}
+        onChangeStrokeWidth={(value) => onSyncStrokeWidth(imp.id, value)}
+        onApplyHatch={onApplyHatch}
+      />
+    );
+  };
+
+  const ungroupedImports = imports.filter(
+    (i) => !layerGroups.some((g) => g.importIds.includes(i.id)),
+  );
+
+  return (
+    <>
+      {layerGroups.map((group) => {
+        const members = group.importIds
+          .map((id) => imports.find((i) => i.id === id))
+          .filter(Boolean) as SvgImport[];
+        const isCollapsed = collapsedGroupIds.has(group.id);
+        const isDropTarget = dragOverGroupId === group.id;
+
+        return (
+          <div key={group.id} className="border-b border-border-ui/40">
+            <GroupHeaderRow
+              group={group}
+              isCollapsed={isCollapsed}
+              isDropTarget={isDropTarget}
+              isSelected={selectedGroupId === group.id}
+              membersCount={members.length}
+              isEditingName={editingGroupName?.id === group.id}
+              editingNameValue={
+                editingGroupName?.id === group.id
+                  ? editingGroupName.value
+                  : group.name
+              }
+              onToggleSelect={(groupId) =>
+                onSelectGroup(selectedGroupId === groupId ? null : groupId)
+              }
+              onDragOverGroup={onGroupDragOver}
+              onDragLeaveGroup={onGroupDragLeave}
+              onDropGroup={onGroupDrop}
+              onToggleCollapse={onToggleGroupCollapse}
+              onUpdateGroupColor={(groupId, color) =>
+                onUpdateLayerGroup(groupId, { color })
+              }
+              onStartEditName={onStartGroupRename}
+              onEditingNameChange={onChangeGroupRename}
+              onCommitName={(groupId, nextValue) =>
+                onCommitGroupRename(groupId, nextValue, group.name)
+              }
+              onCancelEditName={onCancelGroupRename}
+              onRemoveGroup={onRemoveLayerGroup}
+            />
+
+            {!isCollapsed && (
+              <div>
+                {members.map((imp) => renderImport(imp, true))}
+                {members.length === 0 && (
+                  <EmptyGroupDropHint isDropTarget={isDropTarget} />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <UngroupedDropZone
+        isDropTarget={dragOverGroupId === "none"}
+        showHint={showUngroupedHint}
+        onDragOver={onUngroupedDragOver}
+        onDragLeave={onUngroupedDragLeave}
+        onDrop={onUngroupedDrop}
+      >
+        {ungroupedImports.map((imp) => renderImport(imp, false))}
+      </UngroupedDropZone>
+    </>
+  );
+}

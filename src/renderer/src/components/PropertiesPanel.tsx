@@ -11,10 +11,7 @@ import { useMachineStore } from "../store/machineStore";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
-import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
-import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
-import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
-import { ImportRowCard } from "../features/properties-panel/components/ImportRowCard";
+import { ImportsByGroupList } from "../features/properties-panel/components/ImportsByGroupList";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import { type RotStep } from "../features/properties-panel/utils/rotation";
@@ -49,7 +46,10 @@ export function PropertiesPanel() {
   const pageSizes = useCanvasStore((s) => s.pageSizes);
   const isJobActive =
     machineStatus?.state === "Run" || machineStatus?.state === "Hold";
-  const fallbackFeedrate = activeConfig()?.feedrate ?? 300;
+  const cfg = activeConfig();
+  const fallbackFeedrate = cfg?.feedrate ?? 300;
+  const bedW = cfg?.bedWidth ?? 220;
+  const bedH = cfg?.bedHeight ?? 200;
   const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -194,185 +194,73 @@ export function PropertiesPanel() {
             />
 
             {/* ── Layer groups (collapsible) + ungrouped imports ──────── */}
-            {imports.length > 0 &&
-              (() => {
-                const ungroupedImports = imports.filter(
-                  (i) => !layerGroups.some((g) => g.importIds.includes(i.id)),
-                );
-
-                /** Renders a single import row (used both in groups and ungrouped). */
-                const renderImport = (
-                  imp: (typeof imports)[0],
-                  indented: boolean,
-                ) => {
-                  const isSelected = imp.id === selectedImportId;
-                  const isExpanded = expandedIds.has(imp.id);
-                  const groupId = importGroupId(imp.id);
-                  const groupColor =
-                    layerGroups.find((g) => g.id === groupId)?.color ?? null;
-
-                  const cfg = activeConfig();
-                  const bedW = cfg?.bedWidth ?? 220;
-                  const bedH = cfg?.bedHeight ?? 200;
-                  const activePageSize = pageTemplate
-                    ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
-                    : null;
-                  const canAlignToTemplate = !!pageTemplate && !!activePageSize;
-                  const pageW = activePageSize
-                    ? pageTemplate!.landscape
-                      ? activePageSize.heightMM
-                      : activePageSize.widthMM
-                    : bedW;
-                  const pageH = activePageSize
-                    ? pageTemplate!.landscape
-                      ? activePageSize.widthMM
-                      : activePageSize.heightMM
-                    : bedH;
-
-                  return (
-                    <ImportRowCard
-                      key={imp.id}
-                      imp={imp}
-                      indented={indented}
-                      isSelected={isSelected}
-                      isExpanded={isExpanded}
-                      isDragging={draggingImportId === imp.id}
-                      groupColor={groupColor}
-                      expandedLayerKeys={expandedLayerKeys}
-                      isEditingName={editingName?.id === imp.id}
-                      editingNameValue={
-                        editingName?.id === imp.id
-                          ? editingName.value
-                          : imp.name
-                      }
-                      bedW={bedW}
-                      bedH={bedH}
-                      pageW={pageW}
-                      pageH={pageH}
-                      marginMM={pageTemplate?.marginMM ?? 20}
-                      canAlignToTemplate={canAlignToTemplate}
-                      templateAlignEnabled={templateAlignEnabled}
-                      templateAlignTarget={templateAlignTarget}
-                      ratioLocked={ratioLocked}
-                      rotStep={rotStep}
-                      stepFlyoutOpen={stepFlyoutOpen}
-                      showCentreMarker={showCentreMarker}
-                      onSelectImport={selectImport}
-                      onToggleExpand={toggleExpand}
-                      onToggleVisibility={(importId, visible) =>
-                        updateImport(importId, { visible })
-                      }
-                      onStartRename={startImportRename}
-                      onEditingNameChange={changeImportRename}
-                      onCommitName={commitImportRename}
-                      onCancelName={cancelImportRename}
-                      onDeleteImport={removeImport}
-                      onDragStart={handleImportDragStart}
-                      onDragEnd={handleImportDragEnd}
-                      onToggleLayerCollapse={toggleLayerCollapse}
-                      onUpdateLayerVisibility={(importId, layerId, visible) =>
-                        updateImportLayer(importId, layerId, visible)
-                      }
-                      onUpdatePathVisibility={(importId, pathId, visible) =>
-                        updatePath(importId, pathId, { visible })
-                      }
-                      onRemovePath={removePath}
-                      onUpdate={(changes) => updateImport(imp.id, changes)}
-                      onTemplateAlignEnabledChange={setTemplateAlignEnabled}
-                      onTemplateAlignTargetChange={setTemplateAlignTarget}
-                      onRatioLockedChange={setRatioLocked}
-                      onToggleStepFlyout={() => setStepFlyoutOpen((o) => !o)}
-                      onCloseStepFlyout={() => setStepFlyoutOpen(false)}
-                      onSelectRotStep={(s) => {
-                        setRotStep(s);
-                        setStepFlyoutOpen(false);
-                      }}
-                      onToggleCentreMarker={toggleCentreMarker}
-                      onChangeStrokeWidth={(value) =>
-                        syncStrokeWidth(imp.id, value)
-                      }
-                      onApplyHatch={applyHatch}
-                    />
-                  );
-                }; // end renderImport
-
-                return (
-                  <>
-                    {/* Grouped imports — one collapsible section per group */}
-                    {layerGroups.map((group) => {
-                      const members = group.importIds
-                        .map((id) => imports.find((i) => i.id === id))
-                        .filter(Boolean) as (typeof imports)[0][];
-                      const isCollapsed = collapsedGroupIds.has(group.id);
-                      const isDropTarget = dragOverGroupId === group.id;
-
-                      return (
-                        <div
-                          key={group.id}
-                          className="border-b border-border-ui/40"
-                        >
-                          <GroupHeaderRow
-                            group={group}
-                            isCollapsed={isCollapsed}
-                            isDropTarget={isDropTarget}
-                            isSelected={selectedGroupId === group.id}
-                            membersCount={members.length}
-                            isEditingName={editingGroupName?.id === group.id}
-                            editingNameValue={
-                              editingGroupName?.id === group.id
-                                ? editingGroupName.value
-                                : group.name
-                            }
-                            onToggleSelect={(groupId) =>
-                              selectGroup(
-                                selectedGroupId === groupId ? null : groupId,
-                              )
-                            }
-                            onDragOverGroup={handleGroupDragOver}
-                            onDragLeaveGroup={handleGroupDragLeave}
-                            onDropGroup={handleGroupDrop}
-                            onToggleCollapse={toggleGroupCollapse}
-                            onUpdateGroupColor={(groupId, color) =>
-                              updateLayerGroup(groupId, { color })
-                            }
-                            onStartEditName={startGroupRename}
-                            onEditingNameChange={changeGroupRename}
-                            onCommitName={(groupId, nextValue) =>
-                              commitGroupRename(groupId, nextValue, group.name)
-                            }
-                            onCancelEditName={cancelGroupRename}
-                            onRemoveGroup={removeLayerGroup}
-                          />
-
-                          {/* Members (indented), hidden when collapsed */}
-                          {!isCollapsed && (
-                            <div>
-                              {members.map((imp) => renderImport(imp, true))}
-                              {/* Drop hint when group is empty */}
-                              {members.length === 0 && (
-                                <EmptyGroupDropHint
-                                  isDropTarget={isDropTarget}
-                                />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Ungrouped imports + ungroup drop zone */}
-                    <UngroupedDropZone
-                      isDropTarget={dragOverGroupId === "none"}
-                      showHint={showUngroupedHint}
-                      onDragOver={handleUngroupedDragOver}
-                      onDragLeave={handleUngroupedDragLeave}
-                      onDrop={handleUngroupedDrop}
-                    >
-                      {ungroupedImports.map((imp) => renderImport(imp, false))}
-                    </UngroupedDropZone>
-                  </>
-                );
-              })()}
+            {imports.length > 0 && (
+              <ImportsByGroupList
+                imports={imports}
+                layerGroups={layerGroups}
+                selectedImportId={selectedImportId}
+                selectedGroupId={selectedGroupId}
+                expandedIds={expandedIds}
+                collapsedGroupIds={collapsedGroupIds}
+                expandedLayerKeys={expandedLayerKeys}
+                draggingImportId={draggingImportId}
+                dragOverGroupId={dragOverGroupId}
+                showUngroupedHint={showUngroupedHint}
+                bedW={bedW}
+                bedH={bedH}
+                pageTemplate={pageTemplate}
+                pageSizes={pageSizes}
+                templateAlignEnabled={templateAlignEnabled}
+                templateAlignTarget={templateAlignTarget}
+                ratioLocked={ratioLocked}
+                rotStep={rotStep}
+                stepFlyoutOpen={stepFlyoutOpen}
+                showCentreMarker={showCentreMarker}
+                editingName={editingName}
+                editingGroupName={editingGroupName}
+                importGroupId={importGroupId}
+                onSelectImport={selectImport}
+                onSelectGroup={selectGroup}
+                onToggleExpand={toggleExpand}
+                onToggleGroupCollapse={toggleGroupCollapse}
+                onToggleLayerCollapse={toggleLayerCollapse}
+                onUpdateImport={updateImport}
+                onUpdateImportLayer={updateImportLayer}
+                onUpdatePath={updatePath}
+                onUpdateLayerGroup={updateLayerGroup}
+                onRemoveImport={removeImport}
+                onRemovePath={removePath}
+                onRemoveLayerGroup={removeLayerGroup}
+                onApplyHatch={applyHatch}
+                onSyncStrokeWidth={syncStrokeWidth}
+                onToggleCentreMarker={toggleCentreMarker}
+                onTemplateAlignEnabledChange={setTemplateAlignEnabled}
+                onTemplateAlignTargetChange={setTemplateAlignTarget}
+                onRatioLockedChange={setRatioLocked}
+                onToggleStepFlyout={() => setStepFlyoutOpen((o) => !o)}
+                onCloseStepFlyout={() => setStepFlyoutOpen(false)}
+                onSelectRotStep={(s) => {
+                  setRotStep(s);
+                  setStepFlyoutOpen(false);
+                }}
+                onImportDragStart={handleImportDragStart}
+                onImportDragEnd={handleImportDragEnd}
+                onGroupDragOver={handleGroupDragOver}
+                onGroupDragLeave={handleGroupDragLeave}
+                onGroupDrop={handleGroupDrop}
+                onUngroupedDragOver={handleUngroupedDragOver}
+                onUngroupedDragLeave={handleUngroupedDragLeave}
+                onUngroupedDrop={handleUngroupedDrop}
+                onStartImportRename={startImportRename}
+                onChangeImportRename={changeImportRename}
+                onCommitImportRename={commitImportRename}
+                onCancelImportRename={cancelImportRename}
+                onStartGroupRename={startGroupRename}
+                onChangeGroupRename={changeGroupRename}
+                onCommitGroupRename={commitGroupRename}
+                onCancelGroupRename={cancelGroupRename}
+              />
+            )}
           </>
         )}
       </div>
