@@ -127,7 +127,7 @@ Checklist:
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone extracted)
 - [ ] Create section components and move JSX blocks. (in progress: Toolpath + Layers header + NumberField + PathRow + LayerRow + ImportPathsList + ImportHeaderRow + GroupHeaderRow + UngroupedDropZone + EmptyGroupDropHint extracted)
 - [x] Move formatting/estimation helpers to utilities.
-- [ ] Move drag/drop and edit-name logic to hooks.
+- [ ] Move drag/drop and edit-name logic to hooks. (in progress: import/group drag-drop moved to useImportDragDrop)
 - [ ] Preserve current store API contracts.
 
 ### 3) Toolbar Decomposition

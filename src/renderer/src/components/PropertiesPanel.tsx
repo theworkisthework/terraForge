@@ -30,6 +30,7 @@ import { ImportHeaderRow } from "../features/properties-panel/components/ImportH
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
+import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -77,8 +78,6 @@ export function PropertiesPanel() {
     id: string;
     value: string;
   } | null>(null);
-  const [draggingImportId, setDraggingImportId] = useState<string | null>(null);
-  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     new Set(),
   );
@@ -112,6 +111,24 @@ export function PropertiesPanel() {
   /** Returns the group id that the given import belongs to, or null. */
   const importGroupId = (importId: string): string | null =>
     layerGroups.find((g) => g.importIds.includes(importId))?.id ?? null;
+
+  const {
+    draggingImportId,
+    dragOverGroupId,
+    showUngroupedHint,
+    handleImportDragStart,
+    handleImportDragEnd,
+    handleGroupDragOver,
+    handleGroupDragLeave,
+    handleGroupDrop,
+    handleUngroupedDragOver,
+    handleUngroupedDragLeave,
+    handleUngroupedDrop,
+  } = useImportDragDrop({
+    assignImportToGroup,
+    importGroupId,
+    setCollapsedGroupIds,
+  });
 
   /**
    * Set strokeWidthMM on all imports that share the same "pen group" as the
@@ -242,15 +259,8 @@ export function PropertiesPanel() {
                         }}
                         onCancelName={() => setEditingName(null)}
                         onDeleteImport={removeImport}
-                        onDragStart={(e, importId) => {
-                          setDraggingImportId(importId);
-                          e.dataTransfer.setData("text/plain", importId);
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
-                        onDragEnd={() => {
-                          setDraggingImportId(null);
-                          setDragOverGroupId(null);
-                        }}
+                        onDragStart={handleImportDragStart}
+                        onDragEnd={handleImportDragEnd}
                       />
 
                       {/* Expanded path / layer list */}
@@ -1101,34 +1111,9 @@ export function PropertiesPanel() {
                                 selectedGroupId === groupId ? null : groupId,
                               )
                             }
-                            onDragOverGroup={(e, groupId) => {
-                              if (draggingImportId) {
-                                e.preventDefault();
-                                setDragOverGroupId(groupId);
-                              }
-                            }}
-                            onDragLeaveGroup={(e) => {
-                              if (
-                                !e.currentTarget.contains(
-                                  e.relatedTarget as Node,
-                                )
-                              )
-                                setDragOverGroupId(null);
-                            }}
-                            onDropGroup={(e, groupId) => {
-                              e.preventDefault();
-                              const id = e.dataTransfer.getData("text/plain");
-                              if (id) {
-                                assignImportToGroup(id, groupId);
-                                setCollapsedGroupIds((prev) => {
-                                  const next = new Set(prev);
-                                  next.delete(groupId);
-                                  return next;
-                                });
-                              }
-                              setDraggingImportId(null);
-                              setDragOverGroupId(null);
-                            }}
+                            onDragOverGroup={handleGroupDragOver}
+                            onDragLeaveGroup={handleGroupDragLeave}
+                            onDropGroup={handleGroupDrop}
                             onToggleCollapse={toggleGroupCollapse}
                             onUpdateGroupColor={(groupId, color) =>
                               updateLayerGroup(groupId, { color })
@@ -1173,29 +1158,10 @@ export function PropertiesPanel() {
                     {/* Ungrouped imports + ungroup drop zone */}
                     <UngroupedDropZone
                       isDropTarget={dragOverGroupId === "none"}
-                      showHint={
-                        !!draggingImportId && !!importGroupId(draggingImportId)
-                      }
-                      onDragOver={(e) => {
-                        if (
-                          draggingImportId &&
-                          importGroupId(draggingImportId)
-                        ) {
-                          e.preventDefault();
-                          setDragOverGroupId("none");
-                        }
-                      }}
-                      onDragLeave={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget as Node))
-                          setDragOverGroupId(null);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const id = e.dataTransfer.getData("text/plain");
-                        if (id) assignImportToGroup(id, null);
-                        setDraggingImportId(null);
-                        setDragOverGroupId(null);
-                      }}
+                      showHint={showUngroupedHint}
+                      onDragOver={handleUngroupedDragOver}
+                      onDragLeave={handleUngroupedDragLeave}
+                      onDrop={handleUngroupedDrop}
                     >
                       {ungroupedImports.map((imp) => renderImport(imp, false))}
                     </UngroupedDropZone>
