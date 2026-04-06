@@ -8,9 +8,12 @@ import {
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../types";
 import type { CanvasState } from "./canvasStore/types";
+import { generateCopyName } from "./canvasStore/services/clipboard";
 import { createPageTemplateSlice } from "./canvasStore/slices/pageTemplateSlice";
+import { createClipboardSlice } from "./canvasStore/slices/clipboardSlice";
 import { createSelectionSlice } from "./canvasStore/slices/selectionSlice";
 import { createToolpathSlice } from "./canvasStore/slices/toolpathSlice";
+import { createUndoRedoSlice } from "./canvasStore/slices/undoRedoSlice";
 import {
   applyImportHatch,
   regenerateImportHatching,
@@ -21,38 +24,7 @@ import {
   vectorObjectsUngrouped,
 } from "./canvasStore/services/vectorObjects";
 
-// ─── Clipboard helpers ────────────────────────────────────────────────────────
-
-/**
- * Generate a unique copy name for a pasted import, following the pattern:
- * "<base> copy" → "<base> copy (2)" → "<base> copy (3)" etc.
- * Strips any existing copy suffix from sourceName before computing the base,
- * so copying "foo copy" produces "foo copy (2)" rather than "foo copy copy".
- */
-export function generateCopyName(
-  sourceName: string,
-  existingNames: string[],
-): string {
-  const base = sourceName.replace(/ copy \(\d+\)$/, "").replace(/ copy$/, "");
-  const copyBase = `${base} copy`;
-  if (!existingNames.includes(copyBase)) return copyBase;
-  let n = 2;
-  while (existingNames.includes(`${copyBase} (${n})`)) n++;
-  return `${copyBase} (${n})`;
-}
-
-// ─── Gesture-undo stash ──────────────────────────────────────────────────────
-// Holds a snapshot captured at gesture-start (drag/scale/rotate mousedown).
-// Committed to undoStack on mouseup only if imports actually changed.
-let _gestureSnapshot: SvgImport[] | null = null;
-
-const gestureFingerprint = (imps: SvgImport[]) =>
-  imps
-    .map(
-      (i) =>
-        `${i.id}:${i.x},${i.y},${i.scale},${i.scaleX ?? ""},${i.scaleY ?? ""},${i.rotation ?? 0}`,
-    )
-    .join("|");
+export { generateCopyName };
 
 export const useCanvasStore = create<CanvasState>()(
   immer((set, get) => {
@@ -69,12 +41,11 @@ export const useCanvasStore = create<CanvasState>()(
 
     return {
       ...createToolpathSlice(set, get),
+      ...createUndoRedoSlice(set, get),
       ...createPageTemplateSlice(set, get),
+      ...createClipboardSlice(pushUndo)(set, get),
       ...createSelectionSlice(set, get),
       imports: [],
-      undoStack: [],
-      redoStack: [],
-      clipboardImport: null,
       layerGroups: [],
 
       addImport: (imp) => {
@@ -193,135 +164,6 @@ export const useCanvasStore = create<CanvasState>()(
           if (!imp) return;
           applyImportHatch(imp, spacingMM, angleDeg, enabled);
         }),
-
-      // ─── Clipboard actions ──────────────────────────────────────────────────
-
-      copyImport: (id) => {
-        const imp = get().imports.find((i) => i.id === id);
-        if (!imp) return;
-        const snap = structuredClone(imp);
-        set((state) => {
-          state.clipboardImport = snap;
-        });
-      },
-
-      cutImport: (id) => {
-        const imp = get().imports.find((i) => i.id === id);
-        if (!imp) return;
-        pushUndo();
-        const snap = structuredClone(imp);
-        set((state) => {
-          state.clipboardImport = snap;
-          state.imports = state.imports.filter((i) => i.id !== id);
-          if (state.selectedImportId === id) {
-            state.selectedImportId = null;
-            state.selectedPathId = null;
-          }
-        });
-      },
-
-      pasteImport: () => {
-        const clipboard = get().clipboardImport;
-        if (!clipboard) return;
-        pushUndo();
-        const existingNames = get().imports.map((i) => i.name);
-        const newName = generateCopyName(clipboard.name, existingNames);
-        const newId = uuid();
-        const pasted: SvgImport = {
-          ...structuredClone(clipboard),
-          id: newId,
-          name: newName,
-          // Assign fresh IDs to all paths so they don't alias the originals
-          paths: clipboard.paths.map((p) => ({ ...p, id: uuid() })),
-          // Offset slightly so the copy doesn't sit exactly on top of the original
-          x: clipboard.x + 5,
-          y: clipboard.y + 5,
-        };
-        set((state) => {
-          state.imports.push(pasted);
-          state.selectedImportId = newId;
-          state.selectedPathId = null;
-          if (state.toolpathSelected) state.toolpathSelected = false;
-        });
-      },
-
-      selectAllImports: () =>
-        set((state) => {
-          if (state.imports.length === 0) return;
-          state.selectedGroupId = null;
-          if (state.imports.length === 1) {
-            // Only one import — just select it directly.
-            state.selectedImportId = state.imports[0].id;
-            state.allImportsSelected = false;
-          } else if (!state.allImportsSelected) {
-            // Zero or one import selected → enter "all selected" mode.
-            state.allImportsSelected = true;
-            state.selectedImportId = null;
-          } else {
-            // Already all-selected → cycle to the first import individually.
-            state.allImportsSelected = false;
-            state.selectedImportId = state.imports[0].id;
-          }
-          state.selectedPathId = null;
-          state.toolpathSelected = false;
-        }),
-
-      snapshotForGesture: () => {
-        _gestureSnapshot = structuredClone(get().imports);
-        // Starting a new gesture invalidates the redo history.
-        set((state) => {
-          state.redoStack = [];
-        });
-      },
-
-      commitGesture: () => {
-        const before = _gestureSnapshot;
-        _gestureSnapshot = null;
-        if (!before) return;
-        const current = get().imports;
-        // Only push if something gesture-mutable actually changed.
-        if (gestureFingerprint(before) === gestureFingerprint(current)) return;
-        set((state) => {
-          state.undoStack.push(before);
-          if (state.undoStack.length > 50)
-            state.undoStack.splice(0, state.undoStack.length - 50);
-        });
-      },
-
-      undo: () => {
-        const stack = get().undoStack;
-        if (stack.length === 0) return;
-        const prev = stack[stack.length - 1];
-        const currentSnap = structuredClone(get().imports);
-        set((state) => {
-          state.imports = structuredClone(prev);
-          state.undoStack.pop();
-          state.redoStack.push(currentSnap);
-          if (state.redoStack.length > 50)
-            state.redoStack.splice(0, state.redoStack.length - 50);
-          state.selectedImportId = null;
-          state.selectedPathId = null;
-          state.allImportsSelected = false;
-        });
-      },
-
-      redo: () => {
-        const stack = get().redoStack;
-        if (stack.length === 0) return;
-        const next = stack[stack.length - 1];
-        const currentSnap = structuredClone(get().imports);
-        set((state) => {
-          state.imports = structuredClone(next);
-          state.redoStack.pop();
-          state.undoStack.push(currentSnap);
-          if (state.undoStack.length > 50)
-            state.undoStack.splice(0, state.undoStack.length - 50);
-          state.selectedImportId = null;
-          state.selectedPathId = null;
-          state.allImportsSelected = false;
-        });
-      },
-
       // ─── Layer Group actions ────────────────────────────────────────────────
 
       addLayerGroup: (name, color) =>
