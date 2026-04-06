@@ -13,7 +13,13 @@
 // ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Crosshair } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../store/canvasStore";
+import {
+  selectPlotCanvasCanvasState,
+  selectPlotCanvasHandleOverlayState,
+  selectPlotCanvasToolpathState,
+} from "../store/canvasStoreSelectors";
 import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
 import { DEFAULT_STROKE_WIDTH_MM, type SvgImport } from "../../../types";
@@ -55,25 +61,29 @@ export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const imports = useCanvasStore((s) => s.imports);
-  const selectedImportId = useCanvasStore((s) => s.selectedImportId);
-  const allImportsSelected = useCanvasStore((s) => s.allImportsSelected);
-  const selectedGroupId = useCanvasStore((s) => s.selectedGroupId);
-  const selectGroup = useCanvasStore((s) => s.selectGroup);
-  const selectImport = useCanvasStore((s) => s.selectImport);
-  const removeImport = useCanvasStore((s) => s.removeImport);
-  const clearImports = useCanvasStore((s) => s.clearImports);
-  const updateImport = useCanvasStore((s) => s.updateImport);
-  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
-  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
-  const plotProgressCuts = useCanvasStore((s) => s.plotProgressCuts);
-  const plotProgressRapids = useCanvasStore((s) => s.plotProgressRapids);
-  const layerGroups = useCanvasStore((s) => s.layerGroups);
-  const pageTemplate = useCanvasStore((s) => s.pageTemplate);
-  const pageSizes = useCanvasStore((s) => s.pageSizes);
+  const {
+    imports,
+    selectedImportId,
+    allImportsSelected,
+    selectedGroupId,
+    selectGroup,
+    selectImport,
+    removeImport,
+    clearImports,
+    updateImport,
+    layerGroups,
+    pageTemplate,
+    pageSizes,
+  } = useCanvasStore(useShallow(selectPlotCanvasCanvasState));
+  const {
+    gcodeToolpath,
+    setGcodeToolpath,
+    gcodeSource,
+    toolpathSelected,
+    selectToolpath,
+    plotProgressCuts,
+    plotProgressRapids,
+  } = useCanvasStore(useShallow(selectPlotCanvasToolpathState));
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
@@ -2862,7 +2872,7 @@ function HandleOverlay({
   onRotateHandleMouseDown,
   onDelete,
 }: HandleOverlayProps) {
-  const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
+  const showCentreMarker = useCanvasStore(selectPlotCanvasHandleOverlayState);
   const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
   const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
   const left = PAD + imp.x * MM_TO_PX;

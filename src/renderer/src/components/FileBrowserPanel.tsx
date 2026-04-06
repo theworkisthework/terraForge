@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuid } from "uuid";
+import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { selectFileBrowserPaneCanvasState } from "../store/canvasStoreSelectors";
 import { parseGcode } from "../utils/gcodeParser";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { RemoteFile } from "../../../types";
@@ -123,14 +125,14 @@ function FsPane({
     useState<RemoteFile | null>(null);
   const [pendingRunFile, setPendingRunFile] = useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
-  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
-  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
-  const setGcodePreviewLoading = useCanvasStore(
-    (s) => s.setGcodePreviewLoading,
-  );
+  const {
+    gcodeToolpath,
+    gcodeSource,
+    setGcodeToolpath,
+    setGcodeSource,
+    selectToolpath,
+    setGcodePreviewLoading,
+  } = useCanvasStore(useShallow(selectFileBrowserPaneCanvasState));
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const status = useMachineStore((s) => s.status);

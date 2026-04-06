@@ -177,7 +177,7 @@ Checklist:
 - [x] Define slice interfaces and shared store composition. (completed: shared `canvasStore/types.ts` plus initial `pageTemplateSlice` and `toolpathSlice` composition)
 - [x] Move heavy conversion and hatch logic to pure services/selectors. (completed: `services/hatching.ts` and `services/vectorObjects.ts`)
 - [x] Add compatibility layer to avoid breaking existing callers. (completed: composed `useCanvasStore` API preserved, `generateCopyName` re-export kept stable)
-- [ ] Migrate callers to selectors incrementally.
+- [x] Migrate callers to selectors incrementally. (completed: grouped selector migration across renderer canvas-store consumers)
 
 ### 5) Main Process Modularization
 
@@ -265,7 +265,7 @@ Checklist:
 ### Phase 4: Store Slicing
 
 - [x] Introduce store slices with stable external API.
-- [ ] Migrate callsites gradually.
+- [x] Migrate callsites gradually.
 
 ### Phase 5: Main + Machine + Worker Modularization
 
@@ -281,7 +281,7 @@ Current sprint focus:
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
 - [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
-- [ ] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
+- [x] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
 
 Done this sprint:
 
@@ -306,6 +306,8 @@ Done this sprint:
 - [x] Extract `importSlice` and complete `canvasStore.ts` slice composition
 - [x] Add focused tests for extracted canvas-store services and slices
 - [x] Start grouped selector migration for `canvasStore.ts` consumers
+- [x] Migrate `PlotCanvas.tsx` to grouped canvas selectors
+- [x] Migrate remaining small canvas-store consumers to grouped selectors
 
 ## Progress Log
 
@@ -335,6 +337,9 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted `store/canvasStore/services/clipboard.ts`, `store/canvasStore/slices/clipboardSlice.ts`, `store/canvasStore/slices/undoRedoSlice.ts`, and `store/canvasStore/slices/layerGroupSlice.ts`; preserved API compatibility by re-exporting `generateCopyName` from `canvasStore.ts`; validation remains green with `npm.cmd run typecheck` and `tests/unit/stores/canvasStore.test.ts` (105/105).
 - 2026-04-06: Extracted `store/canvasStore/slices/importSlice.ts`, leaving `canvasStore.ts` as slice composition plus `pushUndo` wiring; added focused tests for `pageTemplateSlice`, `toolpathSlice`, `selectionSlice`, `clipboard` service, `clipboardSlice`, `undoRedoSlice`, `layerGroupSlice`, and `importSlice`; validation remains green with `npm.cmd run typecheck`, focused slice/service tests, and `tests/unit/stores/canvasStore.test.ts` (105/105).
 - 2026-04-06: Started grouped selector migration for `canvasStore.ts` consumers by adding `store/canvasStoreSelectors.ts` and moving `Toolbar.tsx`, `GcodeOptionsDialog.tsx`, `useImportActions.ts`, `useLayoutActions.ts`, `useJobActions.ts`, and `usePropertiesPanelStoreBindings.ts` to shallow selector subscriptions; validation passes with `npm.cmd run typecheck`, the full `runTests` suite (170/170), and `tests/unit/stores/canvasStore.test.ts` (105/105).
+- 2026-04-06: Migrated `PlotCanvas.tsx` to grouped `canvasStore` selectors and replaced the remaining inline `showCentreMarker` subscription in `HandleOverlay`; validation passes with `npm.cmd run typecheck`, `tests/component/PlotCanvas.test.tsx` (63/63), and `tests/unit/stores/canvasStore.test.ts` (105/105).
+- 2026-04-06: Migrated `FileBrowserPanel.tsx`, `JobControls.tsx`, and `usePlotProgress.ts` to grouped `canvasStore` selectors; validation passes with `npm.cmd run typecheck`, `tests/component/FileBrowserPanel.test.tsx` (31/31), `tests/component/JobControls.test.tsx` (22/22), and `tests/unit/usePlotProgress.test.tsx` (19/19).
+- 2026-04-06: Completed renderer-wide `canvasStore` callsite migration to grouped selectors; `grep` confirms remaining `useCanvasStore(...)` consumers all route through named selector helpers in `store/canvasStoreSelectors.ts`.
 
 ## Update Rule
 
