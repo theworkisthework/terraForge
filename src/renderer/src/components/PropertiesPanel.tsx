@@ -6,34 +6,20 @@
 // with or without fee is hereby granted, provided that the above copyright notice
 // and this permission notice appear in all copies.
 import { useState } from "react";
-import { DimensionsRow } from "../features/properties-panel/components/DimensionsRow";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
-import {
-  DEFAULT_HATCH_ANGLE_DEG,
-  DEFAULT_HATCH_SPACING_MM,
-  DEFAULT_STROKE_WIDTH_MM,
-} from "../../../types";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
 import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
-import { NumberField } from "../features/properties-panel/components/NumberField";
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
 import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
-import { HatchFillSection } from "../features/properties-panel/components/HatchFillSection";
-import { AlignmentControls } from "../features/properties-panel/components/AlignmentControls";
-import { TransformShortcuts } from "../features/properties-panel/components/TransformShortcuts";
-import { StrokeWidthSection } from "../features/properties-panel/components/StrokeWidthSection";
+import { ImportPropertiesForm } from "../features/properties-panel/components/ImportPropertiesForm";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
-import {
-  ROT_PRESETS,
-  ROT_STEPS,
-  type RotStep,
-} from "../features/properties-panel/utils/rotation";
+import { type RotStep } from "../features/properties-panel/utils/rotation";
 
 export function PropertiesPanel() {
   const imports = useCanvasStore((s) => s.imports);
@@ -227,6 +213,24 @@ export function PropertiesPanel() {
                   const groupColor =
                     layerGroups.find((g) => g.id === groupId)?.color ?? null;
 
+                  const cfg = activeConfig();
+                  const bedW = cfg?.bedWidth ?? 220;
+                  const bedH = cfg?.bedHeight ?? 200;
+                  const activePageSize = pageTemplate
+                    ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
+                    : null;
+                  const canAlignToTemplate = !!pageTemplate && !!activePageSize;
+                  const pageW = activePageSize
+                    ? pageTemplate!.landscape
+                      ? activePageSize.heightMM
+                      : activePageSize.widthMM
+                    : bedW;
+                  const pageH = activePageSize
+                    ? pageTemplate!.landscape
+                      ? activePageSize.widthMM
+                      : activePageSize.heightMM
+                    : bedH;
+
                   return (
                     <div
                       key={imp.id}
@@ -286,273 +290,42 @@ export function PropertiesPanel() {
                           className="px-3 pb-3 pt-2 border-t border-border-ui/30"
                           onDragStart={(e) => e.stopPropagation()}
                         >
-                          {(() => {
-                            const objW =
-                              imp.svgWidth * (imp.scaleX ?? imp.scale);
-                            const objH =
-                              imp.svgHeight * (imp.scaleY ?? imp.scale);
-                            const cfg = activeConfig();
-                            const bedW = cfg?.bedWidth ?? 220;
-                            const bedH = cfg?.bedHeight ?? 200;
-                            const activePageSize = pageTemplate
-                              ? pageSizes.find(
-                                  (ps) => ps.id === pageTemplate.sizeId,
-                                )
-                              : null;
-                            const canAlignToTemplate =
-                              !!pageTemplate && !!activePageSize;
-                            return (
-                              <>
-                                {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
-                                <div className="grid grid-cols-2 gap-2 mb-0">
-                                  <NumberField
-                                    label="X (mm)"
-                                    value={imp.x}
-                                    onChange={(v) =>
-                                      updateImport(imp.id, { x: v })
-                                    }
-                                    step={0.5}
-                                  />
-                                  <NumberField
-                                    label="Y (mm)"
-                                    value={imp.y}
-                                    onChange={(v) =>
-                                      updateImport(imp.id, { y: v })
-                                    }
-                                    step={0.5}
-                                  />
-                                </div>
-
-                                <AlignmentControls
-                                  objW={objW}
-                                  objH={objH}
-                                  bedW={bedW}
-                                  bedH={bedH}
-                                  pageW={
-                                    activePageSize
-                                      ? pageTemplate!.landscape
-                                        ? activePageSize.heightMM
-                                        : activePageSize.widthMM
-                                      : bedW
-                                  }
-                                  pageH={
-                                    activePageSize
-                                      ? pageTemplate!.landscape
-                                        ? activePageSize.widthMM
-                                        : activePageSize.heightMM
-                                      : bedH
-                                  }
-                                  marginMM={pageTemplate?.marginMM ?? 20}
-                                  canAlignToTemplate={canAlignToTemplate}
-                                  templateAlignEnabled={templateAlignEnabled}
-                                  templateAlignTarget={templateAlignTarget}
-                                  onTemplateAlignEnabledChange={
-                                    setTemplateAlignEnabled
-                                  }
-                                  onTemplateAlignTargetChange={
-                                    setTemplateAlignTarget
-                                  }
-                                  onAlignX={(x) =>
-                                    updateImport(imp.id, {
-                                      x: Math.round(x * 1000) / 1000,
-                                    })
-                                  }
-                                  onAlignY={(y) =>
-                                    updateImport(imp.id, {
-                                      y: Math.round(y * 1000) / 1000,
-                                    })
-                                  }
-                                />
-
-                                <DimensionsRow
-                                  objW={objW}
-                                  objH={objH}
-                                  svgWidth={imp.svgWidth}
-                                  svgHeight={imp.svgHeight}
-                                  ratioLocked={ratioLocked}
-                                  currentScaleX={imp.scaleX ?? imp.scale}
-                                  currentScaleY={imp.scaleY ?? imp.scale}
-                                  onUpdate={(changes) =>
-                                    updateImport(imp.id, changes)
-                                  }
-                                  onRatioLockedChange={setRatioLocked}
-                                />
-                                {/* Scale — full width */}
-                                <NumberField
-                                  label="Scale"
-                                  value={imp.scale}
-                                  onChange={(v) =>
-                                    updateImport(imp.id, {
-                                      scale: Math.max(0.001, v),
-                                    })
-                                  }
-                                  step={0.05}
-                                  min={0.001}
-                                />
-                                <TransformShortcuts
-                                  fitScale={Math.min(
-                                    bedW / (imp.svgWidth || 1),
-                                    bedH / (imp.svgHeight || 1),
-                                  )}
-                                  rotStep={rotStep}
-                                  rotSteps={ROT_STEPS}
-                                  stepFlyoutOpen={stepFlyoutOpen}
-                                  showCentreMarker={showCentreMarker}
-                                  snapPresetTitle={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
-                                  showRotationRow={false}
-                                  onFitToBed={() => {
-                                    const fitScale = Math.min(
-                                      bedW / (imp.svgWidth || 1),
-                                      bedH / (imp.svgHeight || 1),
-                                    );
-                                    setRatioLocked(true);
-                                    updateImport(imp.id, {
-                                      scale: fitScale,
-                                      scaleX: undefined,
-                                      scaleY: undefined,
-                                      x: 0,
-                                      y: 0,
-                                    });
-                                  }}
-                                  onResetScale={() => {
-                                    setRatioLocked(true);
-                                    updateImport(imp.id, {
-                                      scale: 1,
-                                      scaleX: undefined,
-                                      scaleY: undefined,
-                                    });
-                                  }}
-                                  onRotateCcw={() =>
-                                    updateImport(imp.id, {
-                                      rotation: imp.rotation - rotStep,
-                                    })
-                                  }
-                                  onRotateCw={() =>
-                                    updateImport(imp.id, {
-                                      rotation: imp.rotation + rotStep,
-                                    })
-                                  }
-                                  onToggleStepFlyout={() =>
-                                    setStepFlyoutOpen((o) => !o)
-                                  }
-                                  onCloseStepFlyout={() =>
-                                    setStepFlyoutOpen(false)
-                                  }
-                                  onSelectRotStep={(s) => {
-                                    setRotStep(s);
-                                    setStepFlyoutOpen(false);
-                                  }}
-                                  onToggleCentreMarker={toggleCentreMarker}
-                                  onSnapToNextPreset={() => {
-                                    const norm =
-                                      ((imp.rotation % 360) + 360) % 360;
-                                    const idx = ROT_PRESETS.findIndex(
-                                      (p) => Math.abs(p - norm) < 1,
-                                    );
-                                    const next =
-                                      ROT_PRESETS[
-                                        idx < 0
-                                          ? 0
-                                          : (idx + 1) % ROT_PRESETS.length
-                                      ];
-                                    updateImport(imp.id, { rotation: next });
-                                  }}
-                                />
-                                {/* Rotation — full width */}
-                                <NumberField
-                                  label="Rotation (°)"
-                                  value={imp.rotation}
-                                  onChange={(v) =>
-                                    updateImport(imp.id, { rotation: v })
-                                  }
-                                  step={1}
-                                />
-                                <TransformShortcuts
-                                  fitScale={Math.min(
-                                    bedW / (imp.svgWidth || 1),
-                                    bedH / (imp.svgHeight || 1),
-                                  )}
-                                  rotStep={rotStep}
-                                  rotSteps={ROT_STEPS}
-                                  stepFlyoutOpen={stepFlyoutOpen}
-                                  showCentreMarker={showCentreMarker}
-                                  snapPresetTitle={`Snap to next preset (${ROT_PRESETS.join("° · ")}°)`}
-                                  showScaleRow={false}
-                                  onFitToBed={() => {
-                                    const fitScale = Math.min(
-                                      bedW / (imp.svgWidth || 1),
-                                      bedH / (imp.svgHeight || 1),
-                                    );
-                                    setRatioLocked(true);
-                                    updateImport(imp.id, {
-                                      scale: fitScale,
-                                      scaleX: undefined,
-                                      scaleY: undefined,
-                                      x: 0,
-                                      y: 0,
-                                    });
-                                  }}
-                                  onResetScale={() => {
-                                    setRatioLocked(true);
-                                    updateImport(imp.id, {
-                                      scale: 1,
-                                      scaleX: undefined,
-                                      scaleY: undefined,
-                                    });
-                                  }}
-                                  onRotateCcw={() =>
-                                    updateImport(imp.id, {
-                                      rotation: imp.rotation - rotStep,
-                                    })
-                                  }
-                                  onRotateCw={() =>
-                                    updateImport(imp.id, {
-                                      rotation: imp.rotation + rotStep,
-                                    })
-                                  }
-                                  onToggleStepFlyout={() =>
-                                    setStepFlyoutOpen((o) => !o)
-                                  }
-                                  onCloseStepFlyout={() =>
-                                    setStepFlyoutOpen(false)
-                                  }
-                                  onSelectRotStep={(s) => {
-                                    setRotStep(s);
-                                    setStepFlyoutOpen(false);
-                                  }}
-                                  onToggleCentreMarker={toggleCentreMarker}
-                                  onSnapToNextPreset={() => {
-                                    const norm =
-                                      ((imp.rotation % 360) + 360) % 360;
-                                    const idx = ROT_PRESETS.findIndex(
-                                      (p) => Math.abs(p - norm) < 1,
-                                    );
-                                    const next =
-                                      ROT_PRESETS[
-                                        idx < 0
-                                          ? 0
-                                          : (idx + 1) % ROT_PRESETS.length
-                                      ];
-                                    updateImport(imp.id, { rotation: next });
-                                  }}
-                                />
-                                <StrokeWidthSection
-                                  strokeWidthMM={imp.strokeWidthMM}
-                                  defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM}
-                                  onChangeStrokeWidth={(value) =>
-                                    syncStrokeWidth(imp.id, value)
-                                  }
-                                />
-
-                                <HatchFillSection
-                                  imp={imp}
-                                  defaultSpacingMM={DEFAULT_HATCH_SPACING_MM}
-                                  defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG}
-                                  onApplyHatch={applyHatch}
-                                />
-                              </>
-                            );
-                          })()}
+                          <ImportPropertiesForm
+                            imp={imp}
+                            bedW={bedW}
+                            bedH={bedH}
+                            pageW={pageW}
+                            pageH={pageH}
+                            marginMM={pageTemplate?.marginMM ?? 20}
+                            canAlignToTemplate={canAlignToTemplate}
+                            templateAlignEnabled={templateAlignEnabled}
+                            templateAlignTarget={templateAlignTarget}
+                            ratioLocked={ratioLocked}
+                            rotStep={rotStep}
+                            stepFlyoutOpen={stepFlyoutOpen}
+                            showCentreMarker={showCentreMarker}
+                            onUpdate={(changes) =>
+                              updateImport(imp.id, changes)
+                            }
+                            onTemplateAlignEnabledChange={
+                              setTemplateAlignEnabled
+                            }
+                            onTemplateAlignTargetChange={setTemplateAlignTarget}
+                            onRatioLockedChange={setRatioLocked}
+                            onToggleStepFlyout={() =>
+                              setStepFlyoutOpen((o) => !o)
+                            }
+                            onCloseStepFlyout={() => setStepFlyoutOpen(false)}
+                            onSelectRotStep={(s) => {
+                              setRotStep(s);
+                              setStepFlyoutOpen(false);
+                            }}
+                            onToggleCentreMarker={toggleCentreMarker}
+                            onChangeStrokeWidth={(value) =>
+                              syncStrokeWidth(imp.id, value)
+                            }
+                            onApplyHatch={applyHatch}
+                          />
                         </div>
                       )}
                     </div>
