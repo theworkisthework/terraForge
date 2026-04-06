@@ -13,10 +13,6 @@ import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
-  EyeOff,
-  Eye,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
@@ -31,6 +27,7 @@ import { NumberField } from "../features/properties-panel/components/NumberField
 import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
 import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
+import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -1085,33 +1082,30 @@ export function PropertiesPanel() {
                           key={group.id}
                           className="border-b border-border-ui/40"
                         >
-                          {/* Group header row */}
-                          <div
-                            className={`flex items-center gap-1.5 px-2 py-1 transition-colors cursor-pointer ${
-                              selectedGroupId === group.id
-                                ? "bg-secondary/20 ring-1 ring-inset ring-secondary/40"
-                                : isDropTarget
-                                  ? "bg-accent/15 ring-1 ring-inset ring-accent/30"
-                                  : "hover:bg-secondary/10"
-                            }`}
-                            onClick={(e) => {
-                              if (
-                                (e.target as HTMLElement).closest(
-                                  "button, input",
-                                )
-                              )
-                                return;
+                          <GroupHeaderRow
+                            group={group}
+                            isCollapsed={isCollapsed}
+                            isDropTarget={isDropTarget}
+                            isSelected={selectedGroupId === group.id}
+                            membersCount={members.length}
+                            isEditingName={editingGroupName?.id === group.id}
+                            editingNameValue={
+                              editingGroupName?.id === group.id
+                                ? editingGroupName.value
+                                : group.name
+                            }
+                            onToggleSelect={(groupId) =>
                               selectGroup(
-                                selectedGroupId === group.id ? null : group.id,
-                              );
-                            }}
-                            onDragOver={(e) => {
+                                selectedGroupId === groupId ? null : groupId,
+                              )
+                            }
+                            onDragOverGroup={(e, groupId) => {
                               if (draggingImportId) {
                                 e.preventDefault();
-                                setDragOverGroupId(group.id);
+                                setDragOverGroupId(groupId);
                               }
                             }}
-                            onDragLeave={(e) => {
+                            onDragLeaveGroup={(e) => {
                               if (
                                 !e.currentTarget.contains(
                                   e.relatedTarget as Node,
@@ -1119,112 +1113,44 @@ export function PropertiesPanel() {
                               )
                                 setDragOverGroupId(null);
                             }}
-                            onDrop={(e) => {
+                            onDropGroup={(e, groupId) => {
                               e.preventDefault();
                               const id = e.dataTransfer.getData("text/plain");
                               if (id) {
-                                assignImportToGroup(id, group.id);
-                                // Auto-expand on drop
+                                assignImportToGroup(id, groupId);
                                 setCollapsedGroupIds((prev) => {
                                   const next = new Set(prev);
-                                  next.delete(group.id);
+                                  next.delete(groupId);
                                   return next;
                                 });
                               }
                               setDraggingImportId(null);
                               setDragOverGroupId(null);
                             }}
-                          >
-                            {/* Collapse toggle */}
-                            <button
-                              aria-expanded={!isCollapsed}
-                              aria-label={
-                                isCollapsed ? "Expand group" : "Collapse group"
-                              }
-                              className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
-                              onClick={() => toggleGroupCollapse(group.id)}
-                            >
-                              {isCollapsed ? (
-                                <ChevronRight size={10} />
-                              ) : (
-                                <ChevronDown size={10} />
-                              )}
-                            </button>
-                            {/* Color swatch / picker */}
-                            <input
-                              type="color"
-                              value={group.color}
-                              onChange={(e) =>
-                                updateLayerGroup(group.id, {
-                                  color: e.target.value,
-                                })
-                              }
-                              className="cursor-pointer border-0 rounded shrink-0"
-                              style={{ width: 14, height: 14, padding: 0 }}
-                              title="Group colour"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            {/* Editable name */}
-                            {editingGroupName?.id === group.id ? (
-                              <input
-                                type="text"
-                                className="flex-1 min-w-0 bg-transparent text-[10px] text-content border-b border-accent outline-none"
-                                value={editingGroupName.value}
-                                autoFocus
-                                onChange={(e) =>
-                                  setEditingGroupName({
-                                    id: group.id,
-                                    value: e.target.value,
-                                  })
-                                }
-                                onBlur={() => {
-                                  updateLayerGroup(group.id, {
-                                    name:
-                                      editingGroupName.value.trim() ||
-                                      group.name,
-                                  });
-                                  setEditingGroupName(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    updateLayerGroup(group.id, {
-                                      name:
-                                        editingGroupName.value.trim() ||
-                                        group.name,
-                                    });
-                                    setEditingGroupName(null);
-                                  }
-                                  if (e.key === "Escape")
-                                    setEditingGroupName(null);
-                                }}
-                              />
-                            ) : (
-                              <span
-                                className="flex-1 min-w-0 text-[10px] text-content font-medium truncate cursor-pointer"
-                                title="Double-click to rename"
-                                onDoubleClick={() =>
-                                  setEditingGroupName({
-                                    id: group.id,
-                                    value: group.name,
-                                  })
-                                }
-                              >
-                                {group.name}
-                              </span>
-                            )}
-                            {/* Member count badge */}
-                            <span className="text-[9px] text-content-faint shrink-0">
-                              {members.length}
-                            </span>
-                            {/* Delete group */}
-                            <button
-                              className="text-content-faint hover:text-accent shrink-0"
-                              title="Delete group (layers become ungrouped)"
-                              onClick={() => removeLayerGroup(group.id)}
-                            >
-                              ✕
-                            </button>
-                          </div>
+                            onToggleCollapse={toggleGroupCollapse}
+                            onUpdateGroupColor={(groupId, color) =>
+                              updateLayerGroup(groupId, { color })
+                            }
+                            onStartEditName={(groupId, currentName) =>
+                              setEditingGroupName({
+                                id: groupId,
+                                value: currentName,
+                              })
+                            }
+                            onEditingNameChange={(nextValue) =>
+                              setEditingGroupName((prev) =>
+                                prev ? { ...prev, value: nextValue } : prev,
+                              )
+                            }
+                            onCommitName={(groupId, nextValue) => {
+                              updateLayerGroup(groupId, {
+                                name: nextValue.trim() || group.name,
+                              });
+                              setEditingGroupName(null);
+                            }}
+                            onCancelEditName={() => setEditingGroupName(null)}
+                            onRemoveGroup={removeLayerGroup}
+                          />
 
                           {/* Members (indented), hidden when collapsed */}
                           {!isCollapsed && (
