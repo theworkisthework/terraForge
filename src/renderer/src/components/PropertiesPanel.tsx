@@ -30,6 +30,7 @@ import { ImportHeaderRow } from "../features/properties-panel/components/ImportH
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
 import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import { EmptyGroupDropHint } from "../features/properties-panel/components/EmptyGroupDropHint";
+import { HatchFillSection } from "../features/properties-panel/components/HatchFillSection";
 import { useImportDragDrop } from "../features/properties-panel/hooks/useImportDragDrop";
 import { usePanelNameEditing } from "../features/properties-panel/hooks/usePanelNameEditing";
 import {
@@ -47,6 +48,7 @@ export function PropertiesPanel() {
   const updatePath = useCanvasStore((s) => s.updatePath);
   const updateImportLayer = useCanvasStore((s) => s.updateImportLayer);
   const removePath = useCanvasStore((s) => s.removePath);
+  const applyHatch = useCanvasStore((s) => s.applyHatch);
   const showCentreMarker = useCanvasStore((s) => s.showCentreMarker);
   const toggleCentreMarker = useCanvasStore((s) => s.toggleCentreMarker);
   const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
@@ -980,96 +982,12 @@ export function PropertiesPanel() {
                                   </div>
                                 </div>
 
-                                {/* ── Hatch fill ─────────────────────────────── */}
-                                {(() => {
-                                  const applyHatch =
-                                    useCanvasStore.getState().applyHatch;
-                                  const hasFilled = imp.paths.some(
-                                    (p) => p.hasFill,
-                                  );
-                                  if (!hasFilled) return null;
-                                  return (
-                                    <div className="mt-2 pt-2 border-t border-border-ui/30">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <span
-                                          id={`hatch-label-${imp.id}`}
-                                          className="text-[10px] text-content-muted uppercase tracking-wider flex-1"
-                                        >
-                                          Hatch fill
-                                        </span>
-                                        <button
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors ${
-                                            imp.hatchEnabled
-                                              ? "bg-accent"
-                                              : "bg-secondary"
-                                          }`}
-                                          role="switch"
-                                          aria-checked={imp.hatchEnabled}
-                                          aria-labelledby={`hatch-label-${imp.id}`}
-                                          onClick={() =>
-                                            applyHatch(
-                                              imp.id,
-                                              imp.hatchSpacingMM ??
-                                                DEFAULT_HATCH_SPACING_MM,
-                                              imp.hatchAngleDeg ??
-                                                DEFAULT_HATCH_ANGLE_DEG,
-                                              !imp.hatchEnabled,
-                                            )
-                                          }
-                                        >
-                                          <span
-                                            className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow transition-transform mt-0.5 ${
-                                              imp.hatchEnabled
-                                                ? "translate-x-3.5"
-                                                : "translate-x-0.5"
-                                            }`}
-                                          />
-                                        </button>
-                                      </div>
-                                      {imp.hatchEnabled && (
-                                        <div>
-                                          <NumberField
-                                            label="Spacing (mm)"
-                                            value={
-                                              imp.hatchSpacingMM ??
-                                              DEFAULT_HATCH_SPACING_MM
-                                            }
-                                            onChange={(v) => {
-                                              if (Number.isFinite(v))
-                                                applyHatch(
-                                                  imp.id,
-                                                  Math.max(0.1, v),
-                                                  imp.hatchAngleDeg ??
-                                                    DEFAULT_HATCH_ANGLE_DEG,
-                                                  true,
-                                                );
-                                            }}
-                                            step={0.1}
-                                            min={0.1}
-                                          />
-                                          <NumberField
-                                            label="Angle (°)"
-                                            value={
-                                              imp.hatchAngleDeg ??
-                                              DEFAULT_HATCH_ANGLE_DEG
-                                            }
-                                            onChange={(v) => {
-                                              if (Number.isFinite(v))
-                                                applyHatch(
-                                                  imp.id,
-                                                  imp.hatchSpacingMM ??
-                                                    DEFAULT_HATCH_SPACING_MM,
-                                                  ((v % 180) + 180) % 180,
-                                                  true,
-                                                );
-                                            }}
-                                            step={5}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
+                                <HatchFillSection
+                                  imp={imp}
+                                  defaultSpacingMM={DEFAULT_HATCH_SPACING_MM}
+                                  defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG}
+                                  onApplyHatch={applyHatch}
+                                />
                               </>
                             );
                           })()}
