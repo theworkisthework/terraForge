@@ -28,6 +28,7 @@ import { EmptyState } from "../features/properties-panel/components/EmptyState";
 import { ImportPathsList } from "../features/properties-panel/components/ImportPathsList";
 import { ImportHeaderRow } from "../features/properties-panel/components/ImportHeaderRow";
 import { GroupHeaderRow } from "../features/properties-panel/components/GroupHeaderRow";
+import { UngroupedDropZone } from "../features/properties-panel/components/UngroupedDropZone";
 import {
   ROT_PRESETS,
   ROT_STEPS,
@@ -1175,7 +1176,11 @@ export function PropertiesPanel() {
                     })}
 
                     {/* Ungrouped imports + ungroup drop zone */}
-                    <div
+                    <UngroupedDropZone
+                      isDropTarget={dragOverGroupId === "none"}
+                      showHint={
+                        !!draggingImportId && !!importGroupId(draggingImportId)
+                      }
                       onDragOver={(e) => {
                         if (
                           draggingImportId &&
@@ -1196,26 +1201,9 @@ export function PropertiesPanel() {
                         setDraggingImportId(null);
                         setDragOverGroupId(null);
                       }}
-                      className={
-                        dragOverGroupId === "none"
-                          ? "bg-accent/5 ring-1 ring-inset ring-accent/20"
-                          : ""
-                      }
                     >
                       {ungroupedImports.map((imp) => renderImport(imp, false))}
-                      {/* Always-visible ungroup hint — only shown while dragging a grouped layer */}
-                      {draggingImportId && importGroupId(draggingImportId) && (
-                        <div
-                          className={`mx-2 my-1 px-2 py-1 text-[9px] text-center border border-dashed rounded transition-colors ${
-                            dragOverGroupId === "none"
-                              ? "border-accent/60 text-accent/70 bg-accent/10"
-                              : "border-border-ui text-content-faint"
-                          }`}
-                        >
-                          Drop here to remove from group
-                        </div>
-                      )}
-                    </div>
+                    </UngroupedDropZone>
                   </>
                 );
               })()}
