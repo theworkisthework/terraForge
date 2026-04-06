@@ -8,7 +8,7 @@ import type {
 import type { RotStep } from "../utils/rotation";
 import { GroupedImportsSection } from "./GroupedImportsSection";
 import { ImportRowCard } from "./ImportRowCard";
-import { UngroupedDropZone } from "./UngroupedDropZone";
+import { UngroupedImportsSection } from "./UngroupedImportsSection";
 
 interface NameEditState {
   id: string;
@@ -242,10 +242,6 @@ export function ImportsByGroupList({
     );
   };
 
-  const ungroupedImports = imports.filter(
-    (i) => !layerGroups.some((g) => g.importIds.includes(i.id)),
-  );
-
   return (
     <>
       <GroupedImportsSection
@@ -269,15 +265,16 @@ export function ImportsByGroupList({
         renderImport={renderImport}
       />
 
-      <UngroupedDropZone
-        isDropTarget={dragOverGroupId === "none"}
-        showHint={showUngroupedHint}
-        onDragOver={onUngroupedDragOver}
-        onDragLeave={onUngroupedDragLeave}
-        onDrop={onUngroupedDrop}
-      >
-        {ungroupedImports.map((imp) => renderImport(imp, false))}
-      </UngroupedDropZone>
+      <UngroupedImportsSection
+        imports={imports}
+        layerGroups={layerGroups}
+        dragOverGroupId={dragOverGroupId}
+        showUngroupedHint={showUngroupedHint}
+        onUngroupedDragOver={onUngroupedDragOver}
+        onUngroupedDragLeave={onUngroupedDragLeave}
+        onUngroupedDrop={onUngroupedDrop}
+        renderImport={renderImport}
+      />
     </>
   );
 }
