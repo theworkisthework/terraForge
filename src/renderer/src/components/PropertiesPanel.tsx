@@ -22,6 +22,7 @@ import { useCanvasStore } from "../store/canvasStore";
 import { useMachineStore } from "../store/machineStore";
 import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 import { ToolpathSection } from "../features/properties-panel/components/ToolpathSection";
+import { LayersHeader } from "../features/properties-panel/components/LayersHeader";
 
 const ROT_STEPS = [1, 5, 15, 30, 45] as const;
 type RotStep = (typeof ROT_STEPS)[number];
@@ -199,27 +200,16 @@ export function PropertiesPanel() {
               />
             )}
 
-            {/* ── Groups header ("+ Add group" button) ────────────── */}
-            {imports.length > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 border-b border-border-ui/50">
-                <span className="text-[10px] text-content-faint uppercase tracking-wider flex-1">
-                  Layers
-                </span>
-                <button
-                  className="text-content-faint hover:text-accent text-xs leading-none px-1"
-                  title="Add layer group"
-                  onClick={() => {
-                    const n = layerGroups.length + 1;
-                    addLayerGroup(
-                      `Group ${n}`,
-                      GROUP_COLORS[layerGroups.length % GROUP_COLORS.length],
-                    );
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            )}
+            <LayersHeader
+              show={imports.length > 0}
+              onAddGroup={() => {
+                const n = layerGroups.length + 1;
+                addLayerGroup(
+                  `Group ${n}`,
+                  GROUP_COLORS[layerGroups.length % GROUP_COLORS.length],
+                );
+              }}
+            />
 
             {/* ── Layer groups (collapsible) + ungrouped imports ──────── */}
             {imports.length > 0 &&
