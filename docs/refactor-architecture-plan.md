@@ -249,7 +249,7 @@ Checklist:
 
 Current sprint focus:
 
-- [ ] Refactor `GcodeOptionsDialog.tsx` (in progress: prefs + validation helpers extracted)
+- [ ] Refactor `GcodeOptionsDialog.tsx` (in progress: prefs/validation + Paths section extracted)
 - [ ] Refactor `PropertiesPanel.tsx`
 - [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
@@ -266,6 +266,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Plan created and checklist initialized.
 - 2026-04-06: Started `GcodeOptionsDialog` refactor by extracting prefs persistence and numeric validation helpers into `features/gcode-options`.
 - 2026-04-06: Verified `GcodeOptionsDialog` behavior parity with `npm run test -- tests/component/GcodeOptionsDialog.test.tsx` (32/32 tests passing).
+- 2026-04-06: Extracted `PathsSection` from `GcodeOptionsDialog` into `features/gcode-options/components/PathsSection.tsx`; targeted dialog tests remain 32/32 passing.
 
 ## Update Rule
 
