@@ -24,7 +24,10 @@ import {
   parsePositiveNumber,
 } from "../features/gcode-options/gcodePrefsValidation";
 
-export { loadGcodePrefs, saveGcodePrefs } from "../features/gcode-options/gcodePrefs";
+export {
+  loadGcodePrefs,
+  saveGcodePrefs,
+} from "../features/gcode-options/gcodePrefs";
 export type { GcodePrefs } from "../features/gcode-options/gcodePrefs";
 
 // ─── Component ────────────────────────────────────────────────────────────────
