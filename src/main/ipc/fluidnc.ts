@@ -6,14 +6,16 @@ import { FluidNCClient } from "../../machine/fluidnc";
 import { SerialClient } from "../../machine/serial";
 import { TaskManager } from "../../tasks/taskManager";
 
-export function registerFluidncIpcHandlers(options: {
+export interface FluidncIpcOptions {
   fluidnc: FluidNCClient;
   serial: SerialClient;
   getConnectionType: () => "wifi" | "serial" | null;
   setConnectionType: (type: "wifi" | "serial" | null) => void;
   safeSend: (channel: string, ...args: unknown[]) => void;
   taskManager: TaskManager;
-}): void {
+}
+
+export function registerFluidncIpcHandlers(options: FluidncIpcOptions): void {
   const {
     fluidnc,
     serial,

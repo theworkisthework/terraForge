@@ -1,13 +1,14 @@
-import { dialog, ipcMain } from "electron";
-import { BrowserWindow } from "electron";
+import { dialog, ipcMain, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
 import type { MachineConfig } from "../../types";
 
-export function registerFsIpcHandlers(options: {
+export interface FsIpcOptions {
   getMainWindow: () => BrowserWindow | null;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
-}): void {
+}
+
+export function registerFsIpcHandlers(options: FsIpcOptions): void {
   const { getMainWindow, loadConfigs, saveConfigs } = options;
 
   ipcMain.handle("fs:openSvgDialog", async () => {
