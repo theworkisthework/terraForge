@@ -278,10 +278,9 @@ Checklist:
 Current sprint focus:
 
 - [x] Refactor `GcodeOptionsDialog.tsx`
-- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
-- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow extracted)
-- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState + PathRow + LayerRow extracted)
+- [x] Refactor `PropertiesPanel.tsx` (sections/hooks/selectors extracted and validated)
 - [x] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
+- [x] Modularize `src/main/index.ts` into bootstrap/menu/ipc/events/config modules
 
 Done this sprint:
 
