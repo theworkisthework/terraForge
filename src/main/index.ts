@@ -1,193 +1,34 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from "electron";
+import { app, ipcMain, dialog, shell } from "electron";
 import { join } from "path";
 import { tmpdir } from "os";
 import { readFile, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { registerAppLifecycleHandlers } from "./bootstrap/lifecycle";
 import { createMainWindow, getMainWindow, safeSend } from "./bootstrap/window";
+import {
+  buildApplicationMenu,
+  registerMenuStateHandlers,
+} from "./menu/applicationMenu";
+import { registerAppIpcHandlers } from "./ipc/app";
+import { registerConfigIpcHandlers } from "./ipc/config";
+import { registerJobIpcHandlers } from "./ipc/jobs";
+import { registerTaskIpcHandlers } from "./ipc/tasks";
 import { FluidNCClient } from "../machine/fluidnc";
 import { SerialClient } from "../machine/serial";
 import { TaskManager } from "../tasks/taskManager";
 import type {
   MachineConfig,
   PageSize,
-  VectorObject,
-  GcodeOptions,
   MachineStatus,
   RemoteFile,
   BackgroundTask,
 } from "../types";
 
-// ─── Application Menu ─────────────────────────────────────────────────────────────────────
-
-function buildApplicationMenu(): void {
-  const isMac = process.platform === "darwin";
-
-  const template: Electron.MenuItemConstructorOptions[] = [
-    // macOS — application menu (first item must be app name)
-    ...(isMac
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { role: "about" as const },
-              { type: "separator" as const },
-              { role: "services" as const },
-              { type: "separator" as const },
-              { role: "hide" as const },
-              { role: "hideOthers" as const },
-              { role: "unhide" as const },
-              { type: "separator" as const },
-              { role: "quit" as const },
-            ],
-          },
-        ]
-      : []),
-
-    {
-      label: "File",
-      submenu: [
-        {
-          id: "import",
-          label: "Import\u2026",
-          accelerator: "CmdOrCtrl+I",
-          click: () => safeSend("menu:import"),
-        },
-        { type: "separator" as const },
-        {
-          id: "openLayout",
-          label: "Open Layout…",
-          accelerator: "CmdOrCtrl+O",
-          click: () => safeSend("menu:openLayout"),
-        },
-        {
-          id: "saveLayout",
-          label: "Save Layout",
-          accelerator: "CmdOrCtrl+S",
-          enabled: false,
-          click: () => safeSend("menu:saveLayout"),
-        },
-        {
-          id: "closeLayout",
-          label: "Close Layout",
-          enabled: false,
-          click: () => safeSend("menu:closeLayout"),
-        },
-        { type: "separator" as const },
-        ...(isMac ? [] : [{ role: "quit" as const }]),
-      ],
-    },
-
-    {
-      label: "Edit",
-      submenu: [
-        { role: "undo" as const },
-        { role: "redo" as const },
-        { type: "separator" as const },
-        {
-          id: "editCut",
-          label: "Cut",
-          accelerator: "CmdOrCtrl+X",
-          enabled: false,
-          click: (_item, win) => {
-            // Let native cut handle any text-input focus, and also notify the
-            // renderer so it can perform a canvas-layer cut if one is selected.
-            if (win instanceof BrowserWindow) win.webContents.cut();
-            safeSend("menu:editCut");
-          },
-        },
-        {
-          id: "editCopy",
-          label: "Copy",
-          accelerator: "CmdOrCtrl+C",
-          enabled: false,
-          click: (_item, win) => {
-            if (win instanceof BrowserWindow) win.webContents.copy();
-            safeSend("menu:editCopy");
-          },
-        },
-        {
-          id: "editPaste",
-          label: "Paste",
-          accelerator: "CmdOrCtrl+V",
-          click: (_item, win) => {
-            // Native paste for text fields; canvas clipboard paste handled in renderer.
-            if (win instanceof BrowserWindow) win.webContents.paste();
-            safeSend("menu:editPaste");
-          },
-        },
-        {
-          id: "editSelectAll",
-          label: "Select All",
-          accelerator: "CmdOrCtrl+A",
-          click: () => {
-            // Do NOT call webContents.selectAll() here — that selects all page
-            // text.  The renderer decides whether to canvas-select or let the
-            // native text-selection behaviour take over.
-            safeSend("menu:editSelectAll");
-          },
-        },
-      ],
-    },
-
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" as const },
-        { role: "forceReload" as const },
-        { role: "toggleDevTools" as const },
-        { type: "separator" as const },
-        { role: "resetZoom" as const },
-        { role: "zoomIn" as const },
-        { role: "zoomOut" as const },
-        { type: "separator" as const },
-        { role: "togglefullscreen" as const },
-      ],
-    },
-
-    {
-      role: "help" as const,
-      submenu: [
-        {
-          label: "User Guide",
-          click: () =>
-            shell.openExternal(
-              "https://github.com/theworkisthework/terraForge/blob/main/docs/terraForge-user-guide.md",
-            ),
-        },
-        { type: "separator" as const },
-        {
-          label: "About terraForge",
-          click: () => safeSend("menu:about"),
-        },
-      ],
-    },
-  ];
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
-// Allow the renderer to toggle the Save Layout / Close Layout menu items.
-ipcMain.on("menu:setLayoutMenuState", (_e, hasImports: boolean) => {
-  const menu = Menu.getApplicationMenu();
-  const save = menu?.getMenuItemById("saveLayout");
-  const close = menu?.getMenuItemById("closeLayout");
-  if (save) save.enabled = hasImports;
-  if (close) close.enabled = hasImports;
-});
-
-// Enable/disable Cut and Copy menu items based on whether a canvas import is selected.
-ipcMain.on("menu:setEditMenuState", (_e, hasSelection: boolean) => {
-  const menu = Menu.getApplicationMenu();
-  const cut = menu?.getMenuItemById("editCut");
-  const copy = menu?.getMenuItemById("editCopy");
-  if (cut) cut.enabled = hasSelection;
-  if (copy) copy.enabled = hasSelection;
-});
+registerMenuStateHandlers();
 
 registerAppLifecycleHandlers({
   createMainWindow,
-  onReady: buildApplicationMenu,
+  onReady: () => buildApplicationMenu(safeSend),
   // Gracefully close the FluidNC WebSocket before the process exits so the
   // machine receives a proper WS close frame instead of a TCP RST.  A TCP RST
   // (from os-level socket teardown on process kill) can wedge the ESP32's WS
@@ -316,140 +157,16 @@ async function loadPageSizes(): Promise<PageSize[]> {
   }
 }
 
-// ─── IPC Handlers — Config ────────────────────────────────────────────────────
-
-ipcMain.handle("config:getMachineConfigs", () => loadConfigs());
-
-ipcMain.handle(
-  "config:saveMachineConfig",
-  async (_e, config: MachineConfig) => {
-    const configs = await loadConfigs();
-    const idx = configs.findIndex((c) => c.id === config.id);
-    if (idx >= 0) configs[idx] = config;
-    else configs.push(config);
-    await saveConfigs(configs);
-  },
-);
-
-ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
-  const configs = await loadConfigs();
-  await saveConfigs(configs.filter((c) => c.id !== id));
+registerConfigIpcHandlers({
+  getMainWindow,
+  loadConfigs,
+  saveConfigs,
+  loadPageSizes,
+  pageSizesPath,
+  builtInPageSizes: BUILT_IN_PAGE_SIZES,
 });
 
-ipcMain.handle("config:exportConfigs", async () => {
-  const mainWindow = getMainWindow();
-  if (!mainWindow) return null;
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: "Export Machine Configs",
-    defaultPath: "terraforge-machine-configs.json",
-    filters: [{ name: "JSON", extensions: ["json"] }],
-  });
-  if (result.canceled || !result.filePath) return null;
-  const configs = await loadConfigs();
-  const payload = JSON.stringify(
-    { terraForge: "machine-configs", version: 1, configs },
-    null,
-    2,
-  );
-  await writeFile(result.filePath, payload, "utf-8");
-  return result.filePath;
-});
-
-ipcMain.handle("config:importConfigs", async () => {
-  const mainWindow = getMainWindow();
-  if (!mainWindow) return { added: 0, skipped: 0 };
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: "Import Machine Configs",
-    filters: [{ name: "JSON", extensions: ["json"] }],
-    properties: ["openFile"],
-  });
-  if (result.canceled || result.filePaths.length === 0)
-    return { added: 0, skipped: 0 };
-  const raw = await readFile(result.filePaths[0], "utf-8");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Not a valid JSON file.");
-  }
-  // Accept both the wrapped format { terraForge, version, configs } and a raw array.
-  let incoming: MachineConfig[];
-  if (
-    parsed &&
-    typeof parsed === "object" &&
-    !Array.isArray(parsed) &&
-    "configs" in (parsed as object)
-  ) {
-    incoming = (parsed as { configs: MachineConfig[] }).configs;
-  } else if (Array.isArray(parsed)) {
-    incoming = parsed as MachineConfig[];
-  } else {
-    throw new Error(
-      "File does not contain a valid terraForge machine config export.",
-    );
-  }
-  if (!incoming.length) return { added: 0, skipped: 0 };
-  // Validate each entry has the required shape fields
-  const required: (keyof MachineConfig)[] = [
-    "name",
-    "bedWidth",
-    "bedHeight",
-    "connection",
-  ];
-  for (const cfg of incoming) {
-    if (!cfg || typeof cfg !== "object")
-      throw new Error("Invalid config entry in import file.");
-    for (const key of required) {
-      if (!(key in cfg))
-        throw new Error(`Config entry missing required field: "${key}".`);
-    }
-  }
-  const existing = await loadConfigs();
-  const existingIds = new Set(existing.map((c) => c.id));
-  const existingNames = new Set(
-    existing.map((c) => c.name.toLowerCase().trim()),
-  );
-  const toAdd: MachineConfig[] = [];
-  let skipped = 0;
-  for (const cfg of incoming) {
-    const nameKey = (cfg.name ?? "").toLowerCase().trim();
-    if (existingIds.has(cfg.id) || existingNames.has(nameKey)) {
-      skipped++;
-    } else {
-      toAdd.push(cfg);
-      // Track names added in this batch so duplicates within the file are also caught
-      existingIds.add(cfg.id);
-      existingNames.add(nameKey);
-    }
-  }
-  if (toAdd.length > 0) {
-    await saveConfigs([...existing, ...toAdd]);
-  }
-  return { added: toAdd.length, skipped };
-});
-
-ipcMain.handle("config:loadPageSizes", () => loadPageSizes());
-
-ipcMain.handle("config:openPageSizesFile", async () => {
-  // Write the built-in defaults if the file doesn't exist yet so the user has
-  // a well-formed starting point to edit.
-  if (!existsSync(pageSizesPath)) {
-    await writeFile(
-      pageSizesPath,
-      JSON.stringify(BUILT_IN_PAGE_SIZES, null, 2),
-      "utf-8",
-    );
-  }
-  shell.openPath(pageSizesPath);
-});
-
-// ─── IPC Handlers — App ───────────────────────────────────────────────────────
-
-ipcMain.handle("app:getVersion", () => app.getVersion());
-
-ipcMain.handle("app:openExternal", (_e, url: string) =>
-  shell.openExternal(url),
-);
+registerAppIpcHandlers();
 
 // ─── IPC Handlers — FluidNC ──────────────────────────────────────────────────
 // All handlers transparently route to either the HTTP client (Wi-Fi) or the
@@ -825,43 +542,6 @@ ipcMain.handle("fs:saveConfigs", (_e, configs: MachineConfig[]) =>
 
 // ─── IPC Handlers — Tasks ─────────────────────────────────────────────────────
 
-ipcMain.handle("tasks:cancel", (_e, taskId: string) =>
-  taskManager.cancel(taskId),
-);
+registerTaskIpcHandlers(taskManager);
 
-// ─── IPC Handlers — Jobs (G-code generation, delegated to renderer worker) ───
-
-ipcMain.handle(
-  "jobs:generateGcode",
-  async (
-    _e,
-    taskId: string,
-    objects: VectorObject[],
-    config: MachineConfig,
-    options: GcodeOptions,
-  ) => {
-    // G-code generation is done in a Web Worker in the renderer.
-    // Main process just tracks the task lifecycle.
-    taskManager.create(taskId, "gcode-generate", "Generating G-code");
-    // The renderer will push progress/completion via ipc
-    return "delegated";
-  },
-);
-
-ipcMain.on(
-  "jobs:gcodeProgress",
-  (_e, taskId: string, progress: number | null) => {
-    taskManager.update(taskId, { progress });
-    safeSend("task:update", taskManager.get(taskId));
-  },
-);
-
-ipcMain.on("jobs:gcodeComplete", (_e, taskId: string) => {
-  taskManager.complete(taskId);
-  safeSend("task:update", taskManager.get(taskId));
-});
-
-ipcMain.on("jobs:gcodeFailed", (_e, taskId: string, error: string) => {
-  taskManager.fail(taskId, error);
-  safeSend("task:update", taskManager.get(taskId));
-});
+registerJobIpcHandlers(taskManager, safeSend);
