@@ -19,7 +19,7 @@ import {
   selectPlotCanvasCanvasState,
   selectPlotCanvasHandleOverlayState,
   selectPlotCanvasToolpathState,
-} from "../store/canvasStoreSelectors";
+} from "../store/canvasSelectors";
 import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
 import { DEFAULT_STROKE_WIDTH_MM, type SvgImport } from "../../../types";

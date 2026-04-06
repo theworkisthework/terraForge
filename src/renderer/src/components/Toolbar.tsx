@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
-import { selectToolbarCanvasState } from "../store/canvasStoreSelectors";
+import { selectToolbarCanvasState } from "../store/canvasSelectors";
 import { useThemeStore } from "../store/themeStore";
 import { MachineConfigDialog } from "./MachineConfigDialog";
 import { GcodeOptionsDialog } from "./GcodeOptionsDialog";

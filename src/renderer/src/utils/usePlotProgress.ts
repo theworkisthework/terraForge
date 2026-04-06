@@ -37,7 +37,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useEffect, useRef } from "react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
-import { selectPlotProgressCanvasState } from "../store/canvasStoreSelectors";
+import { selectPlotProgressCanvasState } from "../store/canvasSelectors";
 import type { GcodeSegment } from "./gcodeParser";
 
 // Segments to scan ahead per coordinate-matching update.

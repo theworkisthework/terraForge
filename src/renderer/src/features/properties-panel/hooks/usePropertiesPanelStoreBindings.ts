@@ -1,6 +1,6 @@
 import { useCanvasStore } from "../../../store/canvasStore";
 import { useShallow } from "zustand/react/shallow";
-import { selectPropertiesPanelStoreBindingsState } from "../../../store/canvasStoreSelectors";
+import { selectPropertiesPanelStoreBindingsState } from "../../../store/canvasSelectors";
 import { useMachineStore } from "../../../store/machineStore";
 
 export function usePropertiesPanelStoreBindings() {

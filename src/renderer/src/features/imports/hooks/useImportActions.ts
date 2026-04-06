@@ -1,7 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
-import { selectImportActionsCanvasState } from "../../../store/canvasStoreSelectors";
+import { selectImportActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
 import {

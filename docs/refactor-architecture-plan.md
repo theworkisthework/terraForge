@@ -308,6 +308,7 @@ Done this sprint:
 - [x] Start grouped selector migration for `canvasStore.ts` consumers
 - [x] Migrate `PlotCanvas.tsx` to grouped canvas selectors
 - [x] Migrate remaining small canvas-store consumers to grouped selectors
+- [x] Reorganize canvas selectors by feature/concern
 
 ## Progress Log
 
@@ -340,6 +341,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Migrated `PlotCanvas.tsx` to grouped `canvasStore` selectors and replaced the remaining inline `showCentreMarker` subscription in `HandleOverlay`; validation passes with `npm.cmd run typecheck`, `tests/component/PlotCanvas.test.tsx` (63/63), and `tests/unit/stores/canvasStore.test.ts` (105/105).
 - 2026-04-06: Migrated `FileBrowserPanel.tsx`, `JobControls.tsx`, and `usePlotProgress.ts` to grouped `canvasStore` selectors; validation passes with `npm.cmd run typecheck`, `tests/component/FileBrowserPanel.test.tsx` (31/31), `tests/component/JobControls.test.tsx` (22/22), and `tests/unit/usePlotProgress.test.tsx` (19/19).
 - 2026-04-06: Completed renderer-wide `canvasStore` callsite migration to grouped selectors; `grep` confirms remaining `useCanvasStore(...)` consumers all route through named selector helpers in `store/canvasStoreSelectors.ts`.
+- 2026-04-06: Reorganized the selector layer from single-file `store/canvasStoreSelectors.ts` into feature-grouped modules under `store/canvasSelectors/` with a barrel export; validation passes with `npm.cmd run typecheck` and the full `runTests` suite (170/170).
 
 ## Update Rule
 

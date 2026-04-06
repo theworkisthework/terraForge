@@ -5,7 +5,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
-import { selectJobControlsCanvasState } from "../store/canvasStoreSelectors";
+import { selectJobControlsCanvasState } from "../store/canvasSelectors";
 import { parseGcode } from "../utils/gcodeParser";
 
 const GCODE_EXTS = [

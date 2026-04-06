@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
-import { selectFileBrowserPaneCanvasState } from "../store/canvasStoreSelectors";
+import { selectFileBrowserPaneCanvasState } from "../store/canvasSelectors";
 import { parseGcode } from "../utils/gcodeParser";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { RemoteFile } from "../../../types";

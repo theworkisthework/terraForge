@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
-import { selectLayoutActionsCanvasState } from "../../../store/canvasStoreSelectors";
+import { selectLayoutActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { type CanvasLayout } from "../../../../../types";
 

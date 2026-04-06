@@ -14,7 +14,7 @@ import React, { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
-import { selectGcodeOptionsDialogCanvasState } from "../store/canvasStoreSelectors";
+import { selectGcodeOptionsDialogCanvasState } from "../store/canvasSelectors";
 import {
   loadGcodePrefs,
   saveGcodePrefs,
