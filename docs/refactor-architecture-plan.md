@@ -18,6 +18,16 @@ Break down oversized files into focused modules, functions, and React components
   - Hard cap for orchestration components: <= 500 lines
   - Utility/service module target: <= 250 lines
 - [ ] Each extracted module has a single clear responsibility.
+- [ ] Every extracted component has direct focused tests (new or updated), not only parent-level coverage.
+
+## Testing Rule For Extractions
+
+- For every extracted component, add or update a dedicated component test file in `tests/component/` in the same PR.
+- Keep parent/component integration tests, but do not rely on them as the only verification for extracted UI units.
+- Minimum expectations per extracted component:
+  - render behavior
+  - primary interaction callbacks
+  - key conditional rendering paths
 
 ## Prioritized Refactor Targets
 
@@ -222,7 +232,7 @@ Checklist:
 ### Phase 1: Pure Function Extraction
 
 - [x] Extract helpers from Toolbar/Properties/GcodeOptions first.
-- [ ] Add/adjust unit tests for extracted logic.
+- [x] Add/adjust unit tests for extracted logic.
 
 ### Phase 2: Hook Extraction
 
@@ -250,8 +260,7 @@ Checklist:
 Current sprint focus:
 
 - [x] Refactor `GcodeOptionsDialog.tsx`
-- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header extracted)
-- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField extracted)
+- [ ] Refactor `PropertiesPanel.tsx` (in progress: helpers + Toolpath + Layers header + NumberField + EmptyState extracted)
 - [ ] Refactor `Toolbar.tsx`
 - [ ] Start `canvasStore.ts` slice extraction
 
@@ -265,6 +274,7 @@ Done this sprint:
 - [x] Extract PropertiesPanel `LayersHeader` component
 - [x] Extract PropertiesPanel `NumberField` component and rotation constants
 - [x] Extract PropertiesPanel `EmptyState` component
+- [x] Add focused tests for extracted `gcode-options` and `properties-panel` components
 
 ## Progress Log
 
@@ -280,6 +290,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Extracted `PropertiesPanel` layers header UI to `features/properties-panel/components/LayersHeader.tsx`; targeted panel tests remain 74/74 passing.
 - 2026-04-06: Extracted `PropertiesPanel` shared `NumberField` and rotation constants (`features/properties-panel/components/NumberField.tsx`, `features/properties-panel/utils/rotation.ts`); targeted panel tests remain 74/74 passing.
 - 2026-04-06: Extracted `PropertiesPanel` empty-state UI to `features/properties-panel/components/EmptyState.tsx`; targeted panel tests remain 74/74 passing.
+- 2026-04-06: Added extracted-component test suites (`tests/component/GcodeOptionsSections.test.tsx`, `tests/component/PropertiesPanelExtractedComponents.test.tsx`, `tests/component/EmptyState.test.tsx`); focused batch passes 11/11.
 
 ## Update Rule
 
@@ -288,3 +299,4 @@ Whenever a refactor item completes:
 1. Tick the matching checkbox.
 2. Add one log entry under Progress Log.
 3. If scope changed, update this plan in the same PR.
+4. Add or update dedicated tests for any extracted components.
