@@ -2,6 +2,28 @@ import { dialog, ipcMain, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
 import type { MachineConfig } from "../../types";
 
+const GCODE_EXTENSIONS = [
+  "gcode",
+  "nc",
+  "g",
+  "gc",
+  "gco",
+  "ngc",
+  "ncc",
+  "cnc",
+  "tap",
+];
+
+const IMPORT_FILTERS = [
+  {
+    name: "Supported Files",
+    extensions: ["svg", "pdf", ...GCODE_EXTENSIONS],
+  },
+  { name: "SVG Files", extensions: ["svg"] },
+  { name: "PDF Files", extensions: ["pdf"] },
+  { name: "G-code Files", extensions: GCODE_EXTENSIONS },
+];
+
 export interface FsIpcOptions {
   getMainWindow: () => BrowserWindow | null;
   loadConfigs: () => Promise<MachineConfig[]>;
@@ -48,40 +70,7 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Import File",
-      filters: [
-        {
-          name: "Supported Files",
-          extensions: [
-            "svg",
-            "pdf",
-            "gcode",
-            "nc",
-            "g",
-            "gc",
-            "gco",
-            "ngc",
-            "ncc",
-            "cnc",
-            "tap",
-          ],
-        },
-        { name: "SVG Files", extensions: ["svg"] },
-        { name: "PDF Files", extensions: ["pdf"] },
-        {
-          name: "G-code Files",
-          extensions: [
-            "gcode",
-            "nc",
-            "g",
-            "gc",
-            "gco",
-            "ngc",
-            "ncc",
-            "cnc",
-            "tap",
-          ],
-        },
-      ],
+      filters: IMPORT_FILTERS,
       properties: ["openFile"],
     });
     return result.canceled ? null : result.filePaths[0];
@@ -92,22 +81,7 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Import G-code",
-      filters: [
-        {
-          name: "G-code Files",
-          extensions: [
-            "gcode",
-            "nc",
-            "g",
-            "gc",
-            "gco",
-            "ngc",
-            "ncc",
-            "cnc",
-            "tap",
-          ],
-        },
-      ],
+      filters: [{ name: "G-code Files", extensions: GCODE_EXTENSIONS }],
       properties: ["openFile"],
     });
     return result.canceled ? null : result.filePaths[0];

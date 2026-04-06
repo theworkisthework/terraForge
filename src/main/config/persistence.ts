@@ -41,17 +41,29 @@ export const BUILT_IN_PAGE_SIZES: PageSize[] = [
   { id: "tabloid", name: "Tabloid", widthMM: 279.4, heightMM: 431.8 },
 ];
 
+function cloneMachineConfigs(configs: MachineConfig[]): MachineConfig[] {
+  return configs.map((config) => ({
+    ...config,
+    connection: { ...config.connection },
+  }));
+}
+
+function clonePageSizes(pageSizes: PageSize[]): PageSize[] {
+  return pageSizes.map((pageSize) => ({ ...pageSize }));
+}
+
 export function createPersistence(userDataPath: string): MainPersistence {
   const configPath = join(userDataPath, "machine-configs.json");
   const pageSizesPath = join(userDataPath, "page-sizes.json");
 
   async function loadConfigs(): Promise<MachineConfig[]> {
-    if (!existsSync(configPath)) return DEFAULT_MACHINE_CONFIGS;
+    if (!existsSync(configPath))
+      return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
     try {
       const raw = await readFile(configPath, "utf-8");
       return JSON.parse(raw) as MachineConfig[];
     } catch {
-      return DEFAULT_MACHINE_CONFIGS;
+      return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
     }
   }
 
@@ -67,7 +79,7 @@ export function createPersistence(userDataPath: string): MainPersistence {
         JSON.stringify(BUILT_IN_PAGE_SIZES, null, 2),
         "utf-8",
       );
-      return BUILT_IN_PAGE_SIZES;
+      return clonePageSizes(BUILT_IN_PAGE_SIZES);
     }
 
     try {
@@ -75,9 +87,9 @@ export function createPersistence(userDataPath: string): MainPersistence {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0)
         return parsed as PageSize[];
-      return BUILT_IN_PAGE_SIZES;
+      return clonePageSizes(BUILT_IN_PAGE_SIZES);
     } catch {
-      return BUILT_IN_PAGE_SIZES;
+      return clonePageSizes(BUILT_IN_PAGE_SIZES);
     }
   }
 

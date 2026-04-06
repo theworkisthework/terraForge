@@ -6,7 +6,7 @@ import { FluidNCClient } from "../../machine/fluidnc";
 import { SerialClient } from "../../machine/serial";
 import { TaskManager } from "../../tasks/taskManager";
 
-export interface FluidncIpcOptions {
+export interface FluidNCIpcOptions {
   fluidnc: FluidNCClient;
   serial: SerialClient;
   getConnectionType: () => "wifi" | "serial" | null;
@@ -15,7 +15,7 @@ export interface FluidncIpcOptions {
   taskManager: TaskManager;
 }
 
-export function registerFluidncIpcHandlers(options: FluidncIpcOptions): void {
+export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
   const {
     fluidnc,
     serial,
