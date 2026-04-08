@@ -95,8 +95,16 @@ export function PlotCanvas() {
   const canvasH = bedH * MM_TO_PX + PAD * 2;
 
   // ── Viewport (vp state, fit calculation, ResizeObserver) ────────────────────
-  const { vp, vpRef, setVp, fitted, setFitted, computeFit, fitToView, containerSize } =
-    useViewport(containerRef, canvasW, canvasH);
+  const {
+    vp,
+    vpRef,
+    setVp,
+    fitted,
+    setFitted,
+    computeFit,
+    fitToView,
+    containerSize,
+  } = useViewport(containerRef, canvasW, canvasH);
 
   // ── Pan/Zoom (wheel event listener) ─────────────────────────────────────────
   const { zoomBy } = useCanvasPanZoom(containerRef, vpRef, setVp, setFitted);

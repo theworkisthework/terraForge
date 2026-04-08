@@ -6,7 +6,10 @@ import { MIN_ZOOM } from "../constants";
 // ── ResizeObserver mock ───────────────────────────────────────────────────────
 // Replace the global with a class stub so `new ResizeObserver(cb)` works.
 
-type ROMock = { observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> };
+type ROMock = {
+  observe: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+};
 let capturedROCallbacks: ResizeObserverCallback[] = [];
 let roMocks: ROMock[] = [];
 
@@ -51,7 +54,14 @@ function fireResize(width: number, height: number, index = 0) {
 function makeContainerRef(width = 800, height = 600) {
   const div = document.createElement("div");
   div.getBoundingClientRect = () =>
-    ({ width, height, top: 0, left: 0, right: width, bottom: height } as DOMRect);
+    ({
+      width,
+      height,
+      top: 0,
+      left: 0,
+      right: width,
+      bottom: height,
+    }) as DOMRect;
   return { current: div };
 }
 
@@ -118,7 +128,9 @@ describe("useViewport", () => {
 
     it("disconnects the ResizeObserver on unmount", () => {
       const ref = makeContainerRef();
-      const { unmount } = renderHook(() => useViewport(ref, CANVAS_W, CANVAS_H));
+      const { unmount } = renderHook(() =>
+        useViewport(ref, CANVAS_W, CANVAS_H),
+      );
       unmount();
       expect(roMocks[0].disconnect).toHaveBeenCalled();
     });

@@ -13,7 +13,7 @@ afterEach(() => {
 function makeContainer() {
   const div = document.createElement("div");
   div.getBoundingClientRect = () =>
-    ({ width: 800, height: 600, top: 0, left: 0 } as DOMRect);
+    ({ width: 800, height: 600, top: 0, left: 0 }) as DOMRect;
   document.body.appendChild(div);
   return div;
 }
@@ -45,7 +45,11 @@ describe("useCanvasPanZoom", () => {
     });
 
     it("decreases zoom when factor < 1", () => {
-      const { containerRef, vpRef, setVp, setFitted } = makeRefs({ zoom: 4, panX: 0, panY: 0 });
+      const { containerRef, vpRef, setVp, setFitted } = makeRefs({
+        zoom: 4,
+        panX: 0,
+        panY: 0,
+      });
       const { result } = renderHook(() =>
         useCanvasPanZoom(containerRef, vpRef, setVp, setFitted),
       );
@@ -55,7 +59,11 @@ describe("useCanvasPanZoom", () => {
     });
 
     it("clamps zoom to MAX_ZOOM", () => {
-      const { containerRef, vpRef, setVp, setFitted } = makeRefs({ zoom: MAX_ZOOM, panX: 0, panY: 0 });
+      const { containerRef, vpRef, setVp, setFitted } = makeRefs({
+        zoom: MAX_ZOOM,
+        panX: 0,
+        panY: 0,
+      });
       const { result } = renderHook(() =>
         useCanvasPanZoom(containerRef, vpRef, setVp, setFitted),
       );
@@ -65,7 +73,11 @@ describe("useCanvasPanZoom", () => {
     });
 
     it("clamps zoom to MIN_ZOOM", () => {
-      const { containerRef, vpRef, setVp, setFitted } = makeRefs({ zoom: MIN_ZOOM, panX: 0, panY: 0 });
+      const { containerRef, vpRef, setVp, setFitted } = makeRefs({
+        zoom: MIN_ZOOM,
+        panX: 0,
+        panY: 0,
+      });
       const { result } = renderHook(() =>
         useCanvasPanZoom(containerRef, vpRef, setVp, setFitted),
       );
@@ -117,11 +129,16 @@ describe("useCanvasPanZoom", () => {
 
   describe("wheel event listener", () => {
     it("scroll up (deltaY < 0) calls zoomBy with factor > 1", () => {
-      const { containerRef, vpRef, setVp, setFitted, containerDiv } = makeRefs();
+      const { containerRef, vpRef, setVp, setFitted, containerDiv } =
+        makeRefs();
       renderHook(() => useCanvasPanZoom(containerRef, vpRef, setVp, setFitted));
       act(() => {
         containerDiv.dispatchEvent(
-          new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true }),
+          new WheelEvent("wheel", {
+            deltaY: -100,
+            bubbles: true,
+            cancelable: true,
+          }),
         );
       });
       expect(setVp).toHaveBeenCalled();
@@ -138,7 +155,11 @@ describe("useCanvasPanZoom", () => {
       renderHook(() => useCanvasPanZoom(containerRef, vpRef, setVp, setFitted));
       act(() => {
         containerDiv.dispatchEvent(
-          new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true }),
+          new WheelEvent("wheel", {
+            deltaY: 100,
+            bubbles: true,
+            cancelable: true,
+          }),
         );
       });
       expect(setVp).toHaveBeenCalled();
@@ -147,9 +168,14 @@ describe("useCanvasPanZoom", () => {
     });
 
     it("calls preventDefault on wheel event", () => {
-      const { containerRef, vpRef, setVp, setFitted, containerDiv } = makeRefs();
+      const { containerRef, vpRef, setVp, setFitted, containerDiv } =
+        makeRefs();
       renderHook(() => useCanvasPanZoom(containerRef, vpRef, setVp, setFitted));
-      const event = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true });
+      const event = new WheelEvent("wheel", {
+        deltaY: -100,
+        bubbles: true,
+        cancelable: true,
+      });
       act(() => {
         containerDiv.dispatchEvent(event);
       });
@@ -157,7 +183,8 @@ describe("useCanvasPanZoom", () => {
     });
 
     it("removes wheel listener on unmount", () => {
-      const { containerRef, vpRef, setVp, setFitted, containerDiv } = makeRefs();
+      const { containerRef, vpRef, setVp, setFitted, containerDiv } =
+        makeRefs();
       const removeSpy = vi.spyOn(containerDiv, "removeEventListener");
       const { unmount } = renderHook(() =>
         useCanvasPanZoom(containerRef, vpRef, setVp, setFitted),
