@@ -6,3 +6,6 @@ export * from "./constants";
 export * from "./types";
 export * from "./utils/coordinates";
 export * from "./utils/geometry";
+export * from "./components/BedLayer";
+export * from "./components/GridLayer";
+export * from "./components/SelectionOverlay";

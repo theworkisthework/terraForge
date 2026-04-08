@@ -145,13 +145,13 @@ Extract zero-logic subcomponents that only render props into `src/renderer/src/f
 
 **Checklist 1b:**
 
-- [ ] Extract `BedLayer.tsx` + unit test
-- [ ] Extract `GridLayer.tsx` + unit test
-- [ ] Extract `SelectionOverlay.tsx` + unit test (may pull geometry from Phase-1a)
-- [ ] Update PlotCanvas to use new components
-- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + E2E bed/grid visual tests
+- [x] Extract `BedLayer.tsx` + unit test (completed 2026-04-08)
+- [x] Extract `GridLayer.tsx` + unit test (completed 2026-04-08)
+- [x] Extract `SelectionOverlay.tsx` + unit test (completed 2026-04-08)
+- [x] Update PlotCanvas to use new components (completed 2026-04-08)
+- [x] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + E2E bed/grid visual tests (completed 2026-04-08)
 
-**Deliverable:** Step 1b complete when: 3 new components exist, PlotCanvas calls them instead of inline JSX, behavior identical.
+**Deliverable:** Step 1b complete. ✅ 3 presentational components extracted and integrated into PlotCanvas with full test coverage (19 co-located tests + 63 PlotCanvas tests all passing).
 
 ---
 

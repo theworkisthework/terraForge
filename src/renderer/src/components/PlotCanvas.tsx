@@ -33,6 +33,9 @@ import {
   type HandlePos,
   type Vp,
   scaleHexColor,
+  BedLayer,
+  GridLayer,
+  SelectionOverlay,
 } from "../features/canvas";
 
 export function PlotCanvas() {
@@ -1541,45 +1544,10 @@ export function PlotCanvas() {
       >
         {/* Bed background — filled by the canvas layer behind this SVG.
              fill="none" here so the canvas #0d1117 rect shows through. */}
-        <rect
-          x={PAD}
-          y={PAD}
-          width={bedW * MM_TO_PX}
-          height={bedH * MM_TO_PX}
-          fill="none"
-          stroke="var(--tf-border)"
-          strokeWidth={1}
-        />
+        <BedLayer bedW={bedW} bedH={bedH} />
 
         {/* Grid — 10 mm intervals, major every 50 mm */}
-        {Array.from(
-          { length: Math.floor(bedW / 10) + 1 },
-          (_, i) => i * 10,
-        ).map((mm) => (
-          <line
-            key={`vg-${mm}`}
-            x1={PAD + mm * MM_TO_PX}
-            y1={PAD}
-            x2={PAD + mm * MM_TO_PX}
-            y2={PAD + bedH * MM_TO_PX}
-            stroke="var(--tf-border)"
-            strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
-          />
-        ))}
-        {Array.from(
-          { length: Math.floor(bedH / 10) + 1 },
-          (_, i) => i * 10,
-        ).map((mm) => (
-          <line
-            key={`hg-${mm}`}
-            x1={PAD}
-            y1={getBedY(mm)}
-            x2={PAD + bedW * MM_TO_PX}
-            y2={getBedY(mm)}
-            stroke="var(--tf-border)"
-            strokeWidth={mm % 50 === 0 ? 0.8 : 0.3}
-          />
-        ))}
+        <GridLayer bedW={bedW} bedH={bedH} getBedY={getBedY} />
 
         {/* Rulers are rendered as a screen-space overlay — see below */}
 
