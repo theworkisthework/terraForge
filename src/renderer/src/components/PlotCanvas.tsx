@@ -26,8 +26,6 @@ import { DEFAULT_STROKE_WIDTH_MM, type SvgImport } from "../../../types";
 import {
   MM_TO_PX,
   PAD,
-  MIN_ZOOM,
-  MAX_ZOOM,
   ZOOM_STEP,
   ROTATE_CURSOR,
   type HandlePos,
@@ -37,6 +35,8 @@ import {
   GridLayer,
   SelectionOverlay,
   ToolpathOverlay,
+  useViewport,
+  useCanvasPanZoom,
 } from "../features/canvas";
 
 export function PlotCanvas() {
@@ -94,111 +94,12 @@ export function PlotCanvas() {
   const canvasW = bedW * MM_TO_PX + PAD * 2;
   const canvasH = bedH * MM_TO_PX + PAD * 2;
 
-  // ── Viewport state ────────────────────────────────────────────────────────────
-  // vpRef mirrors vp for use inside event-handler closures without stale captures.
-  const [vp, _setVp] = useState<Vp>({ zoom: 1, panX: 0, panY: 0 });
-  const vpRef = useRef<Vp>(vp);
-  const setVp = useCallback((next: Vp) => {
-    vpRef.current = next;
-    _setVp(next);
-  }, []);
+  // ── Viewport (vp state, fit calculation, ResizeObserver) ────────────────────
+  const { vp, vpRef, setVp, fitted, setFitted, computeFit, fitToView, containerSize } =
+    useViewport(containerRef, canvasW, canvasH);
 
-  // Container dimensions — fed to RulerOverlay (screen-space rulers).
-  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
-
-  // fittedRef: true → resize re-fits the bed; false → resize preserves zoom + center.
-  const [fitted, _setFitted] = useState(true);
-  const fittedRef = useRef(true);
-  const setFitted = useCallback((v: boolean) => {
-    fittedRef.current = v;
-    _setFitted(v);
-  }, []);
-
-  // ── Fit helpers ───────────────────────────────────────────────────────────────
-  const computeFit = useCallback(
-    (w: number, h: number): Vp => {
-      const pad = 8;
-      const zoom = Math.max(
-        MIN_ZOOM,
-        Math.min((w - pad * 2) / canvasW, (h - pad * 2) / canvasH),
-      );
-      return {
-        zoom,
-        panX: (w - canvasW * zoom) / 2,
-        panY: (h - canvasH * zoom) / 2,
-      };
-    },
-    [canvasW, canvasH],
-  );
-
-  const fitToView = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    setVp(computeFit(width, height));
-    setFitted(true);
-  }, [computeFit, setVp, setFitted]);
-
-  // ── Zoom helper — centered on a client-space point or the container centre ────
-  const zoomBy = useCallback(
-    (factor: number, clientX?: number, clientY?: number) => {
-      const el = containerRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const mx = clientX !== undefined ? clientX - rect.left : rect.width / 2;
-      const my = clientY !== undefined ? clientY - rect.top : rect.height / 2;
-      const old = vpRef.current;
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, old.zoom * factor));
-      const cx = (mx - old.panX) / old.zoom;
-      const cy = (my - old.panY) / old.zoom;
-      setVp({
-        zoom: newZoom,
-        panX: mx - cx * newZoom,
-        panY: my - cy * newZoom,
-      });
-      setFitted(false);
-    },
-    [setVp, setFitted],
-  );
-
-  // ── ResizeObserver — initial fit + responsive resize ─────────────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    let first = true;
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ w: width, h: height });
-      if (first || fittedRef.current) {
-        first = false;
-        setVp(computeFit(width, height));
-      } else {
-        // Keep zoom; slide pan to maintain the same content pixel at the centre.
-        const old = vpRef.current;
-        const cx = (width / 2 - old.panX) / old.zoom;
-        const cy = (height / 2 - old.panY) / old.zoom;
-        setVp({
-          zoom: old.zoom,
-          panX: width / 2 - cx * old.zoom,
-          panY: height / 2 - cy * old.zoom,
-        });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [computeFit, setVp]);
-
-  // ── Scroll wheel → zoom (non-passive so we can preventDefault) ───────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY);
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [zoomBy]);
+  // ── Pan/Zoom (wheel event listener) ─────────────────────────────────────────
+  const { zoomBy } = useCanvasPanZoom(containerRef, vpRef, setVp, setFitted);
 
   // Tracks the last known WCO (work-coordinate offset) from raw FluidNC status.
   // WPos = MPos − WCO, computed here the same way as in usePlotProgress so the

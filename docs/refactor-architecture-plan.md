@@ -203,11 +203,11 @@ Viewport state machine (fit, zoom, pan) and ResizeObserver logic:
 
 **Checklist 3:**
 
-- [ ] Create `src/renderer/src/features/canvas/hooks/useViewport.ts` + unit test
-- [ ] Create `src/renderer/src/features/canvas/hooks/useCanvasPanZoom.ts` + unit test
-- [ ] Create `src/renderer/src/features/canvas/hooks/index.ts` barrel export
-- [ ] Update PlotCanvas to use hooks; remove inline ResizeObserver + wheel listener
-- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + zoom/pan E2E (layout.spec.ts)
+- [x] Create `src/renderer/src/features/canvas/hooks/useViewport.ts` + unit test
+- [x] Create `src/renderer/src/features/canvas/hooks/useCanvasPanZoom.ts` + unit test
+- [x] Create `src/renderer/src/features/canvas/hooks/index.ts` barrel export
+- [x] Update PlotCanvas to use hooks; remove inline ResizeObserver + wheel listener
+- [x] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + zoom/pan E2E (layout.spec.ts)
 
 **Deliverable:** Step 3 complete when: Hooks exist, PlotCanvas uses them, zoom/pan behavior identical; ResizeObserver behavior verified.
 
