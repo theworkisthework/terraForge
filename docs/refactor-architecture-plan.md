@@ -78,34 +78,244 @@ Break down oversized files into focused modules, functions, and React components
 
 ### 1) PlotCanvas Decomposition
 
-Extract from `src/renderer/src/components/PlotCanvas.tsx`:
+PlotCanvas is currently ~3100 lines with 9 distinct responsibilities (viewport, pan/zoom, drag/scale/rotate gestures, keyboard shortcuts, bed/grid rendering, toolpath canvas rendering, overlays). Extract in 6 sequential phases.
 
-- Hooks:
-  - `useViewport`
-  - `useCanvasPanZoom`
-  - `useObjectDrag`
-  - `useObjectScaleRotate`
-  - `useCanvasKeyboardShortcuts`
-- Utilities:
-  - geometry math
-  - handle bounds math
-  - coordinate transform helpers
-- Subcomponents:
-  - `BedLayer`
-  - `GridLayer`
-  - `ImportsLayer`
-  - `SelectionOverlay`
-  - `ToolpathOverlay`
-  - `ProgressOverlay`
-  - `RulerOverlay`
+#### Phase-1a: Extract Utilities & Constants (Utilities only, no state changes)
 
-Checklist:
+Extract pure coordinate math and geometry helpers into `src/renderer/src/features/canvas/`:
 
-- [ ] Create `features/canvas/hooks/` and `features/canvas/components/`.
-- [ ] Move viewport math into `useViewport`.
-- [ ] Move drag/scale/rotate state machines into dedicated hooks.
-- [ ] Extract render-only layer components.
-- [ ] Keep `PlotCanvas.tsx` as orchestrator (< 500 lines target).
+- **coordinates.ts** (150 LOC)
+  - `mmToSvg(mm, origin, bedW, bedH)` — machine-mm → canvas SVG px (origin-aware)
+  - `svgToScreen(x, y, zoom, panX, panY)` — canvas SVG px → screen CSS px (viewport-aware)
+  - `screenToSvg(sx, sy, zoom, panX, panY)` — screen px → canvas SVG px
+  - `svgToMm(x, y, origin, bedW, bedH)` — canvas SVG px → machine-mm (origin-aware)
+  - Unit test: Cover all 5 origin types (bottom-left, top-left, bottom-right, top-right, center)
+
+- **geometry.ts** (200 LOC)
+  - `computeFit(containerW, containerH, canvasW, canvasH)` → `{ zoom, panX, panY }`
+  - `rotatePoint(ox, oy, angle)` → `[x, y]` (rotate offset by degrees)
+  - `computeBoundingBox(imports)` → `{ minX, maxX, minY, maxY }` (AABB in SVG px)
+  - `computeOBB(imports, angle)` → `{ cx, cy, hw, hh, angle }` (oriented bounding box)
+  - `handleBoundsForBox(cx, cy, hw, hh)` → `Array<[HandlePos, sx, sy]>` (8 handle positions in screen px)
+  - `scaleHexColor(hex, factor)` — darken/brighten color (move from PlotCanvas)
+  - Unit test: Verify all handle positions for known geometry; test OBB with various rotation angles; test color scaling
+
+- **types.ts**
+  - `interface Vp { zoom: number; panX: number; panY: number; }` — viewport state
+  - `type HandlePos = "tl" | "t" | "tr" | "r" | "br" | "b" | "bl" | "l"`
+  - Additional shared canvas types as needed
+
+- **constants.ts** (50 LOC)
+  - `MM_TO_PX`, `PAD`, `MIN_ZOOM`, `MAX_ZOOM`, `ZOOM_STEP`
+  - Ruler: `RULER_W`, `FONT`, `BG`, `TICK_COL`, `ORIGIN_COL`, `LABEL_COL`
+  - Handles: `HANDLE_SCREEN_R`, `DEL_OFFSET_PX`, `DEL_HALF_PX`
+  - Cursors: `ROTATE_CURSOR`
+
+**Checklist 1a:**
+
+- [ ] Create `src/renderer/src/features/canvas/utils/{coordinates.ts, geometry.ts, colors.ts}` with full coverage unit tests
+- [ ] Create `src/renderer/src/features/canvas/types.ts` with shared interfaces
+- [ ] Create `src/renderer/src/features/canvas/constants.ts` with all magic numbers
+- [ ] Add `src/renderer/src/features/canvas/index.ts` barrel export
+- [ ] Update PlotCanvas imports: replace inline helpers with imported utilities
+- [ ] Validate: `npm run typecheck` + `npm run test -- tests/unit/features/canvas/` pass
+
+**Deliverable:** Step 1a complete when: All 4 utility modules exist, import cleanly into PlotCanvas, original behavior unchanged (verified by tests/component/PlotCanvas.test.tsx still passing 63/63).
+
+---
+
+#### Phase-1b: Extract Pure Presentational Subcomponents (No state, render-only)
+
+Extract zero-logic subcomponents that only render props into `src/renderer/src/features/canvas/components/`:
+
+- **BedLayer.tsx** (40 LOC)
+  - Input: `bedW`, `bedH`, `bedXMin`, `bedXMax`, `bedYMin`, `bedYMax`
+  - Renders: `<rect>` + border for bed background (canvas fills the interior)
+  - Unit test: Verify rect dimensions and stroke color
+
+- **GridLayer.tsx** (60 LOC)
+  - Input: `bedW`, `bedH`, `getBedY` callback
+  - Renders: Major (50mm) + minor (10mm) grid lines
+  - Unit test: Verify line count for known bed dimensions; test getBedY callback wiring
+
+- **SelectionOverlay.tsx** (80 LOC)
+  - Input: `imports`, `zoom`, `panX`, `panY`, `containerW`, `containerH`, `getBedY`, `activeOBB?`
+  - Renders: Dashed polygon around selected AABB or OBB (from GroupHandleOverlay logic)
+  - Unit test: Verify polygon points for axis-aligned geometry
+
+**Checklist 1b:**
+
+- [ ] Extract `BedLayer.tsx` + unit test
+- [ ] Extract `GridLayer.tsx` + unit test
+- [ ] Extract `SelectionOverlay.tsx` + unit test (may pull geometry from Phase-1a)
+- [ ] Update PlotCanvas to use new components
+- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + E2E bed/grid visual tests
+
+**Deliverable:** Step 1b complete when: 3 new components exist, PlotCanvas calls them instead of inline JSX, behavior identical.
+
+---
+
+#### Phase-2: Extract Canvas-Rendering Layer (useEffect + RAF + Path2D caching)
+
+Extract the complex ToolpathOverlay rendering logic (currently ~400 LOC in PlotCanvas useEffect):
+
+- **ToolpathOverlay.tsx** (400 LOC)
+  - Manages: `<canvas>` ref, RAF debouncing, Path2D caching per import
+  - Inputs: `vp`, `containerSize`, `imports`, `selectedImportId`, `allImportsSelected`, `layerGroups`, `gcodeToolpath`, `toolpathSelected`, `plotProgressCuts`, `plotProgressRapids`, `selectedGroupId`, `activeConfig`, coordinate transform helpers
+  - Renders: `<canvas>` element with coordinate transforms + stroke styling
+  - Responsibilities:
+    - Path2D cache invalidation (rebuild when `imp.paths` or `imp.layers` reference changes)
+    - LOD (level-of-detail) culling at 0.4px screen-length threshold
+    - Plot-progress overlay rendering (cuts + rapids)
+    - Bed background fill
+  - **CRITICAL:** Extract ref-holding logic carefully; test against known G-code paths
+  - Unit test: Mock canvas context; verify setTransform calls for different origins; test LOD culling
+
+**Checklist 2:**
+
+- [ ] Extract canvas rendering into `ToolpathOverlay.tsx` preserving all Path2D cache logic
+- [ ] Add focused unit test for Path2D cache invalidation
+- [ ] Update PlotCanvas to render `<ToolpathOverlay>` instead of inline useEffect
+- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + toolpath rendering E2E (pdf-import.spec.ts, gcode-preview.spec.ts)
+
+**Deliverable:** Step 2 complete when: ToolpathOverlay exists and renders identically to current implementation; all toolpath E2E tests pass.
+
+---
+
+#### Phase-3: Extract Viewport & Pan/Zoom Logic into Hooks
+
+Viewport state machine (fit, zoom, pan) and ResizeObserver logic:
+
+- **useViewport.ts** (100 LOC)
+  - State: `vp` (viewport), `vpRef` (for closure access)
+  - Methods: `setVp()`, `computeFit()`, `fitToView()`
+  - Effect: ResizeObserver for responsive resize
+  - Returns: `{ vp, setVp, fitToView, computeFit }`
+  - Unit test: Mock ResizeObserver; verify fit with various aspect ratios; test preserve-zoom-on-resize
+
+- **useCanvasPanZoom.ts** (80 LOC)
+  - State: `containerSize`
+  - Methods: `zoomBy(factor, clientX?, clientY?)` (zoom centered on point or container center)
+  - Effect: Wheel event listener (non-passive so preventDefault works)
+  - Returns: `{ zoomBy, containerSize, setContainerSize }`
+  - **Dependency:** Calls `setVp` from `useViewport` (passed as prop or via hook composition)
+  - Unit test: Wheel event zoom-in/zoom-out; verify zoom clamping (MIN_ZOOM, MAX_ZOOM); verify screen-point preservation
+
+**Checklist 3:**
+
+- [ ] Create `src/renderer/src/features/canvas/hooks/useViewport.ts` + unit test
+- [ ] Create `src/renderer/src/features/canvas/hooks/useCanvasPanZoom.ts` + unit test
+- [ ] Create `src/renderer/src/features/canvas/hooks/index.ts` barrel export
+- [ ] Update PlotCanvas to use hooks; remove inline ResizeObserver + wheel listener
+- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + zoom/pan E2E (layout.spec.ts)
+
+**Deliverable:** Step 3 complete when: Hooks exist, PlotCanvas uses them, zoom/pan behavior identical; ResizeObserver behavior verified.
+
+---
+
+#### Phase-4: Extract Gesture State & Handlers into Hooks (Drag/Scale/Rotate/OBB)
+
+Four gesture types each have dedicated state machine; extract each into hooks:
+
+- **useObjectDrag.ts** (80 LOC)
+  - State: `dragging { id, startMouseX, startMouseY, startObjX, startObjY, group? }`
+  - Methods: `startDrag()`, `updateDrag()`, `endDrag()`
+  - Logic: Multi-select group-drag detection
+  - Returns: `{ dragging, startDrag, updateDrag, endDrag }`
+  - Unit test: Single-object drag; group drag; state transitions
+
+- **useObjectScaleRotate.ts** (120 LOC)
+  - State: `scaling { id, handle, ... }`, `rotating { id, cx, cy, startAngle, startRotation }`
+  - Methods: `startScale()`, `updateScale()`, `endScale()`, `startRotate()`, `updateRotate()`, `endRotate()`
+  - Logic: 8-point handle detection, angle calculation (atan2)
+  - Returns: `{ scaling, rotating, startScale, updateScale, endScale, startRotate, updateRotate, endRotate }`
+  - Unit test: Handle detection for each of 8 positions; rotation angle clamping; scale clamping
+
+- **useGroupOBB.ts** (150 LOC)
+  - State: `groupScaling`, `groupRotating`, `groupOBBAngle`, `persistentGroupOBB`
+  - Methods: `startGroupDrag()`, `startGroupScale()`, `startGroupRotate()`, `endGroupGesture()`, `clearOBB()`
+  - Logic: Oriented bounding box (OBB) rotation accumulation; persistence across gestures
+  - **Dependency:** `computeOBB()`, `handleBoundsForBox()` from geometry utils
+  - Returns: `{ groupScaling, groupRotating, groupOBBAngle, persistentGroupOBB, ... }`
+  - Unit test: OBB angle accumulation; persistence clearing on deselect; handle positions in OBB frame
+
+- **useSpaceKeyPan.ts** (60 LOC)
+  - State: `spaceDown`, `isPanning`, `panStartRef`
+  - Effects: keydown (space → enable pan mode), keyup (space → disable)
+  - Methods: `startPan()` (called on space+mousedown)
+  - Returns: `{ spaceDown, isPanning, startPan }`
+  - Unit test: Space keydown/keyup; pan mode activation/deactivation
+
+**Checklist 4:**
+
+- [ ] Create `src/renderer/src/features/canvas/hooks/useObjectDrag.ts` + unit test
+- [ ] Create `src/renderer/src/features/canvas/hooks/useObjectScaleRotate.ts` + unit test
+- [ ] Create `src/renderer/src/features/canvas/hooks/useGroupOBB.ts` + unit test
+- [ ] Create `src/renderer/src/features/canvas/hooks/useSpaceKeyPan.ts` + unit test
+- [ ] Update PlotCanvas to use hooks; remove inline gesture state/handlers
+- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + interaction E2E (properties-panel.spec.ts)
+
+**Deliverable:** Step 4 complete when: 4 hooks exist, PlotCanvas simplified, gesture behavior identical; all drag/scale/rotate E2E tests pass.
+
+---
+
+#### Phase-5: Extract Keyboard Shortcuts into Hook
+
+- **useCanvasKeyboardShortcuts.ts** (150 LOC)
+  - Manages all keydown/keyup listeners:
+    - Space: pan mode
+    - Delete/Backspace: remove selected item(s)
+    - Escape: deselect all
+    - Ctrl+Shift+= / Ctrl+Shift+- : keyboard zoom
+    - Ctrl+A: select all imports
+  - **Dependency:** All hooks from Phase-3, 4; store mutations (selectImport, clearImports, etc.)
+  - Returns: nothing (installs listeners via useEffect)
+  - Unit test: Mock keyboard events; verify each shortcut triggers correct action
+
+**Checklist 5:**
+
+- [ ] Create `src/renderer/src/features/canvas/hooks/useCanvasKeyboardShortcuts.ts` + unit test
+- [ ] Update PlotCanvas to use hook; remove inline keyboard listeners
+- [ ] Validate: `npm run typecheck` + keyboard shortcut E2E (no dedicated spec, but layout.spec.ts + properties-panel.spec.ts cover most)
+
+**Deliverable:** Step 5 complete when: Hook exists, PlotCanvas uses it, all keyboard shortcuts work identically.
+
+---
+
+#### Phase-6: Recompose PlotCanvas & Finalize
+
+Pull all extracted pieces together; simplify main PlotCanvas component:
+
+**Checklist 6:**
+
+- [ ] Import all utilities, components, and hooks
+- [ ] Consolidate PlotCanvas JSX to pure orchestration (render calls to: BedLayer, GridLayer, ToolpathOverlay, SelectionOverlay, HandleOverlay, GroupHandleOverlay, RulerOverlay, pen position crosshair)
+- [ ] Remove all inline state, effects, event handlers (delegated to hooks)
+- [ ] Target size: PlotCanvas should drop from ~3100 → ~600–800 lines
+- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + `npm run test:e2e` (full suite)
+
+**Deliverable:** Step 6 complete when: PlotCanvas is primarily orchestration; all 1167+ unit tests + E2E tests pass; no regressions in canvas behavior.
+
+---
+
+#### Testing Strategy
+
+- **Utilities (Phase 1a):** Pure function unit tests; no mocks needed
+- **Components (Phase 1b):** Render tests with props; no store interaction
+- **Canvas Overlay (Phase 2):** Mock canvas context; verify Path2D calls
+- **Hooks (Phase 3–5):** Mock useEffect, event listeners; verify state transitions
+- **Final (Phase 6):** Keep `tests/component/PlotCanvas.test.tsx`; simplify assertions since logic is now in hooks/components
+
+All co-located tests under `src/renderer/src/features/canvas/` with `*.test.ts` or `*.test.tsx` extension.
+
+---
+
+#### Risk Mitigation
+
+1. **Commit per phase:** Each of Phase-1a through Phase-6 = separate commit with passing tests
+2. **Parallel rendering:** Validate ToolpathOverlay against known G-code fixtures (gcode-preview.spec.ts)
+3. **Gesture accuracy:** Use property-based testing for drag/scale calculations if available
+4. **Backwards compatibility:** All extracted functions produce identical output to current implementation (unit tests verify before PlotCanvas changes)
 
 ### 2) PropertiesPanel Decomposition
 

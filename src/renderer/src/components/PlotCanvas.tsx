@@ -23,39 +23,17 @@ import {
 import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
 import { DEFAULT_STROKE_WIDTH_MM, type SvgImport } from "../../../types";
-
-const MM_TO_PX = 3; // internal SVG scale: 3 px per mm
-const PAD = 30; // margin around bed in SVG pixels
-const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 20;
-const ZOOM_STEP = 1.25; // per keyboard / button press
-
-// Lucide rotate-cw cursor shown on the rotation handle and while rotating.
-// White stroke, 24×24, encoded as an SVG data URL.
-// Hotspot centred at (12, 12); fallback to ew-resize for browsers that don't support custom cursors.
-const ROTATE_CURSOR =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E" +
-  "%3Cpath d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/%3E" +
-  "%3Cpath d='M21 3v5h-5'/%3E" +
-  '%3C/svg%3E") 12 12, ew-resize';
-
-// Handle positions: tl, t, tr, r, br, b, bl, l
-type HandlePos = "tl" | "t" | "tr" | "r" | "br" | "b" | "bl" | "l";
-
-// ─── Viewport ─────────────────────────────────────────────────────────────────
-interface Vp {
-  zoom: number;
-  panX: number;
-  panY: number;
-}
-
-/** Scale each RGB channel of a CSS hex colour by `factor` (clamped to 0-255). */
-function scaleHexColor(hex: string, factor: number): string {
-  const r = Math.min(255, Math.round(parseInt(hex.slice(1, 3), 16) * factor));
-  const g = Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor));
-  const b = Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor));
-  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-}
+import {
+  MM_TO_PX,
+  PAD,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  ZOOM_STEP,
+  ROTATE_CURSOR,
+  type HandlePos,
+  type Vp,
+  scaleHexColor,
+} from "../features/canvas";
 
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
