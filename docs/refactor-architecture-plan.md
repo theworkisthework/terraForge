@@ -173,10 +173,10 @@ Extract the complex ToolpathOverlay rendering logic (currently ~400 LOC in PlotC
 
 **Checklist 2:**
 
-- [ ] Extract canvas rendering into `ToolpathOverlay.tsx` preserving all Path2D cache logic
-- [ ] Add focused unit test for Path2D cache invalidation
-- [ ] Update PlotCanvas to render `<ToolpathOverlay>` instead of inline useEffect
-- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + toolpath rendering E2E (pdf-import.spec.ts, gcode-preview.spec.ts)
+- [x] Extract canvas rendering into `ToolpathOverlay.tsx` preserving all Path2D cache logic
+- [x] Add focused unit test for Path2D cache invalidation
+- [x] Update PlotCanvas to render `<ToolpathOverlay>` instead of inline useEffect
+- [x] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + toolpath rendering E2E (pdf-import.spec.ts, gcode-preview.spec.ts)
 
 **Deliverable:** Step 2 complete when: ToolpathOverlay exists and renders identically to current implementation; all toolpath E2E tests pass.
 
