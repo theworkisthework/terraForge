@@ -248,12 +248,12 @@ Four gesture types each have dedicated state machine; extract each into hooks:
 
 **Checklist 4:**
 
-- [ ] Create `src/renderer/src/features/canvas/hooks/useObjectDrag.ts` + unit test
-- [ ] Create `src/renderer/src/features/canvas/hooks/useObjectScaleRotate.ts` + unit test
-- [ ] Create `src/renderer/src/features/canvas/hooks/useGroupOBB.ts` + unit test
-- [ ] Create `src/renderer/src/features/canvas/hooks/useSpaceKeyPan.ts` + unit test
-- [ ] Update PlotCanvas to use hooks; remove inline gesture state/handlers
-- [ ] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + interaction E2E (properties-panel.spec.ts)
+- [x] Create `src/renderer/src/features/canvas/hooks/useObjectDrag.ts` + unit test (completed 2026-04-08)
+- [x] Create `src/renderer/src/features/canvas/hooks/useObjectScaleRotate.ts` + unit test (completed 2026-04-08)
+- [x] Create `src/renderer/src/features/canvas/hooks/useGroupOBB.ts` + unit test (completed 2026-04-08)
+- [x] Create `src/renderer/src/features/canvas/hooks/useSpaceKeyPan.ts` + unit test (completed 2026-04-08)
+- [x] Update PlotCanvas to use hooks; remove inline gesture state/handlers (completed 2026-04-08)
+- [x] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + interaction E2E (properties-panel.spec.ts) (completed 2026-04-08: 21/21 E2E tests passing)
 
 **Deliverable:** Step 4 complete when: 4 hooks exist, PlotCanvas simplified, gesture behavior identical; all drag/scale/rotate E2E tests pass.
 

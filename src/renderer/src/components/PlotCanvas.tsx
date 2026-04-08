@@ -38,6 +38,12 @@ import {
   useViewport,
   useCanvasPanZoom,
 } from "../features/canvas";
+import {
+  useSpaceKeyPan,
+  useObjectDrag,
+  useObjectScaleRotate,
+  useGroupOBB,
+} from "../features/canvas";
 
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -115,122 +121,61 @@ export function PlotCanvas() {
   const penWcoRef = useRef({ x: 0, y: 0, z: 0 });
 
   // ── Pan state ─────────────────────────────────────────────────────────────────
-  const panStartRef = useRef<{
-    mx: number;
-    my: number;
-    panX: number;
-    panY: number;
-  } | null>(null);
-  // Set to true at the end of any drag gesture so the SVG's onClick does not
-  // immediately deselect the import that was just moved / scaled / rotated.
-  const justDraggedRef = useRef(false);
-  const [spaceDown, setSpaceDown] = useState(false);
-  const spaceRef = useRef(false);
-  const [isPanning, setIsPanning] = useState(false);
+  // ── useSpaceKeyPan ─── space-key pan mode + pan gesture state machine ────────
+  const {
+    spaceDown,
+    spaceRef,
+    isPanning,
+    panStartRef,
+    startPan,
+    updatePanMove,
+    endPan,
+  } = useSpaceKeyPan(vpRef, setVp, setFitted);
 
-  const startPan = useCallback((clientX: number, clientY: number) => {
-    panStartRef.current = {
-      mx: clientX,
-      my: clientY,
-      panX: vpRef.current.panX,
-      panY: vpRef.current.panY,
-    };
-    setIsPanning(true);
-  }, []);
+  // ── useObjectDrag ─── single / group object drag state machine ───────────────
+  const {
+    dragging,
+    justDraggedRef,
+    onImportMouseDown,
+    onGroupMouseDown,
+    updateDragMove,
+    endDrag,
+  } = useObjectDrag(vpRef, spaceRef, selectImport, updateImport);
 
-  // ── Drag state (object move) ──────────────────────────────────────────────────
-  const [dragging, setDragging] = useState<{
-    id: string;
-    startMouseX: number;
-    startMouseY: number;
-    startObjX: number;
-    startObjY: number;
-    /** Set when dragging all selected imports as a group. */
-    group?: { id: string; startX: number; startY: number }[];
-  } | null>(null);
+  // ── useObjectScaleRotate ─── scale / rotate handle state machines ────────────
+  const {
+    scaling,
+    rotating,
+    onHandleMouseDown,
+    onRotateHandleMouseDown,
+    updateScaleMove,
+    updateRotateMove,
+    endScale,
+    endRotate,
+  } = useObjectScaleRotate(containerRef, vpRef, updateImport);
 
-  // ── Scale-handle state ────────────────────────────────────────────────────────
-  const [scaling, setScaling] = useState<{
-    id: string;
-    handle: HandlePos;
-    startMouseX: number;
-    startMouseY: number;
-    startScale: number;
-    startObjX: number;
-    startObjY: number;
-    startW: number;
-    startH: number;
-  } | null>(null);
-
-  // ── Rotate-handle state ───────────────────────────────────────────────────────
-  const [rotating, setRotating] = useState<{
-    id: string;
-    cx: number; // centre x in SVG canvas px
-    cy: number; // centre y in SVG canvas px
-    startAngle: number; // atan2 of (mouse → centre) vector at mousedown (rad)
-    startRotation: number; // imp.rotation at mousedown (degrees)
-  } | null>(null);
-
-  // ── Group scale-handle state ──────────────────────────────────────────────────
-  const [groupScaling, setGroupScaling] = useState<{
-    handle: HandlePos;
-    startMouseX: number;
-    startMouseY: number;
-    gCx: number;
-    gCy: number; // group AABB centre in SVG world px
-    gHW: number;
-    gHH: number; // group AABB half-extents in SVG world px
-    items: {
-      id: string;
-      startScaleX: number;
-      startScaleY: number;
-      cxSvg: number; // import centre in SVG world px at gesture start
-      cySvg: number;
-    }[];
-  } | null>(null);
-
-  // ── Group rotate-handle state ─────────────────────────────────────────────────
-  const [groupRotating, setGroupRotating] = useState<{
-    gCx: number;
-    gCy: number; // group AABB centre in SVG world px
-    gHW: number; // group AABB half-width in SVG world px (with padding)
-    gHH: number; // group AABB half-height in SVG world px (with padding)
-    startAngle: number;
-    baseOBBAngle: number; // accumulated OBB angle from previous gestures (degrees)
-    items: {
-      id: string;
-      cxSvg: number;
-      cySvg: number;
-      startX: number;
-      startY: number;
-      startRotation: number;
-    }[];
-  } | null>(null);
-
-  // Live OBB angle (degrees) updated on every mousemove during a rotation gesture.
-  // Equals baseOBBAngle + current-gesture delta.
-  const [groupOBBAngle, setGroupOBBAngle] = useState(0);
-
-  // OBB geometry persisted after a rotation gesture so the box keeps its
-  // orientation when the mouse is released.
-  const [persistentGroupOBB, setPersistentGroupOBB] = useState<{
-    gCx: number;
-    gCy: number;
-    gHW: number;
-    gHH: number;
-    angle: number;
-  } | null>(null);
-  const persistentGroupOBBRef = useRef(persistentGroupOBB);
-  persistentGroupOBBRef.current = persistentGroupOBB;
-
-  // Clear the persistent OBB whenever the group selection is dropped so a
-  // new Ctrl+A always starts with a fresh axis-aligned bounding box.
-  useEffect(() => {
-    if (!allImportsSelected && !selectedGroupId) {
-      setPersistentGroupOBB(null);
-      setGroupOBBAngle(0);
-    }
-  }, [allImportsSelected, selectedGroupId]);
+  // ── useGroupOBB ─── group scale / rotate + persistent OBB ───────────────────
+  const {
+    groupScaling,
+    groupRotating,
+    groupOBBAngle,
+    persistentGroupOBB,
+    onGroupHandleMouseDown,
+    onGroupRotateHandleMouseDown,
+    updateGroupScaleMove,
+    updateGroupRotateMove,
+    endGroupScaling,
+    endGroupRotating,
+    clearGroupOBB,
+  } = useGroupOBB(
+    containerRef,
+    vpRef,
+    updateImport,
+    isBottom,
+    canvasH,
+    allImportsSelected,
+    selectedGroupId,
+  );
 
   // ── Toolpath selection ────────────────────────────────────────────────────────
   // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
@@ -244,13 +189,6 @@ export function PlotCanvas() {
         e.target instanceof HTMLTextAreaElement
       )
         return;
-
-      // Space → enable pan mode
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault();
-        spaceRef.current = true;
-        setSpaceDown(true);
-      }
 
       // Delete / Backspace → remove selected item
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -299,18 +237,9 @@ export function PlotCanvas() {
       }
     };
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        spaceRef.current = false;
-        setSpaceDown(false);
-      }
-    };
-
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
     };
   }, [
     selectedImportId,
@@ -377,518 +306,32 @@ export function PlotCanvas() {
   const getBedX = (mmX: number) =>
     isRight ? PAD + (bedW - mmX) * MM_TO_PX : PAD + mmX * MM_TO_PX;
 
-  // ── Object drag handlers ──────────────────────────────────────────────────────
-  const onImportMouseDown = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      if (spaceRef.current) return; // space held → pan mode, not drag
-      e.stopPropagation();
-      const state = useCanvasStore.getState();
-      state.snapshotForGesture();
-      // In group mode clicking an import continues the group drag without
-      // breaking out to single selection.
-      if (state.allImportsSelected) {
-        setDragging({
-          id,
-          startMouseX: e.clientX,
-          startMouseY: e.clientY,
-          startObjX: 0,
-          startObjY: 0,
-          group: state.imports.map((imp) => ({
-            id: imp.id,
-            startX: imp.x,
-            startY: imp.y,
-          })),
-        });
-        return;
-      }
-      // Layer-group mode: if the clicked import belongs to the selected group,
-      // drag all group members together.
-      if (state.selectedGroupId) {
-        const groupImportIds = new Set(
-          state.layerGroups.find((g) => g.id === state.selectedGroupId)
-            ?.importIds ?? [],
-        );
-        if (groupImportIds.has(id)) {
-          setDragging({
-            id,
-            startMouseX: e.clientX,
-            startMouseY: e.clientY,
-            startObjX: 0,
-            startObjY: 0,
-            group: state.imports
-              .filter((i) => groupImportIds.has(i.id))
-              .map((imp) => ({ id: imp.id, startX: imp.x, startY: imp.y })),
-          });
-          return;
-        }
-      }
-      selectImport(id);
-      const imp = state.imports.find((i) => i.id === id);
-      if (!imp) return;
-      setDragging({
-        id,
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startObjX: imp.x,
-        startObjY: imp.y,
-      });
-    },
-    [selectImport],
-  );
-
-  const onHandleMouseDown = useCallback(
-    (e: React.MouseEvent<SVGCircleElement>, id: string, handle: HandlePos) => {
-      e.stopPropagation();
-      useCanvasStore.getState().snapshotForGesture();
-      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
-      if (!imp) return;
-      const sX = imp.scaleX ?? imp.scale;
-      const sY = imp.scaleY ?? imp.scale;
-      setScaling({
-        id,
-        handle,
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startScale: imp.scale,
-        startScaleX: sX,
-        startScaleY: sY,
-        ratioLocked: imp.scaleX === undefined, // unlocked when scaleX is set
-        startObjX: imp.x,
-        startObjY: imp.y,
-        startW: imp.svgWidth * sX * MM_TO_PX,
-        startH: imp.svgHeight * sY * MM_TO_PX,
-      });
-    },
-    [],
-  );
-
-  const onRotateHandleMouseDown = useCallback(
-    (
-      e: React.MouseEvent<SVGCircleElement>,
-      id: string,
-      cxSvg: number,
-      cySvg: number,
-    ) => {
-      e.stopPropagation();
-      useCanvasStore.getState().snapshotForGesture();
-      const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
-      if (!imp) return;
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const vp = vpRef.current;
-      const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-      const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
-      setRotating({
-        id,
-        cx: cxSvg,
-        cy: cySvg,
-        startAngle: Math.atan2(my - cySvg, mx - cxSvg),
-        startRotation: imp.rotation,
-      });
-    },
-    [],
-  );
-
-  // Mutable refs so group gesture callbacks can read current layout values
-  // without needing to be re-created on every render.
-  const isBottomRef = useRef(isBottom);
-  isBottomRef.current = isBottom;
-  const canvasHRef = useRef(canvasH);
-  canvasHRef.current = canvasH;
-  const getBedYRef = useRef(getBedY);
-  getBedYRef.current = getBedY;
-
-  // ── Group handle callbacks ────────────────────────────────────────────────────
-  const onGroupHandleMouseDown = useCallback(
-    (e: React.MouseEvent<SVGCircleElement>, handle: HandlePos) => {
-      e.stopPropagation();
-      useCanvasStore.getState().snapshotForGesture();
-      const state = useCanvasStore.getState();
-      const {
-        imports: allImps,
-        selectedGroupId: gid,
-        layerGroups: groups,
-      } = state;
-      const imps = gid
-        ? allImps.filter((i) =>
-            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
-          )
-        : allImps;
-      const gBedY = getBedYRef.current;
-      let minWx = Infinity,
-        maxWx = -Infinity,
-        minWy = Infinity,
-        maxWy = -Infinity;
-      const items: {
-        id: string;
-        startScaleX: number;
-        startScaleY: number;
-        cxSvg: number;
-        cySvg: number;
-      }[] = [];
-      for (const imp of imps) {
-        const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
-        const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
-        const left = PAD + imp.x * MM_TO_PX;
-        const top = gBedY(imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale));
-        const hw = (imp.svgWidth * sX) / 2;
-        const hh = (imp.svgHeight * sY) / 2;
-        const cxSvg = left + hw;
-        const cySvg = top + hh;
-        const rad = ((imp.rotation ?? 0) * Math.PI) / 180;
-        const cosA = Math.cos(rad);
-        const sinA = Math.sin(rad);
-        for (const [ox, oy] of [
-          [-hw, -hh],
-          [hw, -hh],
-          [hw, hh],
-          [-hw, hh],
-        ] as [number, number][]) {
-          const wx = cxSvg + ox * cosA - oy * sinA;
-          const wy = cySvg + ox * sinA + oy * cosA;
-          if (wx < minWx) minWx = wx;
-          if (wx > maxWx) maxWx = wx;
-          if (wy < minWy) minWy = wy;
-          if (wy > maxWy) maxWy = wy;
-        }
-        items.push({
-          id: imp.id,
-          startScaleX: imp.scaleX ?? imp.scale,
-          startScaleY: imp.scaleY ?? imp.scale,
-          cxSvg,
-          cySvg,
-        });
-      }
-      setPersistentGroupOBB(null); // geometry changes — discard stale OBB
-      setGroupScaling({
-        handle,
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        gCx: (minWx + maxWx) / 2,
-        gCy: (minWy + maxWy) / 2,
-        gHW: (maxWx - minWx) / 2,
-        gHH: (maxWy - minWy) / 2,
-        items,
-      });
-    },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
-  const onGroupRotateHandleMouseDown = useCallback(
-    (
-      e: React.MouseEvent<SVGCircleElement>,
-      gCx: number,
-      gCy: number,
-      gHW: number,
-      gHH: number,
-    ) => {
-      e.stopPropagation();
-      useCanvasStore.getState().snapshotForGesture();
-      const state = useCanvasStore.getState();
-      const {
-        imports: allImps,
-        selectedGroupId: gid,
-        layerGroups: groups,
-      } = state;
-      const imps = gid
-        ? allImps.filter((i) =>
-            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
-          )
-        : allImps;
-      const gBedY = getBedYRef.current;
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const vp = vpRef.current;
-      const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-      const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
-      const baseOBBAngle = persistentGroupOBBRef.current?.angle ?? 0;
-      setGroupOBBAngle(baseOBBAngle);
-      setGroupRotating({
-        gCx,
-        gCy,
-        gHW,
-        gHH,
-        baseOBBAngle,
-        startAngle: Math.atan2(my - gCy, mx - gCx),
-        items: imps.map((imp) => {
-          const sX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
-          const sY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
-          const left = PAD + imp.x * MM_TO_PX;
-          const top = gBedY(imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale));
-          return {
-            id: imp.id,
-            cxSvg: left + (imp.svgWidth * sX) / 2,
-            cySvg: top + (imp.svgHeight * sY) / 2,
-            startX: imp.x,
-            startY: imp.y,
-            startRotation: imp.rotation ?? 0,
-          };
-        }),
-      });
-    },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
-  /** Starts a group drag — fired from the GroupHandleOverlay hit area. */
-  const onGroupMouseDown = useCallback(
-    (e: React.MouseEvent<SVGRectElement>) => {
-      if (spaceRef.current) return;
-      e.stopPropagation();
-      useCanvasStore.getState().snapshotForGesture();
-      const state = useCanvasStore.getState();
-      const {
-        imports: allImps,
-        selectedGroupId: gid,
-        layerGroups: groups,
-      } = state;
-      const groupImps = gid
-        ? allImps.filter((i) =>
-            groups.find((g) => g.id === gid)?.importIds.includes(i.id),
-          )
-        : allImps;
-      setDragging({
-        id: "__group__",
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startObjX: 0,
-        startObjY: 0,
-        group: groupImps.map((imp) => ({
-          id: imp.id,
-          startX: imp.x,
-          startY: imp.y,
-        })),
-      });
-    },
-    [],
-  );
-
   // ── Unified window mousemove / mouseup ────────────────────────────────────────
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
-      // Pan (middle mouse or Space + drag) — takes priority
-      if (panStartRef.current) {
-        const dx = e.clientX - panStartRef.current.mx;
-        const dy = e.clientY - panStartRef.current.my;
-        setVp({
-          zoom: vpRef.current.zoom,
-          panX: panStartRef.current.panX + dx,
-          panY: panStartRef.current.panY + dy,
-        });
-        setFitted(false);
-        return;
-      }
-
-      // Object drag — convert client-px delta → mm (dividing by zoom + MM_TO_PX)
-      if (dragging) {
-        const zoom = vpRef.current.zoom;
-        const dx = (e.clientX - dragging.startMouseX) / (MM_TO_PX * zoom);
-        const dy = -(e.clientY - dragging.startMouseY) / (MM_TO_PX * zoom);
-        if (dragging.group) {
-          for (const item of dragging.group) {
-            updateImport(item.id, { x: item.startX + dx, y: item.startY + dy });
-          }
-        } else {
-          updateImport(dragging.id, {
-            x: dragging.startObjX + dx,
-            y: dragging.startObjY + dy,
-          });
-        }
-      }
-
-      // Scale-handle drag
-      if (scaling) {
-        const zoom = vpRef.current.zoom;
-        const dx = (e.clientX - scaling.startMouseX) / zoom;
-        const dy = (e.clientY - scaling.startMouseY) / zoom;
-        const h = scaling.handle;
-
-        if (scaling.ratioLocked) {
-          // ─ Locked: uniform scale ───────────────────────────────────
-          let delta = 0;
-          if (h === "tl" || h === "bl") delta = -dx;
-          else if (h === "tr" || h === "br") delta = dx;
-          else if (h === "t") delta = -dy;
-          else if (h === "b") delta = dy;
-          else if (h === "r") delta = dx;
-          else if (h === "l") delta = -dx;
-          const dimPx =
-            h === "t" || h === "b" ? scaling.startH : scaling.startW;
-          const rawScale = Math.max(
-            0.001,
-            scaling.startScale * (1 + delta / dimPx),
-          );
-          updateImport(scaling.id, {
-            scale: rawScale,
-            scaleX: undefined,
-            scaleY: undefined,
-          });
-        } else {
-          // ─ Unlocked: drive each axis independently ─────────────────
-          // Determine which axes this handle moves.
-          const affectsX =
-            h === "l" ||
-            h === "r" ||
-            h === "tl" ||
-            h === "tr" ||
-            h === "br" ||
-            h === "bl";
-          const affectsY =
-            h === "t" ||
-            h === "b" ||
-            h === "tl" ||
-            h === "tr" ||
-            h === "br" ||
-            h === "bl";
-          // Positive deltaX = object grows in X; positive deltaY = grows in Y.
-          const deltaX = h === "r" || h === "tr" || h === "br" ? dx : -dx;
-          const deltaY = h === "b" || h === "br" || h === "bl" ? dy : -dy;
-
-          const patch: { scaleX?: number; scaleY?: number } = {};
-          if (affectsX)
-            patch.scaleX = Math.max(
-              0.001,
-              scaling.startScaleX * (1 + deltaX / scaling.startW),
-            );
-          if (affectsY)
-            patch.scaleY = Math.max(
-              0.001,
-              scaling.startScaleY * (1 + deltaY / scaling.startH),
-            );
-          updateImport(scaling.id, patch);
-        }
-      }
-
-      // Rotation-handle drag
-      if (rotating) {
-        const container = containerRef.current;
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        const vp = vpRef.current;
-        const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-        const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
-        const angle = Math.atan2(my - rotating.cy, mx - rotating.cx);
-        const delta = (angle - rotating.startAngle) * (180 / Math.PI);
-        updateImport(rotating.id, { rotation: rotating.startRotation + delta });
-      }
-
-      // Group scale-handle drag
-      if (groupScaling) {
-        const zoom = vpRef.current.zoom;
-        const dx = (e.clientX - groupScaling.startMouseX) / zoom;
-        const dy = (e.clientY - groupScaling.startMouseY) / zoom;
-        const h = groupScaling.handle;
-        const { gCx, gCy, gHW, gHH } = groupScaling;
-        // Scale factor in the primary axis for this handle
-        let delta = 0;
-        if (h === "tl" || h === "bl") delta = -dx;
-        else if (h === "tr" || h === "br") delta = dx;
-        else if (h === "t") delta = -dy;
-        else if (h === "b") delta = dy;
-        else if (h === "r") delta = dx;
-        else if (h === "l") delta = -dx;
-        const dimPx = h === "t" || h === "b" ? 2 * gHH : 2 * gHW;
-        const k = Math.max(0.001, 1 + delta / dimPx);
-        // For edge handles scale only one axis; corners = uniform.
-        const kX = h === "t" || h === "b" ? 1 : k;
-        const kY = h === "l" || h === "r" ? 1 : k;
-        // Anchor: opposite corner/edge in SVG world coords
-        const ax =
-          h === "tl" || h === "bl"
-            ? gCx + gHW
-            : h === "tr" || h === "br"
-              ? gCx - gHW
-              : gCx;
-        const ay =
-          h === "tl" || h === "tr"
-            ? gCy + gHH
-            : h === "bl" || h === "br"
-              ? gCy - gHH
-              : gCy;
-        const ib = isBottomRef.current;
-        const cH = canvasHRef.current;
-        for (const item of groupScaling.items) {
-          const imp = useCanvasStore
-            .getState()
-            .imports.find((i) => i.id === item.id);
-          if (!imp) continue;
-          const newSX = item.startScaleX * kX;
-          const newSY = item.startScaleY * kY;
-          const newCxSvg = ax + (item.cxSvg - ax) * kX;
-          const newCySvg = ay + (item.cySvg - ay) * kY;
-          const newX = (newCxSvg - PAD) / MM_TO_PX - (imp.svgWidth * newSX) / 2;
-          const newY = ib
-            ? (cH - PAD - newCySvg) / MM_TO_PX - (imp.svgHeight * newSY) / 2
-            : (newCySvg - PAD) / MM_TO_PX - (imp.svgHeight * newSY) / 2;
-          updateImport(item.id, {
-            x: newX,
-            y: newY,
-            scaleX: newSX,
-            scaleY: newSY,
-          });
-        }
-      }
-
-      // Group rotate-handle drag
-      if (groupRotating) {
-        const container = containerRef.current;
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        const vp = vpRef.current;
-        const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-        const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
-        const angle = Math.atan2(
-          my - groupRotating.gCy,
-          mx - groupRotating.gCx,
-        );
-        const delta = (angle - groupRotating.startAngle) * (180 / Math.PI);
-        setGroupOBBAngle(groupRotating.baseOBBAngle + delta);
-        const rad = (delta * Math.PI) / 180;
-        const cosD = Math.cos(rad);
-        const sinD = Math.sin(rad);
-        const ib = isBottomRef.current;
-        const cH = canvasHRef.current;
-        for (const item of groupRotating.items) {
-          const imp = useCanvasStore
-            .getState()
-            .imports.find((i) => i.id === item.id);
-          if (!imp) continue;
-          const dx2 = item.cxSvg - groupRotating.gCx;
-          const dy2 = item.cySvg - groupRotating.gCy;
-          const newCxSvg = groupRotating.gCx + dx2 * cosD - dy2 * sinD;
-          const newCySvg = groupRotating.gCy + dx2 * sinD + dy2 * cosD;
-          const sX = imp.scaleX ?? imp.scale;
-          const sY = imp.scaleY ?? imp.scale;
-          const newX = (newCxSvg - PAD) / MM_TO_PX - (imp.svgWidth * sX) / 2;
-          const newY = ib
-            ? (cH - PAD - newCySvg) / MM_TO_PX - (imp.svgHeight * sY) / 2
-            : (newCySvg - PAD) / MM_TO_PX - (imp.svgHeight * sY) / 2;
-          updateImport(item.id, {
-            x: newX,
-            y: newY,
-            rotation: item.startRotation + delta,
-          });
-        }
-      }
+      // Pan takes priority; if consumed, stop processing other gestures.
+      if (updatePanMove(e)) return;
+      updateDragMove(e);
+      updateScaleMove(e);
+      updateRotateMove(e);
+      updateGroupScaleMove(e);
+      updateGroupRotateMove(e);
     },
     [
-      dragging,
-      scaling,
-      rotating,
-      groupScaling,
-      groupRotating,
-      updateImport,
-      setVp,
-      setFitted,
+      updatePanMove,
+      updateDragMove,
+      updateScaleMove,
+      updateRotateMove,
+      updateGroupScaleMove,
+      updateGroupRotateMove,
     ],
   );
 
   const onMouseUp = useCallback(() => {
     // Commit gesture snapshot to undo stack (only if imports actually changed).
     useCanvasStore.getState().commitGesture();
-    // If any gesture was active, mark it so the SVG onClick can ignore the
-    // synthetic click that the browser fires after mouseup.
+    // If any gesture was active, mark justDraggedRef so SVG onClick can ignore
+    // the synthetic click that the browser fires after mouseup.
     if (
       dragging ||
       scaling ||
@@ -899,32 +342,31 @@ export function PlotCanvas() {
     ) {
       justDraggedRef.current = true;
     }
-    setDragging(null);
-    setScaling(null);
-    setRotating(null);
-    // Persist OBB orientation after a completed rotation gesture so the box
-    // doesn't snap back to axis-aligned when the mouse is released.
-    if (groupRotating) {
-      setPersistentGroupOBB({
-        gCx: groupRotating.gCx,
-        gCy: groupRotating.gCy,
-        gHW: groupRotating.gHW,
-        gHH: groupRotating.gHH,
-        angle: groupOBBAngle,
-      });
-    }
-    // Discard stale OBB when drag or scale has changed the group's geometry.
-    if (dragging?.group || groupScaling) {
-      setPersistentGroupOBB(null);
-    }
-    setGroupScaling(null);
-    setGroupRotating(null);
-    setGroupOBBAngle(0);
-    if (panStartRef.current) {
-      panStartRef.current = null;
-      setIsPanning(false);
-    }
-  }, [dragging, scaling, rotating, groupScaling, groupRotating, groupOBBAngle]);
+    const wasGroupDrag = endDrag();
+    endScale();
+    endRotate();
+    // Persist OBB after rotation; scale/drag discard it.
+    endGroupRotating(groupOBBAngle);
+    if (wasGroupDrag) clearGroupOBB(); // drag changed geometry
+    endGroupScaling(); // scale also discards OBB
+    endPan();
+  }, [
+    dragging,
+    scaling,
+    rotating,
+    groupScaling,
+    groupRotating,
+    groupOBBAngle,
+    panStartRef,
+    justDraggedRef,
+    endDrag,
+    endScale,
+    endRotate,
+    endGroupRotating,
+    clearGroupOBB,
+    endGroupScaling,
+    endPan,
+  ]);
 
   useEffect(() => {
     window.addEventListener("mousemove", onMouseMove);
