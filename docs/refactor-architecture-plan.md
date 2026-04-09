@@ -449,6 +449,43 @@ Checklist:
 - [x] Extract collapsible section UI.
 - [x] Keep dialog behavior and keyboard controls unchanged.
 
+### 9) Extracted Component Purification (Second-Pass Decomposition)
+
+Decompose first-wave extracted TSX files into cleaner container vs presentational layers, reduce oversized components, and replace repeated raw markup with reusable React component primitives.
+
+Primary scope:
+
+- `src/renderer/src/features/canvas/components/CanvasOverlays.tsx`
+- `src/renderer/src/features/canvas/components/CanvasSceneOverlays.tsx`
+- `src/renderer/src/features/canvas/components/ToolpathOverlay.tsx`
+- `src/renderer/src/features/properties-panel/components/ImportsByGroupList.tsx`
+- `src/renderer/src/features/properties-panel/components/ImportPropertiesForm.tsx`
+
+Architecture constraints:
+
+- Container components: orchestration, store wiring, event handlers, lifecycle effects.
+- Presentational components: pure render only, no store reads, no side effects.
+- Shared repeated SVG/HTML action markup should be moved into reusable React components.
+- Prefer Lucide icons for standard actions when equivalent icons exist.
+
+Checklist:
+
+- [ ] Split large multi-component files into focused modules (one component per file where practical).
+- [ ] Extract reusable overlay primitives (selection frame, handle set, rotate stem/handle, delete action badge).
+- [ ] Replace repeated inline delete-icon SVG markup with shared React component primitives.
+- [ ] Extract geometry/view-model logic into hooks/services (ruler ticks/mapping, handle projection, imports-by-group derivation).
+- [ ] Reduce prop-surface complexity for large components by introducing typed prop objects per concern.
+- [ ] Apply size guardrails for this stage:
+  - Presentational TSX target: <= 180 lines, hard cap <= 250.
+  - Container TSX target: <= 280 lines, hard cap <= 400.
+  - Hook/service target: <= 220 lines, hard cap <= 300.
+- [ ] Add or update focused tests for each extracted component/hook.
+- [ ] Validate: `npm run typecheck`, targeted component tests, and full `npm run test:e2e`.
+
+Deliverable:
+
+Stage complete when oversized extracted TSX files are decomposed into clear container/presentational boundaries, repeated raw markup is replaced by reusable React components, and behavior parity is confirmed by typecheck + targeted tests + full E2E.
+
 ## Execution Phases
 
 ### Phase 0: Guardrails
@@ -464,13 +501,13 @@ Checklist:
 
 ### Phase 2: Hook Extraction
 
-- [ ] Move orchestration logic into custom hooks.
-- [ ] Keep component output stable while reducing file size.
+- [x] Move orchestration logic into custom hooks. (completed 2026-04-09)
+- [x] Keep component output stable while reducing file size. (completed 2026-04-09)
 
 ### Phase 3: Component Splitting
 
-- [ ] Break large JSX files into section/layer components.
-- [ ] Ensure component tests still pass.
+- [x] Break large JSX files into section/layer components. (completed 2026-04-09)
+- [x] Ensure component tests still pass. (completed 2026-04-09)
 
 ### Phase 4: Store Slicing
 
@@ -483,10 +520,19 @@ Checklist:
 - [ ] Split FluidNC client internals.
 - [ ] Split gcodeEngine pipeline.
 
+### Phase 6: Secondary TSX Decomposition and UI Purification
+
+- [ ] Decompose large extracted TSX files into container and presentational layers.
+- [ ] Replace repeated raw markup/SVG action controls with reusable React components.
+- [ ] Keep behavior stable with passing targeted tests and full E2E.
+
 ## Working TODO (Tick As We Go)
 
 Current sprint focus:
 
+- [ ] Execute Stage 9 second-pass decomposition for large extracted TSX components
+- [ ] Split `src/machine/fluidnc.ts` internals while preserving `FluidNCClient` API
+- [ ] Split `src/workers/gcodeEngine.ts` pipeline stages with deterministic unit tests
 - [x] Refactor `GcodeOptionsDialog.tsx`
 - [x] Refactor `PropertiesPanel.tsx` (sections/hooks/selectors extracted and validated)
 - [x] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
@@ -565,6 +611,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-09: Completed Phase 6 validation pass with `npm.cmd run typecheck`, `tests/component/PlotCanvas.test.tsx` (63/63), and full `npm.cmd run test:e2e` run exiting cleanly (code 0).
 - 2026-04-09: Completed final Phase 6 orchestration cleanup by extracting remaining `PlotCanvas.tsx` inline toolpath sync, gesture lifecycle, and interaction handlers into `useToolpathSelectionSync`, `useCanvasGestureLifecycle`, and `useCanvasInteractionHandlers`; validation remains green with `npm.cmd run typecheck` and `npm.cmd run test -- tests/component/PlotCanvas.test.tsx` (63/63).
 - 2026-04-09: Re-validated end-to-end stability after Phase 6 completion with a fresh full E2E pass: 170/170 passing in 1.9 minutes.
+- 2026-04-09: Reconciled plan summary checkboxes with completed detailed work (Execution Phase 2/3 now marked complete); no functional code changes in this pass.
 
 ## Update Rule
 
