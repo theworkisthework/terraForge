@@ -274,9 +274,9 @@ Four gesture types each have dedicated state machine; extract each into hooks:
 
 **Checklist 5:**
 
-- [ ] Create `src/renderer/src/features/canvas/hooks/useCanvasKeyboardShortcuts.ts` + unit test
-- [ ] Update PlotCanvas to use hook; remove inline keyboard listeners
-- [ ] Validate: `npm run typecheck` + keyboard shortcut E2E (no dedicated spec, but layout.spec.ts + properties-panel.spec.ts cover most)
+- [x] Create `src/renderer/src/features/canvas/hooks/useCanvasKeyboardShortcuts.ts` + unit test (completed 2026-04-09)
+- [x] Update PlotCanvas to use hook; remove inline keyboard listeners (completed 2026-04-09)
+- [x] Validate: `npm run typecheck` + keyboard shortcut E2E (no dedicated spec, but layout.spec.ts + properties-panel.spec.ts cover most) (completed 2026-04-09: full E2E pass 170/170 in 2.4m)
 
 **Deliverable:** Step 5 complete when: Hook exists, PlotCanvas uses it, all keyboard shortcuts work identically.
 
@@ -559,6 +559,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-06: Completed main-process polish pass with barrel exports (`src/main/ipc/index.ts`, `src/main/events/index.ts`, `src/main/config/index.ts`), FS dialog filter de-duplication, and persistence default cloning safeguards; typecheck and launch e2e remain green (21/21).
 - 2026-04-06: Added focused main-process unit tests for extracted modules: `tests/unit/main/ipc.config.test.ts`, `tests/unit/main/ipc.fluidnc.test.ts`, and `tests/unit/main/persistence.test.ts`; targeted run passes 10/10 and `npm.cmd run typecheck` remains green.
 - 2026-04-06: Expanded main-process coverage with dedicated tests for bootstrap, menu, events, and lightweight IPC registration modules (`tests/unit/main/bootstrap.*.test.ts`, `tests/unit/main/menu.applicationMenu.test.ts`, `tests/unit/main/events.pushEvents.test.ts`, `tests/unit/main/ipc.{app,fs,jobs,tasks}.test.ts`) plus broader branch coverage in config/fluidnc tests; `npx.cmd vitest run tests/unit/main` passes 37/37 and coverage is materially improved.
+- 2026-04-09: Started PlotCanvas Phase 5 keyboard extraction by adding `useCanvasKeyboardShortcuts` and moving inline key listeners out of `PlotCanvas.tsx`; updated `useSpaceKeyPan` to expose `setSpacePressed` while keeping pan gesture state local; validation passes with `npm.cmd run typecheck` and focused tests (`useCanvasKeyboardShortcuts`, `useSpaceKeyPan`, `PlotCanvas`) 82/82.
+- 2026-04-09: Completed Phase 5 validation with full E2E run passing 170/170 in 2.4 minutes; keyboard shortcut behavior remains stable through integration coverage.
 
 ## Update Rule
 

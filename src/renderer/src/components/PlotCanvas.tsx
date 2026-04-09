@@ -43,6 +43,7 @@ import {
   useObjectDrag,
   useObjectScaleRotate,
   useGroupOBB,
+  useCanvasKeyboardShortcuts,
 } from "../features/canvas";
 
 export function PlotCanvas() {
@@ -125,6 +126,7 @@ export function PlotCanvas() {
   const {
     spaceDown,
     spaceRef,
+    setSpacePressed,
     isPanning,
     panStartRef,
     startPan,
@@ -182,80 +184,22 @@ export function PlotCanvas() {
   // can react to canvas selection changes (and vice versa).
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
-
-      // Delete / Backspace → remove selected item
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (allImportsSelected) {
-          clearImports();
-        } else if (selectedGroupId) {
-          const st = useCanvasStore.getState();
-          const groupImportIds = new Set(
-            st.layerGroups.find((g) => g.id === selectedGroupId)?.importIds ??
-              [],
-          );
-          st.imports
-            .filter((i) => groupImportIds.has(i.id))
-            .forEach((i) => st.removeImport(i.id));
-          selectGroup(null);
-        } else if (selectedImportId) {
-          removeImport(selectedImportId);
-        } else if (toolpathSelected && !isJobActive) {
-          setGcodeToolpath(null);
-          // selectedJobFile is cleared by the gcodeToolpath→null effect below.
-        }
-      }
-
-      // Escape → deselect
-      if (e.key === "Escape") {
-        selectImport(null);
-        selectToolpath(false);
-      }
-
-      // Ctrl/Cmd + Shift + + / - → keyboard zoom
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
-        if (e.key === "=" || e.key === "+") {
-          e.preventDefault();
-          zoomBy(ZOOM_STEP);
-        }
-        if (e.key === "-" || e.key === "_") {
-          e.preventDefault();
-          zoomBy(1 / ZOOM_STEP);
-        }
-      }
-
-      // Ctrl/Cmd + 0 → fit to view
-      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
-        e.preventDefault();
-        fitToView();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [
+  useCanvasKeyboardShortcuts({
     selectedImportId,
     allImportsSelected,
     selectedGroupId,
-    selectGroup,
     toolpathSelected,
     isJobActive,
+    selectGroup,
+    selectImport,
     removeImport,
     clearImports,
-    selectImport,
     selectToolpath,
     setGcodeToolpath,
     zoomBy,
     fitToView,
-  ]);
+    setSpacePressed,
+  });
 
   // ── Clear selectedJobFile when the toolpath is removed ─────────────────────
   // Detects the non-null → null transition so clearing the toolpath (via the

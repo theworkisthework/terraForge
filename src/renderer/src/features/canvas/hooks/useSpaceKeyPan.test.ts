@@ -16,95 +16,40 @@ function makeRefs(vp: Vp = { zoom: 1, panX: 0, panY: 0 }) {
   return { vpRef, setVp, setFitted };
 }
 
-function keyDown(code: string, repeat = false) {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", { code, bubbles: true, repeat }),
-  );
-}
-
-function keyUp(code: string) {
-  window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }));
-}
-
 describe("useSpaceKeyPan", () => {
-  describe("space key state", () => {
-    it("sets spaceDown and spaceRef on Space keydown", () => {
+  describe("space state", () => {
+    it("setSpacePressed(true) sets spaceDown and spaceRef", () => {
       const { vpRef, setVp, setFitted } = makeRefs();
       const { result } = renderHook(() =>
         useSpaceKeyPan(vpRef, setVp, setFitted),
       );
-      act(() => keyDown("Space"));
+      act(() => result.current.setSpacePressed(true));
       expect(result.current.spaceDown).toBe(true);
       expect(result.current.spaceRef.current).toBe(true);
     });
 
-    it("clears spaceDown and spaceRef on Space keyup", () => {
+    it("setSpacePressed(false) clears spaceDown and spaceRef", () => {
       const { vpRef, setVp, setFitted } = makeRefs();
       const { result } = renderHook(() =>
         useSpaceKeyPan(vpRef, setVp, setFitted),
       );
       act(() => {
-        keyDown("Space");
-        keyUp("Space");
+        result.current.setSpacePressed(true);
+        result.current.setSpacePressed(false);
       });
       expect(result.current.spaceDown).toBe(false);
       expect(result.current.spaceRef.current).toBe(false);
     });
 
-    it("does not fire on repeat keydown", () => {
+    it("setSpacePressed is idempotent for repeated true", () => {
       const { vpRef, setVp, setFitted } = makeRefs();
       const { result } = renderHook(() =>
         useSpaceKeyPan(vpRef, setVp, setFitted),
       );
-      // repeat=true should not re-run the handler (but for spaceDown: first
-      // real press sets it, repeat does not reset it)
-      act(() => keyDown("Space"));
+      act(() => result.current.setSpacePressed(true));
       expect(result.current.spaceDown).toBe(true);
-      // Dispatching a repeat event should be ignored (e.repeat check)
-      act(() => keyDown("Space", true));
-      // spaceDown stays true (it was already set by the first press)
+      act(() => result.current.setSpacePressed(true));
       expect(result.current.spaceDown).toBe(true);
-    });
-
-    it("does not react to non-Space keys", () => {
-      const { vpRef, setVp, setFitted } = makeRefs();
-      const { result } = renderHook(() =>
-        useSpaceKeyPan(vpRef, setVp, setFitted),
-      );
-      act(() => {
-        window.dispatchEvent(
-          new KeyboardEvent("keydown", { code: "KeyA", bubbles: true }),
-        );
-      });
-      expect(result.current.spaceDown).toBe(false);
-    });
-
-    it("does not react when target is an input", () => {
-      const { vpRef, setVp, setFitted } = makeRefs();
-      const { result } = renderHook(() =>
-        useSpaceKeyPan(vpRef, setVp, setFitted),
-      );
-      const input = document.createElement("input");
-      document.body.appendChild(input);
-      // Focus the input so it's the event target, then dispatch from it
-      input.focus();
-      // The event bubbles to window; the handler checks e.target instanceof HTMLInputElement
-      input.dispatchEvent(
-        new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
-      );
-      expect(result.current.spaceDown).toBe(false);
-      document.body.removeChild(input);
-    });
-
-    it("cleans up listeners on unmount", () => {
-      const remove = vi.spyOn(window, "removeEventListener");
-      const { vpRef, setVp, setFitted } = makeRefs();
-      const { unmount } = renderHook(() =>
-        useSpaceKeyPan(vpRef, setVp, setFitted),
-      );
-      unmount();
-      expect(remove).toHaveBeenCalledWith("keydown", expect.any(Function));
-      expect(remove).toHaveBeenCalledWith("keyup", expect.any(Function));
     });
   });
 

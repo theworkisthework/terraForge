@@ -9,16 +9,9 @@
  *   - updatePanMove: apply pan delta on each mousemove; returns true if handled
  *   - endPan: commit end of pan gesture
  *
- * Space key listeners are installed here. Other keyboard shortcuts live in
- * useCanvasKeyboardShortcuts (Phase 5).
+ * Keyboard listeners are owned by useCanvasKeyboardShortcuts (Phase 5).
  */
-import {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-  type RefObject,
-} from "react";
+import { useState, useRef, useCallback, type RefObject } from "react";
 import type { Vp } from "../types";
 
 export function useSpaceKeyPan(
@@ -77,37 +70,15 @@ export function useSpaceKeyPan(
     }
   }, []);
 
-  // ── Space key listeners ───────────────────────────────────────────────────────
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault();
-        spaceRef.current = true;
-        setSpaceDown(true);
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        spaceRef.current = false;
-        setSpaceDown(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
+  const setSpacePressed = useCallback((pressed: boolean) => {
+    spaceRef.current = pressed;
+    setSpaceDown(pressed);
   }, []);
 
   return {
     spaceDown,
     spaceRef,
+    setSpacePressed,
     isPanning,
     panStartRef,
     startPan,
