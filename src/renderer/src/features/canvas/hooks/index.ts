@@ -5,3 +5,6 @@ export * from "./useObjectDrag";
 export * from "./useObjectScaleRotate";
 export * from "./useGroupOBB";
 export * from "./useCanvasKeyboardShortcuts";
+export * from "./useToolpathSelectionSync";
+export * from "./useCanvasGestureLifecycle";
+export * from "./useCanvasInteractionHandlers";

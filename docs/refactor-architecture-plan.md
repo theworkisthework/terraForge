@@ -290,7 +290,7 @@ Pull all extracted pieces together; simplify main PlotCanvas component:
 
 - [x] Import all utilities, components, and hooks (completed 2026-04-09)
 - [x] Consolidate PlotCanvas JSX to pure orchestration (render calls to: BedLayer, GridLayer, ToolpathOverlay, SelectionOverlay, HandleOverlay, GroupHandleOverlay, RulerOverlay, pen position crosshair) (completed 2026-04-09)
-- [ ] Remove all inline state, effects, event handlers (delegated to hooks)
+- [x] Remove all inline state, effects, event handlers (delegated to hooks) (completed 2026-04-09)
 - [x] Target size: PlotCanvas should drop from ~3100 → ~600–800 lines (completed 2026-04-09: 614 lines)
 - [x] Validate: `npm run typecheck` + `tests/component/PlotCanvas.test.tsx` (63/63) + `npm run test:e2e` (full suite) (completed 2026-04-09)
 
@@ -563,6 +563,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-09: Completed Phase 5 validation with full E2E run passing 170/170 in 2.4 minutes; keyboard shortcut behavior remains stable through integration coverage.
 - 2026-04-09: Advanced Phase 6 by extracting in-file canvas overlays from `PlotCanvas.tsx` into `features/canvas/components/CanvasOverlays.tsx` and `features/canvas/components/CanvasSceneOverlays.tsx`; removed duplicated pen-crosshair render block; `PlotCanvas.tsx` reduced to 614 lines and validation remains green with `npm.cmd run typecheck` plus `tests/component/PlotCanvas.test.tsx` (63/63).
 - 2026-04-09: Completed Phase 6 validation pass with `npm.cmd run typecheck`, `tests/component/PlotCanvas.test.tsx` (63/63), and full `npm.cmd run test:e2e` run exiting cleanly (code 0).
+- 2026-04-09: Completed final Phase 6 orchestration cleanup by extracting remaining `PlotCanvas.tsx` inline toolpath sync, gesture lifecycle, and interaction handlers into `useToolpathSelectionSync`, `useCanvasGestureLifecycle`, and `useCanvasInteractionHandlers`; validation remains green with `npm.cmd run typecheck` and `npm.cmd run test -- tests/component/PlotCanvas.test.tsx` (63/63).
+- 2026-04-09: Re-validated end-to-end stability after Phase 6 completion with a fresh full E2E pass: 170/170 passing in 1.9 minutes.
 
 ## Update Rule
 

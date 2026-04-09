@@ -11,7 +11,7 @@
 // OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
 // DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
 // ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../store/canvasStore";
 import {
@@ -46,6 +46,9 @@ import {
   useObjectScaleRotate,
   useGroupOBB,
   useCanvasKeyboardShortcuts,
+  useToolpathSelectionSync,
+  useCanvasGestureLifecycle,
+  useCanvasInteractionHandlers,
 } from "../features/canvas";
 
 export function PlotCanvas() {
@@ -198,46 +201,12 @@ export function PlotCanvas() {
     setSpacePressed,
   });
 
-  // ── Clear selectedJobFile when the toolpath is removed ─────────────────────
-  // Detects the non-null → null transition so clearing the toolpath (via the
-  // ✕ button, Delete key, or any other path) always resets the job panel.
-  const prevGcodeToolpathRef = useRef(gcodeToolpath);
-  useEffect(() => {
-    const prev = prevGcodeToolpathRef.current;
-    prevGcodeToolpathRef.current = gcodeToolpath;
-    if (prev !== null && gcodeToolpath === null) {
-      setSelectedJobFile(null);
-    }
-  }, [gcodeToolpath, setSelectedJobFile]);
-
-  // ── Sync toolpathSelected ↔ selectedJobFile ───────────────────────────────────
-  // One central effect keeps the file browser and job panel in lock-step with
-  // the canvas toolpath selection (and vice versa).
-  //   selecting   → restore selectedJobFile from gcodeSource
-  //   deselecting → clear selectedJobFile only if it was pointing at gcodeSource
-  useEffect(() => {
-    if (toolpathSelected && gcodeSource) {
-      setSelectedJobFile({
-        path: gcodeSource.path,
-        name: gcodeSource.name,
-        source: gcodeSource.source,
-      });
-    } else if (!toolpathSelected && gcodeSource) {
-      const current = useMachineStore.getState().selectedJobFile;
-      // Only clear selectedJobFile when the toolpath came from a local file.
-      // Remote-file selections (sd/fs) from the file browser should persist
-      // independently of canvas toolpath selection state.
-      if (
-        current?.path === gcodeSource.path &&
-        gcodeSource.source === "local"
-      ) {
-        setSelectedJobFile(null);
-      }
-    }
-    // Intentionally only re-run when toolpathSelected changes; gcodeSource
-    // changing means a new toolpath was loaded which resets toolpathSelected.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toolpathSelected]);
+  useToolpathSelectionSync({
+    gcodeToolpath,
+    gcodeSource,
+    toolpathSelected,
+    setSelectedJobFile,
+  });
 
   // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
   // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
@@ -247,51 +216,7 @@ export function PlotCanvas() {
   const getBedX = (mmX: number) =>
     isRight ? PAD + (bedW - mmX) * MM_TO_PX : PAD + mmX * MM_TO_PX;
 
-  // ── Unified window mousemove / mouseup ────────────────────────────────────────
-  const onMouseMove = useCallback(
-    (e: MouseEvent) => {
-      // Pan takes priority; if consumed, stop processing other gestures.
-      if (updatePanMove(e)) return;
-      updateDragMove(e);
-      updateScaleMove(e);
-      updateRotateMove(e);
-      updateGroupScaleMove(e);
-      updateGroupRotateMove(e);
-    },
-    [
-      updatePanMove,
-      updateDragMove,
-      updateScaleMove,
-      updateRotateMove,
-      updateGroupScaleMove,
-      updateGroupRotateMove,
-    ],
-  );
-
-  const onMouseUp = useCallback(() => {
-    // Commit gesture snapshot to undo stack (only if imports actually changed).
-    useCanvasStore.getState().commitGesture();
-    // If any gesture was active, mark justDraggedRef so SVG onClick can ignore
-    // the synthetic click that the browser fires after mouseup.
-    if (
-      dragging ||
-      scaling ||
-      rotating ||
-      groupScaling ||
-      groupRotating ||
-      panStartRef.current
-    ) {
-      justDraggedRef.current = true;
-    }
-    const wasGroupDrag = endDrag();
-    endScale();
-    endRotate();
-    // Persist OBB after rotation; scale/drag discard it.
-    endGroupRotating(groupOBBAngle);
-    if (wasGroupDrag) clearGroupOBB(); // drag changed geometry
-    endGroupScaling(); // scale also discards OBB
-    endPan();
-  }, [
+  useCanvasGestureLifecycle({
     dragging,
     scaling,
     rotating,
@@ -300,6 +225,12 @@ export function PlotCanvas() {
     groupOBBAngle,
     panStartRef,
     justDraggedRef,
+    updatePanMove,
+    updateDragMove,
+    updateScaleMove,
+    updateRotateMove,
+    updateGroupScaleMove,
+    updateGroupRotateMove,
     endDrag,
     endScale,
     endRotate,
@@ -307,74 +238,26 @@ export function PlotCanvas() {
     clearGroupOBB,
     endGroupScaling,
     endPan,
-  ]);
+  });
 
-  useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMouseMove, onMouseUp]);
-
-  // ── Container mousedown — middle mouse + Space+drag pan ───────────────────────
-  const onContainerMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.button === 1) {
-        // Middle mouse → pan
-        e.preventDefault();
-        startPan(e.clientX, e.clientY);
-      } else if (e.button === 0 && spaceRef.current) {
-        // Space + left click → pan
-        e.preventDefault();
-        startPan(e.clientX, e.clientY);
-      }
-    },
-    [startPan],
-  );
-
-  // Suppress browser context-menu on middle-click release
-  const onContextMenu = useCallback(
-    (e: React.MouseEvent) => e.preventDefault(),
-    [],
-  );
-
-  // ── Overlay button handlers ───────────────────────────────────────────────────
-  const onZoomIn = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      zoomBy(ZOOM_STEP);
-    },
-    [zoomBy],
-  );
-  const onZoomOut = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      zoomBy(1 / ZOOM_STEP);
-    },
-    [zoomBy],
-  );
-  const onFit = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      fitToView();
-    },
-    [fitToView],
-  );
+  const {
+    onContainerMouseDown,
+    onContextMenu,
+    onZoomIn,
+    onZoomOut,
+    onFit,
+    cursor,
+  } = useCanvasInteractionHandlers({
+    startPan,
+    spaceRef,
+    zoomBy,
+    fitToView,
+    spaceDown,
+    isPanning,
+    rotating,
+  });
 
   // ── Toolpath canvas overlay — see ToolpathOverlay component below ────────────
-
-  // ── Cursor ────────────────────────────────────────────────────────────────────
-  const cursor = spaceDown
-    ? isPanning
-      ? "grabbing"
-      : "grab"
-    : isPanning
-      ? "grabbing"
-      : rotating
-        ? ROTATE_CURSOR
-        : undefined;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
