@@ -616,6 +616,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Full unit/component suite re-validated by user-run `npm test`: 104/104 test files and 1316/1316 tests passing (duration 222.93s; transform 58.71s, setup 146.94s, import 138.58s, tests 169.13s, environment 891.88s).
 - 2026-04-10: Stage 9 started with canvas overlay decomposition: extracted shared `DeleteActionBadge` primitive, replaced repeated canvas delete-action markup, switched to Lucide `SquareX`, and split `CanvasOverlays.tsx` into per-component modules (`RulerOverlay`, `ImportLayer`, `GroupHandleOverlay`, `HandleOverlay`) while keeping `CanvasOverlays.tsx` as a compatibility barrel; `npm.cmd run typecheck` passes.
 - 2026-04-10: Continued Stage 9 canvas decomposition by splitting `CanvasSceneOverlays.tsx` into focused modules (`PageTemplateOverlay`, `ToolpathHitAreaOverlay`, `ToolpathSelectionOverlay`, `PenCrosshairOverlay`) and preserving `CanvasSceneOverlays.tsx` as a compatibility barrel; `npm.cmd run typecheck` passes.
+- 2026-04-10: Continued Stage 9 by decomposing `ToolpathOverlay.tsx` heavy drawing blocks into `features/canvas/utils/toolpathOverlayDraw.ts` (`drawImportsLayer`, `drawToolpathLayer`) and reducing overlay component responsibility to orchestration/canvas lifecycle; `npm.cmd run typecheck` passes.
 
 ## Update Rule
 
