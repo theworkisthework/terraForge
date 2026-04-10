@@ -614,6 +614,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-09: Re-validated end-to-end stability after Phase 6 completion with a fresh full E2E pass: 170/170 passing in 1.9 minutes.
 - 2026-04-09: Reconciled plan summary checkboxes with completed detailed work (Execution Phase 2/3 now marked complete); no functional code changes in this pass.
 - 2026-04-10: Full unit/component suite re-validated by user-run `npm test`: 104/104 test files and 1316/1316 tests passing (duration 222.93s; transform 58.71s, setup 146.94s, import 138.58s, tests 169.13s, environment 891.88s).
+- 2026-04-10: Stage 9 started with canvas overlay decomposition: extracted shared `DeleteActionBadge` primitive, replaced repeated canvas delete-action markup, switched to Lucide `SquareX`, and split `CanvasOverlays.tsx` into per-component modules (`RulerOverlay`, `ImportLayer`, `GroupHandleOverlay`, `HandleOverlay`) while keeping `CanvasOverlays.tsx` as a compatibility barrel; `npm.cmd run typecheck` passes.
 
 ## Update Rule
 
