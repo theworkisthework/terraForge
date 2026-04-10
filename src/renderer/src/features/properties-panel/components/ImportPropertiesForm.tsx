@@ -69,7 +69,17 @@ export function ImportPropertiesForm({
   onChangeStrokeWidth,
   onApplyHatch,
 }: ImportPropertiesFormProps) {
-  const { objW, objH, sharedTransformProps } = useImportPropertiesFormModel({
+  const {
+    objW,
+    objH,
+    sharedTransformProps,
+    onChangeX,
+    onChangeY,
+    onAlignX,
+    onAlignY,
+    onChangeScale,
+    onChangeRotation,
+  } = useImportPropertiesFormModel({
     imp,
     bedW,
     bedH,
@@ -90,8 +100,8 @@ export function ImportPropertiesForm({
       <PositionFieldsRow
         x={imp.x}
         y={imp.y}
-        onChangeX={(v) => onUpdate({ x: v })}
-        onChangeY={(v) => onUpdate({ y: v })}
+        onChangeX={onChangeX}
+        onChangeY={onChangeY}
       />
 
       <AlignmentControls
@@ -107,8 +117,8 @@ export function ImportPropertiesForm({
         templateAlignTarget={templateAlignTarget}
         onTemplateAlignEnabledChange={onTemplateAlignEnabledChange}
         onTemplateAlignTargetChange={onTemplateAlignTargetChange}
-        onAlignX={(x) => onUpdate({ x: Math.round(x * 1000) / 1000 })}
-        onAlignY={(y) => onUpdate({ y: Math.round(y * 1000) / 1000 })}
+        onAlignX={onAlignX}
+        onAlignY={onAlignY}
       />
 
       <DimensionsRow
@@ -126,8 +136,8 @@ export function ImportPropertiesForm({
       <TransformControlsSection
         scale={imp.scale}
         rotation={imp.rotation}
-        onChangeScale={(v) => onUpdate({ scale: Math.max(0.001, v) })}
-        onChangeRotation={(v) => onUpdate({ rotation: v })}
+        onChangeScale={onChangeScale}
+        onChangeRotation={onChangeRotation}
         sharedTransformProps={sharedTransformProps}
       />
 

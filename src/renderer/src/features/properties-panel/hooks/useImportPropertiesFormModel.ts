@@ -73,9 +73,22 @@ export function useImportPropertiesFormModel({
     },
   };
 
+  const onChangeX = (v: number) => onUpdate({ x: v });
+  const onChangeY = (v: number) => onUpdate({ y: v });
+  const onAlignX = (x: number) => onUpdate({ x: Math.round(x * 1000) / 1000 });
+  const onAlignY = (y: number) => onUpdate({ y: Math.round(y * 1000) / 1000 });
+  const onChangeScale = (v: number) => onUpdate({ scale: Math.max(0.001, v) });
+  const onChangeRotation = (v: number) => onUpdate({ rotation: v });
+
   return {
     objW,
     objH,
     sharedTransformProps,
+    onChangeX,
+    onChangeY,
+    onAlignX,
+    onAlignY,
+    onChangeScale,
+    onChangeRotation,
   };
 }
