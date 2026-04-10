@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "istanbul",
       include: ["src/**/*.{ts,tsx}"],
@@ -17,6 +17,7 @@ export default defineConfig({
     },
     // Node environment for main-process tests
     environmentMatchGlobs: [
+      ["tests/unit/main/**", "node"],
       ["tests/unit/taskManager*", "node"],
       ["tests/unit/fluidnc*", "node"],
       ["tests/unit/serial*", "node"],

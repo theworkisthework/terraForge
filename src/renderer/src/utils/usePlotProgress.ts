@@ -33,9 +33,11 @@
 //         has moved outside it), an unbounded unpenalised global search locates
 //         the machine, confirmed over MIN_CONSECUTIVE_HITS ticks before commit.
 
+import { useShallow } from "zustand/react/shallow";
 import { useEffect, useRef } from "react";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { selectPlotProgressCanvasState } from "../store/canvasSelectors";
 import type { GcodeSegment } from "./gcodeParser";
 
 // Segments to scan ahead per coordinate-matching update.
@@ -185,9 +187,9 @@ function appendSegmentsToAcc(
 export function usePlotProgress(): void {
   const status = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
-  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
-  const setPlotProgress = useCanvasStore((s) => s.setPlotProgress);
-  const clearPlotProgress = useCanvasStore((s) => s.clearPlotProgress);
+  const { gcodeToolpath, setPlotProgress, clearPlotProgress } = useCanvasStore(
+    useShallow(selectPlotProgressCanvasState),
+  );
 
   const frontierRef = useRef<{ idx: number; t: number }>({ idx: -1, t: 0 });
   const accRef = useRef<Acc>({ cuts: "", rapids: "", completedUpTo: -1 });

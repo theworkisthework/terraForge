@@ -198,7 +198,7 @@ function applyCtm(ctx: Ctx2D, x: number, y: number): [number, number] {
   return [+pt.x.toFixed(4), +pt.y.toFixed(4)];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 async function extractPagePaths(page: any): Promise<string[]> {
   const viewport = page.getViewport({ scale: 1 });
 
@@ -337,7 +337,7 @@ async function extractPagePaths(page: any): Promise<string[]> {
   // Render the page — pdfjs applies the viewport transform (including Y-flip)
   // via ctx.transform() before drawing any paths, so all intercepted coords
   // are already in the correct screen / viewport coordinate space.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   await (page.render({ canvasContext: proxyCtx as any, viewport }) as any)
     .promise;
 

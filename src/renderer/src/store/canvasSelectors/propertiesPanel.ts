@@ -1,0 +1,31 @@
+import type { CanvasState } from "../canvasStore/types";
+
+export const selectPropertiesPanelStoreBindingsState = (
+  state: CanvasState,
+) => ({
+  imports: state.imports,
+  selectedImportId: state.selectedImportId,
+  selectImport: state.selectImport,
+  removeImport: state.removeImport,
+  updateImport: state.updateImport,
+  updatePath: state.updatePath,
+  updateImportLayer: state.updateImportLayer,
+  removePath: state.removePath,
+  applyHatch: state.applyHatch,
+  showCentreMarker: state.showCentreMarker,
+  toggleCentreMarker: state.toggleCentreMarker,
+  gcodeToolpath: state.gcodeToolpath,
+  gcodeSource: state.gcodeSource,
+  setGcodeToolpath: state.setGcodeToolpath,
+  toolpathSelected: state.toolpathSelected,
+  selectToolpath: state.selectToolpath,
+  layerGroups: state.layerGroups,
+  addLayerGroup: state.addLayerGroup,
+  removeLayerGroup: state.removeLayerGroup,
+  updateLayerGroup: state.updateLayerGroup,
+  assignImportToGroup: state.assignImportToGroup,
+  selectedGroupId: state.selectedGroupId,
+  selectGroup: state.selectGroup,
+  pageTemplate: state.pageTemplate,
+  pageSizes: state.pageSizes,
+});

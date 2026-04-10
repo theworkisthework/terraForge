@@ -251,6 +251,8 @@
 - [x] **origin mode** — `origin: "top-left"` G-code should observe origin setting
 - [ ] **Per-import feedrate override**
 - [ ] **Toolpath simulation** — animate pen movement before sending, estimate job duration
+- [ ] **Reverse and trace same path** - draw a path twice but in different directions - complicates nearest neighbour?
+- [ ] **Paint pot dip and pen (posca) priming** - To do painting with a regular brush, need to dip it into a paint pot (multiple pots). This overlaps with priming a paint pen - pressing instead of dipping.
 
 ### Machine Control
 

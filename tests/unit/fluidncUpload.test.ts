@@ -218,6 +218,33 @@ describe("FluidNCClient.uploadFile", () => {
     if (calls.length > 1) expect(calls).toContain(50);
   });
 
+  it("tracks progress for non-buffer stream chunks", async () => {
+    (globalThis as Record<string, unknown>).__statSize = 3;
+    const client = buildClient();
+    const onProgress = vi.fn();
+
+    const uploadPromise = client.uploadFile(
+      "/local/test.gcode",
+      "/sd/",
+      onProgress,
+    );
+
+    // uploadFile awaits fs.stat before registering the stream data handler.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const dataCall = mockReadStream.on.mock.calls.find(
+      ([event]) => event === "data",
+    );
+    expect(dataCall).toBeDefined();
+    const handler = dataCall![1] as (chunk: string) => void;
+    handler("abc");
+
+    await uploadPromise;
+    const calls = onProgress.mock.calls.map(([p]) => p as number);
+    expect(calls).toContain(100);
+  });
+
   it("rejects when HTTP response status is >= 400", async () => {
     getState().submitStatusCode = 404;
     const client = buildClient();
@@ -358,5 +385,27 @@ describe("FluidNCClient.downloadFile", () => {
     await expect(
       client.downloadFile("/file.gcode", "/local/file.gcode"),
     ).rejects.toThrow("No response body");
+  });
+
+  it("destroys writer and rejects when writing chunk fails", async () => {
+    const chunk = new Uint8Array([1, 2, 3]);
+    mockFetch.mockResolvedValueOnce(
+      mockDownloadResponse([chunk], chunk.length),
+    );
+
+    const writer = {
+      write: vi.fn(() => {
+        throw new Error("disk full");
+      }),
+      end: vi.fn(),
+      destroy: vi.fn(),
+    };
+    mockCreateWriteStream.mockImplementationOnce(() => writer as any);
+
+    const client = buildClient();
+    await expect(
+      client.downloadFile("/file.gcode", "/local/file.gcode"),
+    ).rejects.toThrow("disk full");
+    expect(writer.destroy).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { v4 as uuid } from "uuid";
+import { useShallow } from "zustand/react/shallow";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { selectJobControlsCanvasState } from "../store/canvasSelectors";
 import { parseGcode } from "../utils/gcodeParser";
 
 const GCODE_EXTS = [
@@ -25,12 +27,16 @@ export function JobControls() {
   const status = useMachineStore((s) => s.status);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const upsertTask = useTaskStore((s) => s.upsertTask);
-  const toolpathSelected = useCanvasStore((s) => s.toolpathSelected);
-  const gcodeSource = useCanvasStore((s) => s.gcodeSource);
-  const gcodeToolpath = useCanvasStore((s) => s.gcodeToolpath);
-  const setGcodeToolpath = useCanvasStore((s) => s.setGcodeToolpath);
-  const setGcodeSource = useCanvasStore((s) => s.setGcodeSource);
-  const selectToolpath = useCanvasStore((s) => s.selectToolpath);
+  const {
+    toolpathSelected,
+    gcodeSource,
+    gcodeToolpath,
+    setGcodeToolpath,
+    setGcodeSource,
+    selectToolpath,
+    gcodePreviewLoading,
+    setGcodePreviewLoading,
+  } = useCanvasStore(useShallow(selectJobControlsCanvasState));
 
   // When the canvas toolpath is selected and has a local file source, use it
   // as the job file even if nothing is explicitly set in the file browser.
@@ -43,10 +49,6 @@ export function JobControls() {
           name: gcodeSource.name,
         }
       : null);
-  const gcodePreviewLoading = useCanvasStore((s) => s.gcodePreviewLoading);
-  const setGcodePreviewLoading = useCanvasStore(
-    (s) => s.setGcodePreviewLoading,
-  );
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
 
   const jobFileValid =

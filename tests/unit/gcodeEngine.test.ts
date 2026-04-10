@@ -411,6 +411,31 @@ describe("nearestNeighbourSort", () => {
       expect(starts.has(`${x},${y}`)).toBe(true);
     }
   });
+
+  it("falls back to linear scan when distance comparisons are non-finite", () => {
+    const a: Pt[] = [
+      { x: 0, y: 0 },
+      { x: Number.NaN, y: 0 },
+    ];
+    const b: Pt[] = [
+      { x: 20, y: 20 },
+      { x: 25, y: 25 },
+    ];
+    const c: Pt[] = [
+      { x: 30, y: 30 },
+      { x: 35, y: 35 },
+    ];
+
+    const result = nearestNeighbourSort([a, b, c]);
+
+    // After selecting `a` first, curX becomes NaN from its endpoint and all
+    // ring-search distance comparisons become non-finite; fallback should still
+    // pick remaining unvisited entries and preserve completion.
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe(a);
+    expect(result.includes(b)).toBe(true);
+    expect(result.includes(c)).toBe(true);
+  });
 });
 
 // ── flattenToSubpaths ─────────────────────────────────────────────────────────
