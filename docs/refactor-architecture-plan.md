@@ -432,9 +432,9 @@ Split `src/workers/gcodeEngine.ts` into stages:
 
 Checklist:
 
-- [ ] Move pure stage functions to separate modules.
-- [ ] Keep worker entrypoint as orchestration only.
-- [ ] Add deterministic unit coverage for each stage.
+- [x] Move pure stage functions to separate modules. (completed 2026-04-10: parsing, geometry/flattening, optimization, clipping, and flattening-flow stages extracted)
+- [x] Keep worker entrypoint as orchestration only. (current `svgWorker.ts` remains orchestration; stage logic lives in `gcodeEngine` modules)
+- [x] Add deterministic unit coverage for each stage. (completed 2026-04-10: direct tests added for path parsing, geometry/flattening, optimization, clipping, and flattening flow)
 
 ### 8) GcodeOptionsDialog Split
 
@@ -518,8 +518,8 @@ Stage complete when oversized extracted TSX files are decomposed into clear cont
 ### Phase 5: Main + Machine + Worker Modularization
 
 - [x] Split Electron main process modules.
-- [ ] Split FluidNC client internals.
-- [ ] Split gcodeEngine pipeline.
+- [x] Split FluidNC client internals.
+- [x] Split gcodeEngine pipeline.
 
 ### Phase 6: Secondary TSX Decomposition and UI Purification
 
@@ -532,8 +532,8 @@ Stage complete when oversized extracted TSX files are decomposed into clear cont
 Current sprint focus:
 
 - [x] Execute Stage 9 second-pass decomposition for large extracted TSX components
-- [ ] Split `src/machine/fluidnc.ts` internals while preserving `FluidNCClient` API
-- [ ] Split `src/workers/gcodeEngine.ts` pipeline stages with deterministic unit tests
+- [x] Split `src/machine/fluidnc.ts` internals while preserving `FluidNCClient` API
+- [x] Split `src/workers/gcodeEngine.ts` pipeline stages with deterministic unit tests
 - [x] Refactor `GcodeOptionsDialog.tsx`
 - [x] Refactor `PropertiesPanel.tsx` (sections/hooks/selectors extracted and validated)
 - [x] Continue selector/callsite migration for remaining `canvasStore.ts` consumers
@@ -643,6 +643,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Continued gcodeEngine pipeline modularization with clipping stage extraction: moved `clipSubpathsToRect` + `clipSubpathsToBed` (and internal Liang-Barsky clipping logic) into `src/workers/gcodeEngine/stages/clipping.ts`, kept backward-compatible re-exports in `src/workers/gcodeEngine.ts`, and added focused deterministic stage coverage in `tests/unit/gcodeClipping.test.ts`.
 - 2026-04-10: Continued gcodeEngine pipeline modularization with flattening-flow stage extraction: moved `flattenToSubpaths` into `src/workers/gcodeEngine/stages/flatteningFlow.ts`, preserved its use of the extracted parsing + geometry stages, kept backward-compatible re-exports in `src/workers/gcodeEngine.ts`, and added focused deterministic stage coverage in `tests/unit/gcodeFlatteningFlow.test.ts`.
 - 2026-04-10: Started gcodeEngine pipeline modularization with stage extraction of path parsing: moved `tokenizePath` + `toAbsolute` (and `PathToken`) into `src/workers/gcodeEngine/stages/pathParsing.ts`, kept backward-compatible exports in `src/workers/gcodeEngine.ts`, and added focused deterministic coverage in `tests/unit/gcodePathParsing.test.ts`.
+- 2026-04-10: Plan reconciliation pass completed: marked previously stale unchecked FluidNC and gcodeEngine checklist/sprint items as done based on completed extraction logs and passing focused validation; Phase 0 guardrails intentionally left open for follow-up.
 
 ## Update Rule
 
