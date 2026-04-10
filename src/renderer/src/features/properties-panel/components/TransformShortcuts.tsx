@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { RotStep } from "../utils/rotation";
 
-interface TransformShortcutsProps {
+export interface TransformShortcutsProps {
   fitScale: number;
   rotStep: RotStep;
   rotSteps: readonly RotStep[];

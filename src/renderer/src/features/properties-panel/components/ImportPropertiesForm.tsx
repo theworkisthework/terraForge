@@ -9,10 +9,9 @@ import { useImportPropertiesFormModel } from "../hooks/useImportPropertiesFormMo
 import { AlignmentControls } from "./AlignmentControls";
 import { DimensionsRow } from "./DimensionsRow";
 import { HatchFillSection } from "./HatchFillSection";
-import { NumberField } from "./NumberField";
 import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeWidthSection } from "./StrokeWidthSection";
-import { TransformShortcuts } from "./TransformShortcuts";
+import { TransformControlsSection } from "./TransformControlsSection";
 
 interface ImportPropertiesFormProps {
   imp: SvgImport;
@@ -124,26 +123,13 @@ export function ImportPropertiesForm({
         onRatioLockedChange={onRatioLockedChange}
       />
 
-      {/* Scale — full width */}
-      <NumberField
-        label="Scale"
-        value={imp.scale}
-        onChange={(v) => onUpdate({ scale: Math.max(0.001, v) })}
-        step={0.05}
-        min={0.001}
+      <TransformControlsSection
+        scale={imp.scale}
+        rotation={imp.rotation}
+        onChangeScale={(v) => onUpdate({ scale: Math.max(0.001, v) })}
+        onChangeRotation={(v) => onUpdate({ rotation: v })}
+        sharedTransformProps={sharedTransformProps}
       />
-
-      <TransformShortcuts {...sharedTransformProps} showRotationRow={false} />
-
-      {/* Rotation — full width */}
-      <NumberField
-        label="Rotation (°)"
-        value={imp.rotation}
-        onChange={(v) => onUpdate({ rotation: v })}
-        step={1}
-      />
-
-      <TransformShortcuts {...sharedTransformProps} showScaleRow={false} />
 
       <StrokeWidthSection
         strokeWidthMM={imp.strokeWidthMM}
