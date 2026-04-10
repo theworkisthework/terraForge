@@ -5,6 +5,15 @@ import { stat } from "fs/promises";
 import { lookup } from "dns/promises";
 import FormData from "form-data";
 import type { MachineStatus, RemoteFile } from "../types";
+import {
+  parseSdRemoteFiles,
+  parseRemoteFiles,
+} from "./fluidnc/parsers/fileParsers";
+import {
+  parseFirmwareProbeResponse,
+  type FirmwareProbeInfo,
+} from "./fluidnc/parsers/firmwareParser";
+import { parseMachineStatus } from "./fluidnc/parsers/statusParser";
 
 // FluidNC HTTP REST + WebSocket client.
 // All methods use the endpoints documented at:
@@ -87,49 +96,7 @@ export class FluidNCClient extends EventEmitter {
   async getStatus(): Promise<MachineStatus> {
     const res = await this.get("/state");
     const text = await res.text();
-    return this.parseStatus(text);
-  }
-
-  private parseStatus(raw: string): MachineStatus {
-    // FluidNC status: <Idle|MPos:0.000,0.000,0.000|FS:0,0|Ln:42,1234>
-    const stateMatch = raw.match(/<([^|>]+)/);
-    const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
-    const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
-    // FluidNC reports Ln:N,Total during SD-card jobs.  Some firmware versions
-    // omit the total, so the comma and second group are optional.
-    const lnMatch = raw.match(/Ln:(\d+)(?:,(\d+))?/);
-
-    const stateStr = stateMatch?.[1] ?? "Unknown";
-    // FluidNC appends a substate number for some states: Hold:0, Hold:1, Door:0, etc.
-    const stateName = stateStr.split(":")[0];
-    const validStates = [
-      "Idle",
-      "Run",
-      "Hold",
-      "Jog",
-      "Alarm",
-      "Door",
-      "Check",
-      "Home",
-      "Sleep",
-    ];
-    const state = (
-      validStates.includes(stateName) ? stateName : "Unknown"
-    ) as MachineStatus["state"];
-
-    const mpos = mposMatch
-      ? { x: +mposMatch[1], y: +mposMatch[2], z: +mposMatch[3] }
-      : { x: 0, y: 0, z: 0 };
-
-    const wpos = wposMatch
-      ? { x: +wposMatch[1], y: +wposMatch[2], z: +wposMatch[3] }
-      : { ...mpos };
-
-    const lineNum = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
-    const lineTotal =
-      lnMatch?.[2] !== undefined ? parseInt(lnMatch[2], 10) : undefined;
-
-    return { raw, state, mpos, wpos, lineNum, lineTotal };
+    return parseMachineStatus(text);
   }
 
   // ─── Commands ─────────────────────────────────────────────────────────────
@@ -212,12 +179,7 @@ export class FluidNCClient extends EventEmitter {
       files: Array<{ name: string; size: number; dir?: boolean }>;
       path: string;
     };
-    return (json.files ?? []).map((f) => ({
-      name: f.name,
-      path: `${remotePath === "/" ? "" : remotePath}/${f.name}`,
-      size: f.size ?? 0,
-      isDirectory: !!f.dir,
-    }));
+    return parseRemoteFiles(remotePath, json);
   }
 
   // SD card file listing.
@@ -254,25 +216,7 @@ export class FluidNCClient extends EventEmitter {
       throw new Error("SD card: unexpected response format");
     }
 
-    // If the SD card is not mounted FluidNC still returns HTTP 200 but with
-    // a non-ok status string (e.g. "SD CARD READER FAILED" / "No SD card").
-    // Surface this as a thrown error so FsPane shows the message rather than
-    // silently falling through to an empty list.
-    if (
-      json.status &&
-      typeof json.status === "string" &&
-      !json.status.toLowerCase().startsWith("ok") &&
-      !json.files
-    ) {
-      throw new Error(`SD card: ${json.status}`);
-    }
-    const prefix = remotePath === "/" ? "" : remotePath.replace(/\/$/, "");
-    return (json.files ?? []).map((f) => ({
-      name: f.name,
-      path: `${prefix}/${f.name}`,
-      size: parseInt(f.size, 10),
-      isDirectory: f.size === "-1",
-    }));
+    return parseSdRemoteFiles(remotePath, json);
   }
 
   /** Fetch the text content of a remote file (for G-code preview). */
@@ -428,45 +372,9 @@ export class FluidNCClient extends EventEmitter {
    *
    * Returns null if all strategies fail or the controller is unreachable.
    */
-  async probeFirmwareVersion(probeBaseUrl?: string): Promise<{
-    raw: string;
-    version: string;
-    major: number;
-    wsPort: number | null;
-  } | null> {
-    const tryParse = (
-      text: string,
-    ): {
-      raw: string;
-      version: string;
-      major: number;
-      wsPort: number | null;
-    } | null => {
-      // "FW version: FluidNC v4.0.1" — space after colon, then optional "FluidNC "
-      const fwMatch = text.match(
-        /FW\s+version\s*:\s*(?:FluidNC\s+)?v?(\d+)\.(\d+)(?:\.(\d+))?/i,
-      );
-      // "[VER:3.9.7.FluidNC...]" or "[VER:FluidNC v3.9.7:]"
-      const verMatch = !fwMatch
-        ? text.match(/\[VER[:\s]+(?:FluidNC\s+)?v?(\d+)\.(\d+)(?:\.(\d+))?/i)
-        : null;
-      // Last resort: bare semver anywhere, e.g. "v3.9.7"
-      const semver =
-        !fwMatch && !verMatch ? text.match(/\bv?(\d+)\.(\d+)\.(\d+)/) : null;
-
-      const m = fwMatch ?? verMatch ?? semver;
-      if (!m) return null;
-
-      const major = parseInt(m[1], 10);
-      const version = `${m[1]}.${m[2]}${m[3] ? `.${m[3]}` : ""}`;
-
-      // Parse WS port directly from "webcommunication: Sync: <port>"
-      const wsPortMatch = text.match(/webcommunication[^#]*Sync:\s*(\d+)/i);
-      const wsPort = wsPortMatch ? parseInt(wsPortMatch[1], 10) : null;
-
-      return { raw: text.trim(), version, major, wsPort };
-    };
-
+  async probeFirmwareVersion(
+    probeBaseUrl?: string,
+  ): Promise<FirmwareProbeInfo | null> {
     const strategies: Array<() => Promise<string | null>> = [
       // Strategy 1: GET /command?plain=[ESP800] (ESP3D-compat, all versions)
       async () => {
@@ -503,7 +411,7 @@ export class FluidNCClient extends EventEmitter {
       try {
         const body = await strategy();
         if (body !== null) {
-          const parsed = tryParse(body);
+          const parsed = parseFirmwareProbeResponse(body);
           if (parsed) return parsed;
           // Body returned but contained no version — log it for diagnostics
           const preview = body.trim().slice(0, 160).replace(/\n/g, "↵");
@@ -679,7 +587,7 @@ export class FluidNCClient extends EventEmitter {
       const text = raw.toString().trim();
       if (text.startsWith("<")) {
         // Grbl/FluidNC real-time status report
-        this.emit("status", this.parseStatus(text));
+        this.emit("status", parseMachineStatus(text));
       } else if (text === "PING" || text.startsWith("PING:")) {
         // Server-to-client keep-alive heartbeat ("PING" no colon) or ping
         // reply ("PING:60000:60000"). Suppress from console; emit as ping signal.
