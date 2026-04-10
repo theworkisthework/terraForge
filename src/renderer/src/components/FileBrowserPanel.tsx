@@ -194,7 +194,7 @@ function FsPane({
     } else {
       setActiveJobPath(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [status?.state, source]);
 
   const handleDownload = async (file: RemoteFile) => {

@@ -48,6 +48,5 @@ export function useToolpathSelectionSync({
       }
     }
     // Intentionally keyed to selection toggles only; source changes correspond to new toolpath loads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolpathSelected]);
 }

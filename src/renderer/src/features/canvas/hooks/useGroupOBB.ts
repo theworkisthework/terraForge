@@ -146,7 +146,7 @@ export function useGroupOBB(
         items,
       });
     },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
+    [],
   );
 
   const onGroupRotateHandleMouseDown = useCallback(
@@ -203,7 +203,7 @@ export function useGroupOBB(
         }),
       });
     },
-    [containerRef, vpRef], // eslint-disable-line react-hooks/exhaustive-deps
+    [containerRef, vpRef],
   );
 
   const updateGroupScaleMove = useCallback(

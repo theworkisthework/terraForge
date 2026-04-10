@@ -217,7 +217,7 @@ export function Toolbar({
       unsubSelectAll();
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Load custom page sizes from the main process on mount.
   // Falls back to the built-in defaults (already in the store) if IPC fails.
@@ -230,7 +230,7 @@ export function Toolbar({
       .catch(() => {
         /* keep built-in defaults */
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Keep Save Layout / Close Layout menu items enabled only when there are imports.
   useEffect(() => {

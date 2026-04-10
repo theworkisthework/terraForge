@@ -19,7 +19,7 @@ const wsCapture = vi.hoisted(() => ({
 
 vi.mock("ws", () => {
   // EventEmitter must be required inside the factory (hoisted context)
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { EventEmitter } = require("events");
 
   class MockWebSocket extends EventEmitter {

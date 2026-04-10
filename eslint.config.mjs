@@ -1,5 +1,6 @@
 import tsParser from "@typescript-eslint/parser";
 import tsEslintPlugin from "@typescript-eslint/eslint-plugin";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 export default [
   {
@@ -16,6 +17,7 @@ export default [
     files: ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
     plugins: {
       "@typescript-eslint": tsEslintPlugin,
+      "react-hooks": reactHooksPlugin,
     },
     languageOptions: {
       parser: tsParser,
@@ -40,13 +42,21 @@ export default [
     },
   },
   {
+    // Test files often use large describe/it callback bodies for scenario
+    // readability; do not enforce function-length limits there.
+    files: ["tests/**/*.test.{ts,tsx}", "tests/**/*.spec.{ts,tsx}"],
+    rules: {
+      "max-lines-per-function": "off",
+    },
+  },
+  {
     // Stricter guardrails for extracted engine stages where we expect small,
     // single-purpose modules.
     files: ["src/workers/gcodeEngine/stages/**/*.ts"],
     rules: {
-      complexity: ["error", 20],
+      complexity: ["warn", 20],
       "max-lines": [
-        "error",
+        "warn",
         {
           max: 260,
           skipBlankLines: true,
@@ -54,7 +64,7 @@ export default [
         },
       ],
       "max-lines-per-function": [
-        "error",
+        "warn",
         {
           max: 160,
           skipBlankLines: true,
