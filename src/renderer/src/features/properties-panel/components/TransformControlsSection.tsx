@@ -1,8 +1,6 @@
 import { NumberField } from "./NumberField";
-import {
-  TransformShortcuts,
-  type TransformShortcutsProps,
-} from "./TransformShortcuts";
+import { TransformShortcuts } from "./TransformShortcuts";
+import type { TransformShortcutsProps } from "./TransformShortcuts.types";
 
 interface TransformControlsSectionProps {
   scale: number;
