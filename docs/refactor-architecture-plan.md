@@ -481,7 +481,7 @@ Checklist:
   - Container TSX target: <= 280 lines, hard cap <= 400.
   - Hook/service target: <= 220 lines, hard cap <= 300.
 - [x] Add or update focused tests for each extracted component/hook.
-- [ ] Validate: `npm run typecheck`, targeted component tests, and full `npm run test:e2e`.
+- [x] Validate: `npm run typecheck`, targeted component tests, and full `npm run test:e2e`.
 
 Deliverable:
 
@@ -525,13 +525,13 @@ Stage complete when oversized extracted TSX files are decomposed into clear cont
 
 - [x] Decompose large extracted TSX files into container and presentational layers.
 - [x] Replace repeated raw markup/SVG action controls with reusable React components.
-- [ ] Keep behavior stable with passing targeted tests and full E2E.
+- [x] Keep behavior stable with passing targeted tests and full E2E.
 
 ## Working TODO (Tick As We Go)
 
 Current sprint focus:
 
-- [ ] Execute Stage 9 second-pass decomposition for large extracted TSX components
+- [x] Execute Stage 9 second-pass decomposition for large extracted TSX components
 - [ ] Split `src/machine/fluidnc.ts` internals while preserving `FluidNCClient` API
 - [ ] Split `src/workers/gcodeEngine.ts` pipeline stages with deterministic unit tests
 - [x] Refactor `GcodeOptionsDialog.tsx`
@@ -631,6 +631,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `GroupedImportsSection.tsx` to composition: extracted shared prop/view-model contracts to `components/GroupedImportsSection.types.ts`, moved grouped-member and state derivation into `hooks/useGroupedImportsSectionModel.ts`, and extracted per-group presentation to `components/GroupedImportsGroup.tsx`; added focused tests for extracted modules (`useGroupedImportsSectionModel.test.ts`, `GroupedImportsGroup.test.tsx`); validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/GroupedImportsSection.test.tsx` (3/3), `npm.cmd run test -- src/renderer/src/features/properties-panel/components/GroupedImportsGroup.test.tsx` (2/2), and `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useGroupedImportsSectionModel.test.ts` (1/1).
 - 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `UngroupedImportsSection.tsx` to composition: extracted shared prop contract to `components/UngroupedImportsSection.types.ts` and moved ungrouped-member derivation plus drop-target state into `hooks/useUngroupedImportsSectionModel.ts`; added focused hook coverage in `useUngroupedImportsSectionModel.test.ts`; validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/UngroupedImportsSection.test.tsx` (2/2), and `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useUngroupedImportsSectionModel.test.ts` (1/1).
 - 2026-04-10: Stage 9 checklist closeout pass completed for decomposition, reusable primitives, view-model extraction, prop-surface reduction, size guardrails, and focused tests. Remaining closeout step is manual full-suite validation per policy (`npm test` + `npm run test:e2e`) before checking the final Stage 9 validation item.
+- 2026-04-10: Stage 9 final validation completed based on user-run full suite confirmation (`npm test` and `npm run test:e2e` both passing); Stage 9 validation checklist item, Phase 6 behavior-stability item, and current sprint Stage 9 execution focus are now marked complete.
 
 ## Update Rule
 
