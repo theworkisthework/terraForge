@@ -395,6 +395,21 @@ describe("FluidNCClient", () => {
     expect(result).toBeNull();
   });
 
+  it("emits probe failure message when strategy throws non-Error", async () => {
+    const consoleEvents: string[] = [];
+    client.on("console", (msg) => consoleEvents.push(msg));
+
+    mockFetch.mockRejectedValueOnce("network-down");
+    mockFetch.mockResolvedValueOnce(mockResponse("", 500));
+    mockFetch.mockResolvedValueOnce(mockResponse("", 500));
+
+    const result = await client.probeFirmwareVersion();
+    expect(result).toBeNull();
+    expect(consoleEvents.some((msg) => msg.includes("network-down"))).toBe(
+      true,
+    );
+  });
+
   it("returns null when responses contain no version info", async () => {
     // All succeed but body has no version
     mockFetch.mockResolvedValueOnce(mockResponse("no version here"));
@@ -412,6 +427,35 @@ describe("FluidNCClient", () => {
     expect((client as any).fwMajor).toBeNull();
   });
 
+  it("disconnectWebSocket clears reconnect timer and closes ws", () => {
+    vi.useFakeTimers();
+    try {
+      (client as any).wsReconnectTimer = setTimeout(() => {}, 60_000);
+      const mockWs = { close: vi.fn() };
+      (client as any).ws = mockWs;
+
+      client.disconnectWebSocket();
+
+      expect((client as any).wsReconnectTimer).toBeNull();
+      expect(mockWs.close).toHaveBeenCalledWith(1000);
+      expect((client as any).ws).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("disconnectWebSocket tolerates ws close errors", () => {
+    const mockWs = {
+      close: vi.fn(() => {
+        throw new Error("already closed");
+      }),
+    };
+    (client as any).ws = mockWs;
+
+    expect(() => client.disconnectWebSocket()).not.toThrow();
+    expect((client as any).ws).toBeNull();
+  });
+
   // ── Generation counter ──────────────────────────────────────────────────
 
   it("increments wsGeneration on disconnectWebSocket", () => {
@@ -419,6 +463,35 @@ describe("FluidNCClient", () => {
     client.disconnectWebSocket();
     const gen2 = (client as any).wsGeneration;
     expect(gen2).toBeGreaterThan(gen1);
+  });
+
+  it("killWs clears timer and terminates socket", () => {
+    vi.useFakeTimers();
+    try {
+      (client as any).wsReconnectTimer = setTimeout(() => {}, 60_000);
+      const mockWs = { terminate: vi.fn() };
+      (client as any).ws = mockWs;
+
+      (client as any).killWs();
+
+      expect((client as any).wsReconnectTimer).toBeNull();
+      expect(mockWs.terminate).toHaveBeenCalledTimes(1);
+      expect((client as any).ws).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("killWs tolerates terminate errors", () => {
+    const mockWs = {
+      terminate: vi.fn(() => {
+        throw new Error("already dead");
+      }),
+    };
+    (client as any).ws = mockWs;
+
+    expect(() => (client as any).killWs()).not.toThrow();
+    expect((client as any).ws).toBeNull();
   });
 
   // ── sendRealtime via open WebSocket (line 196) ──────────────────────────
@@ -453,6 +526,11 @@ describe("FluidNCClient", () => {
     // ".invalid" TLD is RFC-guaranteed to never resolve
     const result = await (client as any).resolveHost("bogus.host.invalid");
     expect(result).toBe("bogus.host.invalid");
+  });
+
+  it("resolveHost returns resolved address on successful lookup", async () => {
+    const result = await (client as any).resolveHost("127.0.0.1");
+    expect(result).toBe("127.0.0.1");
   });
 
   // ── connectWebSocket explicit wsPort override (lines 534-537) ──────────
