@@ -416,8 +416,8 @@ Split `src/machine/fluidnc.ts` into:
 Checklist:
 
 - [x] Extract pure parsers first with unit tests. (completed 2026-04-10: `statusParser`, `fileParsers`, `firmwareParser` extracted with direct parser tests and existing FluidNC API suite kept green)
-- [ ] Extract HTTP helper wrapper and websocket lifecycle manager.
-- [ ] Keep public `FluidNCClient` API stable.
+- [x] Extract HTTP helper wrapper and websocket lifecycle manager. (completed 2026-04-10: `restClient.ts` and `wsLifecycle.ts` extracted with focused transport/lifecycle coverage)
+- [x] Keep public `FluidNCClient` API stable. (validated 2026-04-10 by existing FluidNC facade suite plus focused transport/lifecycle tests)
 
 ### 7) G-code Engine Pipeline Split
 
@@ -634,6 +634,9 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Stage 9 final validation completed based on user-run full suite confirmation (`npm test` and `npm run test:e2e` both passing); Stage 9 validation checklist item, Phase 6 behavior-stability item, and current sprint Stage 9 execution focus are now marked complete.
 - 2026-04-10: Added pre-refactor FluidNC API hardening tests before modularization: expanded `tests/unit/fluidnc.test.ts` (probe non-Error failure path, resolveHost success path, disconnect/kill WS cleanup branches) and `tests/unit/fluidncUpload.test.ts` (non-buffer upload progress path, download writer-failure path). Focused validation passes with `npm.cmd run test -- tests/unit/fluidnc.test.ts` (60/60) and `npm.cmd run test -- tests/unit/fluidncUpload.test.ts` (15/15). Targeted coverage baseline with `npx.cmd vitest run tests/unit/fluidnc.test.ts tests/unit/fluidncUpload.test.ts --coverage --coverage.include=src/machine/fluidnc.ts` now reports 75/75 tests passing and `fluidnc.ts` at 97.79% statements, 81.81% branches, 97.72% functions, 100% lines.
 - 2026-04-10: Started FluidNC modularization with a parser-first extraction slice: moved pure parsing logic out of `src/machine/fluidnc.ts` into `src/machine/fluidnc/parsers/statusParser.ts`, `src/machine/fluidnc/parsers/fileParsers.ts`, and `src/machine/fluidnc/parsers/firmwareParser.ts`; added direct parser coverage in `tests/unit/fluidncParsers.test.ts`; existing FluidNC API behavior remains stable with `npm.cmd run typecheck`, `npm.cmd run test -- tests/unit/fluidnc.test.ts` (60/60), `npm.cmd run test -- tests/unit/fluidncUpload.test.ts` (15/15), and `npm.cmd run test -- tests/unit/fluidncParsers.test.ts` (5/5).
+- 2026-04-10: Continued FluidNC modularization by extracting the shared HTTP transport into `src/machine/fluidnc/transport/restClient.ts` and delegating existing REST calls through it; added focused transport coverage in `tests/unit/fluidncRestClient.test.ts`; validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- tests/unit/fluidnc.test.ts` (60/60), `npm.cmd run test -- tests/unit/fluidncUpload.test.ts` (15/15), `npm.cmd run test -- tests/unit/fluidncParsers.test.ts` (5/5), and `npm.cmd run test -- tests/unit/fluidncRestClient.test.ts` (4/4).
+- 2026-04-10: Completed the remaining FluidNC transport split by extracting WebSocket lifecycle handling into `src/machine/fluidnc/transport/wsLifecycle.ts` while keeping `FluidNCClient` as the facade over probe/configuration logic; added focused lifecycle coverage in `tests/unit/fluidncWsLifecycle.test.ts`; validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- tests/unit/fluidnc.test.ts tests/unit/fluidncWsLifecycle.test.ts tests/unit/fluidncRestClient.test.ts tests/unit/fluidncParsers.test.ts tests/unit/fluidncUpload.test.ts` (89/89).
+- 2026-04-10: Full-suite validation confirmed by user after FluidNC modularization slices; full suite passing.
 
 ## Update Rule
 
