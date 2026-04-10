@@ -1,48 +1,15 @@
-import type { SvgImport } from "../../../../../types";
 import {
   DEFAULT_HATCH_ANGLE_DEG,
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_STROKE_WIDTH_MM,
 } from "../../../../../types";
-import type { RotStep } from "../utils/rotation";
 import { useImportPropertiesFormModel } from "../hooks/useImportPropertiesFormModel";
-import { AlignmentControls } from "./AlignmentControls";
-import { DimensionsRow } from "./DimensionsRow";
+import type { ImportPropertiesFormProps } from "./ImportPropertiesForm.types";
+import { AlignmentDimensionsSection } from "./AlignmentDimensionsSection";
 import { HatchFillSection } from "./HatchFillSection";
 import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeWidthSection } from "./StrokeWidthSection";
 import { TransformControlsSection } from "./TransformControlsSection";
-
-interface ImportPropertiesFormProps {
-  imp: SvgImport;
-  bedW: number;
-  bedH: number;
-  pageW: number;
-  pageH: number;
-  marginMM: number;
-  canAlignToTemplate: boolean;
-  templateAlignEnabled: boolean;
-  templateAlignTarget: "page" | "margin";
-  ratioLocked: boolean;
-  rotStep: RotStep;
-  stepFlyoutOpen: boolean;
-  showCentreMarker: boolean;
-  onUpdate: (changes: Partial<SvgImport>) => void;
-  onTemplateAlignEnabledChange: (v: boolean) => void;
-  onTemplateAlignTargetChange: (v: "page" | "margin") => void;
-  onRatioLockedChange: (v: boolean) => void;
-  onToggleStepFlyout: () => void;
-  onCloseStepFlyout: () => void;
-  onSelectRotStep: (s: RotStep) => void;
-  onToggleCentreMarker: () => void;
-  onChangeStrokeWidth: (value: number) => void;
-  onApplyHatch: (
-    importId: string,
-    spacingMM: number,
-    angleDeg: number,
-    enabled: boolean,
-  ) => void;
-}
 
 export function ImportPropertiesForm({
   imp,
@@ -104,7 +71,7 @@ export function ImportPropertiesForm({
         onChangeY={onChangeY}
       />
 
-      <AlignmentControls
+      <AlignmentDimensionsSection
         objW={objW}
         objH={objH}
         bedW={bedW}
@@ -119,11 +86,6 @@ export function ImportPropertiesForm({
         onTemplateAlignTargetChange={onTemplateAlignTargetChange}
         onAlignX={onAlignX}
         onAlignY={onAlignY}
-      />
-
-      <DimensionsRow
-        objW={objW}
-        objH={objH}
         svgWidth={imp.svgWidth}
         svgHeight={imp.svgHeight}
         ratioLocked={ratioLocked}
