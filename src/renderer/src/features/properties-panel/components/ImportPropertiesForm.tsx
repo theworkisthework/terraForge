@@ -4,11 +4,13 @@ import {
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_STROKE_WIDTH_MM,
 } from "../../../../../types";
-import { ROT_PRESETS, ROT_STEPS, type RotStep } from "../utils/rotation";
+import type { RotStep } from "../utils/rotation";
+import { useImportPropertiesFormModel } from "../hooks/useImportPropertiesFormModel";
 import { AlignmentControls } from "./AlignmentControls";
 import { DimensionsRow } from "./DimensionsRow";
 import { HatchFillSection } from "./HatchFillSection";
 import { NumberField } from "./NumberField";
+import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeWidthSection } from "./StrokeWidthSection";
 import { TransformShortcuts } from "./TransformShortcuts";
 
@@ -68,66 +70,30 @@ export function ImportPropertiesForm({
   onChangeStrokeWidth,
   onApplyHatch,
 }: ImportPropertiesFormProps) {
-  const objW = imp.svgWidth * (imp.scaleX ?? imp.scale);
-  const objH = imp.svgHeight * (imp.scaleY ?? imp.scale);
-  const fitScale = Math.min(
-    bedW / (imp.svgWidth || 1),
-    bedH / (imp.svgHeight || 1),
-  );
-  const snapPresetTitle = `Snap to next preset (${ROT_PRESETS.join("° · ")}°)`;
-
-  const sharedTransformProps = {
-    fitScale,
+  const { objW, objH, sharedTransformProps } = useImportPropertiesFormModel({
+    imp,
+    bedW,
+    bedH,
     rotStep,
-    rotSteps: ROT_STEPS,
     stepFlyoutOpen,
     showCentreMarker,
-    snapPresetTitle,
-    onFitToBed: () => {
-      onRatioLockedChange(true);
-      onUpdate({
-        scale: fitScale,
-        scaleX: undefined,
-        scaleY: undefined,
-        x: 0,
-        y: 0,
-      });
-    },
-    onResetScale: () => {
-      onRatioLockedChange(true);
-      onUpdate({ scale: 1, scaleX: undefined, scaleY: undefined });
-    },
-    onRotateCcw: () => onUpdate({ rotation: imp.rotation - rotStep }),
-    onRotateCw: () => onUpdate({ rotation: imp.rotation + rotStep }),
+    onUpdate,
+    onRatioLockedChange,
     onToggleStepFlyout,
     onCloseStepFlyout,
     onSelectRotStep,
     onToggleCentreMarker,
-    onSnapToNextPreset: () => {
-      const norm = ((imp.rotation % 360) + 360) % 360;
-      const idx = ROT_PRESETS.findIndex((p) => Math.abs(p - norm) < 1);
-      const next = ROT_PRESETS[idx < 0 ? 0 : (idx + 1) % ROT_PRESETS.length];
-      onUpdate({ rotation: next });
-    },
-  };
+  });
 
   return (
     <>
       {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
-      <div className="grid grid-cols-2 gap-2 mb-0">
-        <NumberField
-          label="X (mm)"
-          value={imp.x}
-          onChange={(v) => onUpdate({ x: v })}
-          step={0.5}
-        />
-        <NumberField
-          label="Y (mm)"
-          value={imp.y}
-          onChange={(v) => onUpdate({ y: v })}
-          step={0.5}
-        />
-      </div>
+      <PositionFieldsRow
+        x={imp.x}
+        y={imp.y}
+        onChangeX={(v) => onUpdate({ x: v })}
+        onChangeY={(v) => onUpdate({ y: v })}
+      />
 
       <AlignmentControls
         objW={objW}

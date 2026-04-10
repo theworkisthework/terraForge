@@ -617,6 +617,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Stage 9 started with canvas overlay decomposition: extracted shared `DeleteActionBadge` primitive, replaced repeated canvas delete-action markup, switched to Lucide `SquareX`, and split `CanvasOverlays.tsx` into per-component modules (`RulerOverlay`, `ImportLayer`, `GroupHandleOverlay`, `HandleOverlay`) while keeping `CanvasOverlays.tsx` as a compatibility barrel; `npm.cmd run typecheck` passes.
 - 2026-04-10: Continued Stage 9 canvas decomposition by splitting `CanvasSceneOverlays.tsx` into focused modules (`PageTemplateOverlay`, `ToolpathHitAreaOverlay`, `ToolpathSelectionOverlay`, `PenCrosshairOverlay`) and preserving `CanvasSceneOverlays.tsx` as a compatibility barrel; `npm.cmd run typecheck` passes.
 - 2026-04-10: Continued Stage 9 by decomposing `ToolpathOverlay.tsx` heavy drawing blocks into `features/canvas/utils/toolpathOverlayDraw.ts` (`drawImportsLayer`, `drawToolpathLayer`) and reducing overlay component responsibility to orchestration/canvas lifecycle; `npm.cmd run typecheck` passes.
+- 2026-04-10: Continued Stage 9 properties-panel decomposition by extracting `useImportPropertiesFormModel` (behavior/actions) and `PositionFieldsRow` (X/Y layout) from `ImportPropertiesForm.tsx`, preserving component API and behavior while tightening functionality vs presentation separation; `npm.cmd run typecheck` passes.
 
 ## Update Rule
 
