@@ -1,17 +1,6 @@
-import type { DragEvent, ReactNode } from "react";
-import type { LayerGroup, SvgImport } from "../../../../../types";
+import { useUngroupedImportsSectionModel } from "../hooks/useUngroupedImportsSectionModel";
 import { UngroupedDropZone } from "./UngroupedDropZone";
-
-interface UngroupedImportsSectionProps {
-  imports: SvgImport[];
-  layerGroups: LayerGroup[];
-  dragOverGroupId: string | null;
-  showUngroupedHint: boolean;
-  onUngroupedDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onUngroupedDragLeave: (event: DragEvent<HTMLDivElement>) => void;
-  onUngroupedDrop: (event: DragEvent<HTMLDivElement>) => void;
-  renderImport: (imp: SvgImport, indented: boolean) => ReactNode;
-}
+import type { UngroupedImportsSectionProps } from "./UngroupedImportsSection.types";
 
 export function UngroupedImportsSection({
   imports,
@@ -23,13 +12,15 @@ export function UngroupedImportsSection({
   onUngroupedDrop,
   renderImport,
 }: UngroupedImportsSectionProps) {
-  const ungroupedImports = imports.filter(
-    (i) => !layerGroups.some((g) => g.importIds.includes(i.id)),
-  );
+  const { ungroupedImports, isDropTarget } = useUngroupedImportsSectionModel({
+    imports,
+    layerGroups,
+    dragOverGroupId,
+  });
 
   return (
     <UngroupedDropZone
-      isDropTarget={dragOverGroupId === "none"}
+      isDropTarget={isDropTarget}
       showHint={showUngroupedHint}
       onDragOver={onUngroupedDragOver}
       onDragLeave={onUngroupedDragLeave}

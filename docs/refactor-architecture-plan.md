@@ -471,16 +471,16 @@ Architecture constraints:
 
 Checklist:
 
-- [ ] Split large multi-component files into focused modules (one component per file where practical).
-- [ ] Extract reusable overlay primitives (selection frame, handle set, rotate stem/handle, delete action badge).
-- [ ] Replace repeated inline delete-icon SVG markup with shared React component primitives.
-- [ ] Extract geometry/view-model logic into hooks/services (ruler ticks/mapping, handle projection, imports-by-group derivation).
-- [ ] Reduce prop-surface complexity for large components by introducing typed prop objects per concern.
-- [ ] Apply size guardrails for this stage:
+- [x] Split large multi-component files into focused modules (one component per file where practical).
+- [x] Extract reusable overlay primitives (selection frame, handle set, rotate stem/handle, delete action badge).
+- [x] Replace repeated inline delete-icon SVG markup with shared React component primitives.
+- [x] Extract geometry/view-model logic into hooks/services (ruler ticks/mapping, handle projection, imports-by-group derivation).
+- [x] Reduce prop-surface complexity for large components by introducing typed prop objects per concern.
+- [x] Apply size guardrails for this stage:
   - Presentational TSX target: <= 180 lines, hard cap <= 250.
   - Container TSX target: <= 280 lines, hard cap <= 400.
   - Hook/service target: <= 220 lines, hard cap <= 300.
-- [ ] Add or update focused tests for each extracted component/hook.
+- [x] Add or update focused tests for each extracted component/hook.
 - [ ] Validate: `npm run typecheck`, targeted component tests, and full `npm run test:e2e`.
 
 Deliverable:
@@ -523,8 +523,8 @@ Stage complete when oversized extracted TSX files are decomposed into clear cont
 
 ### Phase 6: Secondary TSX Decomposition and UI Purification
 
-- [ ] Decompose large extracted TSX files into container and presentational layers.
-- [ ] Replace repeated raw markup/SVG action controls with reusable React components.
+- [x] Decompose large extracted TSX files into container and presentational layers.
+- [x] Replace repeated raw markup/SVG action controls with reusable React components.
 - [ ] Keep behavior stable with passing targeted tests and full E2E.
 
 ## Working TODO (Tick As We Go)
@@ -629,6 +629,8 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `DimensionsRow.tsx` to composition: extracted shared prop contract to `components/DimensionsRow.types.ts`, moved width/height transform behavior and ratio-lock action wiring into `hooks/useDimensionsRowModel.ts`, and extracted reusable presentation primitives `components/DimensionInputField.tsx` and `components/RatioLockToggleButton.tsx`; added focused tests for each extracted module (`useDimensionsRowModel.test.ts`, `DimensionInputField.test.tsx`, `RatioLockToggleButton.test.tsx`); validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/DimensionsRow.test.tsx` (8/8), `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useDimensionsRowModel.test.ts` (2/2), `npm.cmd run test -- src/renderer/src/features/properties-panel/components/DimensionInputField.test.tsx` (1/1), and `npm.cmd run test -- src/renderer/src/features/properties-panel/components/RatioLockToggleButton.test.tsx` (2/2).
 - 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `ImportHeaderRow.tsx` to composition: extracted shared prop contract to `components/ImportHeaderRow.types.ts`, moved row interaction/action wiring to `hooks/useImportHeaderRowModel.ts`, and extracted edit/view name rendering to `components/ImportNameField.tsx`; added focused tests for extracted modules (`useImportHeaderRowModel.test.ts`, `ImportNameField.test.tsx`); validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/ImportHeaderRow.test.tsx` (2/2), `npm.cmd run test -- src/renderer/src/features/properties-panel/components/ImportNameField.test.tsx` (2/2), and `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useImportHeaderRowModel.test.ts` (1/1).
 - 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `GroupedImportsSection.tsx` to composition: extracted shared prop/view-model contracts to `components/GroupedImportsSection.types.ts`, moved grouped-member and state derivation into `hooks/useGroupedImportsSectionModel.ts`, and extracted per-group presentation to `components/GroupedImportsGroup.tsx`; added focused tests for extracted modules (`useGroupedImportsSectionModel.test.ts`, `GroupedImportsGroup.test.tsx`); validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/GroupedImportsSection.test.tsx` (3/3), `npm.cmd run test -- src/renderer/src/features/properties-panel/components/GroupedImportsGroup.test.tsx` (2/2), and `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useGroupedImportsSectionModel.test.ts` (1/1).
+- 2026-04-10: Continued Stage 9 properties-panel decomposition by reducing `UngroupedImportsSection.tsx` to composition: extracted shared prop contract to `components/UngroupedImportsSection.types.ts` and moved ungrouped-member derivation plus drop-target state into `hooks/useUngroupedImportsSectionModel.ts`; added focused hook coverage in `useUngroupedImportsSectionModel.test.ts`; validation passes with `npm.cmd run typecheck`, `npm.cmd run test -- src/renderer/src/features/properties-panel/components/UngroupedImportsSection.test.tsx` (2/2), and `npm.cmd run test -- src/renderer/src/features/properties-panel/hooks/useUngroupedImportsSectionModel.test.ts` (1/1).
+- 2026-04-10: Stage 9 checklist closeout pass completed for decomposition, reusable primitives, view-model extraction, prop-surface reduction, size guardrails, and focused tests. Remaining closeout step is manual full-suite validation per policy (`npm test` + `npm run test:e2e`) before checking the final Stage 9 validation item.
 
 ## Update Rule
 
