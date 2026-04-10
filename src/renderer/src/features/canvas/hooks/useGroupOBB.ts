@@ -52,6 +52,9 @@ export function useGroupOBB(
   const [persistentGroupOBB, setPersistentGroupOBB] =
     useState<PersistentGroupOBB | null>(null);
 
+  const isNonPrimaryButton = (button: number | undefined) =>
+    button !== undefined && button !== 0;
+
   // Ref mirror so gesture callbacks can read the latest value without deps.
   const persistentGroupOBBRef = useRef(persistentGroupOBB);
   persistentGroupOBBRef.current = persistentGroupOBB;
@@ -81,6 +84,7 @@ export function useGroupOBB(
 
   const onGroupHandleMouseDown = useCallback(
     (e: React.MouseEvent<SVGCircleElement>, handle: HandlePos) => {
+      if (isNonPrimaryButton(e.button)) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
       const state = useCanvasStore.getState();
@@ -157,6 +161,7 @@ export function useGroupOBB(
       gHW: number,
       gHH: number,
     ) => {
+      if (isNonPrimaryButton(e.button)) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
       const state = useCanvasStore.getState();

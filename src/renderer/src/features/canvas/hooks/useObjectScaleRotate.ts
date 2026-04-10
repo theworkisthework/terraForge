@@ -25,8 +25,12 @@ export function useObjectScaleRotate(
   const [scaling, setScaling] = useState<ScalingState | null>(null);
   const [rotating, setRotating] = useState<RotatingState | null>(null);
 
+  const isNonPrimaryButton = (button: number | undefined) =>
+    button !== undefined && button !== 0;
+
   const onHandleMouseDown = useCallback(
     (e: React.MouseEvent<SVGCircleElement>, id: string, handle: HandlePos) => {
+      if (isNonPrimaryButton(e.button)) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
@@ -58,6 +62,7 @@ export function useObjectScaleRotate(
       cxSvg: number,
       cySvg: number,
     ) => {
+      if (isNonPrimaryButton(e.button)) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);

@@ -22,10 +22,8 @@ export function useCanvasInteractionHandlers({
 }: UseCanvasInteractionHandlersOptions) {
   const onContainerMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.button === 1) {
-        e.preventDefault();
-        startPan(e.clientX, e.clientY);
-      } else if (e.button === 0 && spaceRef.current) {
+      const isPanButton = e.button === 1 || e.button === 2;
+      if (isPanButton || (e.button === 0 && spaceRef.current)) {
         e.preventDefault();
         startPan(e.clientX, e.clientY);
       }
