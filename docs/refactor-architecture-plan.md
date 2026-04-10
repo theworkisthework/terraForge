@@ -25,6 +25,7 @@ Break down oversized files into focused modules, functions, and React components
 - Use a hybrid test layout:
   - co-located tests for extracted/presentational components (`src/**/ComponentName.test.tsx`)
   - centralized tests for integration/flow behavior (`tests/component/`)
+- Full-suite policy: because full validation is long-running, full unit/component and E2E suites are user-executed on request; the agent should run focused/local checks and ask the user to run full suites when needed, then record reported results in Progress Log.
 - For every extracted component, add or update a dedicated component test in the same PR (prefer co-located).
 - Keep parent/component integration tests, but do not rely on them as the only verification for extracted UI units.
 - Minimum expectations per extracted component:
@@ -612,6 +613,7 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-09: Completed final Phase 6 orchestration cleanup by extracting remaining `PlotCanvas.tsx` inline toolpath sync, gesture lifecycle, and interaction handlers into `useToolpathSelectionSync`, `useCanvasGestureLifecycle`, and `useCanvasInteractionHandlers`; validation remains green with `npm.cmd run typecheck` and `npm.cmd run test -- tests/component/PlotCanvas.test.tsx` (63/63).
 - 2026-04-09: Re-validated end-to-end stability after Phase 6 completion with a fresh full E2E pass: 170/170 passing in 1.9 minutes.
 - 2026-04-09: Reconciled plan summary checkboxes with completed detailed work (Execution Phase 2/3 now marked complete); no functional code changes in this pass.
+- 2026-04-10: Full unit/component suite re-validated by user-run `npm test`: 104/104 test files and 1316/1316 tests passing (duration 222.93s; transform 58.71s, setup 146.94s, import 138.58s, tests 169.13s, environment 891.88s).
 
 ## Update Rule
 

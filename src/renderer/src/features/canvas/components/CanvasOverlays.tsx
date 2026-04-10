@@ -2,7 +2,6 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectPlotCanvasHandleOverlayState } from "../../../store/canvasSelectors";
 import { type SvgImport } from "../../../../../types";
 import {
-  DEL_HALF_PX,
   HANDLE_SCREEN_R,
   MM_TO_PX,
   PAD,
@@ -10,6 +9,7 @@ import {
   RULER_W,
 } from "../constants";
 import type { HandlePos, Vp } from "../types";
+import { DeleteActionBadge } from "./DeleteActionBadge";
 import { SelectionOverlay } from "./SelectionOverlay";
 
 interface RulerOverlayProps {
@@ -375,32 +375,6 @@ export function GroupHandleOverlay({
   const ROTATE_STEM_PX = 24;
   const GROUP_DEL_OFFSET_PX = 26;
 
-  const deleteIcon = (
-    <svg
-      x={-DEL_HALF_PX}
-      y={-DEL_HALF_PX}
-      width={DEL_HALF_PX * 2}
-      height={DEL_HALF_PX * 2}
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect
-        width="18"
-        height="18"
-        x="3"
-        y="3"
-        rx="2"
-        ry="2"
-        fill="var(--tf-accent)"
-        stroke="none"
-      />
-      <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-      <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-    </svg>
-  );
-
   if (activeOBB) {
     const { gCx: oCx, gCy: oCy, gHW: oHW, gHH: oHH, angle } = activeOBB;
     const [pivotSx, pivotSy] = w2s(oCx, oCy);
@@ -487,17 +461,12 @@ export function GroupHandleOverlay({
               onMouseDown={(e) => onGroupHandleMouseDown(e, id)}
             />
           ))}
-          <g
-            data-testid="group-handle-delete"
-            transform={`translate(${delX}, ${delY})`}
-            style={{ cursor: "pointer", pointerEvents: "all" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            {deleteIcon}
-          </g>
+          <DeleteActionBadge
+            dataTestId="group-handle-delete"
+            x={delX}
+            y={delY}
+            onDelete={onDelete}
+          />
         </g>
       </svg>
     );
@@ -639,39 +608,12 @@ export function GroupHandleOverlay({
           onMouseDown={(e) => onGroupHandleMouseDown(e, id)}
         />
       ))}
-      <g
-        data-testid="group-handle-delete"
-        transform={`translate(${delSx},${delSy})`}
-        style={{ cursor: "pointer", pointerEvents: "all" }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-      >
-        <svg
-          x={-DEL_HALF_PX}
-          y={-DEL_HALF_PX}
-          width={DEL_HALF_PX * 2}
-          height={DEL_HALF_PX * 2}
-          viewBox="0 0 24 24"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect
-            width="18"
-            height="18"
-            x="3"
-            y="3"
-            rx="2"
-            ry="2"
-            fill="var(--tf-accent)"
-            stroke="none"
-          />
-          <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-          <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-        </svg>
-      </g>
+      <DeleteActionBadge
+        dataTestId="group-handle-delete"
+        x={delSx}
+        y={delSy}
+        onDelete={onDelete}
+      />
     </svg>
   );
 }
@@ -877,39 +819,12 @@ export function HandleOverlay({
         onMouseDown={(e) => onRotateHandleMouseDown(e, imp.id, cxSvg, cySvg)}
       />
 
-      <g
-        data-testid="handle-delete"
-        transform={`translate(${delSx},${delSy})`}
-        style={{ cursor: "pointer", pointerEvents: "all" }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-      >
-        <svg
-          x={-DEL_HALF_PX}
-          y={-DEL_HALF_PX}
-          width={DEL_HALF_PX * 2}
-          height={DEL_HALF_PX * 2}
-          viewBox="0 0 24 24"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect
-            width="18"
-            height="18"
-            x="3"
-            y="3"
-            rx="2"
-            ry="2"
-            fill="var(--tf-accent)"
-            stroke="none"
-          />
-          <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-          <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-        </svg>
-      </g>
+      <DeleteActionBadge
+        dataTestId="handle-delete"
+        x={delSx}
+        y={delSy}
+        onDelete={onDelete}
+      />
     </svg>
   );
 }

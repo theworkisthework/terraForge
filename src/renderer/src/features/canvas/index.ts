@@ -10,6 +10,7 @@ export * from "./components/BedLayer";
 export * from "./components/GridLayer";
 export * from "./components/SelectionOverlay";
 export * from "./components/ToolpathOverlay";
+export * from "./components/DeleteActionBadge";
 export * from "./components/CanvasOverlays";
 export * from "./components/CanvasSceneOverlays";
 export * from "./hooks";

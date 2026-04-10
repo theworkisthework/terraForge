@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Crosshair } from "lucide-react";
 import { MM_TO_PX, PAD } from "../constants";
+import { DeleteActionBadge } from "./DeleteActionBadge";
 
 interface PageSizeOption {
   id: string;
@@ -218,7 +219,6 @@ export function ToolpathSelectionOverlay({
   const sb = svgB * vp.zoom + vp.panY;
   const delSx = sr + 14;
   const delSy = st - 14;
-  const TP_HALF = 8;
   const TP_PIP = 2.5;
 
   return (
@@ -256,38 +256,12 @@ export function ToolpathSelectionOverlay({
         <circle key={i} cx={cx} cy={cy} r={TP_PIP} fill="#38bdf8" />
       ))}
       {!isJobActive && (
-        <g
-          transform={`translate(${delSx},${delSy})`}
-          style={{ cursor: "pointer", pointerEvents: "all" }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-        >
-          <svg
-            x={-TP_HALF}
-            y={-TP_HALF}
-            width={TP_HALF * 2}
-            height={TP_HALF * 2}
-            viewBox="0 0 24 24"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect
-              width="18"
-              height="18"
-              x="3"
-              y="3"
-              rx="2"
-              ry="2"
-              fill="var(--tf-accent)"
-              stroke="none"
-            />
-            <path d="m15 9-6 6" stroke="white" strokeWidth={2.5} />
-            <path d="m9 9 6 6" stroke="white" strokeWidth={2.5} />
-          </svg>
-        </g>
+        <DeleteActionBadge
+          dataTestId="toolpath-delete"
+          x={delSx}
+          y={delSy}
+          onDelete={onDelete}
+        />
       )}
     </svg>
   );
