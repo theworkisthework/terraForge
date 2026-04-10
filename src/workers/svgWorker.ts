@@ -197,9 +197,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
     await yieldPh4();
   }
 
-  lines.push("; ── End of job ──────────────────────────────────────────────");
+  lines.push("; -- End of job -----------------------------------------------");
   if (liftPenAtEnd) {
-    lines.push(config.penUpCommand + " ; Pen up — safe");
+    lines.push(config.penUpCommand + " ; Pen up - safe");
   }
   if (returnToHome) {
     lines.push("G0 X0 Y0 ; Return to origin");
