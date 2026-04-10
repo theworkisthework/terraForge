@@ -186,8 +186,8 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("G0 X0 Y0 ; Return to origin");
-    expect(gcode).toContain("M5 ; Pen up — safe");
-    expect(gcode).toContain("; ── End of job");
+    expect(gcode).toContain("M5 ; Pen up - safe");
+    expect(gcode).toContain("; -- End of job");
   });
 
   it("omits pen-up and return-to-origin when disabled", async () => {
@@ -200,9 +200,9 @@ describe("svgWorker — G-code body", () => {
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    expect(gcode).not.toContain("M5 ; Pen up — safe");
+    expect(gcode).not.toContain("M5 ; Pen up - safe");
     expect(gcode).not.toContain("G0 X0 Y0 ; Return to origin");
-    expect(gcode).toContain("; ── End of job");
+    expect(gcode).toContain("; -- End of job");
   });
 
   it("produces no G1 moves for an empty object list", async () => {
@@ -255,7 +255,7 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("M43 P0 S0 ; custom end");
-    const liftIdx = gcode.indexOf("M5 ; Pen up — safe");
+    const liftIdx = gcode.indexOf("M5 ; Pen up - safe");
     const returnIdx = gcode.indexOf("G0 X0 Y0 ; Return to origin");
     const customIdx = gcode.indexOf("M43 P0 S0 ; custom end");
     expect(customIdx).toBeGreaterThan(liftIdx);
