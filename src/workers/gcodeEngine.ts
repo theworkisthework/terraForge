@@ -18,6 +18,10 @@ import {
   arcToBeziers,
   type Pt,
 } from "./gcodeEngine/stages/geometryFlattening";
+import {
+  nearestNeighbourSort,
+  joinSubpaths,
+} from "./gcodeEngine/stages/pathOptimization";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,106 +48,7 @@ export { transformPt, cubicBezier, quadBezier, arcToBeziers };
 // rather than O(n), reducing total sort time from O(n²) to O(n√n).
 // For 100 k subpaths this is roughly a 1000× speed improvement over the naive
 // linear scan approach.
-
-export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
-  if (subpaths.length === 0) return [];
-  const n = subpaths.length;
-  if (n === 1) return [subpaths[0]];
-
-  // ── Build bounding box of all start points ──────────────────────────────
-  let xMin = Infinity,
-    yMin = Infinity,
-    xMax = -Infinity,
-    yMax = -Infinity;
-  for (const sp of subpaths) {
-    const { x, y } = sp[0];
-    if (x < xMin) xMin = x;
-    if (y < yMin) yMin = y;
-    if (x > xMax) xMax = x;
-    if (y > yMax) yMax = y;
-  }
-  xMax += 1e-9;
-  yMax += 1e-9; // guard band so max-coord points land inside a cell
-
-  // ── Build spatial grid (~1 start point per cell on average) ────────────
-  const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
-  const rows = Math.max(1, Math.ceil(Math.sqrt(n)));
-  const cw = (xMax - xMin) / cols;
-  const ch = (yMax - yMin) / rows;
-  const minCell = Math.min(cw, ch);
-
-  // cells[r * cols + c] = list of subpath indices whose start falls in that cell
-  const cells: number[][] = Array.from({ length: rows * cols }, () => []);
-  for (let i = 0; i < n; i++) {
-    const { x, y } = subpaths[i][0];
-    const c = Math.min(cols - 1, Math.floor((x - xMin) / cw));
-    const r = Math.min(rows - 1, Math.floor((y - yMin) / ch));
-    cells[r * cols + c].push(i);
-  }
-
-  // ── Greedy nearest-neighbour traversal ──────────────────────────────────
-  const visited = new Uint8Array(n);
-  const sorted: Subpath[] = new Array(n);
-  let curX = 0,
-    curY = 0;
-
-  for (let s = 0; s < n; s++) {
-    let bestIdx = -1;
-    let bestDist = Infinity;
-
-    const cc = Math.min(cols - 1, Math.max(0, Math.floor((curX - xMin) / cw)));
-    const cr = Math.min(rows - 1, Math.max(0, Math.floor((curY - yMin) / ch)));
-    const maxRing = Math.max(cols, rows);
-
-    for (let ring = 0; ring <= maxRing; ring++) {
-      // Early-exit: the nearest any point in this ring can be is (ring-1)*minCell.
-      // If the current best is already closer, no ring beyond this can improve it.
-      if (bestIdx !== -1) {
-        const minPossible = Math.max(0, ring - 1) * minCell;
-        if (minPossible * minPossible > bestDist) break;
-      }
-
-      const rLo = Math.max(0, cr - ring),
-        rHi = Math.min(rows - 1, cr + ring);
-      const cLo = Math.max(0, cc - ring),
-        cHi = Math.min(cols - 1, cc + ring);
-
-      for (let gr = rLo; gr <= rHi; gr++) {
-        for (let gc = cLo; gc <= cHi; gc++) {
-          // Only examine perimeter cells of the ring, not the interior
-          if (ring > 0 && gr > rLo && gr < rHi && gc > cLo && gc < cHi)
-            continue;
-          for (const idx of cells[gr * cols + gc]) {
-            if (visited[idx]) continue;
-            const { x, y } = subpaths[idx][0];
-            const d = (x - curX) ** 2 + (y - curY) ** 2;
-            if (d < bestDist) {
-              bestDist = d;
-              bestIdx = idx;
-            }
-          }
-        }
-      }
-    }
-
-    if (bestIdx === -1) {
-      // Fallback: linear scan for any unvisited entry (should never be reached)
-      for (let i = 0; i < n; i++)
-        if (!visited[i]) {
-          bestIdx = i;
-          break;
-        }
-    }
-
-    visited[bestIdx] = 1;
-    sorted[s] = subpaths[bestIdx];
-    const last = subpaths[bestIdx][subpaths[bestIdx].length - 1];
-    curX = last.x;
-    curY = last.y;
-  }
-
-  return sorted;
-}
+export { nearestNeighbourSort };
 
 // ── Path joiner ───────────────────────────────────────────────────────────────
 
@@ -156,32 +61,7 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
  * Should be called AFTER nearestNeighbourSort so that the NN ordering has
  * already placed nearby subpaths adjacently, maximising merge opportunities.
  */
-export function joinSubpaths(
-  subpaths: Subpath[],
-  toleranceMm: number,
-): Subpath[] {
-  if (subpaths.length === 0) return [];
-  const tolSq = toleranceMm * toleranceMm;
-  const result: Subpath[] = [];
-  let current = subpaths[0].slice();
-
-  for (let i = 1; i < subpaths.length; i++) {
-    const next = subpaths[i];
-    const tail = current[current.length - 1];
-    const head = next[0];
-    const distSq = (tail.x - head.x) ** 2 + (tail.y - head.y) ** 2;
-    if (distSq <= tolSq) {
-      // Within tolerance — continue drawing; include next's points (head first,
-      // as a tiny G1 to its exact position, then the rest of the subpath).
-      current.push(...next);
-    } else {
-      result.push(current);
-      current = next.slice();
-    }
-  }
-  result.push(current);
-  return result;
-}
+export { joinSubpaths };
 
 // ── Main flattener ────────────────────────────────────────────────────────────
 
