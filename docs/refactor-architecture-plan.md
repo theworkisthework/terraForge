@@ -10,15 +10,15 @@ Break down oversized files into focused modules, functions, and React components
 
 ## Success Criteria
 
-- [ ] All refactor changes keep existing behavior (no regressions).
-- [ ] `npm run typecheck` passes after each phase.
-- [ ] Relevant tests pass after each phase (`npm test`, plus targeted e2e as needed).
-- [ ] Major files move toward size targets:
+- [x] All refactor changes keep existing behavior (no regressions).
+- [x] `npm run typecheck` passes after each phase.
+- [x] Relevant tests pass after each phase (`npm test`, plus targeted e2e as needed).
+- [x] Major files move toward size targets:
   - Preferred component size: <= 300 lines
   - Hard cap for orchestration components: <= 500 lines
   - Utility/service module target: <= 250 lines
-- [ ] Each extracted module has a single clear responsibility.
-- [ ] Every extracted component has direct focused tests (new or updated), not only parent-level coverage.
+- [x] Each extracted module has a single clear responsibility.
+- [x] Every extracted component has direct focused tests (new or updated), not only parent-level coverage.
 
 ## Testing Rule For Extractions
 
@@ -74,6 +74,14 @@ Break down oversized files into focused modules, functions, and React components
 
 - `FluidNCClient`: facade over transport + parser modules.
 - G-code engine: split into pipeline stages (tokenize -> normalize -> transform -> optimize -> emit).
+
+## Folder And Naming Conventions
+
+- Keep extracted stage logic under `src/workers/gcodeEngine/stages/` with one domain concern per file.
+- Keep compatibility exports in `src/workers/gcodeEngine.ts` so existing imports remain stable during phased refactor.
+- Name stage files by behavior (`pathParsing`, `geometryFlattening`, `pathOptimization`, `clipping`, `flatteningFlow`).
+- Keep direct stage tests in `tests/unit/` with `gcode<StageName>.test.ts` naming for deterministic coverage of extracted units.
+- Keep worker entry orchestration in `src/workers/svgWorker.ts` unless a dedicated orchestration extraction phase is explicitly started.
 
 ## Detailed Breakdown Plan
 
@@ -491,9 +499,9 @@ Stage complete when oversized extracted TSX files are decomposed into clear cont
 
 ### Phase 0: Guardrails
 
-- [ ] Establish folder conventions and naming.
-- [ ] Add file-size/complexity lint guidance (or CI checks).
-- [ ] Capture baseline: `typecheck`, unit/component tests.
+- [x] Establish folder conventions and naming.
+- [x] Add file-size/complexity lint guidance (or CI checks).
+- [x] Capture baseline: `typecheck`, unit/component tests.
 
 ### Phase 1: Pure Function Extraction
 
@@ -644,6 +652,9 @@ Use this section to track completed steps with date and PR/commit references.
 - 2026-04-10: Continued gcodeEngine pipeline modularization with flattening-flow stage extraction: moved `flattenToSubpaths` into `src/workers/gcodeEngine/stages/flatteningFlow.ts`, preserved its use of the extracted parsing + geometry stages, kept backward-compatible re-exports in `src/workers/gcodeEngine.ts`, and added focused deterministic stage coverage in `tests/unit/gcodeFlatteningFlow.test.ts`.
 - 2026-04-10: Started gcodeEngine pipeline modularization with stage extraction of path parsing: moved `tokenizePath` + `toAbsolute` (and `PathToken`) into `src/workers/gcodeEngine/stages/pathParsing.ts`, kept backward-compatible exports in `src/workers/gcodeEngine.ts`, and added focused deterministic coverage in `tests/unit/gcodePathParsing.test.ts`.
 - 2026-04-10: Plan reconciliation pass completed: marked previously stale unchecked FluidNC and gcodeEngine checklist/sprint items as done based on completed extraction logs and passing focused validation; Phase 0 guardrails intentionally left open for follow-up.
+- 2026-04-10: Completed Phase 0 guardrail steps 1 and 2 by documenting folder/naming conventions for worker stage extraction and recording baseline validation status (`npm.cmd run typecheck` passing in-session; user-reported full suite passing at 130/130 files and 1379/1379 tests).
+- 2026-04-10: Completed Phase 0 guardrail step 3 by adding ESLint-based size/complexity guidance via `eslint.config.mjs` and `npm run lint:complexity`; broad codebase complexity/function-size checks are non-blocking warnings, with stricter error guardrails applied to `src/workers/gcodeEngine/stages/**/*.ts`.
+- 2026-04-10: Final plan closeout: resolved ESLint plugin-rule wiring (`@typescript-eslint/*` rules now resolve under flat config), and marked top-level Success Criteria complete based on accumulated typecheck/test validation and delivered modularization outcomes.
 
 ## Update Rule
 
