@@ -36,6 +36,27 @@ beforeEach(() => {
 });
 
 describe("PlotCanvas", () => {
+  const setupRO = () => {
+    const Original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      _cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this._cb = cb;
+      }
+      observe(el: Element) {
+        this._cb(
+          [{ contentRect: { width: 800, height: 600 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    return () => {
+      globalThis.ResizeObserver = Original;
+    };
+  };
+
   // ── Basic rendering ─────────────────────────────────────────────────
 
   it("renders without crashing", () => {
@@ -473,12 +494,54 @@ describe("PlotCanvas", () => {
   // ── Middle-click pan ───────────────────────────────────────────────
 
   it("middle-click on container starts pan (does not crash)", () => {
+    const restore = setupRO();
     const { container } = render(<PlotCanvas />);
     const div = container.querySelector("div")!;
+    const svg = container.querySelector("svg")!;
+    const before = svg.getAttribute("viewBox");
     fireEvent.mouseDown(div, { button: 1, clientX: 200, clientY: 200 });
     fireEvent.mouseMove(window, { clientX: 210, clientY: 205 });
     fireEvent.mouseUp(window);
-    expect(container.querySelector("svg")).toBeTruthy();
+    expect(svg.getAttribute("viewBox")).not.toBe(before);
+    restore();
+  });
+
+  it("right-click on container starts pan", () => {
+    const restore = setupRO();
+    const { container } = render(<PlotCanvas />);
+    const div = container.querySelector("div")!;
+    const svg = container.querySelector("svg")!;
+    const before = svg.getAttribute("viewBox");
+    fireEvent.mouseDown(div, { button: 2, clientX: 220, clientY: 220 });
+    fireEvent.mouseMove(window, { clientX: 245, clientY: 235 });
+    fireEvent.mouseUp(window);
+    expect(svg.getAttribute("viewBox")).not.toBe(before);
+    restore();
+  });
+
+  it("right-click on import pans canvas without moving the import", () => {
+    const restore = setupRO();
+    const path = createSvgPath({ d: "M0,0 L100,100" });
+    const imp = createSvgImport({ name: "pan-target", paths: [path] });
+    useCanvasStore.setState({ imports: [imp] });
+    const { container } = render(<PlotCanvas />);
+    const svg = container.querySelector("svg")!;
+    const beforeViewBox = svg.getAttribute("viewBox");
+    const beforeImport = useCanvasStore.getState().imports[0];
+    const hitRect = container.querySelector("rect[fill='transparent']")!;
+
+    fireEvent.mouseDown(hitRect, {
+      button: 2,
+      clientX: 180,
+      clientY: 180,
+    });
+    fireEvent.mouseMove(window, { clientX: 210, clientY: 195 });
+    fireEvent.mouseUp(window);
+
+    const afterImport = useCanvasStore.getState().imports[0];
+    expect(svg.getAttribute("viewBox")).not.toBe(beforeViewBox);
+    expect(afterImport.x).toBe(beforeImport.x);
+    expect(afterImport.y).toBe(beforeImport.y);
   });
 
   // ── SVG onClick deselects ──────────────────────────────────────────
@@ -624,27 +687,6 @@ describe("PlotCanvas", () => {
   });
 
   // ── HandleOverlay interactions (require ResizeObserver with size) ──
-
-  const setupRO = () => {
-    const Original = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = class {
-      _cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) {
-        this._cb = cb;
-      }
-      observe(el: Element) {
-        this._cb(
-          [{ contentRect: { width: 800, height: 600 } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-    return () => {
-      globalThis.ResizeObserver = Original;
-    };
-  };
 
   it("handle-delete button removes the selected import", () => {
     const restore = setupRO();

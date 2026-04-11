@@ -24,8 +24,12 @@ export function useObjectDrag(
   const [dragging, setDragging] = useState<DraggingState | null>(null);
   const justDraggedRef = useRef(false);
 
+  const isNonPrimaryButton = (button: number | undefined) =>
+    button !== undefined && button !== 0;
+
   const onImportMouseDown = useCallback(
     (e: React.MouseEvent, id: string) => {
+      if (isNonPrimaryButton(e.button)) return;
       if (spaceRef.current) return; // space held → pan mode, not drag
       e.stopPropagation();
       const state = useCanvasStore.getState();
@@ -82,6 +86,7 @@ export function useObjectDrag(
 
   const onGroupMouseDown = useCallback(
     (e: React.MouseEvent<SVGRectElement>) => {
+      if (isNonPrimaryButton(e.button)) return;
       if (spaceRef.current) return;
       e.stopPropagation();
       useCanvasStore.getState().snapshotForGesture();
