@@ -26,7 +26,10 @@ jobs:
               github.rest.actions.listArtifactsForRepo,
               { owner, repo, per_page: 100 }
             )) {
-              for (const artifact of page.data.artifacts) {
+              const artifacts = Array.isArray(page?.data?.artifacts)
+                ? page.data.artifacts
+                : []
+              for (const artifact of artifacts) {
                 if (artifact.name.startsWith(prefix)) {
                   await github.rest.actions.deleteArtifact({
                     owner,
