@@ -16,6 +16,7 @@ import { MM_TO_PX, PAD } from "../constants";
 import type { Vp } from "../types";
 import type { SvgImport, LayerGroup } from "../../../../../types";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
+import type { Theme } from "../../../store/themeStore";
 import {
   drawImportsLayer,
   drawToolpathLayer,
@@ -46,6 +47,7 @@ export interface ToolpathOverlayProps {
   toolpathSelected: boolean;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
+  theme: Theme;
 }
 
 export function ToolpathOverlay({
@@ -70,6 +72,7 @@ export function ToolpathOverlay({
   toolpathSelected,
   plotProgressCuts,
   plotProgressRapids,
+  theme,
 }: ToolpathOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -206,6 +209,7 @@ export function ToolpathOverlay({
     allImportsSelected,
     layerGroups,
     canvasH,
+    theme,
   ]);
 
   return (

@@ -32,6 +32,7 @@ function makeProps(
     toolpathSelected: false,
     plotProgressCuts: null,
     plotProgressRapids: null,
+    theme: "dark",
     ...overrides,
   };
 }

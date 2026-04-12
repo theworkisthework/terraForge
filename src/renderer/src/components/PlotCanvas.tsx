@@ -14,6 +14,7 @@
 import { useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../store/canvasStore";
+import { useThemeStore } from "../store/themeStore";
 import {
   selectPlotCanvasCanvasState,
   selectPlotCanvasToolpathState,
@@ -79,6 +80,7 @@ export function PlotCanvas() {
     plotProgressRapids,
   } = useCanvasStore(useShallow(selectPlotCanvasToolpathState));
   const activeConfig = useMachineStore((s) => s.activeConfig);
+  const theme = useThemeStore((s) => s.theme);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const machineStatus = useMachineStore((s) => s.status);
@@ -293,6 +295,7 @@ export function PlotCanvas() {
         toolpathSelected={toolpathSelected}
         plotProgressCuts={plotProgressCuts ?? null}
         plotProgressRapids={plotProgressRapids ?? null}
+        theme={theme}
       />
 
       {/* ── Canvas SVG — fills the container; viewBox drives pan/zoom so the
