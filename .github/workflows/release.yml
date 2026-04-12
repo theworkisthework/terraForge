@@ -89,7 +89,7 @@ jobs:
       # Stamp package.json with the tag version (strips the leading "v")
       - name: Set version from tag
         shell: bash
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+        run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
         run: npm install
@@ -120,7 +120,7 @@ jobs:
           cache: npm
 
       - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+        run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
         run: npm install
@@ -158,7 +158,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
       - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+        run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
         run: npm install
