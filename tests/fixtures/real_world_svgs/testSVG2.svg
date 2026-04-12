@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 297.6 419.5">
+  <!-- Generator: Adobe Illustrator 30.2.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 1)  -->
+  <defs>
+    <style>
+      .st0, .st1 {
+        fill: none;
+      }
+
+      .st1, .st2 {
+        stroke: #231f20;
+        stroke-miterlimit: 10;
+      }
+
+      .st2 {
+        fill: #ed2024;
+      }
+
+      .st3 {
+        fill: #ed2024;
+        stroke: none;
+      }
+    </style>
+  </defs>
+  <g id="Circle_Fill_And_Stroke">
+    <circle class="st2" cx="177.2" cy="85.1" r="37.7"/>
+  </g>
+  <g id="Square_Fill_and_Stroke">
+    <rect class="st2" x="47.4" y="61.8" width="74.2" height="46.7"/>
+  </g>
+  <g id="Circle_No_Fill_And_Stroke">
+    <circle class="st1" cx="177.2" cy="190.1" r="37.7"/>
+  </g>
+  <g id="Square_No_Fill_and_Stroke">
+    <rect class="st1" x="47.4" y="166.8" width="74.2" height="46.7"/>
+  </g>
+    <g id="Circle_Fill_And_No_Stroke">
+    <circle class="st3" cx="177.2" cy="295.1" r="37.7"/>
+  </g>
+  <g id="Square_Fill_And_No_Stroke">
+    <rect class="st3" x="47.4" y="271.8" width="74.2" height="46.7"/>
+  </g>
+
+  <g id="Circle_No_Fill_And_No_Stroke">
+    <circle class="st0" cx="177.2" cy="295.1" r="37.7"/>
+  </g>
+  <g id="Square_No_Fill_and_No_Stroke">
+    <rect class="st0" x="47.4" y="271.8" width="74.2" height="46.7"/>
+  </g>
+
+</svg>

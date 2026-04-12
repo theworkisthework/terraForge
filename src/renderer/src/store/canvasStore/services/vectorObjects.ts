@@ -29,6 +29,8 @@ function projectPathToVectorObjects(
     visible: true,
     originalWidth: imp.svgWidth,
     originalHeight: imp.svgHeight,
+    viewBoxX: imp.viewBoxX,
+    viewBoxY: imp.viewBoxY,
     layer: path.layer,
   };
   const outlineVOs: VectorObject[] =

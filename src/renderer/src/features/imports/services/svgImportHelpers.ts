@@ -1,5 +1,87 @@
 // SVG import helper functions extracted from Toolbar.
 
+interface ParsedCssRule {
+  declarations: Map<string, string>;
+  specificity: number;
+  order: number;
+}
+
+export interface SvgStylesheet {
+  classes: Map<string, ParsedCssRule[]>;
+  ids: Map<string, ParsedCssRule[]>;
+  tags: Map<string, ParsedCssRule[]>;
+}
+
+/** Builds a compact, import-local stylesheet index for simple SVG selectors. */
+export function parseSvgStylesheet(doc: Document): SvgStylesheet {
+  const stylesheet: SvgStylesheet = {
+    classes: new Map<string, ParsedCssRule[]>(),
+    ids: new Map<string, ParsedCssRule[]>(),
+    tags: new Map<string, ParsedCssRule[]>(),
+  };
+
+  const styleNodes = Array.from(doc.querySelectorAll("style"));
+  let order = 0;
+
+  for (const node of styleNodes) {
+    const css = (node.textContent ?? "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const blockRe = /([^{}]+)\{([^}]*)\}/g;
+    for (const match of css.matchAll(blockRe)) {
+      const selectorText = match[1]?.trim() ?? "";
+      const body = match[2] ?? "";
+      if (!selectorText) continue;
+
+      const declarations = new Map<string, string>();
+      for (const rawDecl of body.split(";")) {
+        const decl = rawDecl.trim();
+        if (!decl) continue;
+        const colon = decl.indexOf(":");
+        if (colon <= 0) continue;
+        const prop = decl.slice(0, colon).trim().toLowerCase();
+        const value = decl
+          .slice(colon + 1)
+          .trim()
+          .replace(/\s*!important\s*$/i, "");
+        if (!prop || !value) continue;
+        declarations.set(prop, value);
+      }
+      if (declarations.size === 0) continue;
+
+      for (const selectorRaw of selectorText.split(",")) {
+        const selector = selectorRaw.trim();
+        if (!selector) continue;
+
+        let targetMap: Map<string, ParsedCssRule[]> | null = null;
+        let key = "";
+        let specificity = 0;
+
+        if (/^\.[A-Za-z_][\w-]*$/.test(selector)) {
+          targetMap = stylesheet.classes;
+          key = selector.slice(1);
+          specificity = 10;
+        } else if (/^#[A-Za-z_][\w-]*$/.test(selector)) {
+          targetMap = stylesheet.ids;
+          key = selector.slice(1);
+          specificity = 100;
+        } else if (/^[A-Za-z][\w-]*$/.test(selector)) {
+          targetMap = stylesheet.tags;
+          key = selector.toLowerCase();
+          specificity = 1;
+        } else {
+          // Skip complex selectors for now to avoid accidental over-matching.
+          continue;
+        }
+
+        const rules = targetMap.get(key) ?? [];
+        rules.push({ declarations, specificity, order: order++ });
+        targetMap.set(key, rules);
+      }
+    }
+  }
+
+  return stylesheet;
+}
+
 /** True when inline style explicitly declares a display property. */
 function hasExplicitDisplay(el: Element): boolean {
   return /\bdisplay\s*:/.test(el.getAttribute("style") ?? "");
@@ -20,11 +102,12 @@ export function isLayerGroup(el: Element): boolean {
 }
 
 /** True when element is explicitly hidden via style or display attribute. */
-export function isDisplayNone(el: Element): boolean {
-  const styleHidden = /display\s*:\s*none/.test(el.getAttribute("style") ?? "");
-  const attrHidden =
-    (el.getAttribute("display") ?? "").trim().toLowerCase() === "none";
-  return styleHidden || attrHidden;
+export function isDisplayNone(
+  el: Element,
+  stylesheet?: SvgStylesheet,
+): boolean {
+  const display = resolveOwnProp(el, "display", stylesheet).toLowerCase();
+  return display === "none";
 }
 
 /** Best-effort readable name for a layer group with sensible fallback. */
@@ -56,29 +139,98 @@ export function findContainingLayerId(
 function getStyleDecl(style: string, property: string): string {
   for (const decl of style.split(";").filter(Boolean)) {
     const colon = decl.indexOf(":");
-    if (colon !== -1 && decl.slice(0, colon).trim() === property)
+    if (colon !== -1 && decl.slice(0, colon).trim().toLowerCase() === property)
       return decl.slice(colon + 1).trim();
   }
   return "";
 }
 
+function getStylesheetDecl(
+  el: Element,
+  property: string,
+  stylesheet?: SvgStylesheet,
+): string {
+  if (!stylesheet) return "";
+
+  const candidates: ParsedCssRule[] = [];
+  const classNames = (el.getAttribute("class") ?? "")
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  for (const cls of classNames) {
+    const rules = stylesheet.classes.get(cls);
+    if (rules) candidates.push(...rules);
+  }
+
+  if (el.id) {
+    const rules = stylesheet.ids.get(el.id);
+    if (rules) candidates.push(...rules);
+  }
+
+  const tagRules = stylesheet.tags.get(el.tagName.toLowerCase());
+  if (tagRules) candidates.push(...tagRules);
+
+  let value = "";
+  let bestSpecificity = -1;
+  let bestOrder = -1;
+
+  for (const rule of candidates) {
+    const decl = rule.declarations.get(property);
+    if (!decl) continue;
+    if (
+      rule.specificity > bestSpecificity ||
+      (rule.specificity === bestSpecificity && rule.order > bestOrder)
+    ) {
+      value = decl;
+      bestSpecificity = rule.specificity;
+      bestOrder = rule.order;
+    }
+  }
+
+  return value;
+}
+
+function resolveOwnProp(
+  el: Element,
+  property: string,
+  stylesheet?: SvgStylesheet,
+): string {
+  const prop = property.toLowerCase();
+  const style = el.getAttribute("style") ?? "";
+  const styleVal = getStyleDecl(style, prop);
+  if (styleVal && styleVal !== "inherit") return styleVal;
+
+  const attrVal = el.getAttribute(prop) ?? "";
+  if (attrVal && attrVal !== "inherit") return attrVal;
+
+  const cssVal = getStylesheetDecl(el, prop, stylesheet);
+  if (cssVal && cssVal !== "inherit") return cssVal;
+
+  return "";
+}
+
 /** Resolves inherited SVG presentation properties up the ancestor chain. */
-function resolveInheritedProp(el: Element, property: string): string {
+function resolveInheritedProp(
+  el: Element,
+  property: string,
+  stylesheet?: SvgStylesheet,
+): string {
   let current: Element | null = el;
   while (current && current.tagName.toLowerCase() !== "svg") {
-    const style = current.getAttribute("style") ?? "";
-    const styleVal = getStyleDecl(style, property);
-    if (styleVal && styleVal !== "inherit") return styleVal;
-    const attrVal = current.getAttribute(property) ?? "";
-    if (attrVal && attrVal !== "inherit") return attrVal;
+    const own = resolveOwnProp(current, property, stylesheet);
+    if (own) return own;
     current = current.parentElement;
   }
   return "";
 }
 
 /** Returns a visible effective fill color, or null when fill is not visible. */
-export function getEffectiveFill(el: Element): string | null {
-  const fill = resolveInheritedProp(el, "fill");
+export function getEffectiveFill(
+  el: Element,
+  stylesheet?: SvgStylesheet,
+): string | null {
+  const fill = resolveInheritedProp(el, "fill", stylesheet);
   if (
     !fill ||
     fill === "none" ||
@@ -87,8 +239,8 @@ export function getEffectiveFill(el: Element): string | null {
   )
     return null;
 
-  const fillOpacityVal = resolveInheritedProp(el, "fill-opacity");
-  const opacityVal = resolveInheritedProp(el, "opacity");
+  const fillOpacityVal = resolveInheritedProp(el, "fill-opacity", stylesheet);
+  const opacityVal = resolveInheritedProp(el, "opacity", stylesheet);
   if (
     (fillOpacityVal && parseFloat(fillOpacityVal) <= 0) ||
     (opacityVal && parseFloat(opacityVal) <= 0)
@@ -98,15 +250,22 @@ export function getEffectiveFill(el: Element): string | null {
 }
 
 /** True when a stroke is present and visible after inherited style resolution. */
-export function hasVisibleStroke(el: Element): boolean {
-  const stroke = resolveInheritedProp(el, "stroke");
+export function hasVisibleStroke(
+  el: Element,
+  stylesheet?: SvgStylesheet,
+): boolean {
+  const stroke = resolveInheritedProp(el, "stroke", stylesheet);
   if (!stroke || stroke === "none" || stroke === "transparent") return false;
 
-  const widthVal = resolveInheritedProp(el, "stroke-width");
+  const widthVal = resolveInheritedProp(el, "stroke-width", stylesheet);
   if (widthVal && parseFloat(widthVal) === 0) return false;
 
-  const strokeOpacityVal = resolveInheritedProp(el, "stroke-opacity");
-  const opacityVal = resolveInheritedProp(el, "opacity");
+  const strokeOpacityVal = resolveInheritedProp(
+    el,
+    "stroke-opacity",
+    stylesheet,
+  );
+  const opacityVal = resolveInheritedProp(el, "opacity", stylesheet);
   if (
     (strokeOpacityVal && parseFloat(strokeOpacityVal) <= 0) ||
     (opacityVal && parseFloat(opacityVal) <= 0)

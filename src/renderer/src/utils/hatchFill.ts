@@ -198,74 +198,79 @@ export function generateHatchPaths(
   spacingUnits: number,
   angleDeg: number,
 ): string[] {
-  const segs = flattenPathToSegments(d);
-  if (segs.length === 0) return [];
+  try {
+    const segs = flattenPathToSegments(d);
+    if (segs.length === 0) return [];
 
-  // Guard against non-finite angleDeg (e.g. NaN/Infinity from a cleared input).
-  if (!Number.isFinite(angleDeg)) return [];
+    // Guard against non-finite angleDeg (e.g. NaN/Infinity from a cleared input).
+    if (!Number.isFinite(angleDeg)) return [];
 
-  // Rotate all segments by -angle so that the hatch lines become horizontal
-  const rad = (angleDeg * Math.PI) / 180;
-  const cosN = Math.cos(-rad),
-    sinN = Math.sin(-rad);
-  const cosP = Math.cos(rad),
-    sinP = Math.sin(rad);
+    // Rotate all segments by -angle so that the hatch lines become horizontal
+    const rad = (angleDeg * Math.PI) / 180;
+    const cosN = Math.cos(-rad),
+      sinN = Math.sin(-rad);
+    const cosP = Math.cos(rad),
+      sinP = Math.sin(rad);
 
-  const rotSegs = segs.map((s) => ({
-    x1: rotPt(s.x1, s.y1, cosN, sinN).x,
-    y1: rotPt(s.x1, s.y1, cosN, sinN).y,
-    x2: rotPt(s.x2, s.y2, cosN, sinN).x,
-    y2: rotPt(s.x2, s.y2, cosN, sinN).y,
-  }));
+    const rotSegs = segs.map((s) => ({
+      x1: rotPt(s.x1, s.y1, cosN, sinN).x,
+      y1: rotPt(s.x1, s.y1, cosN, sinN).y,
+      x2: rotPt(s.x2, s.y2, cosN, sinN).x,
+      y2: rotPt(s.x2, s.y2, cosN, sinN).y,
+    }));
 
-  let minY = Infinity,
-    maxY = -Infinity;
-  for (const s of rotSegs) {
-    if (s.y1 < minY) minY = s.y1;
-    if (s.y1 > maxY) maxY = s.y1;
-    if (s.y2 < minY) minY = s.y2;
-    if (s.y2 > maxY) maxY = s.y2;
-  }
-
-  const paths: string[] = [];
-
-  // Guard against non-finite or non-positive spacing, which would cause
-  // the scanline loop below to become infinite (scanY would never advance
-  // toward the termination condition).
-  if (!Number.isFinite(spacingUnits) || spacingUnits <= 0) {
-    return paths;
-  }
-
-  // Start half a spacing in from the top edge so we don't land exactly on a
-  // boundary (which can cause degenerate double-intersections at vertices).
-  for (
-    let scanY = minY + spacingUnits / 2;
-    scanY < maxY;
-    scanY += spacingUnits
-  ) {
-    const xs: number[] = [];
+    let minY = Infinity,
+      maxY = -Infinity;
     for (const s of rotSegs) {
-      const { x1, y1, x2, y2 } = s;
-      // Include lower endpoint, exclude upper to avoid double-counting shared
-      // vertices between adjacent segments.
-      if ((y1 <= scanY && scanY < y2) || (y2 <= scanY && scanY < y1)) {
-        const t = (scanY - y1) / (y2 - y1);
-        xs.push(x1 + t * (x2 - x1));
+      if (s.y1 < minY) minY = s.y1;
+      if (s.y1 > maxY) maxY = s.y1;
+      if (s.y2 < minY) minY = s.y2;
+      if (s.y2 > maxY) maxY = s.y2;
+    }
+
+    const paths: string[] = [];
+
+    // Guard against non-finite or non-positive spacing, which would cause
+    // the scanline loop below to become infinite (scanY would never advance
+    // toward the termination condition).
+    if (!Number.isFinite(spacingUnits) || spacingUnits <= 0) {
+      return paths;
+    }
+
+    // Start half a spacing in from the top edge so we don't land exactly on a
+    // boundary (which can cause degenerate double-intersections at vertices).
+    for (
+      let scanY = minY + spacingUnits / 2;
+      scanY < maxY;
+      scanY += spacingUnits
+    ) {
+      const xs: number[] = [];
+      for (const s of rotSegs) {
+        const { x1, y1, x2, y2 } = s;
+        // Include lower endpoint, exclude upper to avoid double-counting shared
+        // vertices between adjacent segments.
+        if ((y1 <= scanY && scanY < y2) || (y2 <= scanY && scanY < y1)) {
+          const t = (scanY - y1) / (y2 - y1);
+          xs.push(x1 + t * (x2 - x1));
+        }
+      }
+      if (xs.length < 2) continue;
+
+      xs.sort((a, b) => a - b);
+
+      // Even-odd fill rule: draw between pairs (0→1), (2→3), …
+      for (let i = 0; i + 1 < xs.length; i += 2) {
+        const p1 = rotPt(xs[i], scanY, cosP, sinP);
+        const p2 = rotPt(xs[i + 1], scanY, cosP, sinP);
+        paths.push(
+          `M${p1.x.toFixed(3)},${p1.y.toFixed(3)} L${p2.x.toFixed(3)},${p2.y.toFixed(3)}`,
+        );
       }
     }
-    if (xs.length < 2) continue;
 
-    xs.sort((a, b) => a - b);
-
-    // Even-odd fill rule: draw between pairs (0→1), (2→3), …
-    for (let i = 0; i + 1 < xs.length; i += 2) {
-      const p1 = rotPt(xs[i], scanY, cosP, sinP);
-      const p2 = rotPt(xs[i + 1], scanY, cosP, sinP);
-      paths.push(
-        `M${p1.x.toFixed(3)},${p1.y.toFixed(3)} L${p2.x.toFixed(3)},${p2.y.toFixed(3)}`,
-      );
-    }
+    return paths;
+  } catch {
+    // Import should still succeed when hatch generation is too complex.
+    return [];
   }
-
-  return paths;
 }
