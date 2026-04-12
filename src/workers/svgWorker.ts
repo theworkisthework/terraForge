@@ -21,6 +21,9 @@ import {
   nearestNeighbourSort,
   joinSubpaths,
   fmtCoord as fmt,
+  tokenizePath,
+  toAbsolute,
+  transformPt,
   type Subpath,
 } from "./gcodeEngine";
 
@@ -38,6 +41,76 @@ interface CancelMessage {
 type InMessage = GenerateMessage | CancelMessage;
 
 const cancelled = new Set<string>();
+
+function approximateObjectSubpaths(
+  obj: VectorObject,
+  config: MachineConfig,
+): Subpath[] {
+  const subpaths: Subpath[] = [];
+  const abs = toAbsolute(tokenizePath(obj.path));
+  let cur: Subpath = [];
+  let cx = 0,
+    cy = 0,
+    startX = 0,
+    startY = 0;
+
+  const push = (x: number, y: number) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    cur.push(transformPt(obj, config, x, y));
+    cx = x;
+    cy = y;
+  };
+
+  for (const cmd of abs) {
+    const a = cmd.args;
+    switch (cmd.type) {
+      case "M": {
+        if (cur.length > 1) subpaths.push(cur);
+        cur = [];
+        if (a.length < 2) break;
+        cx = a[0];
+        cy = a[1];
+        startX = cx;
+        startY = cy;
+        push(cx, cy);
+        for (let i = 2; i + 1 < a.length; i += 2) push(a[i], a[i + 1]);
+        break;
+      }
+      case "L":
+        for (let i = 0; i + 1 < a.length; i += 2) push(a[i], a[i + 1]);
+        break;
+      case "H":
+        for (let i = 0; i < a.length; i++) push(a[i], cy);
+        break;
+      case "V":
+        for (let i = 0; i < a.length; i++) push(cx, a[i]);
+        break;
+      case "C":
+        for (let i = 0; i + 5 < a.length; i += 6) push(a[i + 4], a[i + 5]);
+        break;
+      case "S":
+        for (let i = 0; i + 3 < a.length; i += 4) push(a[i + 2], a[i + 3]);
+        break;
+      case "Q":
+        for (let i = 0; i + 3 < a.length; i += 4) push(a[i + 2], a[i + 3]);
+        break;
+      case "T":
+        for (let i = 0; i + 1 < a.length; i += 2) push(a[i], a[i + 1]);
+        break;
+      case "A":
+        for (let i = 0; i + 6 < a.length; i += 7) push(a[i + 5], a[i + 6]);
+        break;
+      case "Z":
+        push(startX, startY);
+        if (cur.length > 1) subpaths.push(cur);
+        cur = [];
+        break;
+    }
+  }
+
+  if (cur.length > 1) subpaths.push(cur);
+  return subpaths;
+}
 
 self.onmessage = (e: MessageEvent<InMessage>) => {
   const msg = e.data;
@@ -106,6 +179,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
 
   const visibleObjects = objects.filter((o) => o.visible);
+  let skippedObjects = 0;
 
   // Time-based yield helper — only surrenders to the event loop after a full
   // frame's worth of work (~16 ms), instead of yielding on every iteration.
@@ -132,7 +206,17 @@ async function generate(msg: GenerateMessage): Promise<void> {
       self.postMessage({ type: "cancelled", taskId });
       return;
     }
-    const raw = flattenToSubpaths(visibleObjects[i], config);
+    const obj = visibleObjects[i];
+    let raw: Subpath[];
+    try {
+      raw = flattenToSubpaths(obj, config);
+    } catch {
+      // Fallback to coarse endpoint-only approximation for malformed paths.
+      raw = approximateObjectSubpaths(obj, config);
+      if (raw.length === 0) {
+        skippedObjects++;
+      }
+    }
     const clipped = options?.pageClip
       ? clipSubpathsToRect(
           raw,
@@ -143,7 +227,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
         )
       : clipSubpathsToBed(raw, config);
     for (const sp of clipped) {
-      if (sp.length >= 2) allSubpaths.push(sp);
+      if (sp.length >= 2) {
+        allSubpaths.push(sp);
+      }
     }
     const pct = Math.round(((i + 1) / visibleObjects.length) * 40);
     if (pct !== lastPct1) {
@@ -170,6 +256,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(
     `; -- ${modeLabel} path (${orderedSubpaths.length} subpaths) -----------`,
   );
+  if (skippedObjects > 0) {
+    lines.push(`; NOTE: skipped ${skippedObjects} invalid path object(s)`);
+  }
 
   const yieldPh4 = makeYielder();
   let lastPct4 = -1;

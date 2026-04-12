@@ -6,6 +6,8 @@ import {
   vectorObjectsUngrouped,
 } from "./vectorObjects";
 import type { LayerGroup, SvgImport } from "../../../../../types";
+import { flattenToSubpaths } from "../../../../../workers/gcodeEngine/stages/flatteningFlow";
+import { createMachineConfig } from "../../../../../../tests/helpers/factories";
 
 function makeImport(overrides?: Partial<SvgImport>): SvgImport {
   return {
@@ -119,5 +121,39 @@ describe("canvasStore vectorObjects service", () => {
     const result = vectorObjectsUngrouped([impA, impB], groups);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("pb");
+  });
+
+  it("normalizes non-zero viewBox offsets for gcode flattening", () => {
+    const imp = makeImport({
+      x: 0,
+      y: 0,
+      scale: 1,
+      svgWidth: 250,
+      svgHeight: 350,
+      viewBoxX: 47.4,
+      viewBoxY: 47.4,
+      paths: [
+        {
+          id: "p1",
+          d: "M47.4,47.4 L57.4,47.4",
+          svgSource: "<path/>",
+          visible: true,
+        },
+      ],
+    });
+
+    const vos = vectorObjectsForImport(imp);
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    const subpaths = flattenToSubpaths(vos[0], cfg);
+
+    expect(subpaths).toHaveLength(1);
+    expect(subpaths[0][0].x).toBeCloseTo(0);
+    expect(subpaths[0][0].y).toBeCloseTo(0);
+    expect(subpaths[0][1].x).toBeCloseTo(10);
+    expect(subpaths[0][1].y).toBeCloseTo(0);
   });
 });

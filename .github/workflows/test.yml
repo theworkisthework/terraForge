@@ -73,6 +73,8 @@ jobs:
         run: npm run build
 
       - name: Run E2E tests
+        env:
+          TF_E2E_SVG_DIR: tests/fixtures/real_world_svgs
         run: xvfb-run --auto-servernum -- npx playwright test --config=tests/e2e/playwright.config.ts
 
       - name: Upload Playwright report

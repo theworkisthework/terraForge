@@ -3,19 +3,19 @@ export interface PathToken {
   args: number[];
 }
 
+const PATH_NUMBER_RE = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+
+function parsePathArgs(argText: string): number[] {
+  const matches = argText.match(PATH_NUMBER_RE) ?? [];
+  return matches.map(Number).filter(Number.isFinite);
+}
+
 export function tokenizePath(d: string): PathToken[] {
   const tokens: PathToken[] = [];
   const re = /([MmLlHhVvCcSsQqTtAaZz])([\s\S]*?)(?=[MmLlHhVvCcSsQqTtAaZz]|$)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(d)) !== null) {
-    const args = m[2].trim()
-      ? m[2]
-          .trim()
-          .split(/[\s,]+|(?=-)/)
-          .filter(Boolean)
-          .map(Number)
-          .filter(isFinite)
-      : [];
+    const args = m[2].trim() ? parsePathArgs(m[2]) : [];
     tokens.push({ type: m[1], args });
   }
   return tokens;

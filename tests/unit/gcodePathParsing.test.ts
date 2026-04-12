@@ -38,4 +38,20 @@ describe("gcode path parsing stage", () => {
 
     expect(abs[3]).toEqual({ type: "L", args: [12, 13] });
   });
+
+  it("tokenizes compact numbers without separators", () => {
+    const tokens = tokenizePath("M10-5L20.5.25");
+    expect(tokens).toEqual([
+      { type: "M", args: [10, -5] },
+      { type: "L", args: [20.5, 0.25] },
+    ]);
+  });
+
+  it("tokenizes scientific notation numbers", () => {
+    const tokens = tokenizePath("M1e-3,2E+1 L-.5e2,3.25e-1");
+    expect(tokens).toEqual([
+      { type: "M", args: [0.001, 20] },
+      { type: "L", args: [-50, 0.325] },
+    ]);
+  });
 });

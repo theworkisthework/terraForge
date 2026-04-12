@@ -25,9 +25,23 @@ export function flattenToSubpaths(
     lastCpY = 0;
 
   const push = (x: number, y: number) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     cur.push(transformPt(obj, config, x, y));
     cx = x;
     cy = y;
+  };
+
+  const pushFlattenedOrEndpoint = (
+    points: Pt[],
+    endX: number,
+    endY: number,
+  ) => {
+    if (points.length > 0) {
+      for (const p of points) push(p.x, p.y);
+      return;
+    }
+    // Approximation fallback: preserve path continuity with endpoint segment.
+    push(endX, endY);
   };
 
   for (const cmd of abs) {
@@ -71,18 +85,19 @@ export function flattenToSubpaths(
         break;
       case "C":
         for (let i = 0; i < a.length; i += 6) {
-          for (const p of cubicBezier(
+          const endX = a[i + 4];
+          const endY = a[i + 5];
+          const points = cubicBezier(
             cx,
             cy,
             a[i],
             a[i + 1],
             a[i + 2],
             a[i + 3],
-            a[i + 4],
-            a[i + 5],
-          )) {
-            push(p.x, p.y);
-          }
+            endX,
+            endY,
+          );
+          pushFlattenedOrEndpoint(points, endX, endY);
           lastCpX = a[i + 2];
           lastCpY = a[i + 3];
         }
@@ -91,34 +106,29 @@ export function flattenToSubpaths(
         for (let i = 0; i < a.length; i += 4) {
           const c1x = 2 * cx - lastCpX,
             c1y = 2 * cy - lastCpY;
-          for (const p of cubicBezier(
+          const endX = a[i + 2];
+          const endY = a[i + 3];
+          const points = cubicBezier(
             cx,
             cy,
             c1x,
             c1y,
             a[i],
             a[i + 1],
-            a[i + 2],
-            a[i + 3],
-          )) {
-            push(p.x, p.y);
-          }
+            endX,
+            endY,
+          );
+          pushFlattenedOrEndpoint(points, endX, endY);
           lastCpX = a[i];
           lastCpY = a[i + 1];
         }
         break;
       case "Q":
         for (let i = 0; i < a.length; i += 4) {
-          for (const p of quadBezier(
-            cx,
-            cy,
-            a[i],
-            a[i + 1],
-            a[i + 2],
-            a[i + 3],
-          )) {
-            push(p.x, p.y);
-          }
+          const endX = a[i + 2];
+          const endY = a[i + 3];
+          const points = quadBezier(cx, cy, a[i], a[i + 1], endX, endY);
+          pushFlattenedOrEndpoint(points, endX, endY);
           lastCpX = a[i];
           lastCpY = a[i + 1];
         }
@@ -127,16 +137,19 @@ export function flattenToSubpaths(
         for (let i = 0; i < a.length; i += 2) {
           const cpx = 2 * cx - lastCpX,
             cpy = 2 * cy - lastCpY;
-          for (const p of quadBezier(cx, cy, cpx, cpy, a[i], a[i + 1])) {
-            push(p.x, p.y);
-          }
+          const endX = a[i];
+          const endY = a[i + 1];
+          const points = quadBezier(cx, cy, cpx, cpy, endX, endY);
+          pushFlattenedOrEndpoint(points, endX, endY);
           lastCpX = cpx;
           lastCpY = cpy;
         }
         break;
       case "A":
         for (let i = 0; i < a.length; i += 7) {
-          for (const p of arcToBeziers(
+          const endX = a[i + 5];
+          const endY = a[i + 6];
+          const points = arcToBeziers(
             cx,
             cy,
             a[i],
@@ -144,11 +157,10 @@ export function flattenToSubpaths(
             a[i + 2],
             a[i + 3],
             a[i + 4],
-            a[i + 5],
-            a[i + 6],
-          )) {
-            push(p.x, p.y);
-          }
+            endX,
+            endY,
+          );
+          pushFlattenedOrEndpoint(points, endX, endY);
           lastCpX = cx;
           lastCpY = cy;
         }

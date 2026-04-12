@@ -60,6 +60,9 @@ export interface VectorObject {
   /** Original bounding box in SVG user units */
   originalWidth: number;
   originalHeight: number;
+  /** SVG viewBox origin offsets for paths not normalised to (0,0). */
+  viewBoxX?: number;
+  viewBoxY?: number;
   /** Layer / group name from source SVG */
   layer?: string;
 }

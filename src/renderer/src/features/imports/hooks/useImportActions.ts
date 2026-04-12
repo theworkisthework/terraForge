@@ -12,6 +12,7 @@ import {
   isDisplayNone,
   isLayerGroup,
   parseSvgLengthMM,
+  parseSvgStylesheet,
   shapeToPathD,
 } from "../services/svgImportHelpers";
 import {
@@ -29,6 +30,50 @@ import {
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../../../types";
+
+function computeRenderedPathBounds(pathDs: string[]) {
+  if (typeof document === "undefined" || pathDs.length === 0) return null;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const probeSvg = document.createElementNS(ns, "svg");
+  probeSvg.setAttribute("width", "0");
+  probeSvg.setAttribute("height", "0");
+  probeSvg.style.position = "fixed";
+  probeSvg.style.left = "-10000px";
+  probeSvg.style.top = "-10000px";
+  probeSvg.style.pointerEvents = "none";
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  document.body.appendChild(probeSvg);
+  try {
+    for (const d of pathDs) {
+      if (!d) continue;
+      const p = document.createElementNS(ns, "path");
+      p.setAttribute("d", d);
+      probeSvg.appendChild(p);
+      try {
+        const b = p.getBBox();
+        if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+        if (b.x < minX) minX = b.x;
+        if (b.y < minY) minY = b.y;
+        if (b.x + b.width > maxX) maxX = b.x + b.width;
+        if (b.y + b.height > maxY) maxY = b.y + b.height;
+      } catch {
+        // Ignore invalid individual paths; parser fallback covers full import.
+      }
+      p.remove();
+    }
+  } finally {
+    probeSvg.remove();
+  }
+
+  if (!Number.isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY };
+}
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
@@ -57,6 +102,7 @@ export function useImportActions() {
       const doc = parser.parseFromString(raw, "image/svg+xml");
 
       const svgEl = doc.querySelector("svg");
+      const stylesheet = parseSvgStylesheet(doc);
       const vbParts = svgEl
         ?.getAttribute("viewBox")
         ?.trim()
@@ -90,7 +136,7 @@ export function useImportActions() {
       const layers: SvgLayer[] = layerGroupEls.map((g, i) => ({
         id: g.id || `layer_${i}`,
         name: getLayerName(g, i),
-        visible: !isDisplayNone(g),
+        visible: !isDisplayNone(g, stylesheet),
       }));
       layerGroupEls.forEach((g, i) => {
         if (!g.id) g.id = `layer_${i}`;
@@ -105,7 +151,7 @@ export function useImportActions() {
       ).filter((el) => {
         let cur = el.parentElement;
         while (cur && cur.tagName.toLowerCase() !== "svg") {
-          if (isDisplayNone(cur)) {
+          if (isDisplayNone(cur, stylesheet)) {
             if (cur.id && layerGroupIds.has(cur.id)) {
               cur = cur.parentElement;
               continue;
@@ -125,23 +171,13 @@ export function useImportActions() {
         const matrix = getAccumulatedTransform(el);
         const d = applyMatrixToPathD(rawD, matrix);
 
-        const pathBounds = computePathsBounds([d]);
-        if (pathBounds) {
-          const vbMaxX = viewBoxX + svgWidth;
-          const vbMaxY = viewBoxY + svgHeight;
-          if (
-            pathBounds.minX > vbMaxX ||
-            pathBounds.maxX < viewBoxX ||
-            pathBounds.minY > vbMaxY ||
-            pathBounds.maxY < viewBoxY
-          ) {
-            return [];
-          }
-        }
+        // Avoid per-path viewBox culling here: complex Illustrator paths can
+        // yield conservative or noisy bounds during parsing and get dropped,
+        // resulting in partially imported artwork.
 
-        fillFlags.push(getEffectiveFill(el) !== null);
+        fillFlags.push(getEffectiveFill(el, stylesheet) !== null);
         const hasFill = fillFlags[fillFlags.length - 1];
-        const outlineVisible = hasVisibleStroke(el);
+        const outlineVisible = hasVisibleStroke(el, stylesheet);
         const tag = el.tagName.toLowerCase();
         const pathIndex = fillFlags.length;
 
@@ -184,24 +220,18 @@ export function useImportActions() {
         return;
       }
 
-      const bounds = computePathsBounds(paths.map((p) => p.d));
+      const pathDs = paths.map((p) => p.d);
+      const bounds =
+        computeRenderedPathBounds(pathDs) ?? computePathsBounds(pathDs);
+      const normX = bounds?.minX ?? viewBoxX;
+      const normY = bounds?.minY ?? viewBoxY;
       const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
       const effH = bounds ? bounds.maxY - bounds.minY : svgHeight;
 
-      const normalizedPaths = bounds
-        ? paths.map((p) => ({
-            ...p,
-            d: applyMatrixToPathD(
-              p.d,
-              new DOMMatrix([1, 0, 0, 1, -bounds.minX, -bounds.minY]),
-            ),
-          }))
-        : paths;
-
-      let finalPaths = normalizedPaths;
+      let finalPaths = paths;
       if (initScale > 0) {
         const spacingUnits = DEFAULT_HATCH_SPACING_MM / initScale;
-        finalPaths = normalizedPaths.map((np, i) => {
+        finalPaths = paths.map((np, i) => {
           if (!fillFlags[i]) return np;
           const hatchLines = generateHatchPaths(
             np.d,
@@ -223,8 +253,8 @@ export function useImportActions() {
         visible: true,
         svgWidth: effW,
         svgHeight: effH,
-        viewBoxX: 0,
-        viewBoxY: 0,
+        viewBoxX: normX,
+        viewBoxY: normY,
         hatchEnabled: true,
         hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
         hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,

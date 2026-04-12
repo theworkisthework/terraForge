@@ -5,6 +5,12 @@ export interface Pt {
   y: number;
 }
 
+const MAX_CUBIC_SUBDIV_DEPTH = 18;
+
+function allFinite(values: number[]): boolean {
+  return values.every(Number.isFinite);
+}
+
 /**
  * Maps a single SVG user-unit point to machine mm coordinates.
  *
@@ -27,13 +33,15 @@ export function transformPt(
 ): Pt {
   const sX = obj.scaleX ?? obj.scale;
   const sY = obj.scaleY ?? obj.scale;
+  const vbX = obj.viewBoxX ?? 0;
+  const vbY = obj.viewBoxY ?? 0;
   const halfW = (obj.originalWidth / 2) * sX;
   const halfH = (obj.originalHeight / 2) * sY;
 
   // Express the point as an offset from the object's centre in scaled SVG
   // space (SVG Y increases downward).
-  let x = svgX * sX - halfW;
-  let y = svgY * sY - halfH;
+  let x = (svgX - vbX) * sX - halfW;
+  let y = (svgY - vbY) * sY - halfH;
 
   if (obj.rotation !== 0) {
     const rad = (obj.rotation * Math.PI) / 180;
@@ -77,8 +85,11 @@ export function cubicBezier(
   x3: number,
   y3: number,
 ): Pt[] {
+  if (!allFinite([x0, y0, x1, y1, x2, y2, x3, y3])) {
+    return allFinite([x3, y3]) ? [{ x: x3, y: y3 }] : [];
+  }
   const pts: Pt[] = [];
-  subdivideCubic(x0, y0, x1, y1, x2, y2, x3, y3, pts);
+  subdivideCubic(x0, y0, x1, y1, x2, y2, x3, y3, pts, 0);
   pts.push({ x: x3, y: y3 });
   return pts;
 }
@@ -93,7 +104,11 @@ function subdivideCubic(
   x3: number,
   y3: number,
   out: Pt[],
+  depth: number,
 ): void {
+  if (!allFinite([x0, y0, x1, y1, x2, y2, x3, y3])) return;
+  if (depth >= MAX_CUBIC_SUBDIV_DEPTH) return;
+
   const ux = 3 * x1 - 2 * x0 - x3,
     uy = 3 * y1 - 2 * y0 - y3;
   const vx = 3 * x2 - 2 * x3 - x0,
@@ -112,9 +127,31 @@ function subdivideCubic(
     mx123y = (mx12y + mx23y) / 2;
   const midx = (mx012x + mx123x) / 2,
     midy = (mx012y + mx123y) / 2;
-  subdivideCubic(x0, y0, mx01x, mx01y, mx012x, mx012y, midx, midy, out);
+  subdivideCubic(
+    x0,
+    y0,
+    mx01x,
+    mx01y,
+    mx012x,
+    mx012y,
+    midx,
+    midy,
+    out,
+    depth + 1,
+  );
   out.push({ x: midx, y: midy });
-  subdivideCubic(midx, midy, mx123x, mx123y, mx23x, mx23y, x3, y3, out);
+  subdivideCubic(
+    midx,
+    midy,
+    mx123x,
+    mx123y,
+    mx23x,
+    mx23y,
+    x3,
+    y3,
+    out,
+    depth + 1,
+  );
 }
 
 export function quadBezier(
@@ -125,6 +162,9 @@ export function quadBezier(
   x1: number,
   y1: number,
 ): Pt[] {
+  if (!allFinite([x0, y0, cpx, cpy, x1, y1])) {
+    return allFinite([x1, y1]) ? [{ x: x1, y: y1 }] : [];
+  }
   const c1x = x0 + (2 / 3) * (cpx - x0),
     c1y = y0 + (2 / 3) * (cpy - y0);
   const c2x = x1 + (2 / 3) * (cpx - x1),
@@ -143,6 +183,9 @@ export function arcToBeziers(
   x2: number,
   y2: number,
 ): Pt[] {
+  if (!allFinite([x1, y1, rx, ry, xRot, largeArc, sweep, x2, y2])) {
+    return allFinite([x2, y2]) ? [{ x: x2, y: y2 }] : [];
+  }
   if (x1 === x2 && y1 === y2) return [];
   if (rx === 0 || ry === 0) return [{ x: x2, y: y2 }];
   const phi = (xRot * Math.PI) / 180,
@@ -215,7 +258,8 @@ export function arcToBeziers(
     const by3 = cy + sinPhi * rx * cos2 + cosPhi * ry * sin2;
     const bx2 = bx3 + alpha * (cosPhi * rx * sin2 + sinPhi * ry * cos2);
     const by2 = by3 + alpha * (sinPhi * rx * sin2 - cosPhi * ry * cos2);
-    pts.push(...cubicBezier(bx0, by0, bx1, by1, bx2, by2, bx3, by3));
+    const cubicPts = cubicBezier(bx0, by0, bx1, by1, bx2, by2, bx3, by3);
+    for (const p of cubicPts) pts.push(p);
   }
   return pts;
 }
