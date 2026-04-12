@@ -4,7 +4,7 @@ Desktop control app for FluidNC-based pen plotters (TerraPen and compatible mach
 
 Import SVG and PDF artwork, position it on the machine bed, generate optimised G-code, and plot — all without leaving the app.
 
-![Application screenshot](docs/resources/screen-shot.png)
+![Application screenshot](docs/resources/terraForge-quick-demo.gif)
 
 ---
 
