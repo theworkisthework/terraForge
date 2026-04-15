@@ -38,11 +38,15 @@ interface Props {
 
 const PEN_DEFAULTS: Record<
   PenType,
-  { penUpCommand: string; penDownCommand: string }
+  { penUpCommand: string; penDownCommand: string; penDownDelayMs: number }
 > = {
-  solenoid: { penUpCommand: "M3S0", penDownCommand: "M3S1" },
-  servo: { penUpCommand: "G0Z15", penDownCommand: "G0Z0" },
-  stepper: { penUpCommand: "G0Z15", penDownCommand: "G0Z0" },
+  solenoid: {
+    penUpCommand: "M3S0",
+    penDownCommand: "M3S1",
+    penDownDelayMs: 50,
+  },
+  servo: { penUpCommand: "G0Z15", penDownCommand: "G0Z0", penDownDelayMs: 0 },
+  stepper: { penUpCommand: "G0Z15", penDownCommand: "G0Z0", penDownDelayMs: 0 },
 };
 
 const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
@@ -53,6 +57,7 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   penType: "solenoid",
   penUpCommand: PEN_DEFAULTS.solenoid.penUpCommand,
   penDownCommand: PEN_DEFAULTS.solenoid.penDownCommand,
+  penDownDelayMs: PEN_DEFAULTS.solenoid.penDownDelayMs,
   feedrate: 3000,
   connection: { type: "wifi", host: "fluidnc.local", port: 80 },
 };
@@ -132,6 +137,7 @@ export function MachineConfigDialog({ onClose }: Props) {
         penType: newType,
         penUpCommand: defaults.penUpCommand,
         penDownCommand: defaults.penDownCommand,
+        penDownDelayMs: defaults.penDownDelayMs,
       });
     }
   };
@@ -463,6 +469,21 @@ export function MachineConfigDialog({ onClose }: Props) {
                         placeholder={PEN_DEFAULTS[form.penType].penDownCommand}
                       />
                     </Field>
+                    <Field label="Pen-down delay (ms)">
+                      <input
+                        type="number"
+                        value={form.penDownDelayMs}
+                        min={0}
+                        step={1}
+                        disabled={form.penType === "stepper"}
+                        onChange={(e) =>
+                          change({
+                            penDownDelayMs: Math.max(0, Number(e.target.value)),
+                          })
+                        }
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                      />
+                    </Field>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -480,6 +501,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                         change({
                           penUpCommand: d.penUpCommand,
                           penDownCommand: d.penDownCommand,
+                          penDownDelayMs: d.penDownDelayMs,
                         });
                       }}
                       className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content-muted rounded transition-colors"
@@ -493,6 +515,11 @@ export function MachineConfigDialog({ onClose }: Props) {
                         : "Servo / Stepper: G0 Z moves the Z axis"}
                     </span>
                   </div>
+                  <p className="text-xs text-content-faint">
+                    Delay is inserted after pen-down and before XY motion
+                    starts. Machine default delay is applied for solenoid/servo
+                    profiles; stepper ignores the machine default.
+                  </p>
                   <Field label="Feedrate (mm/min)">
                     <input
                       type="number"
@@ -661,7 +688,7 @@ export function MachineConfigDialog({ onClose }: Props) {
       {pendingPenType && (
         <ConfirmDialog
           title="Reset Pen Commands?"
-          message={`Reset pen commands to defaults for "${pendingPenType}"?\n\nUp: ${PEN_DEFAULTS[pendingPenType].penUpCommand}\nDown: ${PEN_DEFAULTS[pendingPenType].penDownCommand}`}
+          message={`Reset pen commands to defaults for "${pendingPenType}"?\n\nUp: ${PEN_DEFAULTS[pendingPenType].penUpCommand}\nDown: ${PEN_DEFAULTS[pendingPenType].penDownCommand}\nDelay: ${PEN_DEFAULTS[pendingPenType].penDownDelayMs} ms`}
           confirmLabel="Reset"
           onConfirm={() => {
             const d = PEN_DEFAULTS[pendingPenType];
@@ -669,6 +696,7 @@ export function MachineConfigDialog({ onClose }: Props) {
               penType: pendingPenType,
               penUpCommand: d.penUpCommand,
               penDownCommand: d.penDownCommand,
+              penDownDelayMs: d.penDownDelayMs,
             });
             setPendingPenType(null);
           }}

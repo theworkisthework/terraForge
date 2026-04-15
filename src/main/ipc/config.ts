@@ -1,6 +1,28 @@
 import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
-import type { MachineConfig, PageSize } from "../../types";
+import type { MachineConfig, PageSize, PenType } from "../../types";
+
+function defaultPenDownDelayMs(penType: PenType): number {
+  switch (penType) {
+    case "solenoid":
+      return 50;
+    case "servo":
+    case "stepper":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function normalizeConfig(config: MachineConfig): MachineConfig {
+  return {
+    ...config,
+    penDownDelayMs:
+      typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
+        ? config.penDownDelayMs
+        : defaultPenDownDelayMs(config.penType),
+  };
+}
 
 interface ConfigIpcOptions {
   getMainWindow: () => BrowserWindow | null;
@@ -25,9 +47,10 @@ export function registerConfigIpcHandlers({
     "config:saveMachineConfig",
     async (_e, config: MachineConfig) => {
       const configs = await loadConfigs();
-      const idx = configs.findIndex((item) => item.id === config.id);
-      if (idx >= 0) configs[idx] = config;
-      else configs.push(config);
+      const normalized = normalizeConfig(config);
+      const idx = configs.findIndex((item) => item.id === normalized.id);
+      if (idx >= 0) configs[idx] = normalized;
+      else configs.push(normalized);
       await saveConfigs(configs);
     },
   );
@@ -127,7 +150,7 @@ export function registerConfigIpcHandlers({
       if (existingIds.has(config.id) || existingNames.has(nameKey)) {
         skipped++;
       } else {
-        toAdd.push(config);
+        toAdd.push(normalizeConfig(config));
         existingIds.add(config.id);
         existingNames.add(nameKey);
       }

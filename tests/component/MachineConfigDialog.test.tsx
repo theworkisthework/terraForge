@@ -280,6 +280,25 @@ describe("MachineConfigDialog", () => {
       expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
     });
 
+    it("disables machine pen-down delay input when stepper is selected", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await act(async () => {});
+      const delayInput = screen.getByDisplayValue("50");
+      expect(delayInput).not.toBeDisabled();
+
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid"),
+        "stepper",
+      );
+      expect(delayInput).toBeDisabled();
+
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Stepper"),
+        "servo",
+      );
+      expect(screen.getByDisplayValue("0")).not.toBeDisabled();
+    });
+
     it("switching with customised commands triggers confirm dialog", async () => {
       render(<MachineConfigDialog onClose={onClose} />);
       // Customise the pen-up command so it no longer matches the solenoid default

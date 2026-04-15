@@ -58,6 +58,7 @@ const TEST_CONFIG = {
   bedHeight: 300,
   penUpCommand: "M3 S0",
   penDownCommand: "M3 S1",
+  penDownDelayMs: 50,
   penType: "solenoid" as const,
   maxSpeed: 3000,
   travelSpeed: 3000,

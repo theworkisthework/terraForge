@@ -25,9 +25,13 @@ const defaultPrefs: GcodePrefs = {
   joinTolerance: 0.2,
   liftPenAtEnd: true,
   returnToHome: false,
+  penDownDelayOverrideEnabled: false,
+  penDownDelayMs: 0,
   customStartGcode: "",
   customEndGcode: "",
   exportPerGroup: false,
+  clipMode: "none",
+  clipOffsetMM: 0,
 };
 
 beforeEach(() => {
@@ -138,8 +142,13 @@ describe("GcodeOptionsDialog", () => {
         joinTolerance: 0.2,
         liftPenAtEnd: true,
         returnToHome: true,
+        penDownDelayOverrideEnabled: false,
+        penDownDelayMs: 0,
         customStartGcode: "",
         customEndGcode: "",
+        exportPerGroup: false,
+        clipMode: "none",
+        clipOffsetMM: 0,
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -234,6 +243,28 @@ describe("GcodeOptionsDialog", () => {
     expect(cb).not.toBeChecked(); // default false
     await userEvent.click(cb);
     expect(cb).toBeChecked();
+  });
+
+  it("enables pen-down delay override and includes override value on confirm", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    const overrideCb = screen.getByRole("checkbox", {
+      name: "Override pen-down delay",
+    });
+    const delayInput = screen.getByRole("spinbutton", {
+      name: "Pen-down delay override (ms)",
+    });
+    expect(delayInput).toBeDisabled();
+    await userEvent.click(overrideCb);
+    expect(delayInput).not.toBeDisabled();
+    fireEvent.change(delayInput, { target: { value: "125" } });
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        penDownDelayOverrideEnabled: true,
+        penDownDelayMs: 125,
+      }),
+    );
   });
 
   it("toggles Join nearby paths checkbox", async () => {
@@ -394,6 +425,8 @@ describe("GcodeOptionsDialog", () => {
       joinTolerance: 0.2,
       liftPenAtEnd: true,
       returnToHome: false,
+      penDownDelayOverrideEnabled: false,
+      penDownDelayMs: 0,
       customStartGcode: "",
       customEndGcode: "",
       exportPerGroup: false,

@@ -119,6 +119,9 @@ export function useJobActions() {
       joinTolerance: prefs.joinTolerance,
       liftPenAtEnd: prefs.liftPenAtEnd,
       returnToHome: prefs.returnToHome,
+      penDownDelayMsOverride: prefs.penDownDelayOverrideEnabled
+        ? prefs.penDownDelayMs
+        : undefined,
       customStartGcode: prefs.customStartGcode,
       customEndGcode: prefs.customEndGcode,
       pageClip:

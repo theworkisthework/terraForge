@@ -6,10 +6,12 @@ interface OptionsSectionProps {
   open: boolean;
   customGcodeOpen: boolean;
   prefs: GcodePrefs;
+  machinePenDownDelayMs: number;
   hasPageTemplate: boolean;
   onToggleOpen: () => void;
   onToggleCustomGcodeOpen: () => void;
   onTogglePref: (key: keyof GcodePrefs) => void;
+  onSetPenDownDelayMs: (value: string) => void;
   onSetClipMode: (mode: GcodePrefs["clipMode"]) => void;
   onSetClipOffset: (value: string) => void;
   onSetTextField: (key: keyof GcodePrefs) => (value: string) => void;
@@ -19,10 +21,12 @@ export function OptionsSection({
   open,
   customGcodeOpen,
   prefs,
+  machinePenDownDelayMs,
   hasPageTemplate,
   onToggleOpen,
   onToggleCustomGcodeOpen,
   onTogglePref,
+  onSetPenDownDelayMs,
   onSetClipMode,
   onSetClipOffset,
   onSetTextField,
@@ -78,6 +82,43 @@ export function OptionsSection({
               </div>
             </div>
           </label>
+
+          <div className="flex flex-col gap-2">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                aria-label="Override pen-down delay"
+                className="mt-0.5 accent-accent cursor-pointer"
+                checked={prefs.penDownDelayOverrideEnabled}
+                onChange={() => onTogglePref("penDownDelayOverrideEnabled")}
+              />
+              <div>
+                <div className="text-sm text-content font-medium">
+                  Override pen-down delay
+                </div>
+                <div className="text-xs text-content-muted mt-0.5">
+                  Add a dwell after pen-down before XY drawing starts.
+                </div>
+              </div>
+            </label>
+
+            <div className="flex items-center gap-2 pl-6">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={prefs.penDownDelayMs}
+                onChange={(e) => onSetPenDownDelayMs(e.target.value)}
+                disabled={!prefs.penDownDelayOverrideEnabled}
+                aria-label="Pen-down delay override (ms)"
+                className="w-24 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span className="text-xs text-content-muted">ms</span>
+              <span className="text-xs text-content-faint">
+                Machine default: {machinePenDownDelayMs} ms
+              </span>
+            </div>
+          </div>
 
           {hasPageTemplate && (
             <div className="flex flex-col gap-1.5 select-none">
