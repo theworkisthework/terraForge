@@ -14,13 +14,23 @@ describe("TransformShortcuts", () => {
     render(
       <TransformShortcuts
         fitScale={1.234}
+        fitScaleX={1.5}
+        fitScaleY={1.2}
         rotStep={45}
         rotSteps={[1, 5, 15, 45, 90]}
         stepFlyoutOpen={false}
         showCentreMarker={true}
+        ratioLocked={true}
         snapPresetTitle="Snap to next preset (0° · 90°)"
+        canScaleToTemplate={false}
+        templateScaleEnabled={false}
+        templateScaleTarget="page"
         onFitToBed={onFitToBed}
+        onFitHorizontal={() => {}}
+        onFitVertical={() => {}}
         onResetScale={onResetScale}
+        onTemplateScaleEnabledChange={() => {}}
+        onTemplateScaleTargetChange={() => {}}
         onRotateCcw={onRotateCcw}
         onRotateCw={onRotateCw}
         onToggleStepFlyout={() => {}}
@@ -35,7 +45,7 @@ describe("TransformShortcuts", () => {
     expect(onFitToBed).toHaveBeenCalledTimes(1);
 
     fireEvent.click(
-      screen.getByTitle("Reset scale to 1:1 (1 SVG unit = 1 mm)"),
+      screen.getByTitle("Reset scale + ratio lock to 1:1 (1 SVG unit = 1 mm)"),
     );
     expect(onResetScale).toHaveBeenCalledTimes(1);
 
@@ -60,13 +70,23 @@ describe("TransformShortcuts", () => {
     const { container } = render(
       <TransformShortcuts
         fitScale={2}
+        fitScaleX={2}
+        fitScaleY={2}
         rotStep={45}
         rotSteps={[1, 5, 15, 45, 90]}
         stepFlyoutOpen={true}
         showCentreMarker={false}
+        ratioLocked={true}
         snapPresetTitle="snap"
+        canScaleToTemplate={false}
+        templateScaleEnabled={false}
+        templateScaleTarget="page"
         onFitToBed={() => {}}
+        onFitHorizontal={() => {}}
+        onFitVertical={() => {}}
         onResetScale={() => {}}
+        onTemplateScaleEnabledChange={() => {}}
+        onTemplateScaleTargetChange={() => {}}
         onRotateCcw={() => {}}
         onRotateCw={() => {}}
         onToggleStepFlyout={onToggleStepFlyout}

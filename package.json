@@ -21,7 +21,8 @@
     "test:e2e": "electron-vite build && playwright test --config=tests/e2e/playwright.config.ts",
     "lint:complexity": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\"",
     "doc:screenshots": "electron-vite build && playwright test --config=tests/e2e/playwright.screenshots.config.ts",
-    "generate-icons": "node --experimental-strip-types scripts/generate-icons.ts"
+    "generate-icons": "node --experimental-strip-types scripts/generate-icons.ts",
+    "generate-svg-components": "node --experimental-strip-types scripts/generate-svg-components.ts"
   },
   "keywords": [
     "electron",

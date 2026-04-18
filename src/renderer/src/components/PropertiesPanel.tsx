@@ -93,9 +93,13 @@ export function PropertiesPanel() {
     ratioLocked,
     templateAlignEnabled,
     templateAlignTarget,
+    templateScaleEnabled,
+    templateScaleTarget,
     setRatioLocked,
     setTemplateAlignEnabled,
     setTemplateAlignTarget,
+    setTemplateScaleEnabled,
+    setTemplateScaleTarget,
     toggleStepFlyout,
     closeStepFlyout,
     selectRotStep,
@@ -208,6 +212,8 @@ export function PropertiesPanel() {
                 pageSizes={pageSizes}
                 templateAlignEnabled={templateAlignEnabled}
                 templateAlignTarget={templateAlignTarget}
+                templateScaleEnabled={templateScaleEnabled}
+                templateScaleTarget={templateScaleTarget}
                 ratioLocked={ratioLocked}
                 rotStep={rotStep}
                 stepFlyoutOpen={stepFlyoutOpen}
@@ -232,6 +238,8 @@ export function PropertiesPanel() {
                 onToggleCentreMarker={toggleCentreMarker}
                 onTemplateAlignEnabledChange={setTemplateAlignEnabled}
                 onTemplateAlignTargetChange={setTemplateAlignTarget}
+                onTemplateScaleEnabledChange={setTemplateScaleEnabled}
+                onTemplateScaleTargetChange={setTemplateScaleTarget}
                 onRatioLockedChange={setRatioLocked}
                 onToggleStepFlyout={toggleStepFlyout}
                 onCloseStepFlyout={closeStepFlyout}

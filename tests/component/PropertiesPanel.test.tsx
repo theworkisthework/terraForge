@@ -305,8 +305,15 @@ describe("PropertiesPanel", () => {
     });
     render(<PropertiesPanel />);
 
-    await userEvent.click(screen.getByLabelText("Align to template"));
-    await userEvent.click(screen.getByLabelText("Margin"));
+    const alignToTemplateToggle = screen.getByLabelText("Align to template");
+    const alignControls = alignToTemplateToggle.closest("div");
+
+    expect(alignControls).not.toBeNull();
+
+    await userEvent.click(alignToTemplateToggle);
+    await userEvent.click(
+      within(alignControls as HTMLElement).getByLabelText("Margin"),
+    );
     await userEvent.click(
       screen.getByTitle("Align left edge to margin left (X = 20)"),
     );
@@ -624,7 +631,7 @@ describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
     setupScaleFixture();
     render(<PropertiesPanel />);
     const resetBtn = screen.getByTitle(
-      "Reset scale to 1:1 (1 SVG unit = 1 mm)",
+      "Reset scale + ratio lock to 1:1 (1 SVG unit = 1 mm)",
     );
     await userEvent.click(resetBtn);
     expect(useCanvasStore.getState().imports[0].scale).toBe(1);
@@ -637,7 +644,7 @@ describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
     }));
     render(<PropertiesPanel />);
     await userEvent.click(
-      screen.getByTitle("Reset scale to 1:1 (1 SVG unit = 1 mm)"),
+      screen.getByTitle("Reset scale + ratio lock to 1:1 (1 SVG unit = 1 mm)"),
     );
     const imp = useCanvasStore.getState().imports[0];
     expect(imp.scaleX).toBeUndefined();
@@ -883,6 +890,70 @@ describe("PropertiesPanel — scale/rotation shortcut buttons", () => {
     expect(st.scale).toBeCloseTo(2);
     expect(st.scaleX).toBeUndefined();
     expect(st.scaleY).toBeUndefined();
+  });
+
+  it("horizontal/vertical scale shortcut buttons are disabled while ratio is locked", () => {
+    setupWHFixture();
+    render(<PropertiesPanel />);
+
+    expect(screen.getByTitle(/Fit horizontal scale/)).toBeDisabled();
+    expect(screen.getByTitle(/Fit vertical scale/)).toBeDisabled();
+  });
+
+  it("horizontal scale shortcut updates only scaleX and preserves position when ratio is unlocked", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "scale-h-shortcut",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      x: 12,
+      y: 34,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    await userEvent.click(screen.getByTitle(/Fit horizontal scale/));
+
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleX).toBeCloseTo(2); // bedW=200, svgWidth=100
+    expect(st.scaleY).toBeCloseTo(1);
+    expect(st.x).toBe(12);
+    expect(st.y).toBe(34);
+  });
+
+  it("vertical scale shortcut updates only scaleY and preserves position when ratio is unlocked", async () => {
+    const cfg = createMachineConfig({ bedWidth: 200, bedHeight: 150 });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+
+    const path = createSvgPath();
+    const imp = createSvgImport({
+      paths: [path],
+      name: "scale-v-shortcut",
+      svgWidth: 100,
+      svgHeight: 50,
+      scale: 1,
+      x: 9,
+      y: 21,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+
+    render(<PropertiesPanel />);
+
+    await userEvent.click(screen.getByTitle("Ratio locked — click to unlock"));
+    await userEvent.click(screen.getByTitle(/Fit vertical scale/));
+
+    const st = useCanvasStore.getState().imports[0];
+    expect(st.scaleY).toBeCloseTo(3); // bedH=150, svgHeight=50
+    expect(st.scaleX).toBeCloseTo(1);
+    expect(st.x).toBe(9);
+    expect(st.y).toBe(21);
   });
 
   // ── Toolpath statistics edge cases ────────────────────────────────────────

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 interface TransformIconButtonProps {
   title: string;
   onClick: () => void;
+  disabled?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -10,6 +11,7 @@ interface TransformIconButtonProps {
 export function TransformIconButton({
   title,
   onClick,
+  disabled = false,
   className,
   children,
 }: TransformIconButtonProps) {
@@ -20,6 +22,7 @@ export function TransformIconButton({
         "p-1.5 text-content-muted hover:text-content transition-colors rounded hover:bg-secondary/40"
       }
       title={title}
+      disabled={disabled}
       onClick={onClick}
     >
       {children}
