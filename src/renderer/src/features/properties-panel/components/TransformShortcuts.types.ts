@@ -7,8 +7,13 @@ export interface TransformShortcutsProps {
   stepFlyoutOpen: boolean;
   showCentreMarker: boolean;
   snapPresetTitle: string;
+  canScaleToTemplate: boolean;
+  templateScaleEnabled: boolean;
+  templateScaleTarget: "page" | "margin";
   onFitToBed: () => void;
   onResetScale: () => void;
+  onTemplateScaleEnabledChange: (v: boolean) => void;
+  onTemplateScaleTargetChange: (v: "page" | "margin") => void;
   onRotateCcw: () => void;
   onRotateCw: () => void;
   onToggleStepFlyout: () => void;

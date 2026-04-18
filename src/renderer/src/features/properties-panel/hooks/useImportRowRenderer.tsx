@@ -23,6 +23,8 @@ interface UseImportRowRendererArgs {
   canAlignToTemplate: boolean;
   templateAlignEnabled: boolean;
   templateAlignTarget: "page" | "margin";
+  templateScaleEnabled: boolean;
+  templateScaleTarget: "page" | "margin";
   ratioLocked: boolean;
   rotStep: RotStep;
   stepFlyoutOpen: boolean;
@@ -55,6 +57,8 @@ interface UseImportRowRendererArgs {
   onRemovePath: (importId: string, pathId: string) => void;
   onTemplateAlignEnabledChange: (v: boolean) => void;
   onTemplateAlignTargetChange: (v: "page" | "margin") => void;
+  onTemplateScaleEnabledChange: (v: boolean) => void;
+  onTemplateScaleTargetChange: (v: "page" | "margin") => void;
   onRatioLockedChange: (v: boolean) => void;
   onToggleStepFlyout: () => void;
   onCloseStepFlyout: () => void;
@@ -84,6 +88,8 @@ export function useImportRowRenderer({
   canAlignToTemplate,
   templateAlignEnabled,
   templateAlignTarget,
+  templateScaleEnabled,
+  templateScaleTarget,
   ratioLocked,
   rotStep,
   stepFlyoutOpen,
@@ -105,6 +111,8 @@ export function useImportRowRenderer({
   onRemovePath,
   onTemplateAlignEnabledChange,
   onTemplateAlignTargetChange,
+  onTemplateScaleEnabledChange,
+  onTemplateScaleTargetChange,
   onRatioLockedChange,
   onToggleStepFlyout,
   onCloseStepFlyout,
@@ -143,6 +151,8 @@ export function useImportRowRenderer({
           canAlignToTemplate={canAlignToTemplate}
           templateAlignEnabled={templateAlignEnabled}
           templateAlignTarget={templateAlignTarget}
+          templateScaleEnabled={templateScaleEnabled}
+          templateScaleTarget={templateScaleTarget}
           ratioLocked={ratioLocked}
           rotStep={rotStep}
           stepFlyoutOpen={stepFlyoutOpen}
@@ -168,6 +178,8 @@ export function useImportRowRenderer({
           onUpdate={(changes) => onUpdateImport(imp.id, changes)}
           onTemplateAlignEnabledChange={onTemplateAlignEnabledChange}
           onTemplateAlignTargetChange={onTemplateAlignTargetChange}
+          onTemplateScaleEnabledChange={onTemplateScaleEnabledChange}
+          onTemplateScaleTargetChange={onTemplateScaleTargetChange}
           onRatioLockedChange={onRatioLockedChange}
           onToggleStepFlyout={onToggleStepFlyout}
           onCloseStepFlyout={onCloseStepFlyout}
@@ -194,6 +206,8 @@ export function useImportRowRenderer({
       canAlignToTemplate,
       templateAlignEnabled,
       templateAlignTarget,
+      templateScaleEnabled,
+      templateScaleTarget,
       ratioLocked,
       rotStep,
       stepFlyoutOpen,
@@ -214,6 +228,8 @@ export function useImportRowRenderer({
       onRemovePath,
       onTemplateAlignEnabledChange,
       onTemplateAlignTargetChange,
+      onTemplateScaleEnabledChange,
+      onTemplateScaleTargetChange,
       onRatioLockedChange,
       onToggleStepFlyout,
       onCloseStepFlyout,

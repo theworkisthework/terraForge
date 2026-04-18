@@ -305,8 +305,15 @@ describe("PropertiesPanel", () => {
     });
     render(<PropertiesPanel />);
 
-    await userEvent.click(screen.getByLabelText("Align to template"));
-    await userEvent.click(screen.getByLabelText("Margin"));
+    const alignToTemplateToggle = screen.getByLabelText("Align to template");
+    const alignControls = alignToTemplateToggle.closest("div");
+
+    expect(alignControls).not.toBeNull();
+
+    await userEvent.click(alignToTemplateToggle);
+    await userEvent.click(
+      within(alignControls as HTMLElement).getByLabelText("Margin"),
+    );
     await userEvent.click(
       screen.getByTitle("Align left edge to margin left (X = 20)"),
     );

@@ -29,6 +29,8 @@ export interface ImportsByGroupListProps {
   pageSizes: PageSize[];
   templateAlignEnabled: boolean;
   templateAlignTarget: "page" | "margin";
+  templateScaleEnabled: boolean;
+  templateScaleTarget: "page" | "margin";
   ratioLocked: boolean;
   rotStep: RotStep;
   stepFlyoutOpen: boolean;
@@ -69,6 +71,8 @@ export interface ImportsByGroupListProps {
   onToggleCentreMarker: () => void;
   onTemplateAlignEnabledChange: (v: boolean) => void;
   onTemplateAlignTargetChange: (v: "page" | "margin") => void;
+  onTemplateScaleEnabledChange: (v: boolean) => void;
+  onTemplateScaleTargetChange: (v: "page" | "margin") => void;
   onRatioLockedChange: (v: boolean) => void;
   onToggleStepFlyout: () => void;
   onCloseStepFlyout: () => void;

@@ -11,6 +11,8 @@ export interface ImportPropertiesFormProps {
   canAlignToTemplate: boolean;
   templateAlignEnabled: boolean;
   templateAlignTarget: "page" | "margin";
+  templateScaleEnabled: boolean;
+  templateScaleTarget: "page" | "margin";
   ratioLocked: boolean;
   rotStep: RotStep;
   stepFlyoutOpen: boolean;
@@ -18,6 +20,8 @@ export interface ImportPropertiesFormProps {
   onUpdate: (changes: Partial<SvgImport>) => void;
   onTemplateAlignEnabledChange: (v: boolean) => void;
   onTemplateAlignTargetChange: (v: "page" | "margin") => void;
+  onTemplateScaleEnabledChange: (v: boolean) => void;
+  onTemplateScaleTargetChange: (v: "page" | "margin") => void;
   onRatioLockedChange: (v: boolean) => void;
   onToggleStepFlyout: () => void;
   onCloseStepFlyout: () => void;

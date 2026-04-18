@@ -9,6 +9,10 @@ export function useInspectorInteractionState() {
   const [templateAlignTarget, setTemplateAlignTarget] = useState<
     "page" | "margin"
   >("page");
+  const [templateScaleEnabled, setTemplateScaleEnabled] = useState(false);
+  const [templateScaleTarget, setTemplateScaleTarget] = useState<
+    "page" | "margin"
+  >("page");
 
   const toggleStepFlyout = () => {
     setStepFlyoutOpen((open) => !open);
@@ -29,9 +33,13 @@ export function useInspectorInteractionState() {
     ratioLocked,
     templateAlignEnabled,
     templateAlignTarget,
+    templateScaleEnabled,
+    templateScaleTarget,
     setRatioLocked,
     setTemplateAlignEnabled,
     setTemplateAlignTarget,
+    setTemplateScaleEnabled,
+    setTemplateScaleTarget,
     toggleStepFlyout,
     closeStepFlyout,
     selectRotStep,

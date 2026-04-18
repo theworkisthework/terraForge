@@ -5,11 +5,19 @@ interface UseImportPropertiesFormModelArgs {
   imp: SvgImport;
   bedW: number;
   bedH: number;
+  pageW: number;
+  pageH: number;
+  marginMM: number;
+  canScaleToTemplate: boolean;
+  templateScaleEnabled: boolean;
+  templateScaleTarget: "page" | "margin";
   rotStep: RotStep;
   stepFlyoutOpen: boolean;
   showCentreMarker: boolean;
   onUpdate: (changes: Partial<SvgImport>) => void;
   onRatioLockedChange: (v: boolean) => void;
+  onTemplateScaleEnabledChange: (v: boolean) => void;
+  onTemplateScaleTargetChange: (v: "page" | "margin") => void;
   onToggleStepFlyout: () => void;
   onCloseStepFlyout: () => void;
   onSelectRotStep: (s: RotStep) => void;
@@ -20,11 +28,19 @@ export function useImportPropertiesFormModel({
   imp,
   bedW,
   bedH,
+  pageW,
+  pageH,
+  marginMM,
+  canScaleToTemplate,
+  templateScaleEnabled,
+  templateScaleTarget,
   rotStep,
   stepFlyoutOpen,
   showCentreMarker,
   onUpdate,
   onRatioLockedChange,
+  onTemplateScaleEnabledChange,
+  onTemplateScaleTargetChange,
   onToggleStepFlyout,
   onCloseStepFlyout,
   onSelectRotStep,
@@ -32,10 +48,26 @@ export function useImportPropertiesFormModel({
 }: UseImportPropertiesFormModelArgs) {
   const objW = imp.svgWidth * (imp.scaleX ?? imp.scale);
   const objH = imp.svgHeight * (imp.scaleY ?? imp.scale);
-  const fitScale = Math.min(
+  const fitBedScale = Math.min(
     bedW / (imp.svgWidth || 1),
     bedH / (imp.svgHeight || 1),
   );
+  const fitPageScale = Math.min(
+    pageW / (imp.svgWidth || 1),
+    pageH / (imp.svgHeight || 1),
+  );
+  const fitMarginW = Math.max(0, pageW - 2 * marginMM);
+  const fitMarginH = Math.max(0, pageH - 2 * marginMM);
+  const fitMarginScale = Math.min(
+    fitMarginW / (imp.svgWidth || 1),
+    fitMarginH / (imp.svgHeight || 1),
+  );
+  const useTemplateBounds = templateScaleEnabled && canScaleToTemplate;
+  const fitScale = useTemplateBounds
+    ? templateScaleTarget === "margin"
+      ? fitMarginScale
+      : fitPageScale
+    : fitBedScale;
   const snapPresetTitle = `Snap to next preset (${ROT_PRESETS.join("° · ")}°)`;
 
   const sharedTransformProps = {
@@ -45,6 +77,11 @@ export function useImportPropertiesFormModel({
     stepFlyoutOpen,
     showCentreMarker,
     snapPresetTitle,
+    canScaleToTemplate,
+    templateScaleEnabled,
+    templateScaleTarget,
+    onTemplateScaleEnabledChange,
+    onTemplateScaleTargetChange,
     onFitToBed: () => {
       onRatioLockedChange(true);
       onUpdate({

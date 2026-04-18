@@ -21,6 +21,8 @@ export function ImportRowCard({
   canAlignToTemplate,
   templateAlignEnabled,
   templateAlignTarget,
+  templateScaleEnabled,
+  templateScaleTarget,
   ratioLocked,
   rotStep,
   stepFlyoutOpen,
@@ -42,6 +44,8 @@ export function ImportRowCard({
   onUpdate,
   onTemplateAlignEnabledChange,
   onTemplateAlignTargetChange,
+  onTemplateScaleEnabledChange,
+  onTemplateScaleTargetChange,
   onRatioLockedChange,
   onToggleStepFlyout,
   onCloseStepFlyout,
@@ -100,6 +104,8 @@ export function ImportRowCard({
           canAlignToTemplate={canAlignToTemplate}
           templateAlignEnabled={templateAlignEnabled}
           templateAlignTarget={templateAlignTarget}
+          templateScaleEnabled={templateScaleEnabled}
+          templateScaleTarget={templateScaleTarget}
           ratioLocked={ratioLocked}
           rotStep={rotStep}
           stepFlyoutOpen={stepFlyoutOpen}
@@ -107,6 +113,8 @@ export function ImportRowCard({
           onUpdate={onUpdate}
           onTemplateAlignEnabledChange={onTemplateAlignEnabledChange}
           onTemplateAlignTargetChange={onTemplateAlignTargetChange}
+          onTemplateScaleEnabledChange={onTemplateScaleEnabledChange}
+          onTemplateScaleTargetChange={onTemplateScaleTargetChange}
           onRatioLockedChange={onRatioLockedChange}
           onToggleStepFlyout={onToggleStepFlyout}
           onCloseStepFlyout={onCloseStepFlyout}
