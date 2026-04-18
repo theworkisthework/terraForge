@@ -6,6 +6,7 @@
 ; Joined   : no
 ; Lift end : yes
 ; Ret home : no
+; Pen delay: 50 ms
 ; Generated: <normalized>
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
@@ -16,6 +17,7 @@ M5 ; Pen up
 G0 X46.646 Y0.000 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X45.975 Y0.093
 G1 X45.323 Y0.344
 G1 X30.665 Y8.784
@@ -48,6 +50,7 @@ M5 ; Pen up
 G0 X0.000 Y95.779 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X0.004 Y95.812
 G1 X0.013 Y95.885
 G1 X0.022 Y95.958
@@ -184,6 +187,7 @@ M5 ; Pen up
 G0 X58.261 Y107.818 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X58.382 Y107.848
 G1 X58.493 Y107.824
 G1 X58.574 Y107.751
@@ -211,6 +215,7 @@ M5 ; Pen up
 G0 X87.471 Y140.996 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X72.813 Y149.437
 G1 X71.814 Y149.932
 G1 X70.769 Y150.285
@@ -372,6 +377,7 @@ M5 ; Pen up
 G0 X74.771 Y103.531 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X74.771 Y97.578
 G1 X62.362 Y104.722
 G1 X62.362 Y110.675
@@ -383,6 +389,7 @@ M5 ; Pen up
 G0 X63.526 Y112.607 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X65.511 Y113.771
 G1 X66.255 Y114.133
 G1 X67.019 Y114.389
@@ -418,6 +425,7 @@ M5 ; Pen up
 G0 X62.256 Y102.209 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X74.771 Y95.012
 G1 X74.771 Y89.191
 G1 X60.801 Y97.287
@@ -432,6 +440,7 @@ M5 ; Pen up
 G0 X58.314 Y97.393 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X58.208 Y97.181
 G1 X57.757 Y96.471
 G1 X57.259 Y95.790
@@ -463,6 +472,7 @@ M5 ; Pen up
 G0 X74.771 Y114.168 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X74.315 Y114.625
 G1 X73.822 Y115.044
 G1 X72.734 Y115.782
@@ -486,6 +496,7 @@ M5 ; Pen up
 G0 X53.949 Y140.838 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X67.469 Y133.059
 G1 X67.469 Y116.814
 G1 X66.676 Y116.659
@@ -506,6 +517,7 @@ M5 ; Pen up
 G0 X46.646 Y136.604 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X60.113 Y128.826
 G1 X60.113 Y113.215
 G1 X55.060 Y110.305
@@ -523,6 +535,7 @@ M5 ; Pen up
 G0 X39.291 Y132.345 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X52.811 Y124.566
 G1 X52.811 Y109.008
 G1 X47.757 Y106.098
@@ -540,6 +553,7 @@ M5 ; Pen up
 G0 X16.192 Y102.023 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X16.192 Y97.499
 G1 X12.277 Y99.748
 G1 X16.192 Y102.023
@@ -550,6 +564,7 @@ M5 ; Pen up
 G0 X10.001 Y98.478 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X16.192 Y94.880
 G1 X16.192 Y89.059
 G1 X4.921 Y95.541
@@ -561,6 +576,7 @@ M5 ; Pen up
 G0 X45.508 Y4.551 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X32.544 Y12.012
 G1 X30.978 Y12.995
 G1 X29.447 Y14.106
@@ -638,6 +654,7 @@ M5 ; Pen up
 G0 X52.864 Y7.488 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X47.757 Y4.551
 G1 X47.757 Y19.526
 G1 X47.719 Y19.817
@@ -689,6 +706,7 @@ M5 ; Pen up
 G0 X53.419 Y31.221 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X60.166 Y27.331
 G1 X60.166 Y11.774
 G1 X55.113 Y8.864
@@ -740,6 +758,7 @@ M5 ; Pen up
 G0 X52.811 Y58.288 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X47.757 Y55.377
 G1 X47.757 Y70.300
 G1 X47.719 Y70.590
@@ -769,6 +788,7 @@ M5 ; Pen up
 G0 X60.166 Y62.521 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X55.060 Y59.584
 G1 X55.060 Y74.533
 G1 X55.021 Y74.824
@@ -822,6 +842,7 @@ M5 ; Pen up
 G0 X67.469 Y66.701 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X62.415 Y63.791
 G1 X62.415 Y78.793
 G1 X62.377 Y79.084
@@ -838,6 +859,7 @@ M5 ; Pen up
 G0 X69.215 Y83.979 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X56.092 Y91.519
 G1 X57.107 Y92.348
 G1 X58.046 Y93.246
@@ -860,6 +882,7 @@ M5 ; Pen up
 G0 X77.020 Y87.180 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X77.020 Y87.180
 G1 X77.020 Y108.506
 G1 X77.020 Y108.506
@@ -898,6 +921,7 @@ M5 ; Pen up
 G0 X89.429 Y87.154 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X89.401 Y86.257
 G1 X89.315 Y85.374
 G1 X89.174 Y84.505
