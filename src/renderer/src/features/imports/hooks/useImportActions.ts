@@ -143,12 +143,7 @@ export function useImportActions() {
       });
       const layerGroupIds = new Set(layers.map((l) => l.id));
 
-      // Collect shape elements, skipping those inside hidden non-layer ancestors.
-      const els = Array.from(
-        doc.querySelectorAll(
-          "path, rect, circle, ellipse, line, polyline, polygon",
-        ),
-      ).filter((el) => {
+      const isIncludedByDisplayRules = (el: Element): boolean => {
         let cur = el.parentElement;
         while (cur && cur.tagName.toLowerCase() !== "svg") {
           if (isDisplayNone(cur, stylesheet)) {
@@ -161,7 +156,20 @@ export function useImportActions() {
           cur = cur.parentElement;
         }
         return true;
-      });
+      };
+
+      const skippedTextCount = Array.from(doc.querySelectorAll("text")).filter(
+        (textEl) =>
+          !textEl.closest("defs, clipPath, mask, symbol") &&
+          isIncludedByDisplayRules(textEl),
+      ).length;
+
+      // Collect shape elements, skipping those inside hidden non-layer ancestors.
+      const els = Array.from(
+        doc.querySelectorAll(
+          "path, rect, circle, ellipse, line, polyline, polygon",
+        ),
+      ).filter((el) => isIncludedByDisplayRules(el));
 
       const fillFlags: boolean[] = [];
 
@@ -210,10 +218,14 @@ export function useImportActions() {
       });
 
       if (paths.length === 0) {
+        const textSkipSuffix =
+          skippedTextCount > 0
+            ? ` (${skippedTextCount} text element${skippedTextCount === 1 ? "" : "s"} skipped; convert text to outlines)`
+            : "";
         upsertTask({
           id: taskId,
           type: "svg-parse",
-          label: "No paths found in SVG",
+          label: `No paths found in SVG${textSkipSuffix}`,
           progress: null,
           status: "error",
         });
@@ -262,12 +274,17 @@ export function useImportActions() {
       };
 
       addImport(imp);
+      const skippedTextMessage =
+        skippedTextCount > 0
+          ? `${skippedTextCount} text element${skippedTextCount === 1 ? "" : "s"} skipped; convert text to outlines`
+          : undefined;
       upsertTask({
         id: taskId,
         type: "svg-parse",
         label: "SVG imported",
         progress: 100,
-        status: "completed",
+        status: skippedTextCount > 0 ? "warning" : "completed",
+        error: skippedTextMessage,
       });
     } catch (err) {
       upsertTask({
