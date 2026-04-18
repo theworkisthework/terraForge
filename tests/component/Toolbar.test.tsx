@@ -1200,6 +1200,34 @@ describe("Toolbar", () => {
       });
     });
 
+    it("shows warning import task when SVG includes unsupported text with vector paths", async () => {
+      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <path d="M 0,0 L 50,50" stroke="black" fill="none" />
+        <text x="10" y="70">with complements</text>
+      </svg>`;
+      (
+        window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/partial-text.svg");
+      (
+        window.terraForge.fs.readFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(svgXml);
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Import"));
+      await waitFor(() => {
+        expect(useCanvasStore.getState().imports.length).toBe(1);
+      });
+
+      await waitFor(() => {
+        const tasks = Object.values(useTaskStore.getState().tasks);
+        const parseTask = tasks.find((t) => t.type === "svg-parse");
+        expect(parseTask?.status).toBe("warning");
+        expect(parseTask?.label).toBe("SVG imported");
+        expect(parseTask?.error).toMatch(/text element/i);
+        expect(parseTask?.error).toMatch(/convert text to outlines/i);
+      });
+    });
+
     it("shows error task when SVG read fails", async () => {
       (
         window.terraForge.fs.openImportDialog as ReturnType<typeof vi.fn>

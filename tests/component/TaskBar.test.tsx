@@ -64,6 +64,21 @@ describe("TaskBar", () => {
     expect(screen.getByText("Connection refused")).toBeInTheDocument();
   });
 
+  it("shows warning indicator and warning detail", () => {
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Imported with warnings",
+      status: "warning",
+      error: "1 text element skipped; convert text to outlines",
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    render(<TaskBar />);
+    expect(screen.getByText("Imported with warnings")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 text element skipped; convert text to outlines"),
+    ).toBeInTheDocument();
+  });
+
   it("cancel button triggers cancelTask on running task", async () => {
     const task = createBackgroundTask({
       id: "t1",
@@ -165,6 +180,21 @@ describe("TaskBar", () => {
     render(<TaskBar />);
     vi.advanceTimersByTime(15000);
     // Error task should still be present
+    expect(useTaskStore.getState().tasks["t1"]).toBeDefined();
+    vi.useRealTimers();
+  });
+
+  it("does not auto-dismiss warning tasks", () => {
+    vi.useFakeTimers();
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Warning",
+      status: "warning",
+      error: "Text skipped",
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    render(<TaskBar />);
+    vi.advanceTimersByTime(15000);
     expect(useTaskStore.getState().tasks["t1"]).toBeDefined();
     vi.useRealTimers();
   });

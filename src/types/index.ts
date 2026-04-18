@@ -258,7 +258,12 @@ export type TaskType =
   | "job-start"
   | "ws-connect";
 
-export type TaskStatus = "running" | "completed" | "cancelled" | "error";
+export type TaskStatus =
+  | "running"
+  | "completed"
+  | "cancelled"
+  | "warning"
+  | "error";
 
 export interface BackgroundTask {
   id: string;

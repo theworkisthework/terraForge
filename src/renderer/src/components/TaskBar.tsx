@@ -4,7 +4,7 @@ import type { BackgroundTask } from "../../../../types";
 
 /** Completed / cancelled toasts auto-dismiss after this delay. */
 const DISMISS_MS = 8000;
-/** Errors are never auto-dismissed — user must click ✕. */
+/** Errors and warnings are never auto-dismissed — user must click ✕. */
 const AUTO_DISMISS_STATUSES: ReadonlySet<string> = new Set([
   "completed",
   "cancelled",
@@ -30,21 +30,26 @@ function Toast({ task }: { task: BackgroundTask }) {
   const isRunning = task.status === "running";
   const isDone = task.status === "completed";
   const isCancelled = task.status === "cancelled";
+  const isWarning = task.status === "warning";
   const isError = task.status === "error";
 
   const borderColor = isError
     ? "border-accent/50"
-    : isDone
-      ? "border-green-700/50"
-      : isCancelled
-        ? "border-accent/30"
-        : "border-border-ui";
+    : isWarning
+      ? "border-yellow-500/50"
+      : isDone
+        ? "border-green-700/50"
+        : isCancelled
+          ? "border-accent/30"
+          : "border-border-ui";
 
   return (
     <div
       className={`flex items-center gap-2.5 bg-panel/95 backdrop-blur border ${
         borderColor
-      } rounded-lg px-3 py-2 shadow-xl w-[280px]`}
+      } rounded-lg px-3 py-2 shadow-xl w-[280px] ${
+        isWarning ? "items-start" : ""
+      }`}
     >
       {/* Status icon / spinner / progress bar */}
       {isRunning && task.progress === null && (
@@ -69,6 +74,11 @@ function Toast({ task }: { task: BackgroundTask }) {
       {isCancelled && (
         <span className="text-accent text-sm shrink-0 leading-none">✕</span>
       )}
+      {isWarning && (
+        <span className="text-yellow-400 text-xs shrink-0 leading-none font-bold">
+          !
+        </span>
+      )}
       {isError && (
         <span className="text-accent text-xs shrink-0 leading-none font-bold">
           !
@@ -77,12 +87,21 @@ function Toast({ task }: { task: BackgroundTask }) {
 
       {/* Label + optional error detail */}
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-xs text-content truncate" title={task.label}>
+        <span
+          className={`text-xs text-content ${
+            isWarning ? "whitespace-normal break-words leading-5" : "truncate"
+          }`}
+          title={task.label}
+        >
           {task.label}
         </span>
-        {isError && task.error && (
+        {(isError || isWarning) && task.error && (
           <span
-            className="text-[10px] text-accent/80 truncate"
+            className={`text-[10px] ${
+              isWarning
+                ? "text-yellow-300/90 whitespace-normal break-words leading-4"
+                : "text-accent/80 truncate"
+            }`}
             title={task.error}
           >
             {task.error}
