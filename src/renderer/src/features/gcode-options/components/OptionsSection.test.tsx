@@ -45,9 +45,12 @@ describe("OptionsSection", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Clip to margin" }));
     expect(onSetClipMode).toHaveBeenCalledWith("margin");
 
-    fireEvent.change(screen.getByRole("spinbutton"), {
-      target: { value: "2.0" },
-    });
+    fireEvent.change(
+      screen.getByRole("spinbutton", { name: "Safety inset (mm)" }),
+      {
+        target: { value: "2.0" },
+      },
+    );
     expect(onSetClipOffset).toHaveBeenCalledWith("2.0");
 
     fireEvent.click(screen.getByRole("button", { name: "Custom G-code" }));

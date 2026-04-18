@@ -159,6 +159,7 @@ export function OptionsSection({
                     min="0"
                     max="50"
                     step="0.5"
+                    aria-label="Safety inset (mm)"
                     value={prefs.clipOffsetMM}
                     onChange={(e) => onSetClipOffset(e.target.value)}
                     className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
