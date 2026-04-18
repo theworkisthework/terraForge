@@ -4,6 +4,7 @@ interface NumberFieldProps {
   onChange: (value: number) => void;
   step?: number;
   min?: number;
+  disabled?: boolean;
 }
 
 export function NumberField({
@@ -12,6 +13,7 @@ export function NumberField({
   onChange,
   step = 1,
   min,
+  disabled = false,
 }: NumberFieldProps) {
   const inputId = `numfield-${label
     .replace(/[^a-zA-Z0-9]+/g, "-")
@@ -32,8 +34,9 @@ export function NumberField({
         value={Math.round(value * 1000) / 1000}
         step={step}
         min={min}
+        disabled={disabled}
         onChange={(e) => onChange(+e.target.value)}
-        className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none"
+        className="w-full bg-app border border-border-ui rounded px-2 py-1 text-xs text-content focus:border-accent outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>
   );

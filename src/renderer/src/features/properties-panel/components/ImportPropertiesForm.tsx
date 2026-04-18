@@ -60,6 +60,7 @@ export function ImportPropertiesForm({
     canScaleToTemplate: canAlignToTemplate,
     templateScaleEnabled,
     templateScaleTarget,
+    ratioLocked,
     rotStep,
     stepFlyoutOpen,
     showCentreMarker,

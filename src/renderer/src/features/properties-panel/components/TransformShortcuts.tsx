@@ -6,21 +6,30 @@ import {
   RotateCcw,
   RotateCw,
 } from "lucide-react";
+import {
+  ScaleHorizontalIcon,
+  ScaleVerticalIcon,
+} from "../../../components/generated-icons";
 import { RotationStepFlyout } from "./RotationStepFlyout";
 import { TransformIconButton } from "./TransformIconButton";
 import type { TransformShortcutsProps } from "./TransformShortcuts.types";
 
 export function TransformShortcuts({
   fitScale,
+  fitScaleX,
+  fitScaleY,
   rotStep,
   rotSteps,
   stepFlyoutOpen,
   showCentreMarker,
+  ratioLocked,
   snapPresetTitle,
   canScaleToTemplate,
   templateScaleEnabled,
   templateScaleTarget,
   onFitToBed,
+  onFitHorizontal,
+  onFitVertical,
   onResetScale,
   onTemplateScaleEnabledChange,
   onTemplateScaleTargetChange,
@@ -52,10 +61,38 @@ export function TransformShortcuts({
               <Maximize2 size={14} strokeWidth={2} />
             </TransformIconButton>
             <TransformIconButton
-              title="Reset scale to 1:1 (1 SVG unit = 1 mm)"
+              title="Reset scale + ratio lock to 1:1 (1 SVG unit = 1 mm)"
               onClick={onResetScale}
             >
               <Minimize2 size={14} strokeWidth={2} />
+            </TransformIconButton>
+
+            <span className="mx-1 h-4 w-px bg-border-ui/60" />
+
+            <TransformIconButton
+              title={`Fit horizontal scale (${Math.round(fitScaleX * 1000) / 1000})`}
+              onClick={onFitHorizontal}
+              disabled={ratioLocked}
+              className={`p-1.5 transition-colors rounded hover:bg-secondary/40 ${
+                ratioLocked
+                  ? "text-content-faint/40 cursor-not-allowed"
+                  : "text-content-muted hover:text-content"
+              }`}
+            >
+              <ScaleHorizontalIcon className="h-3.5 w-3.5" />
+            </TransformIconButton>
+
+            <TransformIconButton
+              title={`Fit vertical scale (${Math.round(fitScaleY * 1000) / 1000})`}
+              onClick={onFitVertical}
+              disabled={ratioLocked}
+              className={`p-1.5 transition-colors rounded hover:bg-secondary/40 ${
+                ratioLocked
+                  ? "text-content-faint/40 cursor-not-allowed"
+                  : "text-content-muted hover:text-content"
+              }`}
+            >
+              <ScaleVerticalIcon className="h-3.5 w-3.5" />
             </TransformIconButton>
           </div>
           <div className="flex items-center gap-2 mb-2">
