@@ -3,6 +3,8 @@ import type { CanvasState } from "../canvasStore/types";
 export const selectJobActionsCanvasState = (state: CanvasState) => ({
   imports: state.imports,
   layerGroups: state.layerGroups,
+  selectedImportId: state.selectedImportId,
+  selectedGroupId: state.selectedGroupId,
   pageTemplate: state.pageTemplate,
   pageSizes: state.pageSizes,
   setGcodeToolpath: state.setGcodeToolpath,

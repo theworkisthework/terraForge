@@ -18,6 +18,8 @@ export function useJobActions() {
   const {
     imports,
     layerGroups,
+    selectedImportId,
+    selectedGroupId,
     pageTemplate,
     pageSizes,
     setGcodeToolpath,
@@ -194,10 +196,17 @@ export function useJobActions() {
         unregisterCancelCallback(taskId);
         setGenerating(false);
 
+        const selectedGroup = selectedGroupId
+          ? layerGroups.find((group) => group.id === selectedGroupId)
+          : null;
+        const selectedImport = selectedImportId
+          ? imports.find((imp) => imp.id === selectedImportId)
+          : null;
         const baseName =
-          imports.length === 1
-            ? imports[0].name
-            : `${imports[0].name}+${imports.length - 1}`;
+          selectedGroup?.name ||
+          selectedImport?.name ||
+          imports[0]?.name ||
+          "untitled";
         const safeName = baseName
           .replace(/\.[^.]+$/, "")
           .replace(/[\\/:*?"<>|]/g, "_");

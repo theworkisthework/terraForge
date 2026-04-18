@@ -911,6 +911,217 @@ describe("Toolbar", () => {
         expect(window.terraForge.fs.writeFile).toHaveBeenCalled();
       });
     });
+
+    it("uses selected layer group name for default save filename", async () => {
+      let workerInstance: {
+        onmessage: ((e: MessageEvent) => void) | null;
+      } | null = null;
+      function MockWorker() {
+        const inst = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as ((e: MessageEvent) => void) | null,
+          onerror: null,
+        };
+        workerInstance = inst;
+        return inst;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+      (
+        window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/out/layer.gcode");
+      (
+        window.terraForge.fs.writeFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(undefined);
+      localStorage.setItem(
+        "terraforge.gcodePrefs",
+        JSON.stringify({
+          optimise: true,
+          uploadToSd: false,
+          saveLocally: true,
+          joinPaths: false,
+          joinTolerance: 0.2,
+          liftPenAtEnd: true,
+          returnToHome: false,
+          customStartGcode: "",
+          customEndGcode: "",
+        }),
+      );
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({
+        configs: [cfg],
+        activeConfigId: cfg.id,
+        connected: false,
+      });
+      const imp = createSvgImport({ id: "imp-a", name: "first-import" });
+      useCanvasStore.setState({
+        imports: [imp],
+        layerGroups: [
+          {
+            id: "g-a",
+            name: "Layer: 1/Top*",
+            color: "#ff0000",
+            importIds: [imp.id],
+          },
+        ],
+        selectedGroupId: "g-a",
+        selectedImportId: imp.id,
+      });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      await waitFor(() => expect(workerInstance).not.toBeNull());
+      await act(async () => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\n" },
+        } as MessageEvent);
+      });
+
+      await waitFor(() => {
+        expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalledWith(
+          "Layer_ 1_Top__opt.gcode",
+        );
+      });
+    });
+
+    it("uses selected import name when no group is selected", async () => {
+      let workerInstance: {
+        onmessage: ((e: MessageEvent) => void) | null;
+      } | null = null;
+      function MockWorker() {
+        const inst = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as ((e: MessageEvent) => void) | null,
+          onerror: null,
+        };
+        workerInstance = inst;
+        return inst;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+      (
+        window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/out/second.gcode");
+      (
+        window.terraForge.fs.writeFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(undefined);
+      localStorage.setItem(
+        "terraforge.gcodePrefs",
+        JSON.stringify({
+          optimise: false,
+          uploadToSd: false,
+          saveLocally: true,
+          joinPaths: false,
+          joinTolerance: 0.2,
+          liftPenAtEnd: true,
+          returnToHome: false,
+          customStartGcode: "",
+          customEndGcode: "",
+        }),
+      );
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({
+        configs: [cfg],
+        activeConfigId: cfg.id,
+        connected: false,
+      });
+      const first = createSvgImport({ id: "imp-1", name: "first-import" });
+      const second = createSvgImport({ id: "imp-2", name: "second/import" });
+      useCanvasStore.setState({
+        imports: [first, second],
+        selectedGroupId: null,
+        selectedImportId: second.id,
+      });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      await waitFor(() => expect(workerInstance).not.toBeNull());
+      await act(async () => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\n" },
+        } as MessageEvent);
+      });
+
+      await waitFor(() => {
+        expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalledWith(
+          "second_import.gcode",
+        );
+      });
+    });
+
+    it("falls back to first import name when nothing is selected", async () => {
+      let workerInstance: {
+        onmessage: ((e: MessageEvent) => void) | null;
+      } | null = null;
+      function MockWorker() {
+        const inst = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as ((e: MessageEvent) => void) | null,
+          onerror: null,
+        };
+        workerInstance = inst;
+        return inst;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+      (
+        window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+      ).mockResolvedValue("/out/first.gcode");
+      (
+        window.terraForge.fs.writeFile as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(undefined);
+      localStorage.setItem(
+        "terraforge.gcodePrefs",
+        JSON.stringify({
+          optimise: false,
+          uploadToSd: false,
+          saveLocally: true,
+          joinPaths: false,
+          joinTolerance: 0.2,
+          liftPenAtEnd: true,
+          returnToHome: false,
+          customStartGcode: "",
+          customEndGcode: "",
+        }),
+      );
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({
+        configs: [cfg],
+        activeConfigId: cfg.id,
+        connected: false,
+      });
+      const first = createSvgImport({ id: "imp-1", name: "first-file.svg" });
+      const second = createSvgImport({ id: "imp-2", name: "second-file" });
+      useCanvasStore.setState({
+        imports: [first, second],
+        selectedGroupId: null,
+        selectedImportId: null,
+      });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      await waitFor(() => expect(workerInstance).not.toBeNull());
+      await act(async () => {
+        workerInstance!.onmessage?.({
+          data: { type: "complete", gcode: "G0 X0 Y0\n" },
+        } as MessageEvent);
+      });
+
+      await waitFor(() => {
+        expect(window.terraForge.fs.saveGcodeDialog).toHaveBeenCalledWith(
+          "first-file.gcode",
+        );
+      });
+    });
   });
 
   // ── SVG import: shape variety ──────────────────────────────────────────────
