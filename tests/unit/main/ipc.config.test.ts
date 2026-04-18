@@ -52,6 +52,7 @@ describe("registerConfigIpcHandlers", () => {
       bedWidth: 220,
       bedHeight: 200,
       connection: { type: "wifi", host: "fluidnc.local", port: 80 },
+      penDownDelayMs: 0,
     };
   }
 

@@ -23,6 +23,7 @@ const machineConfig: MachineConfig = {
   penType: "solenoid",
   penUpCommand: "M5",
   penDownCommand: "M3 S1000",
+  penDownDelayMs: 50,
   feedrate: 1800,
   connection: { type: "wifi", host: "test.local", port: 80 },
 };

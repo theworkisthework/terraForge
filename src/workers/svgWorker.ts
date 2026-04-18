@@ -42,6 +42,13 @@ type InMessage = GenerateMessage | CancelMessage;
 
 const cancelled = new Set<string>();
 
+function fmtSeconds(n: number): string {
+  return n
+    .toFixed(3)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*?)0+$/, "$1");
+}
+
 function approximateObjectSubpaths(
   obj: VectorObject,
   config: MachineConfig,
@@ -140,6 +147,15 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const returnToHome = options?.returnToHome ?? false;
   const customStartGcode = (options?.customStartGcode ?? "").trim();
   const customEndGcode = (options?.customEndGcode ?? "").trim();
+  const hasDelayOverride = typeof options?.penDownDelayMsOverride === "number";
+  const rawDelayMs = hasDelayOverride
+    ? options.penDownDelayMsOverride
+    : config.penType === "servo" || config.penType === "solenoid"
+      ? (config.penDownDelayMs ?? 0)
+      : 0;
+  const penDownDelayMs = Number.isFinite(rawDelayMs)
+    ? Math.max(0, rawDelayMs)
+    : 0;
 
   lines.push(
     "; -- terraForge G-code ------------------------------------------",
@@ -157,6 +173,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Joined   : ${doJoin ? `yes (tolerance ${joinTol} mm)` : "no"}`);
   lines.push(`; Lift end : ${liftPenAtEnd ? "yes" : "no"}`);
   lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
+  lines.push(`; Pen delay: ${penDownDelayMs} ms`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -273,6 +290,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
     lines.push(`F${config.feedrate}`);
     lines.push(config.penDownCommand + " ; Pen down");
+    if (penDownDelayMs > 0) {
+      lines.push(`G4 P${fmtSeconds(penDownDelayMs / 1000)} ; Pen settle delay`);
+    }
     for (let s = 1; s < subpath.length; s++) {
       lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
     }

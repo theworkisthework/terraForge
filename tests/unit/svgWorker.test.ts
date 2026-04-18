@@ -102,7 +102,9 @@ function makeSimpleObj() {
   });
 }
 
-function makeConfig() {
+function makeConfig(
+  overrides?: Partial<ReturnType<typeof createMachineConfig>>,
+) {
   return createMachineConfig({
     origin: "top-left",
     bedWidth: 200,
@@ -111,6 +113,7 @@ function makeConfig() {
     penDownCommand: "M3 S1000",
     feedrate: 3000,
     name: "Test Plotter",
+    ...overrides,
   });
 }
 
@@ -173,6 +176,79 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X");
     expect(gcode).toContain("M3 S1000 ; Pen down");
     expect(gcode).toContain("M5 ; Pen up");
+  });
+
+  it("inserts dwell after pen-down and before the first G1 move", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-pen-delay",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions(),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    const downIdx = gcode.indexOf("M3 S1000 ; Pen down");
+    const dwellIdx = gcode.indexOf("G4 P0.05 ; Pen settle delay");
+    const drawIdx = gcode.indexOf("\nG1 X", downIdx);
+    expect(downIdx).toBeGreaterThan(-1);
+    expect(dwellIdx).toBeGreaterThan(downIdx);
+    expect(drawIdx).toBeGreaterThan(dwellIdx);
+  });
+
+  it("omits dwell when effective pen-down delay is zero", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-pen-delay-zero",
+      objects: [makeSimpleObj()],
+      config: makeConfig({ penDownDelayMs: 50 }),
+      options: createGcodeOptions({ penDownDelayMsOverride: 0 }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("G4 P");
+  });
+
+  it("uses per-generation delay override instead of machine default", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-pen-delay-override",
+      objects: [makeSimpleObj()],
+      config: makeConfig({ penDownDelayMs: 50 }),
+      options: createGcodeOptions({ penDownDelayMsOverride: 250 }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("G4 P0.25 ; Pen settle delay");
+    expect(gcode).not.toContain("G4 P0.05 ; Pen settle delay");
+  });
+
+  it("ignores machine default delay for stepper configs", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-stepper-default-ignored",
+      objects: [makeSimpleObj()],
+      config: makeConfig({ penType: "stepper", penDownDelayMs: 400 }),
+      options: createGcodeOptions(),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("G4 P");
+    expect(gcode).toContain("; Pen delay: 0 ms");
+  });
+
+  it("still applies per-generation delay override for stepper configs", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-stepper-override-applies",
+      objects: [makeSimpleObj()],
+      config: makeConfig({ penType: "stepper", penDownDelayMs: 0 }),
+      options: createGcodeOptions({ penDownDelayMsOverride: 300 }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("G4 P0.3 ; Pen settle delay");
+    expect(gcode).toContain("; Pen delay: 300 ms");
   });
 
   it("ends with return-to-origin and pen-safe commands", async () => {

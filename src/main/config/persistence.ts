@@ -1,7 +1,7 @@
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import type { MachineConfig, PageSize } from "../../types";
+import type { MachineConfig, PageSize, PenType } from "../../types";
 
 export interface MainPersistence {
   configPath: string;
@@ -21,6 +21,7 @@ export const DEFAULT_MACHINE_CONFIGS: MachineConfig[] = [
     penType: "solenoid",
     penUpCommand: "M5",
     penDownCommand: "M3 S1000",
+    penDownDelayMs: 50,
     feedrate: 3000,
     connection: {
       type: "wifi",
@@ -48,6 +49,32 @@ function cloneMachineConfigs(configs: MachineConfig[]): MachineConfig[] {
   }));
 }
 
+function defaultPenDownDelayMs(penType: PenType): number {
+  switch (penType) {
+    case "solenoid":
+      return 50;
+    case "servo":
+    case "stepper":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function normalizeConfig(config: MachineConfig): MachineConfig {
+  return {
+    ...config,
+    penDownDelayMs:
+      typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
+        ? config.penDownDelayMs
+        : defaultPenDownDelayMs(config.penType),
+  };
+}
+
+function normalizeConfigs(configs: MachineConfig[]): MachineConfig[] {
+  return configs.map(normalizeConfig);
+}
+
 function clonePageSizes(pageSizes: PageSize[]): PageSize[] {
   return pageSizes.map((pageSize) => ({ ...pageSize }));
 }
@@ -61,7 +88,8 @@ export function createPersistence(userDataPath: string): MainPersistence {
       return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
     try {
       const raw = await readFile(configPath, "utf-8");
-      return JSON.parse(raw) as MachineConfig[];
+      const parsed = JSON.parse(raw) as MachineConfig[];
+      return normalizeConfigs(parsed);
     } catch {
       return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
     }

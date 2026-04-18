@@ -43,6 +43,7 @@ interface Props {
 
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
+  const activeConfig = useMachineStore((s) => s.activeConfig());
   const { layerGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
@@ -70,6 +71,11 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
 
   const setClipMode = (mode: GcodePrefs["clipMode"]) => {
     setPrefs((p) => ({ ...p, clipMode: mode }));
+  };
+
+  const setPenDownDelayMs = (val: string) => {
+    const n = parseNonNegativeNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, penDownDelayMs: n }));
   };
 
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
@@ -124,10 +130,12 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             open={optionsOpen}
             customGcodeOpen={customGcodeOpen}
             prefs={prefs}
+            machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
             hasPageTemplate={!!pageTemplate}
             onToggleOpen={() => setOptionsOpen((o) => !o)}
             onToggleCustomGcodeOpen={() => setCustomGcodeOpen((o) => !o)}
             onTogglePref={toggle}
+            onSetPenDownDelayMs={setPenDownDelayMs}
             onSetClipMode={setClipMode}
             onSetClipOffset={setClipOffsetMM}
             onSetTextField={setTextField}

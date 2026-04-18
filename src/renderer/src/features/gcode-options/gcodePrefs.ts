@@ -10,6 +10,8 @@ export interface GcodePrefs {
   joinTolerance: number; // mm
   liftPenAtEnd: boolean;
   returnToHome: boolean;
+  penDownDelayOverrideEnabled: boolean;
+  penDownDelayMs: number;
   customStartGcode: string;
   customEndGcode: string;
   /** How to clip G-code when a page template is active.
@@ -30,6 +32,8 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   joinTolerance: 0.2,
   liftPenAtEnd: true,
   returnToHome: false,
+  penDownDelayOverrideEnabled: false,
+  penDownDelayMs: 0,
   customStartGcode: "",
   customEndGcode: "",
   clipMode: "none",

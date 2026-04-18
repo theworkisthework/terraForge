@@ -31,6 +31,8 @@ export interface MachineConfig {
   penType: PenType;
   penUpCommand: string;
   penDownCommand: string;
+  /** Delay after pen-down before XY motion begins (milliseconds). */
+  penDownDelayMs: number;
   feedrate: number; // mm/min
   connection: MachineConnection;
 }
@@ -235,6 +237,8 @@ export interface GcodeOptions {
   joinTolerance: number; // mm — max gap between path end and next path start to join (default 0.2)
   liftPenAtEnd: boolean; // send penUpCommand after the last stroke (default true)
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
+  /** Optional per-generation override for pen-down delay (milliseconds). */
+  penDownDelayMsOverride?: number;
   customStartGcode: string; // raw G-code lines inserted after the preamble, before paths
   customEndGcode: string; // raw G-code lines appended after lift/return, before EOF comment
   /** When a page template is active, clip G-code to the page's printable area

@@ -6,6 +6,7 @@
 ; Joined   : no
 ; Lift end : yes
 ; Ret home : no
+; Pen delay: 50 ms
 ; Generated: <normalized>
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
@@ -16,6 +17,7 @@ M5 ; Pen up
 G0 X25.786 Y22.661 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
 G1 X25.793 Y22.628
 G1 X25.816 Y22.540
 G1 X25.909 Y22.246
