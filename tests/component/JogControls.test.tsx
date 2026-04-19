@@ -70,9 +70,9 @@ describe("JogControls", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders feedrate input with default value", () => {
+  it("renders jog speed input with default value", () => {
     render(<JogControls />);
-    expect(screen.getByText("Feedrate mm/min")).toBeInTheDocument();
+    expect(screen.getByText("Jog Speed (feedrate mm/min)")).toBeInTheDocument();
     const input = screen.getByRole("spinbutton");
     expect(input).toHaveValue(3000);
   });

@@ -14,7 +14,6 @@ beforeEach(() => {
     penType: "solenoid",
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
-    feedrate: 3000,
     connection: { type: "wifi", host: "fluidnc.local", port: 80 },
   });
   useMachineStore.setState({
@@ -532,12 +531,15 @@ describe("MachineConfigDialog", () => {
     expect(screen.getByText("Save Changes")).not.toBeDisabled();
   });
 
-  it("editing feedrate updates form (marks dirty)", async () => {
+  it("editing draw speed updates form (marks dirty)", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
-    const feedrateInput = screen.getByDisplayValue("3000") as HTMLInputElement;
-    await userEvent.clear(feedrateInput);
-    await userEvent.type(feedrateInput, "4500");
+    const speedInputs = screen.getAllByDisplayValue(
+      "3000",
+    ) as HTMLInputElement[];
+    // First speed input is Draw speed
+    await userEvent.clear(speedInputs[0]);
+    await userEvent.type(speedInputs[0], "4500");
     expect(screen.getByText("Save Changes")).not.toBeDisabled();
   });
 

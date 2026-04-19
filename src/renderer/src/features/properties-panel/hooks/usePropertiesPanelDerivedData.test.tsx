@@ -24,7 +24,8 @@ const machineConfig: MachineConfig = {
   penUpCommand: "M5",
   penDownCommand: "M3 S1000",
   penDownDelayMs: 50,
-  feedrate: 1800,
+  jogSpeed: 3200,
+  drawSpeed: 1800,
   connection: { type: "wifi", host: "test.local", port: 80 },
 };
 
@@ -71,7 +72,7 @@ describe("usePropertiesPanelDerivedData", () => {
     );
 
     expect(result.current.isJobActive).toBe(false);
-    expect(result.current.fallbackFeedrate).toBe(300);
+    expect(result.current.fallbackFeedrate).toBe(3000);
     expect(result.current.bedW).toBe(220);
     expect(result.current.bedH).toBe(200);
     expect(result.current.toolpathFileName).toBe("G-code toolpath");

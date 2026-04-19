@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   CircleSlash2,
   House,
@@ -23,8 +23,16 @@ interface Props {
 
 export function JogControls({ onClose }: Props) {
   const [step, setStep] = useState<JogStep>(1);
-  const [feedrate, setFeedrate] = useState(3000);
   const activeConfig = useMachineStore((s) => s.activeConfig());
+  const [feedrate, setFeedrate] = useState<number>(
+    () => activeConfig?.jogSpeed ?? 3000,
+  );
+
+  // Sync jog speed when the active machine profile changes
+  useEffect(() => {
+    setFeedrate(activeConfig?.jogSpeed ?? 3000);
+  }, [activeConfig?.id]);
+
   const penUp = activeConfig?.penUpCommand ?? "";
   const penDown = activeConfig?.penDownCommand ?? "";
   const penType = activeConfig?.penType ?? "solenoid";
@@ -178,11 +186,13 @@ export function JogControls({ onClose }: Props) {
         </Tooltip>
       </div>
 
-      {/* Feedrate */}
+      {/* Jog Speed */}
       <div>
-        <label className="text-xs text-content-faint block mb-1">
-          Feedrate mm/min
-        </label>
+        <Tooltip text="Controls the speed of jog moves only (does not affect gcode speed settings).">
+          <label className="text-xs text-content-faint block mb-1 cursor-help">
+            Jog Speed (feedrate mm/min)
+          </label>
+        </Tooltip>
         <input
           type="number"
           value={feedrate}

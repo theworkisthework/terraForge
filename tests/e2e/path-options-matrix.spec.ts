@@ -109,9 +109,15 @@ test.describe("gcode path options matrix snapshots", () => {
           });
 
           await expect
-            .poll(() => fs.existsSync(savePath), {
-              timeout: 20_000,
-            })
+            .poll(
+              () => {
+                if (!fs.existsSync(savePath)) return false;
+                return fs.readFileSync(savePath, "utf-8").trim().length > 0;
+              },
+              {
+                timeout: 20_000,
+              },
+            )
             .toBe(true);
 
           const gcode = fs.readFileSync(savePath, "utf-8");

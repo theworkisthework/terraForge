@@ -12,6 +12,10 @@ export interface GcodePrefs {
   returnToHome: boolean;
   penDownDelayOverrideEnabled: boolean;
   penDownDelayMs: number;
+  /** Override the machine's default drawing speed for this job only. */
+  drawSpeedOverrideEnabled: boolean;
+  /** Drawing speed override value in mm/min (used when drawSpeedOverrideEnabled is true). */
+  drawSpeedOverride: number;
   customStartGcode: string;
   customEndGcode: string;
   /** How to clip G-code when a page template is active.
@@ -34,6 +38,8 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   returnToHome: false,
   penDownDelayOverrideEnabled: false,
   penDownDelayMs: 0,
+  drawSpeedOverrideEnabled: false,
+  drawSpeedOverride: 3000,
   customStartGcode: "",
   customEndGcode: "",
   clipMode: "none",
