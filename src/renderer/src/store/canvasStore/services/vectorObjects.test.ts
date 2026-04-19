@@ -78,6 +78,49 @@ describe("canvasStore vectorObjects service", () => {
     expect(vectorObjectsForImport(imp)).toEqual([]);
   });
 
+  it("emits generated outline for no-stroke paths when enabled at import level", () => {
+    const imp = makeImport({
+      generatedStrokeForNoStroke: true,
+      paths: [
+        {
+          id: "p1",
+          d: "M0,0 L10,10",
+          svgSource: "<path/>",
+          visible: true,
+          sourceOutlineVisible: false,
+          outlineVisible: false,
+        },
+      ],
+    });
+
+    const result = vectorObjectsForImport(imp);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
+  });
+
+  it("respects import and path stroke toggles", () => {
+    const basePath = {
+      id: "p1",
+      d: "M0,0 L10,10",
+      svgSource: "<path/>",
+      visible: true,
+      sourceOutlineVisible: true,
+      outlineVisible: true,
+    };
+
+    const importStrokeOff = makeImport({
+      strokeEnabled: false,
+      paths: [basePath],
+    });
+    expect(vectorObjectsForImport(importStrokeOff)).toHaveLength(0);
+
+    const pathStrokeOff = makeImport({
+      strokeEnabled: true,
+      paths: [{ ...basePath, strokeEnabled: false }],
+    });
+    expect(vectorObjectsForImport(pathStrokeOff)).toHaveLength(0);
+  });
+
   it("vectorObjectsForImports aggregates all visible imports", () => {
     const impA = makeImport({ id: "a" });
     const impB = makeImport({ id: "b", visible: false });

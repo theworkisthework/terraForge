@@ -155,6 +155,12 @@ describe("svgImportHelpers", () => {
     expect(getEffectiveFill(opacityZeroFill)).toBeNull();
     expect(getEffectiveFill(styleInheritedFill)).toBe("#0f0");
 
+    const defaultFill = firstMatch(
+      '<svg><path id="df" d="M0,0 L10,0"/></svg>',
+      "path#df",
+    );
+    expect(getEffectiveFill(defaultFill)).toBe("black");
+
     const visibleStroke = firstMatch(
       '<svg><path id="vs" d="M0,0" stroke="#222"/></svg>',
       "path#vs",

@@ -27,6 +27,7 @@ describe("ImportPathsList", () => {
     const onToggleLayerCollapse = vi.fn();
     const onUpdateLayerVisibility = vi.fn();
     const onUpdatePathVisibility = vi.fn();
+    const onUpdatePathStroke = vi.fn();
     const onRemovePath = vi.fn();
 
     const imp = buildImport({
@@ -57,6 +58,7 @@ describe("ImportPathsList", () => {
         onToggleLayerCollapse={onToggleLayerCollapse}
         onUpdateLayerVisibility={onUpdateLayerVisibility}
         onUpdatePathVisibility={onUpdatePathVisibility}
+        onUpdatePathStroke={onUpdatePathStroke}
         onRemovePath={onRemovePath}
       />,
     );
@@ -71,6 +73,9 @@ describe("ImportPathsList", () => {
 
     fireEvent.click(screen.getByLabelText("Hide path"));
     expect(onUpdatePathVisibility).toHaveBeenCalledWith("imp-1", "p1", false);
+
+    fireEvent.click(screen.getAllByLabelText("Disable path stroke")[0]);
+    expect(onUpdatePathStroke).toHaveBeenCalledWith("imp-1", "p1", false);
 
     fireEvent.click(screen.getAllByRole("button", { name: "✕" })[0]);
     expect(onRemovePath).toHaveBeenCalledWith("imp-1", "p1");
@@ -92,6 +97,7 @@ describe("ImportPathsList", () => {
         onToggleLayerCollapse={() => {}}
         onUpdateLayerVisibility={() => {}}
         onUpdatePathVisibility={() => {}}
+        onUpdatePathStroke={() => {}}
         onRemovePath={() => {}}
       />,
     );

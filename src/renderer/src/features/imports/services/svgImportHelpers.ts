@@ -230,13 +230,9 @@ export function getEffectiveFill(
   el: Element,
   stylesheet?: SvgStylesheet,
 ): string | null {
-  const fill = resolveInheritedProp(el, "fill", stylesheet);
-  if (
-    !fill ||
-    fill === "none" ||
-    fill === "transparent" ||
-    fill.startsWith("url(")
-  )
+  // SVG default fill is black when fill is unspecified.
+  const fill = resolveInheritedProp(el, "fill", stylesheet) || "black";
+  if (fill === "none" || fill === "transparent" || fill.startsWith("url("))
     return null;
 
   const fillOpacityVal = resolveInheritedProp(el, "fill-opacity", stylesheet);

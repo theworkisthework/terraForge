@@ -89,9 +89,15 @@ export interface SvgPath {
   layer?: string;
   /** Whether the original shape had a visible fill colour (used to regenerate hatch) */
   hasFill?: boolean;
+  /** True when the source SVG had an explicit visible stroke after style resolution. */
+  sourceOutlineVisible?: boolean;
   /** Whether the outline should be plotted. False for shapes with no visible stroke.
    *  The path geometry is still retained for hatch-fill computation. */
   outlineVisible?: boolean;
+  /** User toggle for this path's outline visibility. Defaults to true. */
+  strokeEnabled?: boolean;
+  /** Per-path override to generate an outline even when source stroke is absent. */
+  generatedStrokeEnabled?: boolean;
   /** Hatch-fill line d-strings synthesised from this path's fill at import time.
    *  Rendered and emitted for G-code alongside the outline.  Toggled as a unit
    *  with the parent path's `visible` flag. */
@@ -148,6 +154,10 @@ export interface SvgImport {
   hatchEnabled?: boolean;
   hatchSpacingMM?: number;
   hatchAngleDeg?: number;
+  /** Import-level default toggle for stroke outlines. Defaults to true. */
+  strokeEnabled?: boolean;
+  /** Import-level toggle to generate outlines for source paths with no stroke. */
+  generatedStrokeForNoStroke?: boolean;
   /** Preview stroke width in mm — controls how thick paths appear on the canvas.
    *  Does not affect G-code output. Defaults to DEFAULT_STROKE_WIDTH_MM. */
   strokeWidthMM?: number;

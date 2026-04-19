@@ -125,28 +125,26 @@ describe("importSlice", () => {
       pageTemplate: { sizeId: "a4", landscape: true, marginMM: 20 },
     });
 
-    store
-      .getState()
-      .loadLayout(
-        [
-          {
-            id: "new",
-            name: "new",
-            paths: [],
-            x: 0,
-            y: 0,
-            scale: 1,
-            rotation: 0,
-            visible: true,
-            svgWidth: 1,
-            svgHeight: 1,
-            viewBoxX: 0,
-            viewBoxY: 0,
-          },
-        ] as any,
-        [{ id: "g1", name: "group", color: "#222", importIds: ["new"] }],
-        { sizeId: "letter", landscape: false, marginMM: 10 },
-      );
+    store.getState().loadLayout(
+      [
+        {
+          id: "new",
+          name: "new",
+          paths: [],
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          svgWidth: 1,
+          svgHeight: 1,
+          viewBoxX: 0,
+          viewBoxY: 0,
+        },
+      ] as any,
+      [{ id: "g1", name: "group", color: "#222", importIds: ["new"] }],
+      { sizeId: "letter", landscape: false, marginMM: 10 },
+    );
 
     expect(pushUndo).toHaveBeenCalledTimes(1);
     expect(store.getState().imports[0].id).toBe("new");
@@ -185,5 +183,39 @@ describe("importSlice", () => {
 
     expect(store.getState().imports[0].paths[0].visible).toBe(true);
     expect(store.getState().imports[0].layers?.[0].visible).toBe(true);
+  });
+
+  it("normalizes legacy no-stroke paths to inherit import generated-stroke toggle", () => {
+    const store = makeStore();
+
+    store.getState().addImport({
+      id: "imp1",
+      name: "shape",
+      paths: [
+        {
+          id: "p1",
+          d: "M0 0",
+          svgSource: "",
+          visible: true,
+          outlineVisible: false,
+          sourceOutlineVisible: false,
+          generatedStrokeEnabled: false,
+        },
+      ],
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      svgWidth: 10,
+      svgHeight: 10,
+      viewBoxX: 0,
+      viewBoxY: 0,
+      generatedStrokeForNoStroke: true,
+    } as any);
+
+    const imp = store.getState().imports[0];
+    expect(imp.generatedStrokeForNoStroke).toBe(true);
+    expect(imp.paths[0].generatedStrokeEnabled).toBeUndefined();
   });
 });

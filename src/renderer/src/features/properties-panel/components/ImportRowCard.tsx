@@ -40,6 +40,7 @@ export function ImportRowCard({
   onToggleLayerCollapse,
   onUpdateLayerVisibility,
   onUpdatePathVisibility,
+  onUpdatePathStroke,
   onRemovePath,
   onUpdate,
   onTemplateAlignEnabledChange,
@@ -89,6 +90,7 @@ export function ImportRowCard({
           onToggleLayerCollapse={onToggleLayerCollapse}
           onUpdateLayerVisibility={onUpdateLayerVisibility}
           onUpdatePathVisibility={onUpdatePathVisibility}
+          onUpdatePathStroke={onUpdatePathStroke}
           onRemovePath={onRemovePath}
         />
       )}

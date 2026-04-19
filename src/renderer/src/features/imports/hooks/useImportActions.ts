@@ -185,7 +185,7 @@ export function useImportActions() {
 
         fillFlags.push(getEffectiveFill(el, stylesheet) !== null);
         const hasFill = fillFlags[fillFlags.length - 1];
-        const outlineVisible = hasVisibleStroke(el, stylesheet);
+        const sourceOutlineVisible = hasVisibleStroke(el, stylesheet);
         const tag = el.tagName.toLowerCase();
         const pathIndex = fillFlags.length;
 
@@ -210,7 +210,9 @@ export function useImportActions() {
             svgSource: el.outerHTML,
             visible: true,
             hasFill,
-            outlineVisible,
+            sourceOutlineVisible,
+            outlineVisible: sourceOutlineVisible,
+            strokeEnabled: true,
             label,
             layer: findContainingLayerId(el, layerGroupIds),
           },
@@ -270,6 +272,8 @@ export function useImportActions() {
         hatchEnabled: true,
         hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
         hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+        strokeEnabled: true,
+        generatedStrokeForNoStroke: false,
         layers: layers.length > 0 ? layers : undefined,
       };
 

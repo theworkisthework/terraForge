@@ -482,6 +482,33 @@ describe("PropertiesPanel", () => {
     expect(screen.getByText("Hatch fill")).toBeInTheDocument();
   });
 
+  it("shows stroke outlines toggle for selected import", () => {
+    const path = createSvgPath({ sourceOutlineVisible: true });
+    const imp = createSvgImport({ paths: [path], name: "stroke-toggle" });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+    expect(
+      screen.getByRole("switch", { name: "Stroke outlines" }),
+    ).toBeInTheDocument();
+  });
+
+  it("toggles import stroke outlines on and off", async () => {
+    const path = createSvgPath({ sourceOutlineVisible: true });
+    const imp = createSvgImport({
+      paths: [path],
+      name: "stroke-toggle-update",
+      strokeEnabled: true,
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    const strokeToggle = screen.getByRole("switch", {
+      name: "Stroke outlines",
+    });
+    await userEvent.click(strokeToggle);
+    expect(useCanvasStore.getState().imports[0].strokeEnabled).toBe(false);
+  });
+
   it("toggle switch calls applyHatch to flip hatchEnabled", async () => {
     const path = createSvgPath({ hasFill: true });
     const imp = createSvgImport({
@@ -494,7 +521,7 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
     render(<PropertiesPanel />);
 
-    const toggle = screen.getByRole("switch");
+    const toggle = screen.getByRole("switch", { name: "Hatch fill" });
     await userEvent.click(toggle);
     expect(useCanvasStore.getState().imports[0].hatchEnabled).toBe(true);
   });

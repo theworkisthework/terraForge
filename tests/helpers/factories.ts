@@ -68,6 +68,9 @@ export function createSvgPath(overrides?: Partial<SvgPath>): SvgPath {
     d: "M 0 0 L 10 0 L 10 10 L 0 10 Z",
     svgSource: "<path/>",
     visible: true,
+    sourceOutlineVisible: true,
+    outlineVisible: true,
+    strokeEnabled: true,
     ...overrides,
   };
 }
@@ -89,6 +92,8 @@ export function createSvgImport(overrides?: Partial<SvgImport>): SvgImport {
     hatchEnabled: false,
     hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
     hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+    strokeEnabled: true,
+    generatedStrokeForNoStroke: false,
     ...overrides,
   };
 }

@@ -17,6 +17,11 @@ interface ImportPathsListProps {
     pathId: string,
     visible: boolean,
   ) => void;
+  onUpdatePathStroke: (
+    importId: string,
+    pathId: string,
+    strokeEnabled: boolean,
+  ) => void;
   onRemovePath: (importId: string, pathId: string) => void;
 }
 
@@ -27,6 +32,7 @@ export function ImportPathsList({
   onToggleLayerCollapse,
   onUpdateLayerVisibility,
   onUpdatePathVisibility,
+  onUpdatePathStroke,
   onRemovePath,
 }: ImportPathsListProps) {
   return (
@@ -60,9 +66,24 @@ export function ImportPathsList({
                       key={p.id}
                       label={p.label ?? `path ${p.id.slice(0, 6)}`}
                       visible={p.visible}
+                      strokeEnabled={p.strokeEnabled ?? true}
+                      strokeAvailable={
+                        (p.sourceOutlineVisible ??
+                          p.outlineVisible !== false) ||
+                        (p.generatedStrokeEnabled ??
+                          imp.generatedStrokeForNoStroke ??
+                          false)
+                      }
                       indented
                       onToggleVisibility={() =>
                         onUpdatePathVisibility(imp.id, p.id, !p.visible)
+                      }
+                      onToggleStroke={() =>
+                        onUpdatePathStroke(
+                          imp.id,
+                          p.id,
+                          !(p.strokeEnabled ?? true),
+                        )
                       }
                       onRemove={() => onRemovePath(imp.id, p.id)}
                     />
@@ -79,8 +100,18 @@ export function ImportPathsList({
                 key={p.id}
                 label={p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`}
                 visible={p.visible}
+                strokeEnabled={p.strokeEnabled ?? true}
+                strokeAvailable={
+                  (p.sourceOutlineVisible ?? p.outlineVisible !== false) ||
+                  (p.generatedStrokeEnabled ??
+                    imp.generatedStrokeForNoStroke ??
+                    false)
+                }
                 onToggleVisibility={() =>
                   onUpdatePathVisibility(imp.id, p.id, !p.visible)
+                }
+                onToggleStroke={() =>
+                  onUpdatePathStroke(imp.id, p.id, !(p.strokeEnabled ?? true))
                 }
                 onRemove={() => onRemovePath(imp.id, p.id)}
               />
@@ -92,8 +123,18 @@ export function ImportPathsList({
             key={p.id}
             label={p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`}
             visible={p.visible}
+            strokeEnabled={p.strokeEnabled ?? true}
+            strokeAvailable={
+              (p.sourceOutlineVisible ?? p.outlineVisible !== false) ||
+              (p.generatedStrokeEnabled ??
+                imp.generatedStrokeForNoStroke ??
+                false)
+            }
             onToggleVisibility={() =>
               onUpdatePathVisibility(imp.id, p.id, !p.visible)
+            }
+            onToggleStroke={() =>
+              onUpdatePathStroke(imp.id, p.id, !(p.strokeEnabled ?? true))
             }
             onRemove={() => onRemovePath(imp.id, p.id)}
           />

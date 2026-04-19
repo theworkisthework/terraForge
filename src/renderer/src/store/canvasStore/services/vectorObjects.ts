@@ -33,8 +33,18 @@ function projectPathToVectorObjects(
     viewBoxY: imp.viewBoxY,
     layer: path.layer,
   };
+  const importStrokeEnabled = imp.strokeEnabled ?? true;
+  const pathStrokeEnabled = path.strokeEnabled ?? true;
+  const sourceOutlineVisible =
+    typeof path.sourceOutlineVisible === "boolean"
+      ? path.sourceOutlineVisible
+      : path.outlineVisible !== false;
+  const generatedStrokeEnabled =
+    path.generatedStrokeEnabled ?? imp.generatedStrokeForNoStroke ?? false;
+  const hasStrokeGeometry = sourceOutlineVisible || generatedStrokeEnabled;
+
   const outlineVOs: VectorObject[] =
-    path.outlineVisible !== false ? [base] : [];
+    importStrokeEnabled && pathStrokeEnabled && hasStrokeGeometry ? [base] : [];
   const hatchVOs: VectorObject[] = (path.hatchLines ?? []).map(
     (hatchLine, index): VectorObject => ({
       ...base,
