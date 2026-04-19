@@ -33,7 +33,10 @@ export interface MachineConfig {
   penDownCommand: string;
   /** Delay after pen-down before XY motion begins (milliseconds). */
   penDownDelayMs: number;
-  feedrate: number; // mm/min
+  /** Speed for jog panel commands ($J moves). mm/min. */
+  jogSpeed: number;
+  /** Default drawing feedrate emitted in generated G-code (F word). mm/min. */
+  drawSpeed: number;
   connection: MachineConnection;
 }
 
@@ -244,6 +247,8 @@ export interface GcodeOptions {
   /** When a page template is active, clip G-code to the page's printable area
    *  (page dimensions minus margin on all sides) instead of the full machine bed. */
   pageClip?: { widthMM: number; heightMM: number; marginMM: number };
+  /** Optional per-job drawing speed override (mm/min). Overrides machine drawSpeed when set. */
+  drawSpeedOverride?: number;
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────

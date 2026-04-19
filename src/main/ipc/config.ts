@@ -15,12 +15,25 @@ function defaultPenDownDelayMs(penType: PenType): number {
 }
 
 function normalizeConfig(config: MachineConfig): MachineConfig {
+  // Migrate legacy single-feedrate configs written before the jog/draw split.
+  const legacy = (config as unknown as Record<string, unknown>).feedrate as
+    | number
+    | undefined;
+  const legacySpeed = typeof legacy === "number" && legacy >= 1 ? legacy : 3000;
   return {
     ...config,
     penDownDelayMs:
       typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
         ? config.penDownDelayMs
         : defaultPenDownDelayMs(config.penType),
+    jogSpeed:
+      typeof config.jogSpeed === "number" && config.jogSpeed >= 1
+        ? config.jogSpeed
+        : legacySpeed,
+    drawSpeed:
+      typeof config.drawSpeed === "number" && config.drawSpeed >= 1
+        ? config.drawSpeed
+        : legacySpeed,
   };
 }
 

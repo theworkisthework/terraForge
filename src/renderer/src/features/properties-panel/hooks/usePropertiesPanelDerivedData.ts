@@ -34,7 +34,7 @@ export function usePropertiesPanelDerivedData({
   const isJobActive =
     machineStatus?.state === "Run" || machineStatus?.state === "Hold";
   const cfg = activeConfig();
-  const fallbackFeedrate = cfg?.feedrate ?? 300;
+  const fallbackFeedrate = cfg?.drawSpeed ?? 3000;
   const bedW = cfg?.bedWidth ?? 220;
   const bedH = cfg?.bedHeight ?? 200;
   const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";

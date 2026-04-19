@@ -58,7 +58,8 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   penUpCommand: PEN_DEFAULTS.solenoid.penUpCommand,
   penDownCommand: PEN_DEFAULTS.solenoid.penDownCommand,
   penDownDelayMs: PEN_DEFAULTS.solenoid.penDownDelayMs,
-  feedrate: 3000,
+  jogSpeed: 3000,
+  drawSpeed: 3000,
   connection: { type: "wifi", host: "fluidnc.local", port: 80 },
 };
 
@@ -520,17 +521,30 @@ export function MachineConfigDialog({ onClose }: Props) {
                     starts. Machine default delay is applied for solenoid/servo
                     profiles; stepper ignores the machine default.
                   </p>
-                  <Field label="Feedrate (mm/min)">
-                    <input
-                      type="number"
-                      value={form.feedrate}
-                      min={1}
-                      onChange={(e) =>
-                        change({ feedrate: Number(e.target.value) })
-                      }
-                      className={inputCls}
-                    />
-                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Draw speed (mm/min)">
+                      <input
+                        type="number"
+                        value={form.drawSpeed}
+                        min={1}
+                        onChange={(e) =>
+                          change({ drawSpeed: Number(e.target.value) })
+                        }
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="Jog speed (mm/min)">
+                      <input
+                        type="number"
+                        value={form.jogSpeed}
+                        min={1}
+                        onChange={(e) =>
+                          change({ jogSpeed: Number(e.target.value) })
+                        }
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
                 </Section>
 
                 {/* Connection */}

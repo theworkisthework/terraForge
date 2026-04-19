@@ -111,7 +111,7 @@ function makeConfig(
     bedHeight: 200,
     penUpCommand: "M5",
     penDownCommand: "M3 S1000",
-    feedrate: 3000,
+    drawSpeed: 3000,
     name: "Test Plotter",
     ...overrides,
   });
@@ -549,7 +549,7 @@ describe("svgWorker — coordinate output", () => {
     }
   });
 
-  it("feedrate line appears before pen-down in each subpath", async () => {
+  it("draw speed line appears before pen-down in each subpath", async () => {
     dispatch({
       type: "generate",
       taskId: "feedrate-pos",
@@ -559,7 +559,7 @@ describe("svgWorker — coordinate output", () => {
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    // F3000 should appear before M3 S1000 in G-code body
+    // F3000 (from config.drawSpeed) should appear before M3 S1000 in G-code body
     const fIdx = gcode.indexOf("F3000");
     const penDownIdx = gcode.indexOf("M3 S1000 ; Pen down");
     expect(fIdx).toBeGreaterThan(-1);

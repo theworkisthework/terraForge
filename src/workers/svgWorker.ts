@@ -288,7 +288,11 @@ async function generate(msg: GenerateMessage): Promise<void> {
     const subpath = orderedSubpaths[i];
     const first = subpath[0];
     lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
-    lines.push(`F${config.feedrate}`);
+    const drawSpeed =
+      typeof options?.drawSpeedOverride === "number"
+        ? options.drawSpeedOverride
+        : config.drawSpeed;
+    lines.push(`F${drawSpeed}`);
     lines.push(config.penDownCommand + " ; Pen down");
     if (penDownDelayMs > 0) {
       lines.push(`G4 P${fmtSeconds(penDownDelayMs / 1000)} ; Pen settle delay`);
