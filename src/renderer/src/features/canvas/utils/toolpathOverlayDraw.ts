@@ -102,7 +102,10 @@ export function drawImportsLayer({
       const hatchD = imp.paths
         .filter(
           (p) =>
-            p.visible && (p.hatchLines?.length ?? 0) > 0 && isLayerVisible(p),
+            p.visible &&
+            (p.fillEnabled ?? true) &&
+            (p.hatchLines?.length ?? 0) > 0 &&
+            isLayerVisible(p),
         )
         .flatMap((p) => p.hatchLines!)
         .join(" ");

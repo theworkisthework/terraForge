@@ -196,6 +196,14 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
 
   const visibleObjects = objects.filter((o) => o.visible);
+
+  // Sort objects by sourceColor to batch by color for pen-swapping workflow
+  const colorSortedObjects = visibleObjects.sort((a, b) => {
+    const aColor = a.sourceColor ?? "";
+    const bColor = b.sourceColor ?? "";
+    return aColor.localeCompare(bColor);
+  });
+
   let skippedObjects = 0;
 
   // Time-based yield helper — only surrenders to the event loop after a full
@@ -217,13 +225,27 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const allSubpaths: Subpath[] = [];
   const yieldPh1 = makeYielder();
   let lastPct1 = -1;
-  for (let i = 0; i < visibleObjects.length; i++) {
+  let lastColor: string | undefined = undefined;
+  let colorObjectCount = 0;
+
+  for (let i = 0; i < colorSortedObjects.length; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
       self.postMessage({ type: "cancelled", taskId });
       return;
     }
-    const obj = visibleObjects[i];
+    const obj = colorSortedObjects[i];
+
+    // Emit color batch comment when color changes
+    if (obj.sourceColor !== lastColor && i > 0) {
+      lines.push(
+        `; -- Color: ${lastColor ?? "(no color)"} (${colorObjectCount} object${colorObjectCount === 1 ? "" : "s"}) --`,
+      );
+      colorObjectCount = 0;
+    }
+    lastColor = obj.sourceColor;
+    colorObjectCount++;
+
     let raw: Subpath[];
     try {
       raw = flattenToSubpaths(obj, config);
@@ -248,12 +270,19 @@ async function generate(msg: GenerateMessage): Promise<void> {
         allSubpaths.push(sp);
       }
     }
-    const pct = Math.round(((i + 1) / visibleObjects.length) * 40);
+    const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
     if (pct !== lastPct1) {
       lastPct1 = pct;
       self.postMessage({ type: "progress", taskId, percent: pct });
     }
     await yieldPh1();
+  }
+
+  // Emit final color batch comment
+  if (colorSortedObjects.length > 0 && lastColor !== undefined) {
+    lines.push(
+      `; -- Color: ${lastColor ?? "(no color)"} (${colorObjectCount} object${colorObjectCount === 1 ? "" : "s"}) --`,
+    );
   }
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────

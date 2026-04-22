@@ -8,6 +8,7 @@ import { useMachineStore } from "../../../store/machineStore";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { type GcodeOptions, type VectorObject } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
+import { normalizeSvgColor } from "../../imports/services/svgImportHelpers";
 
 /** Orchestrates machine connection, disconnection, and G-code generation. */
 export function useJobActions() {
@@ -149,11 +150,16 @@ export function useJobActions() {
 
   /**
    * Generates G-code for all canvas imports as a single file.
-   * Routes to per-group export when `prefs.exportPerGroup` is enabled.
+   * Routes to per-group/per-color export when enabled.
    */
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
+
+    if (prefs.exportPerColor) {
+      await handleGenerateGcodePerColor(prefs, cfg);
+      return;
+    }
 
     if (prefs.exportPerGroup && layerGroups.length > 0) {
       await handleGenerateGcodePerGroup(prefs, cfg);
@@ -388,6 +394,148 @@ export function useJobActions() {
               id: taskId,
               type: "gcode-generate",
               label: `${group.name} failed`,
+              progress: null,
+              status: "error",
+            });
+            resolve(null);
+          }
+        };
+        worker.postMessage({
+          type: "generate",
+          taskId,
+          objects,
+          config: cfg,
+          options,
+        });
+      });
+
+      if (!gcode) continue;
+
+      if (prefs.saveLocally && saveDir) {
+        const savePath = `${saveDir}/${defaultFilename}`;
+        await window.terraForge.fs.writeFile(savePath, gcode);
+      }
+
+      if (prefs.uploadToSd && useMachineStore.getState().connected) {
+        const uploadTaskId = uuid();
+        const remotePath = "/" + defaultFilename;
+        try {
+          await window.terraForge.fluidnc.uploadGcode(
+            uploadTaskId,
+            gcode,
+            remotePath,
+          );
+        } catch {
+          // Upload error surfaced via upload task toast
+        }
+      }
+    }
+
+    setGenerating(false);
+  };
+
+  /**
+   * Generates separate G-code files per source fill color.
+   */
+  const handleGenerateGcodePerColor = async (
+    prefs: GcodePrefs,
+    cfg: ReturnType<typeof activeConfig>,
+  ) => {
+    if (!cfg) return;
+    const options = buildOptions(prefs);
+
+    type ColorEntry = {
+      color: string;
+      objects: VectorObject[];
+    };
+
+    const allObjects = useCanvasStore.getState().toVectorObjects();
+    const byColor = new Map<string, VectorObject[]>();
+
+    for (const obj of allObjects) {
+      const rawColor = obj.sourceColor?.trim();
+      const key = rawColor ? normalizeSvgColor(rawColor) : "";
+      if (!key) continue;
+      const arr = byColor.get(key) ?? [];
+      arr.push(obj);
+      byColor.set(key, arr);
+    }
+
+    const allEntries: ColorEntry[] = Array.from(byColor.entries())
+      .map(([color, objects]) => ({ color, objects }))
+      .filter((e) => e.objects.length > 0)
+      .sort((a, b) => a.color.localeCompare(b.color));
+
+    if (allEntries.length === 0) return;
+
+    let saveDir: string | null = null;
+    if (prefs.saveLocally) {
+      saveDir = await window.terraForge.fs.chooseDirectory();
+      if (!saveDir) return;
+    }
+
+    const toColorFilenameBase = (color: string) => {
+      const normalized = normalizeSvgColor(color.trim());
+      const prefixed = normalized.startsWith("#")
+        ? `hex-${normalized.slice(1)}`
+        : normalized;
+      return (
+        prefixed
+          .replace(/\s+/g, "_")
+          .replace(/[^a-z0-9._-]/g, "_")
+          .replace(/^_+|_+$/g, "") || "uncolored"
+      );
+    };
+
+    setGenerating(true);
+
+    for (const entry of allEntries) {
+      const objects = entry.objects;
+      const taskId = uuid();
+      const safeName = toColorFilenameBase(entry.color);
+      const defaultFilename = prefs.optimise
+        ? `color_${safeName}_opt.gcode`
+        : `color_${safeName}.gcode`;
+
+      upsertTask({
+        id: taskId,
+        type: "gcode-generate",
+        label: `Generating ${entry.color}…`,
+        progress: 0,
+        status: "running",
+      });
+
+      const gcode = await new Promise<string | null>((resolve) => {
+        const worker = new Worker(
+          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
+          { type: "module" },
+        );
+        worker.onmessage = (e) => {
+          const msg = e.data;
+          if (msg.type === "progress") {
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `Generating ${entry.color}…`,
+              progress: msg.percent,
+              status: "running",
+            });
+          } else if (msg.type === "complete") {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `${entry.color} ready`,
+              progress: 100,
+              status: "completed",
+            });
+            resolve(msg.gcode as string);
+          } else {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `${entry.color} failed`,
               progress: null,
               status: "error",
             });

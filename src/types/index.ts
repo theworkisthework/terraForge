@@ -70,6 +70,8 @@ export interface VectorObject {
   viewBoxY?: number;
   /** Layer / group name from source SVG */
   layer?: string;
+  /** Source fill color for color-based G-code batching (e.g. '#FF0000', 'black'). */
+  sourceColor?: string;
 }
 
 // ─── SVG Import Model ─────────────────────────────────────────────────────────
@@ -89,6 +91,13 @@ export interface SvgPath {
   layer?: string;
   /** Whether the original shape had a visible fill colour (used to regenerate hatch) */
   hasFill?: boolean;
+  /** Resolved fill color from SVG (e.g. '#FF0000', 'black', 'rgb(255,0,0)').
+   *  Set only if hasFill is true; used for color-based path grouping. */
+  fillColor?: string;
+  /** Resolved visible source stroke color from SVG, normalized when available. */
+  strokeColor?: string;
+  /** Effective visual source color for grouping (prefers fill, falls back to stroke). */
+  sourceColor?: string;
   /** True when the source SVG had an explicit visible stroke after style resolution. */
   sourceOutlineVisible?: boolean;
   /** Whether the outline should be plotted. False for shapes with no visible stroke.
@@ -96,6 +105,10 @@ export interface SvgPath {
   outlineVisible?: boolean;
   /** User toggle for this path's outline visibility. Defaults to true. */
   strokeEnabled?: boolean;
+  /** User toggle for this path's fill visibility (controls hatch rendering).
+   *  When false the fill/hatch is hidden but the stroke remains visible.
+   *  Controlled by fill-color group toggles in the Properties Panel. */
+  fillEnabled?: boolean;
   /** Per-path override to generate an outline even when source stroke is absent. */
   generatedStrokeEnabled?: boolean;
   /** Hatch-fill line d-strings synthesised from this path's fill at import time.

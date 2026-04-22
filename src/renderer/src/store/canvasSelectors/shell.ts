@@ -1,4 +1,5 @@
 import type { CanvasState } from "../canvasStore/types";
+import { normalizeSvgColor } from "../../features/imports/services/svgImportHelpers";
 
 export const selectToolbarCanvasState = (state: CanvasState) => ({
   imports: state.imports,
@@ -20,5 +21,12 @@ export const selectToolbarCanvasState = (state: CanvasState) => ({
 
 export const selectGcodeOptionsDialogCanvasState = (state: CanvasState) => ({
   layerGroupCount: state.layerGroups.length,
+  colorGroupCount: new Set(
+    state.imports.flatMap((imp) =>
+      imp.paths
+        .filter((p) => p.hasFill && !!p.fillColor)
+        .map((p) => normalizeSvgColor(p.fillColor ?? "")),
+    ),
+  ).size,
   pageTemplate: state.pageTemplate,
 });

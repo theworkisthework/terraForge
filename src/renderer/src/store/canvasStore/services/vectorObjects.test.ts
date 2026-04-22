@@ -48,6 +48,7 @@ describe("canvasStore vectorObjects service", () => {
           d: "M0,0 L10,10",
           svgSource: "<path/>",
           visible: true,
+          fillColor: "#ffd54f",
           hatchLines: ["M0,1 L10,1", "M0,2 L10,2"],
         },
       ],
@@ -59,6 +60,9 @@ describe("canvasStore vectorObjects service", () => {
     expect(result[0].id).toBe("p1");
     expect(result[1].id).toBe("p1-h0");
     expect(result[2].id).toBe("p1-h1");
+    expect(result[0].sourceColor).toBe("black");
+    expect(result[1].sourceColor).toBe("#ffd54f");
+    expect(result[2].sourceColor).toBe("#ffd54f");
   });
 
   it("filters out paths hidden by invisible layers", () => {

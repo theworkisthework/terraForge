@@ -6,6 +6,8 @@ export interface GcodePrefs {
   saveLocally: boolean;
   /** When true, generate a separate G-code file per layer group (multi-pen plots). */
   exportPerGroup: boolean;
+  /** When true, generate a separate G-code file per source fill color. */
+  exportPerColor: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
   liftPenAtEnd: boolean;
@@ -32,6 +34,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   uploadToSd: true,
   saveLocally: false,
   exportPerGroup: false,
+  exportPerColor: false,
   joinPaths: false,
   joinTolerance: 0.2,
   liftPenAtEnd: true,

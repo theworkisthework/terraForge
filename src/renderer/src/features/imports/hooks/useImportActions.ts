@@ -7,10 +7,12 @@ import { useMachineStore } from "../../../store/machineStore";
 import {
   findContainingLayerId,
   getEffectiveFill,
+  getEffectiveStrokeColor,
   getLayerName,
   hasVisibleStroke,
   isDisplayNone,
   isLayerGroup,
+  normalizeSvgColor,
   parseSvgLengthMM,
   parseSvgStylesheet,
   shapeToPathD,
@@ -183,8 +185,16 @@ export function useImportActions() {
         // yield conservative or noisy bounds during parsing and get dropped,
         // resulting in partially imported artwork.
 
-        fillFlags.push(getEffectiveFill(el, stylesheet) !== null);
-        const hasFill = fillFlags[fillFlags.length - 1];
+        const effectiveFill = getEffectiveFill(el, stylesheet);
+        const hasFill = effectiveFill !== null;
+        fillFlags.push(hasFill);
+        const effectiveStroke = getEffectiveStrokeColor(el, stylesheet);
+        const normalizedFill = effectiveFill
+          ? normalizeSvgColor(effectiveFill)
+          : undefined;
+        const normalizedStroke = effectiveStroke
+          ? normalizeSvgColor(effectiveStroke)
+          : undefined;
         const sourceOutlineVisible = hasVisibleStroke(el, stylesheet);
         const tag = el.tagName.toLowerCase();
         const pathIndex = fillFlags.length;
@@ -210,6 +220,9 @@ export function useImportActions() {
             svgSource: el.outerHTML,
             visible: true,
             hasFill,
+            fillColor: normalizedFill,
+            strokeColor: normalizedStroke,
+            sourceColor: normalizedFill ?? normalizedStroke,
             sourceOutlineVisible,
             outlineVisible: sourceOutlineVisible,
             strokeEnabled: true,

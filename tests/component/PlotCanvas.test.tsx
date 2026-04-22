@@ -556,6 +556,20 @@ describe("PlotCanvas", () => {
     expect(useCanvasStore.getState().selectedImportId).toBeNull();
   });
 
+  it("clicking import hit area keeps that import selected", () => {
+    const path = createSvgPath({ d: "M0,0 L10,10" });
+    const imp = createSvgImport({ name: "sel", paths: [path] });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: null });
+    const { container } = render(<PlotCanvas />);
+    const hitRect = container.querySelector("rect[fill='transparent']");
+    expect(hitRect).toBeTruthy();
+
+    fireEvent.mouseDown(hitRect!, { button: 0, clientX: 120, clientY: 80 });
+    fireEvent.click(hitRect!);
+
+    expect(useCanvasStore.getState().selectedImportId).toBe(imp.id);
+  });
+
   it("clicking SVG background deselects toolpath", async () => {
     const tp = createGcodeToolpath();
     useCanvasStore.setState({ gcodeToolpath: tp, toolpathSelected: true });

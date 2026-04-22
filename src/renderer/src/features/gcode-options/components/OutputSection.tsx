@@ -5,6 +5,7 @@ interface OutputSectionProps {
   open: boolean;
   connected: boolean;
   layerGroupCount: number;
+  colorGroupCount: number;
   prefs: GcodePrefs;
   onToggleOpen: () => void;
   onTogglePref: (key: keyof GcodePrefs) => void;
@@ -14,6 +15,7 @@ export function OutputSection({
   open,
   connected,
   layerGroupCount,
+  colorGroupCount,
   prefs,
   onToggleOpen,
   onTogglePref,
@@ -95,6 +97,31 @@ export function OutputSection({
               {prefs.exportPerGroup && layerGroupCount === 0 && (
                 <div className="text-xs text-amber-400 mt-1">
                   No groups defined - add groups in the Properties panel first.
+                </div>
+              )}
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="Export one file per colour group"
+              className="mt-0.5 accent-accent cursor-pointer"
+              checked={prefs.exportPerColor}
+              onChange={() => onTogglePref("exportPerColor")}
+            />
+            <div>
+              <div className="text-sm text-content font-medium">
+                Export one file per colour group
+              </div>
+              <div className="text-xs text-content-muted mt-0.5">
+                Generate a separate G-code file for each detected path fill
+                color - ideal for pen-swap workflows.
+              </div>
+              {prefs.exportPerColor && colorGroupCount === 0 && (
+                <div className="text-xs text-amber-400 mt-1">
+                  No fill colours detected - color export would produce no
+                  files.
                 </div>
               )}
             </div>
