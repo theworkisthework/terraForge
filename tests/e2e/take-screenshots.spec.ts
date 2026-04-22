@@ -376,6 +376,42 @@ test("13-layer-groups — properties panel with layer groups section", async () 
   await rightAside.evaluate((el) => (el.scrollTop = 0));
 });
 
+// ─── 13b: Properties panel — colour groups ───────────────────────────────────
+
+test("13b-colour-groups — properties panel with import grouped by color", async () => {
+  // Ensure we have at least one import row to work with
+  const rowCount = await window.locator("text=sample").count();
+  if (rowCount === 0) {
+    await mockOpenDialog(electronApp, fixturePath("sample.svg"));
+    await window.locator("button:has-text('Import')").click();
+    await window.locator("text=sample").first().waitFor({ timeout: 15_000 });
+    await window.waitForTimeout(400);
+  }
+
+  const rightAside = window.locator("aside:last-of-type");
+  await rightAside.evaluate((el) => (el.scrollTop = 0));
+  await window.waitForTimeout(150);
+
+  // Select and expand the first import row
+  await window.locator("text=sample").first().click();
+  await window.waitForTimeout(150);
+  const expandBtn = window.locator("button[aria-label='Expand paths']").first();
+  if (await expandBtn.isVisible()) {
+    await expandBtn.click();
+    await window.waitForTimeout(150);
+  }
+
+  // Switch path grouping mode from layer to color
+  await window.locator("button:has-text('By Color')").first().click();
+  await window
+    .locator("span[title='Toggle color group visibility']")
+    .first()
+    .waitFor({ timeout: 5_000 });
+  await window.waitForTimeout(150);
+
+  await shotElement(window, "aside:last-of-type", "13b-colour-groups.png", 0);
+});
+
 // ─── 14a: G-code Options dialog — Paths section ────────────────────────────
 
 test("14a-gcode-paths — G-code options dialog with Paths section open", async () => {
@@ -448,6 +484,42 @@ test("14c-gcode-output — G-code options dialog with Output section open (defau
   // Close dialog
   await window.locator("button:has-text('Cancel')").click();
   await window.waitForTimeout(200);
+});
+
+// ─── 14d: G-code Options dialog — Output section with colour export options ─
+
+test("14d-gcode-output-colour-groups — output section showing per-colour export options", async () => {
+  // Ensure at least one import exists so Generate G-code is enabled.
+  const rowCount = await window.locator("text=sample").count();
+  if (rowCount === 0) {
+    await mockOpenDialog(electronApp, fixturePath("sample.svg"));
+    await window.locator("button:has-text('Import')").click();
+    await window.locator("text=sample").first().waitFor({ timeout: 15_000 });
+    await window.waitForTimeout(300);
+  }
+
+  const btn = window.locator("button:has-text('Generate G-code')");
+  await btn.waitFor({ state: "visible", timeout: 5_000 });
+  await btn.click();
+  await window
+    .locator("h2:has-text('Generate G-code')")
+    .waitFor({ timeout: 5_000 });
+  await window.waitForTimeout(200);
+
+  // Enable colour export so dependent option appears active
+  const perColorCheckbox = window.locator(
+    "input[aria-label='Export one file per colour group']",
+  );
+  if (!(await perColorCheckbox.isChecked())) {
+    await perColorCheckbox.check();
+    await window.waitForTimeout(100);
+  }
+
+  await shot(window, "14d-gcode-output-colour-groups.png");
+
+  // Close dialog
+  await window.locator("button:has-text('Cancel')").click();
+  await window.waitForTimeout(150);
 });
 
 // ─── 15: File Browser panel ──────────────────────────────────────────────────
