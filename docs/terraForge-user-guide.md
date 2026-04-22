@@ -443,6 +443,17 @@ The **Stroke width** field sets the canvas preview stroke thickness in mm. This 
 
 Ticking **Centre marker** displays a crosshair (+) at the geometric centre of the selected import. The marker renders at a constant screen size at all zoom levels.
 
+### Stroke Outlines
+
+The **Stroke outlines** section controls whether path outlines are plotted for the selected import.
+
+| Toggle                                  | Description                                                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stroke outlines**                     | Master toggle — when off, no stroke paths from this import are included in G-code output. Useful for imports you want to plot as hatch-fill only.                           |
+| **Generate stroke for no-stroke paths** | Only shown when the import contains paths that have no source stroke (fill-only shapes). When on, synthetic outlines are generated along the path boundary so they can be plotted. Generated outlines appear in the colour groups view and count towards per-colour export. |
+
+> **Note:** "Generate stroke for no-stroke paths" is hidden when all paths already carry a stroke colour. It appears automatically once a fill-only path is detected.
+
 ### Hatch Fill
 
 Hatch fill generates evenly-spaced parallel lines across closed filled shapes — useful when the pen can only draw strokes and you want to shade an area.
