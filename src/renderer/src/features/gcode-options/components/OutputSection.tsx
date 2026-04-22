@@ -126,6 +126,32 @@ export function OutputSection({
               )}
             </div>
           </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="Export separate hatch files per colour"
+              className="mt-0.5 accent-accent cursor-pointer"
+              disabled={!prefs.exportPerColor}
+              checked={prefs.exportPerHatch}
+              onChange={() => onTogglePref("exportPerHatch")}
+            />
+            <div>
+              <div className="text-sm text-content font-medium">
+                Export separate hatch files per colour
+              </div>
+              <div className="text-xs text-content-muted mt-0.5">
+                Generate additional hatch-only files for each color group,
+                allowing you to apply hatches with a separate tool/pen. Requires
+                "Export one file per colour group" to be enabled.
+              </div>
+              {prefs.exportPerHatch && !prefs.exportPerColor && (
+                <div className="text-xs text-amber-400 mt-1">
+                  Enable "Export one file per colour group" to use this option.
+                </div>
+              )}
+            </div>
+          </label>
         </div>
       )}
     </div>

@@ -453,6 +453,10 @@ export function useJobActions() {
     const byColor = new Map<string, VectorObject[]>();
 
     for (const obj of allObjects) {
+      // Exclude hatch objects (identified by ID containing '-h') from per-color export
+      // Hatches are handled separately by exportPerHatch if enabled
+      if (obj.id.includes("-h")) continue;
+
       const rawColor = obj.sourceColor?.trim();
       const key = rawColor ? normalizeSvgColor(rawColor) : "";
       if (!key) continue;
@@ -573,7 +577,138 @@ export function useJobActions() {
       }
     }
 
+    // Generate hatch-only files if enabled
+    if (prefs.exportPerHatch) {
+      await handleGenerateGcodePerHatch(prefs, cfg, saveDir);
+    }
+
     setGenerating(false);
+  };
+
+  /**
+   * Generates separate hatch-only G-code files for each color.
+   * Only includes hatch lines, no outlines — useful for multi-pen plotting
+   * where hatches are applied with a separate tool/pen.
+   */
+  const handleGenerateGcodePerHatch = async (
+    prefs: GcodePrefs,
+    cfg: ReturnType<typeof activeConfig>,
+    saveDir: string | null,
+  ) => {
+    if (!cfg) return;
+    const options = buildOptions(prefs);
+
+    // Group hatch objects by their fill color (sourceColor)
+    const allObjects = useCanvasStore.getState().toVectorObjects();
+    const hatchByColor = new Map<string, VectorObject[]>();
+
+    for (const obj of allObjects) {
+      // Only process hatch objects (identified by ID containing '-h')
+      if (!obj.id.includes("-h")) continue;
+
+      const rawColor = obj.sourceColor?.trim();
+      const key = rawColor ? normalizeSvgColor(rawColor) : "";
+      if (!key) continue;
+      const arr = hatchByColor.get(key) ?? [];
+      arr.push(obj);
+      hatchByColor.set(key, arr);
+    }
+
+    const toColorFilenameBase = (color: string) => {
+      const normalized = normalizeSvgColor(color.trim());
+      const prefixed = normalized.startsWith("#")
+        ? `hex-${normalized.slice(1)}`
+        : normalized;
+      return (
+        prefixed
+          .replace(/\s+/g, "_")
+          .replace(/[^a-z0-9._-]/g, "_")
+          .replace(/^_+|_+$/g, "") || "uncolored"
+      );
+    };
+
+    for (const [color, hatchObjects] of hatchByColor.entries()) {
+      const taskId = uuid();
+      const safeName = toColorFilenameBase(color);
+      const defaultFilename = prefs.optimise
+        ? `hatch_${safeName}_opt.gcode`
+        : `hatch_${safeName}.gcode`;
+
+      upsertTask({
+        id: taskId,
+        type: "gcode-generate",
+        label: `Generating hatch ${color}…`,
+        progress: 0,
+        status: "running",
+      });
+
+      const gcode = await new Promise<string | null>((resolve) => {
+        const worker = new Worker(
+          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
+          { type: "module" },
+        );
+        worker.onmessage = (e) => {
+          const msg = e.data;
+          if (msg.type === "progress") {
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `Generating hatch ${color}…`,
+              progress: msg.percent,
+              status: "running",
+            });
+          } else if (msg.type === "complete") {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `Hatch ${color} ready`,
+              progress: 100,
+              status: "completed",
+            });
+            resolve(msg.gcode as string);
+          } else {
+            worker.terminate();
+            upsertTask({
+              id: taskId,
+              type: "gcode-generate",
+              label: `Hatch ${color} failed`,
+              progress: null,
+              status: "error",
+            });
+            resolve(null);
+          }
+        };
+        worker.postMessage({
+          type: "generate",
+          taskId,
+          objects: hatchObjects,
+          config: cfg,
+          options,
+        });
+      });
+
+      if (!gcode) continue;
+
+      if (prefs.saveLocally && saveDir) {
+        const savePath = `${saveDir}/${defaultFilename}`;
+        await window.terraForge.fs.writeFile(savePath, gcode);
+      }
+
+      if (prefs.uploadToSd && useMachineStore.getState().connected) {
+        const uploadTaskId = uuid();
+        const remotePath = "/" + defaultFilename;
+        try {
+          await window.terraForge.fluidnc.uploadGcode(
+            uploadTaskId,
+            gcode,
+            remotePath,
+          );
+        } catch {
+          // Upload error surfaced via upload task toast
+        }
+      }
+    }
   };
 
   return {

@@ -8,6 +8,8 @@ export interface GcodePrefs {
   exportPerGroup: boolean;
   /** When true, generate a separate G-code file per source fill color. */
   exportPerColor: boolean;
+  /** When true, generate separate hatch-only files for each color (requires exportPerColor). */
+  exportPerHatch: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
   liftPenAtEnd: boolean;
@@ -35,6 +37,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   saveLocally: false,
   exportPerGroup: false,
   exportPerColor: false,
+  exportPerHatch: false,
   joinPaths: false,
   joinTolerance: 0.2,
   liftPenAtEnd: true,
