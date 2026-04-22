@@ -13,6 +13,10 @@ G90      ; Absolute coordinates
 G21      ; Units: mm
 M5 ; Pen up
 
+; -- Color: #000000 (2 objects) --
+; -- Color: #0072a4 (73 objects) --
+; -- Color: #ebebeb (88 objects) --
+; -- Color: #ff1616 (72 objects) --
 ; -- Optimised path (156 subpaths) -----------
 G0 X8.480 Y0.000 ; Rapid travel
 F3000

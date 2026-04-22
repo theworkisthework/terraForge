@@ -8,6 +8,14 @@ Import SVG and PDF artwork, position it on the machine bed, generate optimised G
 
 ---
 
+## Documentation
+
+- [User Guide](docs/terraForge-user-guide.md) — full feature walkthrough with screenshots
+- [Spec](docs/terraForge-spec.md) — architecture and IPC API reference
+- [Feature Status](docs/terraForge-features.md) — implemented / in-progress / planned
+
+---
+
 ## Features
 
 ### File Import
@@ -99,14 +107,6 @@ npm run dist:mac     # macOS
 npm run dist:linux   # Linux
 npm run dist:all     # All three platforms
 ```
-
----
-
-## Documentation
-
-- [User Guide](docs/terraForge-user-guide.md) — full feature walkthrough with screenshots
-- [Spec](docs/terraForge-spec.md) — architecture and IPC API reference
-- [Feature Status](docs/terraForge-features.md) — implemented / in-progress / planned
 
 ---
 

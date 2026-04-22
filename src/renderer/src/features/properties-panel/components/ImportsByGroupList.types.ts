@@ -3,6 +3,7 @@ import type {
   LayerGroup,
   PageSize,
   PageTemplate,
+  SvgPath,
   SvgImport,
 } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
@@ -52,7 +53,7 @@ export interface ImportsByGroupListProps {
   onUpdatePath: (
     importId: string,
     pathId: string,
-    changes: { visible?: boolean },
+    changes: Partial<Pick<SvgPath, "visible" | "strokeEnabled">>,
   ) => void;
   onUpdateLayerGroup: (
     groupId: string,

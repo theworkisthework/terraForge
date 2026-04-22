@@ -13,7 +13,12 @@ describe("OutputSection", () => {
         open
         connected={false}
         layerGroupCount={0}
-        prefs={{ ...DEFAULT_GCODE_PREFS, exportPerGroup: true }}
+        colorGroupCount={0}
+        prefs={{
+          ...DEFAULT_GCODE_PREFS,
+          exportPerGroup: true,
+          exportPerColor: true,
+        }}
         onToggleOpen={onToggleOpen}
         onTogglePref={onTogglePref}
       />,
@@ -21,6 +26,7 @@ describe("OutputSection", () => {
 
     expect(screen.getByText("(not connected — will be skipped)")).toBeDefined();
     expect(screen.getByText(/No groups defined/i)).toBeDefined();
+    expect(screen.getByText(/No fill colours detected/i)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
     expect(onToggleOpen).toHaveBeenCalledTimes(1);

@@ -44,7 +44,7 @@ interface Props {
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
-  const { layerGroupCount, pageTemplate } = useCanvasStore(
+  const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
   const [prefs, setPrefs] = useState<GcodePrefs>(loadGcodePrefs);
@@ -54,7 +54,25 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
   const toggle = (key: keyof GcodePrefs) =>
-    setPrefs((p) => ({ ...p, [key]: !p[key] }));
+    setPrefs((p) => {
+      if (key === "exportPerGroup") {
+        const next = !p.exportPerGroup;
+        return {
+          ...p,
+          exportPerGroup: next,
+          exportPerColor: next ? false : p.exportPerColor,
+        };
+      }
+      if (key === "exportPerColor") {
+        const next = !p.exportPerColor;
+        return {
+          ...p,
+          exportPerColor: next,
+          exportPerGroup: next ? false : p.exportPerGroup,
+        };
+      }
+      return { ...p, [key]: !p[key] };
+    });
 
   const setTextField = (key: keyof GcodePrefs) => (val: string) =>
     setPrefs((p) => ({ ...p, [key]: val }));
@@ -154,6 +172,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             open={outputOpen}
             connected={connected}
             layerGroupCount={layerGroupCount}
+            colorGroupCount={colorGroupCount}
             prefs={prefs}
             onToggleOpen={() => setOutputOpen((o) => !o)}
             onTogglePref={toggle}

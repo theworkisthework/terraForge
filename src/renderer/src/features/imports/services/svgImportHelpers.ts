@@ -12,6 +12,73 @@ export interface SvgStylesheet {
   tags: Map<string, ParsedCssRule[]>;
 }
 
+const NAMED_COLORS: Record<string, [number, number, number]> = {
+  black: [0, 0, 0],
+  white: [255, 255, 255],
+  red: [255, 0, 0],
+  green: [0, 128, 0],
+  blue: [0, 0, 255],
+  yellow: [255, 255, 0],
+  cyan: [0, 255, 255],
+  magenta: [255, 0, 255],
+  gray: [128, 128, 128],
+  grey: [128, 128, 128],
+};
+
+function toHexByte(value: number): string {
+  return Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
+}
+
+/** Parses supported CSS color formats to RGB. */
+export function parseColorToRgb(
+  color: string,
+): [number, number, number] | null {
+  const lower = color.toLowerCase().trim();
+  if (lower in NAMED_COLORS) {
+    return NAMED_COLORS[lower];
+  }
+
+  if (lower.startsWith("#")) {
+    const hex = lower.slice(1);
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        return [r, g, b];
+      }
+    } else if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        return [r, g, b];
+      }
+    }
+  }
+
+  const rgbMatch = lower.match(
+    /rgb(?:a)?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/,
+  );
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1]);
+    const g = parseInt(rgbMatch[2]);
+    const b = parseInt(rgbMatch[3]);
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+      return [r, g, b];
+    }
+  }
+
+  return null;
+}
+
+/** Normalizes supported CSS colors to lowercase 6-digit hex. */
+export function normalizeSvgColor(color: string): string {
+  const rgb = parseColorToRgb(color);
+  if (!rgb) return color.trim().toLowerCase();
+  return `#${toHexByte(rgb[0])}${toHexByte(rgb[1])}${toHexByte(rgb[2])}`;
+}
+
 /** Builds a compact, import-local stylesheet index for simple SVG selectors. */
 export function parseSvgStylesheet(doc: Document): SvgStylesheet {
   const stylesheet: SvgStylesheet = {
@@ -230,13 +297,9 @@ export function getEffectiveFill(
   el: Element,
   stylesheet?: SvgStylesheet,
 ): string | null {
-  const fill = resolveInheritedProp(el, "fill", stylesheet);
-  if (
-    !fill ||
-    fill === "none" ||
-    fill === "transparent" ||
-    fill.startsWith("url(")
-  )
+  // SVG default fill is black when fill is unspecified.
+  const fill = resolveInheritedProp(el, "fill", stylesheet) || "black";
+  if (fill === "none" || fill === "transparent" || fill.startsWith("url("))
     return null;
 
   const fillOpacityVal = resolveInheritedProp(el, "fill-opacity", stylesheet);
@@ -249,16 +312,16 @@ export function getEffectiveFill(
   return fill;
 }
 
-/** True when a stroke is present and visible after inherited style resolution. */
-export function hasVisibleStroke(
+/** Returns a visible effective stroke color, or null when stroke is not visible. */
+export function getEffectiveStrokeColor(
   el: Element,
   stylesheet?: SvgStylesheet,
-): boolean {
+): string | null {
   const stroke = resolveInheritedProp(el, "stroke", stylesheet);
-  if (!stroke || stroke === "none" || stroke === "transparent") return false;
+  if (!stroke || stroke === "none" || stroke === "transparent") return null;
 
   const widthVal = resolveInheritedProp(el, "stroke-width", stylesheet);
-  if (widthVal && parseFloat(widthVal) === 0) return false;
+  if (widthVal && parseFloat(widthVal) === 0) return null;
 
   const strokeOpacityVal = resolveInheritedProp(
     el,
@@ -269,9 +332,19 @@ export function hasVisibleStroke(
   if (
     (strokeOpacityVal && parseFloat(strokeOpacityVal) <= 0) ||
     (opacityVal && parseFloat(opacityVal) <= 0)
-  )
-    return false;
-  return true;
+  ) {
+    return null;
+  }
+
+  return stroke;
+}
+
+/** True when a stroke is present and visible after inherited style resolution. */
+export function hasVisibleStroke(
+  el: Element,
+  stylesheet?: SvgStylesheet,
+): boolean {
+  return getEffectiveStrokeColor(el, stylesheet) !== null;
 }
 
 /** Parses SVG length values into mm; returns null for unresolved percentages. */

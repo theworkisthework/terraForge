@@ -4,6 +4,7 @@ import type {
   SvgPath,
   VectorObject,
 } from "../../../../../types";
+import { normalizeSvgColor } from "../../../features/imports/services/svgImportHelpers";
 
 function isLayerVisible(
   path: SvgPath,
@@ -33,14 +34,35 @@ function projectPathToVectorObjects(
     viewBoxY: imp.viewBoxY,
     layer: path.layer,
   };
+  const importStrokeEnabled = imp.strokeEnabled ?? true;
+  const pathStrokeEnabled = path.strokeEnabled ?? true;
+  const sourceOutlineVisible =
+    typeof path.sourceOutlineVisible === "boolean"
+      ? path.sourceOutlineVisible
+      : path.outlineVisible !== false;
+  const generatedStrokeEnabled =
+    path.generatedStrokeEnabled ?? imp.generatedStrokeForNoStroke ?? false;
+  const hasStrokeGeometry = sourceOutlineVisible || generatedStrokeEnabled;
+
   const outlineVOs: VectorObject[] =
-    path.outlineVisible !== false ? [base] : [];
+    importStrokeEnabled && pathStrokeEnabled && hasStrokeGeometry
+      ? [
+          {
+            ...base,
+            // Keep all outline work in the black export bucket.
+            sourceColor: normalizeSvgColor("black"),
+          },
+        ]
+      : [];
   const hatchVOs: VectorObject[] = (path.hatchLines ?? []).map(
     (hatchLine, index): VectorObject => ({
       ...base,
       id: `${path.id}-h${index}`,
       svgSource: "",
       path: hatchLine,
+      sourceColor: path.fillColor
+        ? normalizeSvgColor(path.fillColor)
+        : undefined,
     }),
   );
   return [...outlineVOs, ...hatchVOs];

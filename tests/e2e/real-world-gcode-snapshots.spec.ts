@@ -32,10 +32,6 @@ function normalizeGcodeForSnapshot(gcode: string): string {
     .trim();
 }
 
-function readNormalizedSnapshot(snapshotPath: string): string {
-  return normalizeGcodeForSnapshot(fs.readFileSync(snapshotPath, "utf-8"));
-}
-
 async function setCheckboxState(
   page: Page,
   labelText: string,
@@ -113,10 +109,8 @@ test.describe("real-world SVG -> G-code snapshots", () => {
 
         const gcode = fs.readFileSync(savePath, "utf-8");
         const snapshotName = `${path.parse(svgFile).name}.gcode`;
-        const snapshotPath = testInfo.snapshotPath(snapshotName);
-
-        expect(normalizeGcodeForSnapshot(gcode)).toBe(
-          readNormalizedSnapshot(snapshotPath),
+        await expect(normalizeGcodeForSnapshot(gcode)).toMatchSnapshot(
+          snapshotName,
         );
       } finally {
         await closeApp(electronApp as ElectronApplication, userDataDir);

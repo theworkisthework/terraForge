@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   findContainingLayerId,
   getEffectiveFill,
+  getEffectiveStrokeColor,
   getLayerName,
   hasVisibleStroke,
   isDisplayNone,
   isLayerGroup,
+  normalizeSvgColor,
   parseSvgLengthMM,
+  parseColorToRgb,
   parseSvgStylesheet,
   shapeToPathD,
 } from "./svgImportHelpers";
@@ -121,6 +124,7 @@ describe("svgImportHelpers", () => {
     );
 
     expect(getEffectiveFill(filledPath)).toBe("#111");
+    expect(getEffectiveStrokeColor(hiddenStrokePath)).toBeNull();
     expect(hasVisibleStroke(hiddenStrokePath)).toBe(false);
 
     const noFill = firstMatch(
@@ -155,6 +159,12 @@ describe("svgImportHelpers", () => {
     expect(getEffectiveFill(opacityZeroFill)).toBeNull();
     expect(getEffectiveFill(styleInheritedFill)).toBe("#0f0");
 
+    const defaultFill = firstMatch(
+      '<svg><path id="df" d="M0,0 L10,0"/></svg>',
+      "path#df",
+    );
+    expect(getEffectiveFill(defaultFill)).toBe("black");
+
     const visibleStroke = firstMatch(
       '<svg><path id="vs" d="M0,0" stroke="#222"/></svg>',
       "path#vs",
@@ -177,10 +187,15 @@ describe("svgImportHelpers", () => {
     );
 
     expect(hasVisibleStroke(visibleStroke)).toBe(true);
+    expect(getEffectiveStrokeColor(visibleStroke)).toBe("#222");
     expect(hasVisibleStroke(noneStroke)).toBe(false);
+    expect(getEffectiveStrokeColor(noneStroke)).toBeNull();
     expect(hasVisibleStroke(transparentStroke)).toBe(false);
+    expect(getEffectiveStrokeColor(transparentStroke)).toBeNull();
     expect(hasVisibleStroke(strokeOpacityZero)).toBe(false);
+    expect(getEffectiveStrokeColor(strokeOpacityZero)).toBeNull();
     expect(hasVisibleStroke(opacityZeroStroke)).toBe(false);
+    expect(getEffectiveStrokeColor(opacityZeroStroke)).toBeNull();
   });
 
   it("resolves class-based style rules from style blocks", () => {
@@ -255,6 +270,17 @@ describe("svgImportHelpers", () => {
     if (!group) throw new Error("Expected test group");
 
     expect(isDisplayNone(group, stylesheet)).toBe(true);
+  });
+
+  it("normalizes supported colors to lowercase hex", () => {
+    expect(parseColorToRgb("black")).toEqual([0, 0, 0]);
+    expect(parseColorToRgb("#abc")).toEqual([170, 187, 204]);
+    expect(parseColorToRgb("rgb(255, 0, 0)")).toEqual([255, 0, 0]);
+
+    expect(normalizeSvgColor("black")).toBe("#000000");
+    expect(normalizeSvgColor("#abc")).toBe("#aabbcc");
+    expect(normalizeSvgColor("RGB(255, 0, 0)")).toBe("#ff0000");
+    expect(normalizeSvgColor("var(--plot-color)")).toBe("var(--plot-color)");
   });
 
   it("converts primitive shapes to path d", () => {

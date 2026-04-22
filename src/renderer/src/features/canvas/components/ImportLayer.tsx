@@ -39,6 +39,7 @@ export function ImportLayer({
       <g
         transform={groupTransform}
         onMouseDown={(e) => onImportMouseDown(e, imp.id)}
+        onClick={(e) => e.stopPropagation()}
         style={{ cursor: "grab" }}
       >
         <rect

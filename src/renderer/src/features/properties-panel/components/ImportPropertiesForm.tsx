@@ -8,6 +8,7 @@ import type { ImportPropertiesFormProps } from "./ImportPropertiesForm.types";
 import { AlignmentDimensionsSection } from "./AlignmentDimensionsSection";
 import { HatchFillSection } from "./HatchFillSection";
 import { PositionFieldsRow } from "./PositionFieldsRow";
+import { StrokeOptionsSection } from "./StrokeOptionsSection";
 import { StrokeWidthSection } from "./StrokeWidthSection";
 import { TransformControlsSection } from "./TransformControlsSection";
 
@@ -115,6 +116,8 @@ export function ImportPropertiesForm({
         onChangeRotation={onChangeRotation}
         sharedTransformProps={sharedTransformProps}
       />
+
+      <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
 
       <StrokeWidthSection
         strokeWidthMM={imp.strokeWidthMM}

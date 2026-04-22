@@ -9,6 +9,7 @@ import { scaleHexColor } from "./geometry";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 
 export interface ImportPath2DCacheEntry {
+  impRef: SvgImport;
   pathsRef: SvgImport["paths"];
   layersRef: SvgImport["layers"];
   outline: Path2D;
@@ -68,6 +69,7 @@ export function drawImportsLayer({
     let impCache = cache.get(imp.id);
     if (
       !impCache ||
+      impCache.impRef !== imp ||
       impCache.pathsRef !== imp.paths ||
       impCache.layersRef !== imp.layers
     ) {
@@ -76,20 +78,39 @@ export function drawImportsLayer({
         : null;
       const isLayerVisible = (p: (typeof imp.paths)[number]) =>
         !hiddenLayerIds || !p.layer || !hiddenLayerIds.has(p.layer);
+
+      const hasOutline = (p: (typeof imp.paths)[number]) => {
+        const importStrokeEnabled = imp.strokeEnabled ?? true;
+        const pathStrokeEnabled = p.strokeEnabled ?? true;
+        const sourceOutlineVisible =
+          typeof p.sourceOutlineVisible === "boolean"
+            ? p.sourceOutlineVisible
+            : p.outlineVisible !== false;
+        const generatedStrokeEnabled =
+          p.generatedStrokeEnabled ?? imp.generatedStrokeForNoStroke ?? false;
+        return (
+          importStrokeEnabled &&
+          pathStrokeEnabled &&
+          (sourceOutlineVisible || generatedStrokeEnabled)
+        );
+      };
+
       const outlineD = imp.paths
-        .filter(
-          (p) => p.visible && p.outlineVisible !== false && isLayerVisible(p),
-        )
+        .filter((p) => p.visible && hasOutline(p) && isLayerVisible(p))
         .map((p) => p.d)
         .join(" ");
       const hatchD = imp.paths
         .filter(
           (p) =>
-            p.visible && (p.hatchLines?.length ?? 0) > 0 && isLayerVisible(p),
+            p.visible &&
+            (p.fillEnabled ?? true) &&
+            (p.hatchLines?.length ?? 0) > 0 &&
+            isLayerVisible(p),
         )
         .flatMap((p) => p.hatchLines!)
         .join(" ");
       impCache = {
+        impRef: imp,
         pathsRef: imp.paths,
         layersRef: imp.layers,
         outline: new Path2D(outlineD),

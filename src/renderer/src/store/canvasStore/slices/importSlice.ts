@@ -11,11 +11,37 @@ import { vectorObjectsForImports } from "../services/vectorObjects";
 import type { CanvasStateCreator, ImportSlice } from "../types";
 
 function withDefaultHatchSettings(imp: SvgImport): SvgImport {
+  const normalizedPaths = imp.paths.map((path) => {
+    const sourceOutlineVisible =
+      typeof path.sourceOutlineVisible === "boolean"
+        ? path.sourceOutlineVisible
+        : path.outlineVisible !== false;
+
+    const generatedStrokeEnabled =
+      typeof path.generatedStrokeEnabled === "boolean"
+        ? sourceOutlineVisible
+          ? path.generatedStrokeEnabled
+          : path.generatedStrokeEnabled
+            ? true
+            : undefined
+        : undefined;
+
+    return {
+      ...path,
+      sourceOutlineVisible,
+      strokeEnabled: path.strokeEnabled ?? true,
+      generatedStrokeEnabled,
+    };
+  });
+
   return {
     hatchEnabled: false,
     hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
     hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
+    strokeEnabled: true,
+    generatedStrokeForNoStroke: false,
     ...imp,
+    paths: normalizedPaths,
   };
 }
 

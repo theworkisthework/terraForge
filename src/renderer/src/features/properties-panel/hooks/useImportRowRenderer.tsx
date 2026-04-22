@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { SvgImport } from "../../../../../types";
+import type { SvgImport, SvgPath } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
 import { ImportRowCard } from "../components/ImportRowCard";
 
@@ -52,7 +52,9 @@ interface UseImportRowRendererArgs {
   onUpdatePath: (
     importId: string,
     pathId: string,
-    changes: { visible?: boolean },
+    changes: Partial<
+      Pick<SvgPath, "visible" | "strokeEnabled" | "fillEnabled">
+    >,
   ) => void;
   onRemovePath: (importId: string, pathId: string) => void;
   onTemplateAlignEnabledChange: (v: boolean) => void;
@@ -173,6 +175,12 @@ export function useImportRowRenderer({
           onUpdateLayerVisibility={onUpdateImportLayer}
           onUpdatePathVisibility={(importId, pathId, visible) =>
             onUpdatePath(importId, pathId, { visible })
+          }
+          onUpdatePathFillEnabled={(importId, pathId, fillEnabled) =>
+            onUpdatePath(importId, pathId, { fillEnabled })
+          }
+          onUpdatePathStroke={(importId, pathId, strokeEnabled) =>
+            onUpdatePath(importId, pathId, { strokeEnabled })
           }
           onRemovePath={onRemovePath}
           onUpdate={(changes) => onUpdateImport(imp.id, changes)}

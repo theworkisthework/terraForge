@@ -47,6 +47,16 @@ export interface ImportRowCardProps {
     pathId: string,
     visible: boolean,
   ) => void;
+  onUpdatePathFillEnabled: (
+    importId: string,
+    pathId: string,
+    fillEnabled: boolean,
+  ) => void;
+  onUpdatePathStroke: (
+    importId: string,
+    pathId: string,
+    strokeEnabled: boolean,
+  ) => void;
   onRemovePath: (importId: string, pathId: string) => void;
   onUpdate: (changes: Partial<SvgImport>) => void;
   onTemplateAlignEnabledChange: (v: boolean) => void;

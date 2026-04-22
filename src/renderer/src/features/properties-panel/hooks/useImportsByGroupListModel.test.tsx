@@ -39,6 +39,8 @@ describe("useImportsByGroupListModel", () => {
       pageSizes: [],
       templateAlignEnabled: false,
       templateAlignTarget: "page" as const,
+      templateScaleEnabled: false,
+      templateScaleTarget: "page" as const,
       ratioLocked: true,
       rotStep: 45 as const,
       stepFlyoutOpen: false,
