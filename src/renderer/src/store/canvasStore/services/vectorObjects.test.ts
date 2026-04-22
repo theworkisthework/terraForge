@@ -60,7 +60,7 @@ describe("canvasStore vectorObjects service", () => {
     expect(result[0].id).toBe("p1");
     expect(result[1].id).toBe("p1-h0");
     expect(result[2].id).toBe("p1-h1");
-    expect(result[0].sourceColor).toBe("black");
+    expect(result[0].sourceColor).toBe("#000000");
     expect(result[1].sourceColor).toBe("#ffd54f");
     expect(result[2].sourceColor).toBe("#ffd54f");
   });

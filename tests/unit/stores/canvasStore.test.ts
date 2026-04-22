@@ -211,7 +211,11 @@ describe("canvasStore", () => {
   });
 
   it("excludes outline VectorObject when outlineVisible is false", () => {
-    const path = createSvgPath({ visible: true, outlineVisible: false });
+    const path = createSvgPath({
+      visible: true,
+      outlineVisible: false,
+      sourceOutlineVisible: false,
+    });
     const imp = createSvgImport({ paths: [path], visible: true });
     useCanvasStore.getState().addImport(imp);
     const vos = useCanvasStore.getState().toVectorObjects();

@@ -13,7 +13,26 @@ G90      ; Absolute coordinates
 G21      ; Units: mm
 M5 ; Pen up
 
+; -- Color: #000000 (2 objects) --
+; -- Color: #0072a4 (73 objects) --
+; -- Color: #ebebeb (88 objects) --
+; -- Color: #ff1616 (72 objects) --
 ; -- Sequential path (156 subpaths) -----------
+G0 X8.480 Y72.999 ; Rapid travel
+F3000
+M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
+G1 X139.730 Y72.999
+G1 X139.730 Y0.000
+M5 ; Pen up
+
+G0 X8.480 Y0.000 ; Rapid travel
+F3000
+M3 S1000 ; Pen down
+G4 P0.05 ; Pen settle delay
+G1 X8.480 Y72.999
+M5 ; Pen up
+
 G0 X198.960 Y200.000 ; Rapid travel
 F3000
 M3 S1000 ; Pen down
@@ -586,21 +605,6 @@ F3000
 M3 S1000 ; Pen down
 G4 P0.05 ; Pen settle delay
 G1 X36.028 Y133.830
-M5 ; Pen up
-
-G0 X8.480 Y72.999 ; Rapid travel
-F3000
-M3 S1000 ; Pen down
-G4 P0.05 ; Pen settle delay
-G1 X139.730 Y72.999
-G1 X139.730 Y0.000
-M5 ; Pen up
-
-G0 X8.480 Y0.000 ; Rapid travel
-F3000
-M3 S1000 ; Pen down
-G4 P0.05 ; Pen settle delay
-G1 X8.480 Y72.999
 M5 ; Pen up
 
 G0 X138.315 Y72.999 ; Rapid travel

@@ -425,6 +425,7 @@ describe("GcodeOptionsDialog", () => {
       optimise: true,
       uploadToSd: true,
       saveLocally: false,
+      exportPerColor: false,
       joinPaths: false,
       joinTolerance: 0.2,
       liftPenAtEnd: true,
