@@ -520,6 +520,189 @@ describe("svgWorker — cancellation", () => {
   });
 });
 
+// ── Knife lead-in/out mode ──────────────────────────────────────────────────
+
+describe("svgWorker — knife lead-in/out", () => {
+  it("emits lead-in arc, overcut, and lead-out arc for closed paths", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "knife-closed",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 20 0 L 20 20 L 0 20 Z",
+          hasFill: true,
+          originalWidth: 30,
+          originalHeight: 30,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        knifeLeadInOutEnabled: true,
+        knifeLeadRadiusMM: 1,
+        knifeOvercutMM: 1.5,
+      }),
+    });
+
+    const msg = await waitForMsgById("complete", "knife-closed");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("Knife LI : yes (R=1 mm, overcut=1.5 mm)");
+    expect(gcode).toContain("; Knife lead-in");
+    expect(gcode).toContain("; Knife overcut");
+    expect(gcode).toContain("; Knife lead-out");
+  });
+
+  it("does not emit knife arcs for open paths", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "knife-open",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 20 0 L 20 20",
+          hasFill: false,
+          originalWidth: 30,
+          originalHeight: 30,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        knifeLeadInOutEnabled: true,
+        knifeLeadRadiusMM: 1,
+        knifeOvercutMM: 1,
+      }),
+    });
+
+    const msg = await waitForMsgById("complete", "knife-open");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("; Knife lead-in");
+    expect(gcode).not.toContain("; Knife lead-out");
+    expect(gcode).not.toContain("; Knife overcut");
+  });
+
+  it("disables join mode when knife lead mode is enabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "knife-overrides-join",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 20 0 L 20 20 L 0 20 Z",
+          hasFill: true,
+          originalWidth: 30,
+          originalHeight: 30,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        joinPaths: true,
+        joinTolerance: 0.2,
+        knifeLeadInOutEnabled: true,
+        knifeLeadRadiusMM: 2.5,
+        knifeOvercutMM: 1,
+      }),
+    });
+
+    const msg = await waitForMsgById("complete", "knife-overrides-join");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("Joined   : no (disabled by knife lead mode)");
+    expect(gcode).toContain("; Knife lead-in");
+    expect(gcode).toContain("; Knife lead-out");
+  });
+
+  it("places inner-contour lead-in on hole waste side for compound paths", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "knife-hole-side",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 40 0 L 40 40 L 0 40 Z M 10 20 L 10 30 L 30 30 L 30 10 L 10 10 Z",
+          hasFill: true,
+          originalWidth: 50,
+          originalHeight: 50,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        knifeLeadInOutEnabled: true,
+        knifeLeadRadiusMM: 1,
+        knifeOvercutMM: 0.5,
+      }),
+    });
+
+    const msg = await waitForMsgById("complete", "knife-hole-side");
+    const gcode = msg.gcode as string;
+    const leadStarts = gcode
+      .split("\n")
+      .filter((l) => l.includes("; Knife lead-in start"));
+    const leadOuts = gcode
+      .split("\n")
+      .filter((l) => l.includes("; Knife lead-out"));
+
+    expect(leadStarts.length).toBeGreaterThanOrEqual(2);
+    expect(leadOuts.length).toBeGreaterThanOrEqual(2);
+
+    const m = /X(-?\d+\.\d+)\s+Y(-?\d+\.\d+)/.exec(leadStarts[1]);
+    expect(m).not.toBeNull();
+    const x = Number(m![1]);
+    const y = Number(m![2]);
+
+    // Inner contour waste is the hole interior (10..30,10..30).
+    expect(x).toBeGreaterThan(10);
+    expect(x).toBeLessThan(30);
+    expect(y).toBeGreaterThan(10);
+    expect(y).toBeLessThan(30);
+
+    const mo = /X(-?\d+\.\d+)\s+Y(-?\d+\.\d+)/.exec(leadOuts[1]);
+    expect(mo).not.toBeNull();
+    const ox = Number(mo![1]);
+    const oy = Number(mo![2]);
+    expect(ox).toBeGreaterThan(10);
+    expect(ox).toBeLessThan(30);
+    expect(oy).toBeGreaterThan(10);
+    expect(oy).toBeLessThan(30);
+  });
+
+  it("attempts seam repositioning for tight triangular hole and falls back gracefully", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "knife-tight-triangle-hole",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 60 0 L 30 90 Z M 30 55 L 20 20 L 40 20 Z",
+          hasFill: true,
+          originalWidth: 70,
+          originalHeight: 100,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        knifeLeadInOutEnabled: true,
+        knifeLeadRadiusMM: 2.5,
+        knifeOvercutMM: 1,
+      }),
+    });
+
+    const msg = await waitForMsgById("complete", "knife-tight-triangle-hole");
+    const gcode = msg.gcode as string;
+    const leadStarts = gcode
+      .split("\n")
+      .filter((l) => l.includes("; Knife lead-in start"));
+    const leadOuts = gcode
+      .split("\n")
+      .filter((l) => l.includes("; Knife lead-out"));
+
+    // At minimum the outer contour should still get knife arcs.
+    expect(leadStarts.length).toBeGreaterThanOrEqual(1);
+    expect(leadOuts.length).toBeGreaterThanOrEqual(1);
+
+    // For very tight holes, the solver may decide there is no safe arc pair.
+    // In that case it must emit an explicit diagnostic note.
+    if (leadStarts.length < 2 || leadOuts.length < 2) {
+      expect(gcode).toContain("Knife note: no safe lead arcs for subpath");
+    }
+  });
+});
+
 // ── Coordinate integration ────────────────────────────────────────────────────
 
 describe("svgWorker — coordinate output", () => {

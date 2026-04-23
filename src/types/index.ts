@@ -70,6 +70,8 @@ export interface VectorObject {
   viewBoxY?: number;
   /** Layer / group name from source SVG */
   layer?: string;
+  /** True when the source path has visible fill in SVG import analysis. */
+  hasFill?: boolean;
   /** Source fill color for color-based G-code batching (e.g. '#FF0000', 'black'). */
   sourceColor?: string;
 }
@@ -261,6 +263,12 @@ export interface GcodeOptions {
   optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel
   joinPaths: boolean; // [experimental] connect endpoints within joinTolerance to skip pen up/down
   joinTolerance: number; // mm — max gap between path end and next path start to join (default 0.2)
+  /** Enable tangential lead-in/out arcs for closed contours (knife cutting mode). */
+  knifeLeadInOutEnabled?: boolean;
+  /** Radius of lead-in/out arcs in mm (knife cutting mode). */
+  knifeLeadRadiusMM?: number;
+  /** Distance to continue past seam after closure before lead-out, in mm. */
+  knifeOvercutMM?: number;
   liftPenAtEnd: boolean; // send penUpCommand after the last stroke (default true)
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
   /** Optional per-generation override for pen-down delay (milliseconds). */

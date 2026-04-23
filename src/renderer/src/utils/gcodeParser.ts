@@ -12,7 +12,7 @@
 //
 // Supported:
 //   G0, G1        — linear rapid / feed
-//   G2, G3        — arcs (approximated as straight lines for now)
+//   G2, G3        — arcs (interpolated to polyline segments for preview)
 //   G20 / G21     — inch / mm units
 //   G90 / G91     — absolute / relative positioning
 //   N<number>     — line numbers (parsed and counted)
@@ -98,6 +98,30 @@ export function parseGcode(gcode: string): GcodeToolpath {
     }
   };
 
+  const addCutSegment = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    lineNum: number,
+  ) => {
+    const segDist = Math.hypot(x1 - x0, y1 - y0);
+    totalCutDistance += segDist;
+    updateBounds(x1, y1);
+    segments.push({
+      from: { x: x0, y: y0 },
+      to: { x: x1, y: y1 },
+      type: "cut",
+      lineNum,
+    });
+    if (!lastWasCut || currentCutPath === null) {
+      currentCutPath = [x0, y0];
+      cutSubPaths.push(currentCutPath);
+    }
+    currentCutPath.push(x1, y1);
+    lastWasCut = true;
+  };
+
   for (const rawLine of gcode.split("\n")) {
     lineCount++;
 
@@ -138,6 +162,8 @@ export function parseGcode(gcode: string): GcodeToolpath {
     const xw = getW("X");
     const yw = getW("Y");
     const fw = getW("F");
+    const iw = getW("I");
+    const jw = getW("J");
 
     // Skip lines with no X/Y motion
     if (xw === undefined && yw === undefined) continue;
@@ -150,35 +176,74 @@ export function parseGcode(gcode: string): GcodeToolpath {
     const ny =
       yw !== undefined ? (isAbsolute ? yw * scale : y + yw * scale) : y;
 
-    updateBounds(nx, ny);
-
-    const segDist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
-
-    // Record the segment for live plot-progress tracking
-    segments.push({
-      from: { x, y },
-      to: { x: nx, y: ny },
-      type: motionMode === 0 ? "rapid" : "cut",
-      lineNum: lineCount,
-    });
-
     if (motionMode === 0) {
+      updateBounds(nx, ny);
+      const segDist = Math.hypot(nx - x, ny - y);
+      segments.push({
+        from: { x, y },
+        to: { x: nx, y: ny },
+        type: "rapid",
+        lineNum: lineCount,
+      });
       // Rapid — record as a flat quad [x_from, y_from, x_to, y_to]
       totalRapidDistance += segDist;
       rapidData.push(x, y, nx, ny);
       // A rapid lifts the pen, so the next cut must start a new sub-path.
       currentCutPath = null;
       lastWasCut = false;
-    } else {
-      // Feed (G1) or arc (G2/G3 approximated as straight line)
-      totalCutDistance += segDist;
-      if (!lastWasCut || currentCutPath === null) {
-        // Start a new cut sub-path beginning at the current position.
-        currentCutPath = [x, y];
-        cutSubPaths.push(currentCutPath);
+    } else if (motionMode === 2 || motionMode === 3) {
+      // Arc feed move (G2/G3), flattened into short line segments.
+      const sx = x;
+      const sy = y;
+
+      const hasCenter = iw !== undefined || jw !== undefined;
+      if (!hasCenter) {
+        // No center data; fall back to a single linear segment.
+        addCutSegment(sx, sy, nx, ny, lineCount);
+      } else {
+        const cx = sx + (iw ?? 0) * scale;
+        const cy = sy + (jw ?? 0) * scale;
+        const rs = Math.hypot(sx - cx, sy - cy);
+        const re = Math.hypot(nx - cx, ny - cy);
+        const r = (rs + re) * 0.5;
+
+        if (!Number.isFinite(r) || r <= 1e-9) {
+          addCutSegment(sx, sy, nx, ny, lineCount);
+        } else {
+          let a0 = Math.atan2(sy - cy, sx - cx);
+          let a1 = Math.atan2(ny - cy, nx - cx);
+          let delta = a1 - a0;
+          if (motionMode === 2) {
+            while (delta >= 0) delta -= Math.PI * 2;
+          } else {
+            while (delta <= 0) delta += Math.PI * 2;
+          }
+
+          // Full circle when endpoint equals startpoint.
+          if (Math.hypot(nx - sx, ny - sy) <= 1e-6) {
+            delta = motionMode === 2 ? -Math.PI * 2 : Math.PI * 2;
+          }
+
+          const arcSteps = Math.max(
+            1,
+            Math.ceil(Math.abs(delta) / (Math.PI / 18)),
+          );
+          let px = sx;
+          let py = sy;
+          for (let step = 1; step <= arcSteps; step++) {
+            const t = step / arcSteps;
+            const a = a0 + delta * t;
+            const tx = step === arcSteps ? nx : cx + Math.cos(a) * r;
+            const ty = step === arcSteps ? ny : cy + Math.sin(a) * r;
+            addCutSegment(px, py, tx, ty, lineCount);
+            px = tx;
+            py = ty;
+          }
+        }
       }
-      currentCutPath.push(nx, ny);
-      lastWasCut = true;
+    } else {
+      // Linear feed move (G1)
+      addCutSegment(x, y, nx, ny, lineCount);
     }
 
     x = nx;

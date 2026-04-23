@@ -12,6 +12,9 @@ export interface GcodePrefs {
   exportPerHatch: boolean;
   joinPaths: boolean;
   joinTolerance: number; // mm
+  knifeLeadInOutEnabled: boolean;
+  knifeLeadRadiusMM: number;
+  knifeOvercutMM: number;
   liftPenAtEnd: boolean;
   returnToHome: boolean;
   penDownDelayOverrideEnabled: boolean;
@@ -40,6 +43,9 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   exportPerHatch: false,
   joinPaths: false,
   joinTolerance: 0.2,
+  knifeLeadInOutEnabled: false,
+  knifeLeadRadiusMM: 1,
+  knifeOvercutMM: 1,
   liftPenAtEnd: true,
   returnToHome: false,
   penDownDelayOverrideEnabled: false,

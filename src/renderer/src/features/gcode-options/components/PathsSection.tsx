@@ -7,6 +7,8 @@ interface PathsSectionProps {
   onToggleOpen: () => void;
   onTogglePref: (key: keyof GcodePrefs) => void;
   onJoinToleranceChange: (value: string) => void;
+  onKnifeLeadRadiusChange: (value: string) => void;
+  onKnifeOvercutChange: (value: string) => void;
 }
 
 export function PathsSection({
@@ -15,6 +17,8 @@ export function PathsSection({
   onToggleOpen,
   onTogglePref,
   onJoinToleranceChange,
+  onKnifeLeadRadiusChange,
+  onKnifeOvercutChange,
 }: PathsSectionProps) {
   return (
     <div>
@@ -82,6 +86,7 @@ export function PathsSection({
                 </label>
                 <input
                   type="number"
+                  aria-label="Tolerance"
                   min="0.01"
                   max="10"
                   step="0.05"
@@ -89,6 +94,81 @@ export function PathsSection({
                   onChange={(e) => onJoinToleranceChange(e.target.value)}
                   disabled={!prefs.joinPaths}
                   className="w-20 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
+                />
+                <span className="text-xs text-content-muted">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 select-none">
+            <input
+              type="checkbox"
+              aria-label="Knife lead-in/out on closed paths"
+              className="mt-0.5 accent-accent cursor-pointer flex-shrink-0"
+              checked={prefs.knifeLeadInOutEnabled}
+              onChange={() => onTogglePref("knifeLeadInOutEnabled")}
+              id="knife-lead-cb"
+            />
+            <div className="flex-1 min-w-0">
+              <label
+                htmlFor="knife-lead-cb"
+                className="cursor-pointer flex items-center gap-2 flex-wrap"
+              >
+                <span className="text-sm text-content font-medium">
+                  Knife lead-in / lead-out
+                </span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 leading-none">
+                  Closed paths
+                </span>
+              </label>
+              <div className="text-xs text-content-muted mt-0.5">
+                Adds tangential arcs on the waste side plus seam overcut for
+                drag-knife cuts.
+              </div>
+              <div
+                className={`grid grid-cols-[auto_92px_auto] items-center gap-x-2 gap-y-2 mt-2 transition-opacity ${
+                  prefs.knifeLeadInOutEnabled
+                    ? "opacity-100"
+                    : "opacity-30 pointer-events-none"
+                }`}
+              >
+                <label
+                  htmlFor="knife-lead-radius"
+                  className="text-xs text-content-muted whitespace-nowrap"
+                >
+                  Arc radius
+                </label>
+                <input
+                  id="knife-lead-radius"
+                  aria-label="Knife lead arc radius (mm)"
+                  type="number"
+                  min="0.1"
+                  max="20"
+                  step="0.1"
+                  value={prefs.knifeLeadRadiusMM}
+                  onChange={(e) => onKnifeLeadRadiusChange(e.target.value)}
+                  disabled={!prefs.knifeLeadInOutEnabled}
+                  className="w-full px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
+                />
+                <span className="text-xs text-content-muted">mm</span>
+
+                <label
+                  htmlFor="knife-overcut"
+                  className="text-xs text-content-muted whitespace-nowrap"
+                >
+                  Overcut
+                </label>
+                <input
+                  id="knife-overcut"
+                  aria-label="Knife overcut distance (mm)"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  value={prefs.knifeOvercutMM}
+                  onChange={(e) => onKnifeOvercutChange(e.target.value)}
+                  disabled={!prefs.knifeLeadInOutEnabled}
+                  className="w-full px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent"
                 />
                 <span className="text-xs text-content-muted">mm</span>
               </div>

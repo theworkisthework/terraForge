@@ -8,6 +8,8 @@ describe("PathsSection", () => {
     const onToggleOpen = vi.fn();
     const onTogglePref = vi.fn();
     const onJoinToleranceChange = vi.fn();
+    const onKnifeLeadRadiusChange = vi.fn();
+    const onKnifeOvercutChange = vi.fn();
 
     render(
       <PathsSection
@@ -16,6 +18,8 @@ describe("PathsSection", () => {
         onToggleOpen={onToggleOpen}
         onTogglePref={onTogglePref}
         onJoinToleranceChange={onJoinToleranceChange}
+        onKnifeLeadRadiusChange={onKnifeLeadRadiusChange}
+        onKnifeOvercutChange={onKnifeOvercutChange}
       />,
     );
 
@@ -25,7 +29,7 @@ describe("PathsSection", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Optimise paths" }));
     expect(onTogglePref).toHaveBeenCalledWith("optimise");
 
-    fireEvent.change(screen.getByRole("spinbutton"), {
+    fireEvent.change(screen.getByLabelText("Tolerance"), {
       target: { value: "0.75" },
     });
     expect(onJoinToleranceChange).toHaveBeenCalledWith("0.75");
