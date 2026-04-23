@@ -120,6 +120,9 @@ export function useJobActions() {
       optimisePaths: prefs.optimise,
       joinPaths: prefs.joinPaths,
       joinTolerance: prefs.joinTolerance,
+      knifeLeadInOutEnabled: prefs.knifeLeadInOutEnabled,
+      knifeLeadRadiusMM: prefs.knifeLeadRadiusMM,
+      knifeOvercutMM: prefs.knifeOvercutMM,
       liftPenAtEnd: prefs.liftPenAtEnd,
       returnToHome: prefs.returnToHome,
       penDownDelayMsOverride: prefs.penDownDelayOverrideEnabled

@@ -23,6 +23,9 @@ const defaultPrefs: GcodePrefs = {
   saveLocally: false,
   joinPaths: false,
   joinTolerance: 0.2,
+  knifeLeadInOutEnabled: false,
+  knifeLeadRadiusMM: 1,
+  knifeOvercutMM: 1,
   liftPenAtEnd: true,
   returnToHome: false,
   penDownDelayOverrideEnabled: false,
@@ -142,6 +145,9 @@ describe("GcodeOptionsDialog", () => {
         saveLocally: false,
         joinPaths: false,
         joinTolerance: 0.2,
+        knifeLeadInOutEnabled: false,
+        knifeLeadRadiusMM: 1,
+        knifeOvercutMM: 1,
         liftPenAtEnd: true,
         returnToHome: true,
         penDownDelayOverrideEnabled: false,
@@ -284,7 +290,9 @@ describe("GcodeOptionsDialog", () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
     await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
     const joinCb = screen.getByRole("checkbox", { name: "Join nearby paths" });
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByRole("spinbutton", {
+      name: "Tolerance",
+    });
     expect(toleranceInput).toBeDisabled();
     await userEvent.click(joinCb);
     expect(toleranceInput).not.toBeDisabled();
@@ -296,7 +304,9 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByRole("spinbutton", {
+      name: "Tolerance",
+    });
     fireEvent.change(toleranceInput, { target: { value: "0.5" } });
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
     expect(onConfirm).toHaveBeenCalledWith(
@@ -310,7 +320,9 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByRole("spinbutton", {
+      name: "Tolerance",
+    });
     await userEvent.clear(toleranceInput);
     await userEvent.type(toleranceInput, "abc");
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -326,7 +338,9 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
-    const toleranceInput = screen.getByRole("spinbutton");
+    const toleranceInput = screen.getByRole("spinbutton", {
+      name: "Tolerance",
+    });
     await userEvent.clear(toleranceInput);
     await userEvent.type(toleranceInput, "0");
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -334,6 +348,38 @@ describe("GcodeOptionsDialog", () => {
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ joinTolerance: 0.2 }),
     );
+  });
+
+  it("enabling knife lead mode disables Join nearby paths", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+
+    const joinCb = screen.getByRole("checkbox", { name: "Join nearby paths" });
+    const knifeCb = screen.getByRole("checkbox", {
+      name: "Knife lead-in/out on closed paths",
+    });
+
+    await userEvent.click(joinCb);
+    expect(joinCb).toBeChecked();
+    await userEvent.click(knifeCb);
+    expect(knifeCb).toBeChecked();
+    expect(joinCb).not.toBeChecked();
+  });
+
+  it("enabling Join nearby paths disables knife lead mode", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+
+    const joinCb = screen.getByRole("checkbox", { name: "Join nearby paths" });
+    const knifeCb = screen.getByRole("checkbox", {
+      name: "Knife lead-in/out on closed paths",
+    });
+
+    await userEvent.click(knifeCb);
+    expect(knifeCb).toBeChecked();
+    await userEvent.click(joinCb);
+    expect(joinCb).toBeChecked();
+    expect(knifeCb).not.toBeChecked();
   });
 
   // ── "Not connected" warning on SD card option ─────────────────────────────
@@ -429,6 +475,9 @@ describe("GcodeOptionsDialog", () => {
       exportPerHatch: false,
       joinPaths: false,
       joinTolerance: 0.2,
+      knifeLeadInOutEnabled: false,
+      knifeLeadRadiusMM: 1,
+      knifeOvercutMM: 1,
       liftPenAtEnd: true,
       returnToHome: false,
       penDownDelayOverrideEnabled: false,

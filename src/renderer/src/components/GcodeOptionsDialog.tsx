@@ -71,6 +71,22 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
           exportPerGroup: next ? false : p.exportPerGroup,
         };
       }
+      if (key === "joinPaths") {
+        const next = !p.joinPaths;
+        return {
+          ...p,
+          joinPaths: next,
+          knifeLeadInOutEnabled: next ? false : p.knifeLeadInOutEnabled,
+        };
+      }
+      if (key === "knifeLeadInOutEnabled") {
+        const next = !p.knifeLeadInOutEnabled;
+        return {
+          ...p,
+          knifeLeadInOutEnabled: next,
+          joinPaths: next ? false : p.joinPaths,
+        };
+      }
       return { ...p, [key]: !p[key] };
     });
 
@@ -80,6 +96,16 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const setJoinTolerance = (val: string) => {
     const n = parsePositiveNumber(val);
     if (n !== null) setPrefs((p) => ({ ...p, joinTolerance: n }));
+  };
+
+  const setKnifeLeadRadius = (val: string) => {
+    const n = parsePositiveNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, knifeLeadRadiusMM: n }));
+  };
+
+  const setKnifeOvercut = (val: string) => {
+    const n = parseNonNegativeNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, knifeOvercutMM: n }));
   };
 
   const setClipOffsetMM = (val: string) => {
@@ -145,6 +171,8 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             onToggleOpen={() => setPathsOpen((o) => !o)}
             onTogglePref={toggle}
             onJoinToleranceChange={setJoinTolerance}
+            onKnifeLeadRadiusChange={setKnifeLeadRadius}
+            onKnifeOvercutChange={setKnifeOvercut}
           />
 
           <div className="border-t border-border-ui" />

@@ -98,18 +98,21 @@ describe("parseGcode", () => {
     expect(cutSubpathCount(r)).toBe(2); // two separate cut sub-paths
   });
 
-  // â”€â”€ Arc commands (G2/G3) â€” approximated as lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ Arc commands (G2/G3) â€” segmented into polylines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   it("treats G2 clockwise arc as a feed move", () => {
     const r = parse("G1 X5 Y0\nG2 X10 Y5 I5 J0\n");
     // G2 treated as feed â€” should be in cuts, not rapids
     expect(cutsContainPoint(r, 10, 5)).toBe(true);
     expect(rapidsEmpty(r)).toBe(true);
+    // Arc preview should contain interpolated interior points, not just endpoints.
+    expect(r.cutPaths[0].length).toBeGreaterThan(6);
   });
 
   it("treats G3 counter-clockwise arc as a feed move", () => {
     const r = parse("G1 X5 Y0\nG3 X10 Y5 I5 J0\n");
     expect(cutsContainPoint(r, 10, 5)).toBe(true);
+    expect(r.cutPaths[0].length).toBeGreaterThan(6);
   });
 
   // â”€â”€ Modal state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

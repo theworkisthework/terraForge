@@ -33,6 +33,7 @@ function projectPathToVectorObjects(
     viewBoxX: imp.viewBoxX,
     viewBoxY: imp.viewBoxY,
     layer: path.layer,
+    hasFill: path.hasFill ?? false,
   };
   const importStrokeEnabled = imp.strokeEnabled ?? true;
   const pathStrokeEnabled = path.strokeEnabled ?? true;
