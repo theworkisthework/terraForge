@@ -459,7 +459,10 @@ function densifyClosedSubpath(sp: Subpath): Subpath {
   for (let i = 0; i < ring.length; i++) {
     dense.push(ring[i]);
     const next = ring[(i + 1) % ring.length];
-    dense.push({ x: (ring[i].x + next.x) * 0.5, y: (ring[i].y + next.y) * 0.5 });
+    dense.push({
+      x: (ring[i].x + next.x) * 0.5,
+      y: (ring[i].y + next.y) * 0.5,
+    });
   }
   dense.push(dense[0]);
   return dense;
