@@ -295,7 +295,7 @@ describe("MachineConfigDialog", () => {
         screen.getByDisplayValue("Stepper"),
         "servo",
       );
-      expect(screen.getByDisplayValue("0")).not.toBeDisabled();
+      expect(screen.getByLabelText("Pen-down delay (ms)")).not.toBeDisabled();
     });
 
     it("switching with customised commands triggers confirm dialog", async () => {

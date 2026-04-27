@@ -22,6 +22,7 @@ export const DEFAULT_MACHINE_CONFIGS: MachineConfig[] = [
     penUpCommand: "M5",
     penDownCommand: "M3 S1000",
     penDownDelayMs: 50,
+    penUpDelayMs: 0,
     jogSpeed: 3000,
     drawSpeed: 3000,
     connection: {
@@ -62,6 +63,10 @@ function defaultPenDownDelayMs(penType: PenType): number {
   }
 }
 
+function defaultPenUpDelayMs(_penType: PenType): number {
+  return 0;
+}
+
 function normalizeConfig(config: MachineConfig): MachineConfig {
   // Migrate legacy single-feedrate configs written before the jog/draw split.
   const legacy = (config as unknown as Record<string, unknown>).feedrate as
@@ -74,6 +79,10 @@ function normalizeConfig(config: MachineConfig): MachineConfig {
       typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
         ? config.penDownDelayMs
         : defaultPenDownDelayMs(config.penType),
+    penUpDelayMs:
+      typeof config.penUpDelayMs === "number" && config.penUpDelayMs >= 0
+        ? config.penUpDelayMs
+        : defaultPenUpDelayMs(config.penType),
     jogSpeed:
       typeof config.jogSpeed === "number" && config.jogSpeed >= 1
         ? config.jogSpeed

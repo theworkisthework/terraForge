@@ -125,6 +125,9 @@ export function useJobActions() {
       penDownDelayMsOverride: prefs.penDownDelayOverrideEnabled
         ? prefs.penDownDelayMs
         : undefined,
+      penUpDelayMsOverride: prefs.penUpDelayOverrideEnabled
+        ? prefs.penUpDelayMs
+        : undefined,
       drawSpeedOverride: prefs.drawSpeedOverrideEnabled
         ? prefs.drawSpeedOverride
         : undefined,
