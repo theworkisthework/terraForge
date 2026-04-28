@@ -6,6 +6,8 @@ import type {
 } from "../../../../../types";
 import { normalizeSvgColor } from "../../../features/imports/services/svgImportHelpers";
 
+const GENERATED_STROKE_GROUP_COLOR = normalizeSvgColor("black");
+
 function isLayerVisible(
   path: SvgPath,
   hiddenLayerIds: Set<string> | null,
@@ -43,14 +45,23 @@ function projectPathToVectorObjects(
   const generatedStrokeEnabled =
     path.generatedStrokeEnabled ?? imp.generatedStrokeForNoStroke ?? false;
   const hasStrokeGeometry = sourceOutlineVisible || generatedStrokeEnabled;
+  const rawStrokeColor = path.strokeColor
+    ? path.strokeColor
+    : sourceOutlineVisible
+      ? path.sourceColor
+      : generatedStrokeEnabled
+        ? GENERATED_STROKE_GROUP_COLOR
+        : undefined;
+  const strokeColor = rawStrokeColor
+    ? normalizeSvgColor(rawStrokeColor)
+    : undefined;
 
   const outlineVOs: VectorObject[] =
     importStrokeEnabled && pathStrokeEnabled && hasStrokeGeometry
       ? [
           {
             ...base,
-            // Keep all outline work in the black export bucket.
-            sourceColor: normalizeSvgColor("black"),
+            sourceColor: strokeColor,
           },
         ]
       : [];

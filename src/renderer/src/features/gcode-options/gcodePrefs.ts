@@ -6,7 +6,7 @@ export interface GcodePrefs {
   saveLocally: boolean;
   /** When true, generate a separate G-code file per layer group (multi-pen plots). */
   exportPerGroup: boolean;
-  /** When true, generate a separate G-code file per source fill color. */
+  /** When true, generate separate G-code files per source stroke and/or fill color group. */
   exportPerColor: boolean;
   /** When true, generate separate hatch-only files for each color (requires exportPerColor). */
   exportPerHatch: boolean;
