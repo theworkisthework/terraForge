@@ -33,6 +33,8 @@ export interface MachineConfig {
   penDownCommand: string;
   /** Delay after pen-down before XY motion begins (milliseconds). */
   penDownDelayMs: number;
+  /** Delay after pen-up before rapid travel begins (milliseconds). */
+  penUpDelayMs: number;
   /** Speed for jog panel commands ($J moves). mm/min. */
   jogSpeed: number;
   /** Default drawing feedrate emitted in generated G-code (F word). mm/min. */
@@ -265,6 +267,8 @@ export interface GcodeOptions {
   returnToHome: boolean; // send G0 X0 Y0 at end of job (default false)
   /** Optional per-generation override for pen-down delay (milliseconds). */
   penDownDelayMsOverride?: number;
+  /** Optional per-generation override for pen-up delay (milliseconds). */
+  penUpDelayMsOverride?: number;
   customStartGcode: string; // raw G-code lines inserted after the preamble, before paths
   customEndGcode: string; // raw G-code lines appended after lift/return, before EOF comment
   /** When a page template is active, clip G-code to the page's printable area

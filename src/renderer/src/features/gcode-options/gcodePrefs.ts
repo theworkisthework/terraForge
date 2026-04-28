@@ -16,6 +16,10 @@ export interface GcodePrefs {
   returnToHome: boolean;
   penDownDelayOverrideEnabled: boolean;
   penDownDelayMs: number;
+  /** When true, use penUpDelayMs as an override for pen-up delay instead of the machine default. */
+  penUpDelayOverrideEnabled: boolean;
+  /** Per-generation pen-up delay override in ms (used when penUpDelayOverrideEnabled is true). */
+  penUpDelayMs: number;
   /** Override the machine's default drawing speed for this job only. */
   drawSpeedOverrideEnabled: boolean;
   /** Drawing speed override value in mm/min (used when drawSpeedOverrideEnabled is true). */
@@ -44,6 +48,8 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   returnToHome: false,
   penDownDelayOverrideEnabled: false,
   penDownDelayMs: 0,
+  penUpDelayOverrideEnabled: false,
+  penUpDelayMs: 0,
   drawSpeedOverrideEnabled: false,
   drawSpeedOverride: 3000,
   customStartGcode: "",

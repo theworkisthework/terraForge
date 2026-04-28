@@ -37,6 +37,7 @@ export function createMachineConfig(
     penUpCommand: "M5",
     penDownCommand: "M3 S1000",
     penDownDelayMs: 50,
+    penUpDelayMs: 0,
     jogSpeed: 3000,
     drawSpeed: 3000,
     connection: { type: "wifi", host: "test.local", port: 80 },

@@ -154,7 +154,17 @@ async function generate(msg: GenerateMessage): Promise<void> {
       ? (config.penDownDelayMs ?? 0)
       : 0;
   const penDownDelayMs = Number.isFinite(rawDelayMs)
-    ? Math.max(0, rawDelayMs)
+    ? Math.max(0, rawDelayMs ?? 0)
+    : 0;
+
+  const hasUpDelayOverride = typeof options?.penUpDelayMsOverride === "number";
+  const rawUpDelayMs = hasUpDelayOverride
+    ? options.penUpDelayMsOverride
+    : config.penType === "servo" || config.penType === "solenoid"
+      ? (config.penUpDelayMs ?? 0)
+      : 0;
+  const penUpDelayMs = Number.isFinite(rawUpDelayMs)
+    ? Math.max(0, rawUpDelayMs ?? 0)
     : 0;
 
   lines.push(
@@ -174,6 +184,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Lift end : ${liftPenAtEnd ? "yes" : "no"}`);
   lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
   lines.push(`; Pen delay: ${penDownDelayMs} ms`);
+  lines.push(`; Pen up delay: ${penUpDelayMs} ms`);
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -328,6 +339,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
     }
     for (let s = 1; s < subpath.length; s++) {
       lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
+    }
+    if (penUpDelayMs > 0) {
+      lines.push(`G4 P${fmtSeconds(penUpDelayMs / 1000)} ; Pen lift delay`);
     }
     lines.push(config.penUpCommand + " ; Pen up");
     lines.push("");

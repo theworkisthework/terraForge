@@ -38,15 +38,31 @@ interface Props {
 
 const PEN_DEFAULTS: Record<
   PenType,
-  { penUpCommand: string; penDownCommand: string; penDownDelayMs: number }
+  {
+    penUpCommand: string;
+    penDownCommand: string;
+    penDownDelayMs: number;
+    penUpDelayMs: number;
+  }
 > = {
   solenoid: {
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
     penDownDelayMs: 50,
+    penUpDelayMs: 0,
   },
-  servo: { penUpCommand: "G0Z15", penDownCommand: "G0Z0", penDownDelayMs: 0 },
-  stepper: { penUpCommand: "G0Z15", penDownCommand: "G0Z0", penDownDelayMs: 0 },
+  servo: {
+    penUpCommand: "G0Z15",
+    penDownCommand: "G0Z0",
+    penDownDelayMs: 0,
+    penUpDelayMs: 0,
+  },
+  stepper: {
+    penUpCommand: "G0Z15",
+    penDownCommand: "G0Z0",
+    penDownDelayMs: 0,
+    penUpDelayMs: 0,
+  },
 };
 
 const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
@@ -58,6 +74,7 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   penUpCommand: PEN_DEFAULTS.solenoid.penUpCommand,
   penDownCommand: PEN_DEFAULTS.solenoid.penDownCommand,
   penDownDelayMs: PEN_DEFAULTS.solenoid.penDownDelayMs,
+  penUpDelayMs: PEN_DEFAULTS.solenoid.penUpDelayMs,
   jogSpeed: 3000,
   drawSpeed: 3000,
   connection: { type: "wifi", host: "fluidnc.local", port: 80 },
@@ -139,6 +156,7 @@ export function MachineConfigDialog({ onClose }: Props) {
         penUpCommand: defaults.penUpCommand,
         penDownCommand: defaults.penDownCommand,
         penDownDelayMs: defaults.penDownDelayMs,
+        penUpDelayMs: defaults.penUpDelayMs,
       });
     }
   };
@@ -473,6 +491,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <Field label="Pen-down delay (ms)">
                       <input
                         type="number"
+                        aria-label="Pen-down delay (ms)"
                         value={form.penDownDelayMs}
                         min={0}
                         step={1}
@@ -480,6 +499,22 @@ export function MachineConfigDialog({ onClose }: Props) {
                         onChange={(e) =>
                           change({
                             penDownDelayMs: Math.max(0, Number(e.target.value)),
+                          })
+                        }
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                      />
+                    </Field>
+                    <Field label="Pen-up delay (ms)">
+                      <input
+                        type="number"
+                        aria-label="Pen-up delay (ms)"
+                        value={form.penUpDelayMs}
+                        min={0}
+                        step={1}
+                        disabled={form.penType === "stepper"}
+                        onChange={(e) =>
+                          change({
+                            penUpDelayMs: Math.max(0, Number(e.target.value)),
                           })
                         }
                         className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -503,6 +538,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                           penUpCommand: d.penUpCommand,
                           penDownCommand: d.penDownCommand,
                           penDownDelayMs: d.penDownDelayMs,
+                          penUpDelayMs: d.penUpDelayMs,
                         });
                       }}
                       className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content-muted rounded transition-colors"
@@ -517,9 +553,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                     </span>
                   </div>
                   <p className="text-xs text-content-faint">
-                    Delay is inserted after pen-down and before XY motion
-                    starts. Machine default delay is applied for solenoid/servo
-                    profiles; stepper ignores the machine default.
+                    Pen-down delay is inserted after pen-down before XY motion
+                    starts. Pen-up delay is inserted after pen-up before rapid
+                    travel begins. Both delays are ignored for stepper profiles.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Draw speed (mm/min)">
@@ -702,7 +738,7 @@ export function MachineConfigDialog({ onClose }: Props) {
       {pendingPenType && (
         <ConfirmDialog
           title="Reset Pen Commands?"
-          message={`Reset pen commands to defaults for "${pendingPenType}"?\n\nUp: ${PEN_DEFAULTS[pendingPenType].penUpCommand}\nDown: ${PEN_DEFAULTS[pendingPenType].penDownCommand}\nDelay: ${PEN_DEFAULTS[pendingPenType].penDownDelayMs} ms`}
+          message={`Reset pen commands to defaults for "${pendingPenType}"?\n\nUp: ${PEN_DEFAULTS[pendingPenType].penUpCommand}\nDown: ${PEN_DEFAULTS[pendingPenType].penDownCommand}\nDown delay: ${PEN_DEFAULTS[pendingPenType].penDownDelayMs} ms\nUp delay: ${PEN_DEFAULTS[pendingPenType].penUpDelayMs} ms`}
           confirmLabel="Reset"
           onConfirm={() => {
             const d = PEN_DEFAULTS[pendingPenType];
@@ -711,6 +747,7 @@ export function MachineConfigDialog({ onClose }: Props) {
               penUpCommand: d.penUpCommand,
               penDownCommand: d.penDownCommand,
               penDownDelayMs: d.penDownDelayMs,
+              penUpDelayMs: d.penUpDelayMs,
             });
             setPendingPenType(null);
           }}

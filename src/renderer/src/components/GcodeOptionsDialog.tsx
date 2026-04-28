@@ -96,6 +96,11 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     if (n !== null) setPrefs((p) => ({ ...p, penDownDelayMs: n }));
   };
 
+  const setPenUpDelayMs = (val: string) => {
+    const n = parseNonNegativeNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, penUpDelayMs: n }));
+  };
+
   const setDrawSpeedOverride = (val: string) => {
     const n = parsePositiveNumber(val);
     if (n !== null) setPrefs((p) => ({ ...p, drawSpeedOverride: n }));
@@ -154,12 +159,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             customGcodeOpen={customGcodeOpen}
             prefs={prefs}
             machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
+            machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
             machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
             hasPageTemplate={!!pageTemplate}
             onToggleOpen={() => setOptionsOpen((o) => !o)}
             onToggleCustomGcodeOpen={() => setCustomGcodeOpen((o) => !o)}
             onTogglePref={toggle}
             onSetPenDownDelayMs={setPenDownDelayMs}
+            onSetPenUpDelayMs={setPenUpDelayMs}
             onSetDrawSpeedOverride={setDrawSpeedOverride}
             onSetClipMode={setClipMode}
             onSetClipOffset={setClipOffsetMM}

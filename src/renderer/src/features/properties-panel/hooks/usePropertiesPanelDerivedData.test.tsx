@@ -24,6 +24,7 @@ const machineConfig: MachineConfig = {
   penUpCommand: "M5",
   penDownCommand: "M3 S1000",
   penDownDelayMs: 50,
+  penUpDelayMs: 0,
   jogSpeed: 3200,
   drawSpeed: 1800,
   connection: { type: "wifi", host: "test.local", port: 80 },

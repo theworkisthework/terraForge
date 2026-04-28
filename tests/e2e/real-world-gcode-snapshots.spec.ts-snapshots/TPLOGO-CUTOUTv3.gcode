@@ -7,6 +7,7 @@
 ; Lift end : yes
 ; Ret home : no
 ; Pen delay: 50 ms
+; Pen up delay: 0 ms
 ; Generated: <normalized>
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
