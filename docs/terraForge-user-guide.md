@@ -1,6 +1,6 @@
 # terraForge — User Guide
 
-> **Version:** 1.1 · **Date:** 2026-03-29
+> **Version:** 1.2 · **Date:** 2026-04-22
 > This guide covers all currently implemented features of terraForge.
 
 ---
@@ -103,21 +103,27 @@ Click the **⚙** (gear) button at the far right of the toolbar.
 
 4. **Pen type** automatically fills in sensible defaults for the pen commands:
 
-   | Pen Type | Pen Up  | Pen Down |
-   | -------- | ------- | -------- |
-   | Solenoid | `M3S0`  | `M3S1`   |
-   | Servo    | `G0Z15` | `G0Z0`   |
-   | Stepper  | `G0Z15` | `G0Z0`   |
+   | Pen Type | Pen Up  | Pen Down | Pen-down Delay |
+   | -------- | ------- | -------- | -------------- |
+   | Solenoid | `M3S0`  | `M3S1`   | `50 ms`        |
+   | Servo    | `G0Z15` | `G0Z0`   | `0 ms`         |
+   | Stepper  | `G0Z15` | `G0Z0`   | `0 ms`         |
 
    Use the **⇕ Swap** button if your solenoid wiring is reversed. Use **↺ Reset** to restore type defaults after manual edits.
 
-5. Fill in the **Connection** section (see connection details in §4).
+   The **Pen-down delay (ms)** field controls dwell time inserted after pen-down and before XY drawing starts.
 
-6. Click **Save Changes**.
+5. Set your default speeds:
+   - **Draw speed (mm/min)**: default plotting feedrate for generated G-code.
+   - **Jog speed (mm/min)**: default speed used by jog moves.
 
-7. Click **Set as Active** to make this the working machine.
+6. Fill in the **Connection** section (see connection details in §4).
 
-8. Click **Close**.
+7. Click **Save Changes**.
+
+8. Click **Set as Active** to make this the working machine.
+
+9. Click **Close**.
 
 ![Completed machine config form](../docs/resources/04-machine-config-completed.png)
 
@@ -409,10 +415,16 @@ The **🔒 padlock** icon between the W and H fields controls aspect ratio:
 
 ### Scale Shortcuts
 
-Two buttons appear below the Scale input:
+Four transform buttons appear below the Scale input:
 
-- **⊞ Fit to bed** — scales the import as large as possible while keeping it within the bed boundary, then repositions it at the bed origin.
-- **⊟ 1:1 reset** — restores scale to 1 (1 SVG user unit = 1 mm).
+- **⊞ Fit to bed / Fit to page / Fit to margin** — scales the import as large as possible while keeping it in bounds. The target is bed by default, or page/margin when template scaling is enabled.
+- **⊟ 1:1 reset** — restores scale to 1 (1 SVG user unit = 1 mm) and re-enables ratio lock.
+- **Fit horizontal scale** — fits width only to the current target frame.
+- **Fit vertical scale** — fits height only to the current target frame.
+
+Horizontal/vertical fit buttons are disabled while aspect ratio lock is enabled.
+
+Use **Scale to template** to switch fit actions from bed to the active page template, then choose **Page** or **Margin** as the fit target. If no page template is active, template scaling controls are disabled.
 
 ### Rotation Controls
 
@@ -430,6 +442,17 @@ The **Stroke width** field sets the canvas preview stroke thickness in mm. This 
 ### Centre Marker
 
 Ticking **Centre marker** displays a crosshair (+) at the geometric centre of the selected import. The marker renders at a constant screen size at all zoom levels.
+
+### Stroke Outlines
+
+The **Stroke outlines** section controls whether path outlines are plotted for the selected import.
+
+| Toggle                                  | Description                                                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stroke outlines**                     | Master toggle — when off, no stroke paths from this import are included in G-code output. Useful for imports you want to plot as hatch-fill only.                           |
+| **Generate stroke for no-stroke paths** | Only shown when the import contains paths that have no source stroke (fill-only shapes). When on, synthetic outlines are generated along the path boundary so they can be plotted. Generated outlines appear in the colour groups view and count towards per-colour export. |
+
+> **Note:** "Generate stroke for no-stroke paths" is hidden when all paths already carry a stroke colour. It appears automatically once a fill-only path is detected.
 
 ### Hatch Fill
 
@@ -510,9 +533,22 @@ Drag any import row from the ungrouped list into a group header. Drag it back ou
 
 Click a group header row to select the entire group. Drag, scale, and rotate operations apply to all members simultaneously, transforming around the group centroid.
 
+### Colour Groups
+
+In addition to manual layer groups, terraForge automatically builds **colour groups** from SVG path colours.
+
+![Properties panel grouped by colour](../docs/resources/13b-colour-groups.png)
+
+- Groups are based on effective path fill/stroke colour.
+- Each colour group appears as a collapsible row in the Properties panel with a colour swatch and path count.
+- Toggle a colour group's visibility to include/exclude all paths in that group from generation.
+- Paths are sorted in hue order (rainbow order) to make colour-based workflows easier to scan.
+
+Colour grouping is useful for pen-swap workflows where each pen corresponds to one source artwork colour.
+
 ### Generating G-code Per Group
 
-When layer groups are defined, you can generate a separate G-code file for each group from the G-code options dialog. Each file is named after the group (e.g. `red_layer.gcode`, `blue_layer.gcode`). Imports not assigned to any group are collected into a single additional file.
+When layer groups are defined, you can generate a separate G-code file for each group from the G-code options dialog. Each file is named after the group (e.g. `red_layer.gcode`, `blue_layer.gcode`). Imports not assigned to any group are collected into a single additional file named `ungrouped.gcode`.
 
 ---
 
@@ -539,22 +575,27 @@ When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.
 
 ![G-code Options dialog — Options section expanded](../docs/resources/14b-gcode-options-section.png)
 
-| Option              | Description                                                                         |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| **Lift pen at end** | Send the pen-up command after the last stroke (recommended)                         |
-| **Return to home**  | Rapid to origin (X0 Y0) after the job finishes                                      |
-| **Page clipping**   | Clip G-code to the page/margin boundary (only shown when a page template is active) |
-| **Custom G-code**   | Sub-collapsible for custom start/end G-code blocks inserted around the job          |
+| Option                      | Description                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| **Lift pen at end**         | Send the pen-up command after the last stroke (recommended)                            |
+| **Return to home**          | Rapid to origin (X0 Y0) after the job finishes                                         |
+| **Override pen-down delay** | Apply a per-job pen-down delay override (ms). Shows machine default next to the input. |
+| **Override draw speed**     | Apply a per-job drawing speed (feedrate) override in mm/min.                           |
+| **Page clipping**           | Clip G-code to the page/margin boundary (only shown when a page template is active)    |
+| **Custom G-code**           | Sub-collapsible for custom start/end G-code blocks inserted around the job             |
 
 #### Output section
 
 ![G-code Options dialog — Output section expanded](../docs/resources/14c-gcode-output.png)
+![G-code Options dialog — Output section with colour export options](../docs/resources/14d-gcode-output-colour-groups.png)
 
-| Option                        | Description                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| **Upload to SD card**         | Upload the generated file to the machine SD card root after generation        |
-| **Save to computer**          | Open a native save dialog after generation                                    |
-| **Export one file per group** | Generate a separate G-code file for each layer group (multi-colour pen plots) |
+| Option                                     | Description                                                                              |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| **Upload to SD card**                      | Upload the generated file to the machine SD card root after generation                   |
+| **Save to computer**                       | Open a native save dialog after generation                                               |
+| **Export one file per group**              | Generate a separate G-code file for each layer group (multi-colour pen plots)            |
+| **Export one file per colour group**       | Generate a separate G-code file for each detected path colour group.                     |
+| **Export separate hatch files per colour** | Generate additional hatch-only files for each colour group (requires per-colour export). |
 
 - At least one output (**Upload** or **Save**) must be selected; the **Generate** button is disabled otherwise.
 - When **Upload to SD card** is selected and a machine is connected, the uploaded file is automatically selected as the queued job — **Start job** is immediately ready.
@@ -562,7 +603,9 @@ When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.
 
 ### Persisted Preferences
 
-All four dialog settings (including join-paths tolerance) are saved in `localStorage` and restored on the next session. Defaults: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
+G-code dialog preferences are saved in `localStorage` and restored on the next session, including join tolerance, pen-down delay override, draw speed override, and output targets.
+
+Defaults: Optimise = on, Join paths = off (0.2 mm), Lift pen at end = on, Return to home = off, Override pen-down delay = off, Override draw speed = off, Upload to SD = on, Save to computer = off, Export per group = off, Export per colour group = off, Export hatch per colour = off.
 
 ### Path Optimisation
 
@@ -576,11 +619,17 @@ Optimised filenames append `_opt`: `logo_opt.gcode`, `logo+2_opt.gcode`.
 
 ### Save Filename
 
-The default filename in the save dialog is derived from the import name(s):
+For single-file export, the default filename base is chosen in this order:
 
-- Single import: `logo.gcode`
-- Multiple imports: `logo+2.gcode` (first name + count of others)
-- Optimised: `logo_opt.gcode` / `logo+2_opt.gcode`
+- Selected layer group name (if a group is selected)
+- Selected import name (if an import is selected)
+- First import name
+
+The name is sanitised for filesystem-safe output, and `_opt` is appended when optimisation is enabled.
+
+For per-group export, each file is named from the group name, and unassigned imports export as `ungrouped.gcode`.
+
+For per-colour export, files are generated per detected colour group using a colour-based filename (for example, `color_hex-ff0000.gcode`), with `_opt` appended when optimisation is enabled.
 
 ### G-code Header
 
