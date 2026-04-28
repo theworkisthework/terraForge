@@ -438,7 +438,7 @@ export function useJobActions() {
   };
 
   /**
-   * Generates separate G-code files per source fill color.
+   * Generates separate G-code files per source stroke and/or fill color group.
    */
   const handleGenerateGcodePerColor = async (
     prefs: GcodePrefs,
@@ -456,9 +456,8 @@ export function useJobActions() {
     const byColor = new Map<string, VectorObject[]>();
 
     for (const obj of allObjects) {
-      // Exclude hatch objects (identified by ID containing '-h') from per-color export
-      // Hatches are handled separately by exportPerHatch if enabled
-      if (obj.id.includes("-h")) continue;
+      // When hatch-only export is enabled, keep hatch objects out of mixed files.
+      if (prefs.exportPerHatch && obj.id.includes("-h")) continue;
 
       const rawColor = obj.sourceColor?.trim();
       const key = rawColor ? normalizeSvgColor(rawColor) : "";
