@@ -6,6 +6,7 @@ import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { selectFileBrowserPaneCanvasState } from "../store/canvasSelectors";
 import { parseGcode } from "../utils/gcodeParser";
+import { useStableMachineState } from "../hooks/useStableMachineState";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { RemoteFile } from "../../../types";
 
@@ -138,6 +139,7 @@ function FsPane({
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const status = useMachineStore((s) => s.status);
+  const displayMachineState = useStableMachineState(status?.state);
   const hasRunningTransfer = Object.values(tasks).some(
     (task) =>
       (task.type === "file-upload" || task.type === "file-download") &&
@@ -202,7 +204,7 @@ function FsPane({
   // Only fires on status state transitions so clicking a different row while
   // a job is running cannot overwrite the already-set activeJobPath.
   useEffect(() => {
-    if (status?.state === "Run" || status?.state === "Hold") {
+    if (displayMachineState === "Run" || displayMachineState === "Hold") {
       setActiveJobPath((prev) => {
         if (prev !== null) return prev; // already set — keep it
         const jf = selectedJobFileRef.current;
@@ -211,7 +213,7 @@ function FsPane({
     } else {
       setActiveJobPath(null);
     }
-  }, [status?.state, source]);
+  }, [displayMachineState, source]);
 
   const handleDownload = async (file: RemoteFile) => {
     if (hasRunningTransfer) return;
@@ -521,7 +523,8 @@ function FsPane({
 
             {files.map((file) => {
               const anyJobActive =
-                (status?.state === "Run" || status?.state === "Hold") &&
+                (displayMachineState === "Run" ||
+                  displayMachineState === "Hold") &&
                 activeJobPath !== null;
 
               // While a job is running, keep the highlight on the active file
@@ -583,9 +586,11 @@ function FsPane({
                     (() => {
                       const isGcode = isGcodeFile(file.name);
                       const isThisRunning =
-                        activeJobPath === file.path && status?.state === "Run";
+                        activeJobPath === file.path &&
+                        displayMachineState === "Run";
                       const isThisHeld =
-                        activeJobPath === file.path && status?.state === "Hold";
+                        activeJobPath === file.path &&
+                        displayMachineState === "Hold";
                       const isActiveJob = isThisRunning || isThisHeld;
                       const isLoadingThis = runningFile === file.path;
                       return (

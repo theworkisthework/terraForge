@@ -7,6 +7,7 @@ import { useTaskStore } from "../store/taskStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { selectJobControlsCanvasState } from "../store/canvasSelectors";
 import { parseGcode } from "../utils/gcodeParser";
+import { useStableMachineState } from "../hooks/useStableMachineState";
 
 const GCODE_EXTS = [
   ".gcode",
@@ -50,12 +51,13 @@ export function JobControls() {
         }
       : null);
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
+  const displayState = useStableMachineState(status?.state);
 
   const jobFileValid =
     effectiveJobFile != null && isGcodeFile(effectiveJobFile.name);
 
-  const isRunning = status?.state === "Run";
-  const isHeld = status?.state === "Hold";
+  const isRunning = displayState === "Run";
+  const isHeld = displayState === "Hold";
   const isActive = isRunning || isHeld;
 
   const lineNum = status?.lineNum;

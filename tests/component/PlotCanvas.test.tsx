@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCanvasStore } from "@renderer/store/canvasStore";
@@ -33,6 +33,10 @@ beforeEach(() => {
     selectedJobFile: null,
   });
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("PlotCanvas", () => {
@@ -842,6 +846,60 @@ describe("PlotCanvas", () => {
       const svgs = container.querySelectorAll("svg");
       expect(svgs.length).toBeGreaterThan(1);
     }
+    restore();
+  });
+
+  it("toolpath-overlay delete button stays hidden through a brief Idle blip", () => {
+    vi.useFakeTimers();
+    const restore = setupRO();
+    const tp = createGcodeToolpath();
+    useCanvasStore.setState({
+      gcodeToolpath: tp,
+      toolpathSelected: true,
+      gcodeSource: null,
+    });
+    useMachineStore.setState({
+      status: {
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+      },
+    });
+
+    const { container } = render(<PlotCanvas />);
+    expect(
+      container.querySelector('[data-testid="toolpath-delete"]'),
+    ).toBeNull();
+
+    act(() => {
+      useMachineStore.setState({
+        status: {
+          state: "Idle",
+          mpos: { x: 0, y: 0, z: 0 },
+          wpos: { x: 0, y: 0, z: 0 },
+          raw: "<Idle|MPos:0,0,0>",
+        },
+      });
+    });
+
+    expect(
+      container.querySelector('[data-testid="toolpath-delete"]'),
+    ).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(
+      container.querySelector('[data-testid="toolpath-delete"]'),
+    ).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(
+      container.querySelector('[data-testid="toolpath-delete"]'),
+    ).toBeTruthy();
     restore();
   });
 
