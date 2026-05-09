@@ -97,7 +97,27 @@ test.beforeAll(async () => {
   // Immediate resolve for operations we will trigger in tests.
   await mockIpcInvoke(electronApp, "fluidnc:deleteFile", undefined);
   await mockIpcInvoke(electronApp, "fluidnc:runFile", undefined);
-  await mockIpcInvoke(electronApp, "fluidnc:uploadFile", undefined);
+  // Upload mock: resolve immediately AND send a task:update completion event so
+  // the renderer task store clears the running transfer task.  Without this the
+  // task stays "running" for the rest of the suite, causing hasRunningTransfer
+  // to remain true and breaking later button-title assertions.
+  await electronApp.evaluate(({ ipcMain, BrowserWindow }) => {
+    ipcMain.removeHandler("fluidnc:uploadFile");
+    ipcMain.handle(
+      "fluidnc:uploadFile",
+      async (_e: Electron.IpcMainInvokeEvent, taskId: string) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        win?.webContents.send("task:update", {
+          id: taskId,
+          type: "file-upload",
+          label: "Upload complete",
+          status: "completed",
+          progress: 100,
+        });
+        return undefined;
+      },
+    );
+  });
   await mockIpcInvoke(electronApp, "fluidnc:fetchFileText", REMOTE_GCODE);
 
   // Reload so the renderer picks up the mocked configs.
