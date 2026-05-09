@@ -13,7 +13,7 @@ on:
         default: true
         type: boolean
       build_macos:
-        description: Build macOS DMG (.dmg)
+        description: Build macOS DMGs (.dmg) for Apple Silicon and Intel
         required: true
         default: false
         type: boolean
@@ -114,7 +114,7 @@ jobs:
       - name: Install dependencies
         run: npm i
 
-      - name: Build macOS package
+      - name: Build macOS packages
         run: npm run dist:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
