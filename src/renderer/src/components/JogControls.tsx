@@ -24,6 +24,7 @@ interface Props {
 export function JogControls({ onClose }: Props) {
   const [step, setStep] = useState<JogStep>(1);
   const activeConfig = useMachineStore((s) => s.activeConfig());
+  const connected = useMachineStore((s) => s.connected);
   const [feedrate, setFeedrate] = useState<number>(
     () => activeConfig?.jogSpeed ?? 3000,
   );
@@ -115,6 +116,7 @@ export function JogControls({ onClose }: Props) {
           title={`Move Y +${step} mm`}
           ariaLabel="Jog Y+"
           onClick={() => jog("Y", 1)}
+          disabled={!connected}
         />
         <div />
 
@@ -123,6 +125,7 @@ export function JogControls({ onClose }: Props) {
           title={`Move X -${step} mm`}
           ariaLabel="Jog X-"
           onClick={() => jog("X", -1)}
+          disabled={!connected}
         />
         <JogBtn
           label={<House size={14} />}
@@ -131,12 +134,14 @@ export function JogControls({ onClose }: Props) {
           onClick={async () => {
             await window.terraForge.fluidnc.sendCommand("G0 X0 Y0");
           }}
+          disabled={!connected}
         />
         <JogBtn
           label={<ArrowBigRight size={16} />}
           title={`Move X +${step} mm`}
           ariaLabel="Jog X+"
           onClick={() => jog("X", 1)}
+          disabled={!connected}
         />
 
         <div />
@@ -145,6 +150,7 @@ export function JogControls({ onClose }: Props) {
           title={`Move Y -${step} mm`}
           ariaLabel="Jog Y-"
           onClick={() => jog("Y", -1)}
+          disabled={!connected}
         />
         <div />
       </div>
@@ -155,7 +161,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen down"
             onClick={() => movePen(-1)}
-            disabled={penType === "solenoid" && !penDown}
+            disabled={!connected || (penType === "solenoid" && !penDown)}
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <PenLine size={15} />
@@ -166,7 +172,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen up"
             onClick={() => movePen(1)}
-            disabled={penType === "solenoid" && !penUp}
+            disabled={!connected || (penType === "solenoid" && !penUp)}
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <Pen size={15} />
@@ -179,7 +185,8 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 Z0");
             }}
-            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors flex items-center justify-center"
+            disabled={!connected}
+            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center"
           >
             <CircleSlash2 size={14} />
           </button>
@@ -214,7 +221,8 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("$H");
             }}
-            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors flex items-center justify-center gap-1.5"
+            disabled={!connected}
+            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
           >
             <House size={13} />
             Run Homing
@@ -225,7 +233,8 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
             }}
-            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors flex items-center justify-center gap-1.5"
+            disabled={!connected}
+            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
           >
             <CircleSlash2 size={13} />
             Set Zero
@@ -241,17 +250,20 @@ function JogBtn({
   onClick,
   title,
   ariaLabel,
+  disabled,
 }: {
   label: React.ReactNode;
   onClick: () => void;
   title?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }) {
   const btn = (
     <button
       onClick={onClick}
       aria-label={ariaLabel}
-      className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors font-mono flex items-center justify-center w-full"
+      disabled={disabled}
+      className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors font-mono flex items-center justify-center w-full disabled:opacity-40"
     >
       {label}
     </button>

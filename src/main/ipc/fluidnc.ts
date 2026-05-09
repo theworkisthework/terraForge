@@ -36,7 +36,9 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
   });
 
   ipcMain.handle("fluidnc:sendCommand", (_e, cmd: string) => {
-    if (getConnectionType() === "serial") return serial.sendCommand(cmd);
+    const connType = getConnectionType();
+    if (connType === null) return Promise.reject(new Error("Not connected"));
+    if (connType === "serial") return serial.sendCommand(cmd);
     return fluidnc.sendCommand(cmd);
   });
 

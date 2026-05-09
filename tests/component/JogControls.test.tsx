@@ -12,7 +12,7 @@ beforeEach(() => {
     configs: [],
     activeConfigId: null,
     status: null,
-    connected: false,
+    connected: true,
     wsLive: false,
     selectedJobFile: null,
   });
@@ -170,7 +170,7 @@ describe("JogControls — Z jog with servo/stepper pen type", () => {
       configs: [cfg],
       activeConfigId: cfg.id,
       status: null,
-      connected: false,
+      connected: true,
       wsLive: false,
       selectedJobFile: null,
     });
@@ -233,7 +233,7 @@ describe("JogControls — pen commands with solenoid pen type", () => {
       configs: [cfg],
       activeConfigId: cfg.id,
       status: null,
-      connected: false,
+      connected: true,
       wsLive: false,
       selectedJobFile: null,
     });
@@ -256,5 +256,56 @@ describe("JogControls — pen commands with solenoid pen type", () => {
     expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
       expect.stringContaining("$J="),
     );
+  });
+});
+
+// ── Disconnected state ────────────────────────────────────────────────────────
+
+describe("JogControls — when disconnected", () => {
+  beforeEach(() => {
+    const cfg = createMachineConfig({
+      penType: "solenoid",
+      penUpCommand: "M3S0",
+      penDownCommand: "M3S1",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: false,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  it("disables XY jog buttons when not connected", () => {
+    render(<JogControls />);
+    expect(screen.getByRole("button", { name: "Jog X+" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Jog X-" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Jog Y+" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Jog Y-" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Go to origin" })).toBeDisabled();
+  });
+
+  it("disables pen and Z buttons when not connected", () => {
+    render(<JogControls />);
+    expect(screen.getByRole("button", { name: "Pen down" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Pen up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Zero Z" })).toBeDisabled();
+  });
+
+  it("disables positioning shortcut buttons when not connected", () => {
+    render(<JogControls />);
+    expect(screen.getByRole("button", { name: /Run Homing/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Set Zero/i })).toBeDisabled();
+  });
+
+  it("does not send commands when jog buttons clicked while disconnected", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
+    await userEvent.click(screen.getByRole("button", { name: /Run Homing/i }));
+    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalled();
   });
 });
