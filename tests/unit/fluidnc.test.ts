@@ -19,7 +19,7 @@ const wsCapture = vi.hoisted(() => ({
 
 vi.mock("ws", () => {
   // EventEmitter must be required inside the factory (hoisted context)
-   
+
   const { EventEmitter } = require("events");
 
   class MockWebSocket extends EventEmitter {
@@ -94,13 +94,29 @@ describe("FluidNCClient", () => {
 
   // ── sendCommand ─────────────────────────────────────────────────────────
 
-  it("sends command via GET for fw 4.x (default)", async () => {
+  it("sends command via GET commandText for fw 4.x (default)", async () => {
     mockFetch.mockResolvedValueOnce(mockResponse("ok"));
     const result = await client.sendCommand("G0 X10");
     expect(result).toBe("ok");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/command?plain="),
+      expect.stringContaining("/command?commandText="),
       expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("falls back to GET plain query when commandText query fails", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("", 404))
+      .mockResolvedValueOnce(mockResponse("ok"));
+
+    const result = await client.sendCommand("G10 L20 P1 X0 Y0");
+    expect(result).toBe("ok");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[0][0]).toEqual(
+      expect.stringContaining("/command?commandText="),
+    );
+    expect(mockFetch.mock.calls[1][0]).toEqual(
+      expect.stringContaining("/command?plain="),
     );
   });
 
@@ -170,7 +186,9 @@ describe("FluidNCClient", () => {
   });
 
   it("throws on HTTP error from sendCommand", async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse("", 404));
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("", 404))
+      .mockResolvedValueOnce(mockResponse("", 404));
     await expect(client.sendCommand("test")).rejects.toThrow("HTTP 404");
   });
 
