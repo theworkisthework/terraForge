@@ -103,7 +103,9 @@ npm run typecheck    # TypeScript strict check
 
 ```sh
 npm run dist:win     # Windows
-npm run dist:mac     # macOS
+npm run dist:mac     # macOS arm64 + x64
+npm run dist:mac:arm64
+npm run dist:mac:x64
 npm run dist:linux   # Linux
 npm run dist:all     # All three platforms
 ```
