@@ -424,7 +424,8 @@ describe("FluidNCClient.downloadFile", () => {
       end: ReturnType<typeof vi.fn>;
     };
     expect(writer).toBeDefined();
-    expect(writer.write).toHaveBeenCalledWith(chunk);
+    expect(writer.write).toHaveBeenCalled();
+    expect(writer.write.mock.calls[0]?.[0]).toEqual(chunk);
     expect(writer.end).toHaveBeenCalled();
   });
 
