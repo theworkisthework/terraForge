@@ -14,7 +14,7 @@ G90      ; Absolute coordinates
 G21      ; Units: mm
 M5 ; Pen up
 
-; -- Color: #000000 (4 objects) --
+; -- Color: #231f20 (4 objects) --
 ; -- Color: #ed2024 (42 objects) --
 ; -- Sequential path (46 subpaths) -----------
 G0 X24.368 Y65.532 ; Rapid travel
