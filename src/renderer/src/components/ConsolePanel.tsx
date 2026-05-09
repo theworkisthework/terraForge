@@ -3,6 +3,7 @@ import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
 import { JobControls } from "./JobControls";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useStableMachineState } from "../hooks/useStableMachineState";
 
 export function ConsolePanel() {
   const lines = useConsoleStore((s) => s.lines);
@@ -15,12 +16,13 @@ export function ConsolePanel() {
   const [cmd, setCmd] = useState("");
   const [resetting, setResetting] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const displayState = useStableMachineState(status?.state);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  const isAlarm = status?.state === "Alarm";
+  const isAlarm = displayState === "Alarm";
 
   const handleSend = async () => {
     const trimmed = cmd.trim();
@@ -90,12 +92,12 @@ export function ConsolePanel() {
               ) : (
                 <span
                   className={`text-xs px-2 py-0.5 rounded ${
-                    status.state === "Run"
+                    displayState === "Run"
                       ? "bg-green-900 text-green-300"
                       : "bg-secondary text-content-muted"
                   }`}
                 >
-                  {status.state}
+                  {displayState}
                 </span>
               ))}
             {status?.wpos && (
