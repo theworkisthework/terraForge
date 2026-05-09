@@ -132,7 +132,7 @@ jobs:
           # secrets here if you ever get an Apple Developer account.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload DMG
+      - name: Upload DMGs
         uses: actions/upload-artifact@v4
         with:
           name: mac
