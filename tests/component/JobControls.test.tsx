@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -22,6 +22,10 @@ beforeEach(() => {
   });
   useTaskStore.setState({ tasks: {} });
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("JobControls", () => {
@@ -127,6 +131,46 @@ describe("JobControls", () => {
     });
     render(<JobControls />);
     expect(screen.getByText("✕ Abort")).toBeInTheDocument();
+  });
+
+  it("keeps active controls visible through a brief Idle blip", async () => {
+    vi.useFakeTimers();
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+      },
+    });
+
+    render(<JobControls />);
+    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+
+    act(() => {
+      useMachineStore.setState({
+        status: {
+          state: "Idle",
+          mpos: { x: 0, y: 0, z: 0 },
+          wpos: { x: 0, y: 0, z: 0 },
+          raw: "<Idle|MPos:0,0,0>",
+        },
+      });
+    });
+
+    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+    expect(screen.queryByText("▶ Start job")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(screen.getByText("▶ Start job")).toBeInTheDocument();
   });
 
   it("calls pauseJob when Pause clicked", async () => {

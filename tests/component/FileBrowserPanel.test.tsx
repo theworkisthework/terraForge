@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  act,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -28,6 +34,10 @@ beforeEach(() => {
     gcodeSource: null,
   });
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("FileBrowserPanel", () => {
@@ -788,6 +798,70 @@ describe("FileBrowserPanel", () => {
     expect(screen.getByTitle("Resume job")).toBeInTheDocument();
     await userEvent.click(screen.getByTitle("Resume job"));
     expect(window.terraForge.fluidnc.resumeJob).toHaveBeenCalled();
+  });
+
+  it("keeps the active file controls stable through a brief Idle blip", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        name: "run.gcode",
+        path: "/run.gcode",
+        size: 100,
+        isDirectory: false,
+      },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
+      status: {
+        state: "Run" as any,
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+      } as any,
+    });
+    render(<FileBrowserPanel />);
+    await waitFor(() =>
+      expect(screen.getByText("run.gcode")).toBeInTheDocument(),
+    );
+
+    vi.useFakeTimers();
+
+    expect(screen.getByTitle("Pause job")).toBeInTheDocument();
+    expect(screen.queryByTitle("Run job now")).not.toBeInTheDocument();
+
+    act(() => {
+      useMachineStore.setState({
+        status: {
+          state: "Idle" as any,
+          mpos: { x: 0, y: 0, z: 0 },
+          wpos: { x: 0, y: 0, z: 0 },
+          raw: "<Idle|MPos:0,0,0>",
+        } as any,
+      });
+    });
+
+    expect(screen.getByTitle("Pause job")).toBeInTheDocument();
+    expect(screen.queryByTitle("Run job now")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByTitle("Pause job")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(screen.queryByTitle("Pause job")).not.toBeInTheDocument();
+
+    const row = screen.getByTestId("file-row-run.gcode");
+    fireEvent.mouseOver(row);
+    expect(screen.getByTitle("Run job now")).toBeInTheDocument();
   });
 
   // ── Drag-to-resize divider ──────────────────────────────────────────

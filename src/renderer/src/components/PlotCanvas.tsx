@@ -21,6 +21,7 @@ import {
 } from "../store/canvasSelectors";
 import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
+import { useStableMachineState } from "../hooks/useStableMachineState";
 import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 import {
   MM_TO_PX,
@@ -85,8 +86,9 @@ export function PlotCanvas() {
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const machineStatus = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
+  const displayMachineState = useStableMachineState(machineStatus?.state);
   const isJobActive =
-    machineStatus?.state === "Run" || machineStatus?.state === "Hold";
+    displayMachineState === "Run" || displayMachineState === "Hold";
 
   // Activate live plot-progress tracking whenever a toolpath is loaded
   // and the machine is running a job.

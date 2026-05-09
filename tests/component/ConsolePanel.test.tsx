@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useConsoleStore } from "@renderer/store/consoleStore";
@@ -16,6 +16,10 @@ beforeEach(() => {
     selectedJobFile: null,
   });
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("ConsolePanel", () => {
@@ -62,6 +66,46 @@ describe("ConsolePanel", () => {
       },
     });
     render(<ConsolePanel />);
+    expect(screen.getByText("Idle")).toBeInTheDocument();
+  });
+
+  it("keeps the Run badge visible through a brief Idle blip", () => {
+    vi.useFakeTimers();
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        raw: "<Run|MPos:0,0,0>",
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+      },
+    });
+
+    render(<ConsolePanel />);
+    expect(screen.getByText("Run")).toBeInTheDocument();
+
+    act(() => {
+      useMachineStore.setState({
+        status: {
+          raw: "<Idle|MPos:0,0,0>",
+          state: "Idle",
+          mpos: { x: 0, y: 0, z: 0 },
+          wpos: { x: 0, y: 0, z: 0 },
+        },
+      });
+    });
+
+    expect(screen.getByText("Run")).toBeInTheDocument();
+    expect(screen.queryByText("Idle")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByText("Run")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
     expect(screen.getByText("Idle")).toBeInTheDocument();
   });
 
