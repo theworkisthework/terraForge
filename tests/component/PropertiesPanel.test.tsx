@@ -66,11 +66,15 @@ describe("PropertiesPanel", () => {
     useCanvasStore.setState({ imports: [imp] });
     render(<PropertiesPanel />);
     const nameSpan = screen.getByText("original");
-    await userEvent.dblClick(nameSpan);
+    // Use fireEvent.dblClick so the double-click handler fires synchronously
+    // without the multi-step pointer simulation that userEvent uses. This avoids
+    // a hang where userEvent.type waits for post-input cleanup after {Enter}
+    // unmounts the input mid-sequence.
+    fireEvent.dblClick(nameSpan);
     // An input should now appear with the current name
     const input = screen.getByDisplayValue("original");
-    await userEvent.clear(input);
-    await userEvent.type(input, "renamed{Enter}");
+    fireEvent.change(input, { target: { value: "renamed" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(useCanvasStore.getState().imports[0].name).toBe("renamed");
   });
 

@@ -64,6 +64,9 @@ describe("registerFluidncIpcHandlers", () => {
       get: vi.fn((id: string) => ({ id })),
       complete: vi.fn(),
       fail: vi.fn(),
+      isCancelled: vi.fn(() => false),
+      registerCancelHandler: vi.fn(),
+      clearCancelHandler: vi.fn(),
     };
 
     const safeSend = vi.fn();
@@ -193,6 +196,7 @@ describe("registerFluidncIpcHandlers", () => {
       "/sd/job.gcode",
       expect.any(Function),
       "job.gcode",
+      expect.any(Object),
     );
     expect(deps.taskManager.update).toHaveBeenCalledWith("task-1", {
       progress: 50,
