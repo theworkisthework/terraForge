@@ -111,6 +111,7 @@ function FsPane({
   open,
   onToggle,
 }: FsPaneProps) {
+  const tasks = useTaskStore((s) => s.tasks);
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [path, setPath] = useState("/");
   const [loading, setLoading] = useState(false);
@@ -125,6 +126,7 @@ function FsPane({
     useState<RemoteFile | null>(null);
   const [pendingRunFile, setPendingRunFile] = useState<RemoteFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RemoteFile | null>(null);
+  const pendingRefreshRef = useRef(false);
   const {
     gcodeToolpath,
     gcodeSource,
@@ -136,6 +138,11 @@ function FsPane({
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const status = useMachineStore((s) => s.status);
+  const hasRunningTransfer = Object.values(tasks).some(
+    (task) =>
+      (task.type === "file-upload" || task.type === "file-download") &&
+      task.status === "running",
+  );
 
   const navigate = useCallback(
     async (target: string) => {
@@ -170,10 +177,20 @@ function FsPane({
     if (!connected) return;
     return window.terraForge.fluidnc.onConsoleMessage((msg) => {
       if (msg.includes("[MSG:Files changed]")) {
+        if (hasRunningTransfer) {
+          pendingRefreshRef.current = true;
+          return;
+        }
         navigate(path);
       }
     });
-  }, [connected, navigate, path]);
+  }, [connected, hasRunningTransfer, navigate, path]);
+
+  useEffect(() => {
+    if (!connected || hasRunningTransfer || !pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    navigate(path);
+  }, [connected, hasRunningTransfer, navigate, path]);
 
   // Keep a ref so the status-change effect can read selectedJobFile without
   // adding it to the dependency array (which would cause it to fire — and
@@ -194,10 +211,10 @@ function FsPane({
     } else {
       setActiveJobPath(null);
     }
-     
   }, [status?.state, source]);
 
   const handleDownload = async (file: RemoteFile) => {
+    if (hasRunningTransfer) return;
     const localPath = isGcodeFile(file.name)
       ? await window.terraForge.fs.saveGcodeDialog(file.name)
       : await window.terraForge.fs.saveFileDialog(file.name);
@@ -219,13 +236,14 @@ function FsPane({
   };
 
   const handleUpload = async () => {
+    if (hasRunningTransfer) return;
     const localPath = await window.terraForge.fs.openFileDialog();
     if (!localPath) return;
     const name = localPath.split(/[\\/]/).pop()!;
     const remotePath = (path === "/" ? "" : path) + "/" + name;
     const taskId = uuid();
+    pendingRefreshRef.current = true;
     uploadFn(localPath, remotePath, taskId, name);
-    setTimeout(() => navigate(path), 1500);
   };
 
   const doPreview = async (file: RemoteFile) => {
@@ -364,6 +382,7 @@ function FsPane({
   };
 
   const handleRun = (file: RemoteFile) => {
+    if (hasRunningTransfer) return;
     // If a different toolpath is already loaded, warn before replacing it.
     if (gcodeToolpath && gcodeSource?.path !== file.path) {
       setPendingRunFile(file);
@@ -438,9 +457,13 @@ function FsPane({
               e.stopPropagation();
               navigate(path);
             }}
-            disabled={!connected || loading}
+            disabled={!connected || loading || hasRunningTransfer}
             aria-label="Refresh"
-            title="Refresh"
+            title={
+              hasRunningTransfer
+                ? "Refresh disabled during file transfer"
+                : "Refresh"
+            }
             className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
           >
             {loading ? "…" : "↻"}
@@ -558,6 +581,7 @@ function FsPane({
                     </span>
                   ) : (
                     (() => {
+                      const isGcode = isGcodeFile(file.name);
                       const isThisRunning =
                         activeJobPath === file.path && status?.state === "Run";
                       const isThisHeld =
@@ -569,7 +593,7 @@ function FsPane({
                           data-testid={`file-actions-${file.name}`}
                           className={`gap-0.5 shrink-0 ${isActiveJob || isLoadingThis ? "flex" : "hidden group-hover:flex"}`}
                         >
-                          {isGcodeFile(file.name) && (
+                          {isGcode && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -584,7 +608,7 @@ function FsPane({
                               {previewing === file.path ? "…" : "👁"}
                             </button>
                           )}
-                          {isThisRunning ? (
+                          {isGcode && isThisRunning ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -595,7 +619,7 @@ function FsPane({
                             >
                               ⏸
                             </button>
-                          ) : isThisHeld ? (
+                          ) : isGcode && isThisHeld ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -606,35 +630,45 @@ function FsPane({
                             >
                               ▶
                             </button>
-                          ) : (
+                          ) : isGcode ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRun(file);
                               }}
                               title={
-                                anyJobActive
-                                  ? "A job is already running"
-                                  : "Run job now"
+                                hasRunningTransfer
+                                  ? "Unavailable while a file transfer is running"
+                                  : anyJobActive
+                                    ? "A job is already running"
+                                    : "Run job now"
                               }
-                              disabled={isLoadingThis || anyJobActive}
+                              disabled={
+                                isLoadingThis ||
+                                anyJobActive ||
+                                hasRunningTransfer
+                              }
                               className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover disabled:opacity-50 text-white"
                             >
                               ▶
                             </button>
-                          )}
+                          ) : null}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDownload(file);
                             }}
-                            disabled={serialMode || anyJobActive}
+                            disabled={
+                              serialMode || anyJobActive || hasRunningTransfer
+                            }
                             title={
-                              anyJobActive
-                                ? "Unavailable while a job is running"
-                                : serialMode
-                                  ? "File download not available over serial"
-                                  : "Download"
+                              hasRunningTransfer
+                                ? "Unavailable while a file transfer is running"
+                                : anyJobActive
+                                  ? "Unavailable while a job is running"
+                                  : serialMode
+                                    ? "File download not available over serial"
+                                    : "Download"
                             }
                             className="text-[9px] px-1 py-0.5 rounded bg-secondary hover:bg-secondary-hover disabled:opacity-40"
                           >
@@ -668,9 +702,13 @@ function FsPane({
           <div className={`shrink-0 px-2 py-1.5 border-t ${borderAccent}/50`}>
             <button
               onClick={handleUpload}
-              disabled={!connected || serialMode}
+              disabled={!connected || serialMode || hasRunningTransfer}
               title={
-                serialMode ? "File upload not available over serial" : undefined
+                hasRunningTransfer
+                  ? "Unavailable while a file transfer is running"
+                  : serialMode
+                    ? "File upload not available over serial"
+                    : undefined
               }
               className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${
                 accentColor === "blue"

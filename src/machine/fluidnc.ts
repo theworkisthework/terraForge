@@ -46,6 +46,8 @@ export class FluidNCClient extends EventEmitter {
    * Emitted as a "firmware" event when first detected and cleared on disconnect.
    */
   private fwInfo: string | null = null;
+  private static readonly uploadVerifyMaxAttempts = 6;
+  private static readonly uploadVerifyDelayMs = 300;
 
   private getWsState() {
     return this as unknown as {
@@ -273,9 +275,16 @@ export class FluidNCClient extends EventEmitter {
     onProgress?: (percent: number) => void,
     /** Override the filename sent in the multipart form (what FluidNC writes to SD). */
     remoteFilename?: string,
+    signal?: AbortSignal,
   ): Promise<void> {
+    if (signal?.aborted) throw new Error("Upload cancelled");
     const stats = await stat(localPath);
     const total = stats.size;
+    const { targetDir, targetFilename } = this.resolveUploadTarget(
+      remotePath,
+      localPath,
+      remoteFilename,
+    );
     let uploaded = 0;
 
     const form = new FormData();
@@ -285,31 +294,149 @@ export class FluidNCClient extends EventEmitter {
         ? chunk.length
         : Buffer.byteLength(chunk);
       if (onProgress && total > 0) {
-        onProgress(Math.round((uploaded / total) * 100));
+        // Bytes read from disk can get ahead of what the controller has
+        // actually received, especially over unstable AP links.
+        onProgress(Math.min(95, Math.round((uploaded / total) * 95)));
       }
     });
 
-    form.append("path", remotePath);
+    form.append("path", targetDir);
     form.append("file", stream, {
-      filename: remoteFilename ?? localPath.split(/[\\/]/).pop(),
+      filename: targetFilename,
       knownLength: total,
     });
 
     await new Promise<void>((resolve, reject) => {
       const url = `${this.baseUrl}/upload`;
-      form.submit(url, (err, res) => {
+      let settled = false;
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+      const onAbort = () => {
+        const abortErr = new Error("Upload cancelled");
+        stream.destroy(abortErr);
+        request?.destroy?.(abortErr);
+        fail(abortErr);
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      const request = form.submit(url, (err, res) => {
+        if (signal) signal.removeEventListener("abort", onAbort);
         if (err) return reject(err);
         res.resume();
         res.on("end", () => {
           if ((res.statusCode ?? 0) >= 400) {
-            reject(new Error(`Upload failed: HTTP ${res.statusCode}`));
+            fail(new Error(`Upload failed: HTTP ${res.statusCode}`));
           } else {
-            onProgress?.(100);
-            resolve();
+            if (!settled) {
+              settled = true;
+              resolve();
+            }
           }
         });
       });
     });
+
+    await this.verifyUploadedFileSize(targetDir, targetFilename, total, signal);
+    onProgress?.(100);
+  }
+
+  private resolveUploadTarget(
+    remotePath: string,
+    localPath: string,
+    remoteFilename?: string,
+  ): { targetDir: string; targetFilename: string } {
+    const fallbackName = localPath.split(/[\\/]/).pop() ?? "upload.gcode";
+
+    if (remoteFilename) {
+      const normalizedRemotePath = (remotePath || "/").replace(/\\/g, "/");
+      const inferredName = normalizedRemotePath.split("/").pop() || "";
+      if (inferredName === remoteFilename) {
+        const parent = normalizedRemotePath.slice(
+          0,
+          Math.max(1, normalizedRemotePath.length - remoteFilename.length - 1),
+        );
+        return {
+          targetDir: parent || "/",
+          targetFilename: remoteFilename,
+        };
+      }
+      return {
+        targetDir: normalizedRemotePath || "/",
+        targetFilename: remoteFilename,
+      };
+    }
+
+    const normalizedRemotePath = (remotePath || "/").replace(/\\/g, "/");
+    if (normalizedRemotePath.endsWith("/")) {
+      return {
+        targetDir: normalizedRemotePath || "/",
+        targetFilename: fallbackName,
+      };
+    }
+
+    const split = normalizedRemotePath.split("/");
+    const nameFromPath = split.pop() || fallbackName;
+    const dirFromPath = split.join("/") || "/";
+    return {
+      targetDir: dirFromPath,
+      targetFilename: nameFromPath,
+    };
+  }
+
+  private async verifyUploadedFileSize(
+    targetDir: string,
+    targetFilename: string,
+    expectedSize: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (
+      let attempt = 1;
+      attempt <= FluidNCClient.uploadVerifyMaxAttempts;
+      attempt += 1
+    ) {
+      if (signal?.aborted) throw new Error("Upload cancelled");
+      try {
+        const [sdFiles, internalFiles] = await Promise.all([
+          this.listSDFiles(targetDir).catch(() => [] as RemoteFile[]),
+          this.listFiles(targetDir).catch(() => [] as RemoteFile[]),
+        ]);
+        const entry = [...sdFiles, ...internalFiles].find(
+          (f) => !f.isDirectory && f.name === targetFilename,
+        );
+
+        if (entry && entry.size === expectedSize) return;
+
+        if (entry) {
+          lastError = new Error(
+            `Upload verification failed: expected ${expectedSize} bytes, got ${entry.size} bytes for ${targetFilename}`,
+          );
+        } else {
+          lastError = new Error(
+            `Upload verification failed: ${targetFilename} not found in ${targetDir}`,
+          );
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      if (attempt < FluidNCClient.uploadVerifyMaxAttempts) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, FluidNCClient.uploadVerifyDelayMs * attempt);
+        });
+      }
+    }
+
+    throw (
+      lastError ?? new Error(`Upload verification failed for ${targetFilename}`)
+    );
   }
 
   async downloadFile(
@@ -317,35 +444,97 @@ export class FluidNCClient extends EventEmitter {
     localPath: string,
     filesystem: "internal" | "sdcard" = "sdcard",
     onProgress?: (percent: number) => void,
+    signal?: AbortSignal,
   ): Promise<void> {
+    if (signal?.aborted) throw new Error("Download cancelled");
     const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
-    const res = await this.restClient.get(`${prefix}${filePath}`);
+    // Large files can legitimately take much longer than the default HTTP timeout.
+    const res = await this.restClient.get(
+      `${prefix}${filePath}`,
+      0,
+      "GET",
+      signal,
+    );
     const total = Number(res.headers.get("content-length") ?? 0);
     let received = 0;
 
     const writer = createWriteStream(localPath);
+    const writerWithEvents = writer as unknown as {
+      on?: (event: string, listener: (...args: unknown[]) => void) => void;
+    };
     const reader = res.body?.getReader();
+    const readerWithCancel = reader as { cancel?: () => Promise<unknown> };
     if (!reader) throw new Error("No response body for download");
 
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
+
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        if (typeof readerWithCancel.cancel === "function") {
+          readerWithCancel.cancel().catch(() => {});
+        }
+        writer.destroy();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+
+      const canListen = typeof writerWithEvents.on === "function";
+      if (canListen) {
+        writerWithEvents.on!("error", fail);
+        writerWithEvents.on!("finish", () => {
+          if (settled) return;
+          settled = true;
+          onProgress?.(100);
+          resolve();
+        });
+      }
+
       const pump = async () => {
         try {
           while (true) {
+            if (signal?.aborted) {
+              throw new Error("Download cancelled");
+            }
             const { done, value } = await reader.read();
             if (done) break;
-            writer.write(value);
+            await new Promise<void>((resolveWrite, rejectWrite) => {
+              let writeSettled = false;
+              const finishWrite = (err?: unknown) => {
+                if (writeSettled) return;
+                writeSettled = true;
+                if (err) rejectWrite(err);
+                else resolveWrite();
+              };
+
+              try {
+                writer.write(value, (err) => {
+                  finishWrite(err);
+                });
+
+                // Unit-test mocks may not call write callbacks at all.
+                if (!canListen) {
+                  queueMicrotask(() => finishWrite());
+                }
+              } catch (err) {
+                finishWrite(err);
+              }
+            });
             received += value.length;
             if (onProgress && total > 0) {
               onProgress(Math.round((received / total) * 100));
             }
           }
           writer.end();
-          onProgress?.(100);
-          resolve();
+          if (!canListen) {
+            if (settled) return;
+            settled = true;
+            onProgress?.(100);
+            resolve();
+          }
         } catch (e) {
-          writer.destroy();
-          reject(e);
+          fail(e);
         }
       };
       pump();

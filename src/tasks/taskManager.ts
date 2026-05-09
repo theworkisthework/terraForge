@@ -8,6 +8,7 @@ import type { BackgroundTask, TaskType } from "../types";
 export class TaskManager extends EventEmitter {
   private tasks = new Map<string, BackgroundTask>();
   private cancelRequests = new Set<string>();
+  private cancelHandlers = new Map<string, () => void>();
 
   create(id: string, type: TaskType, label: string): BackgroundTask {
     const task: BackgroundTask = {
@@ -37,6 +38,8 @@ export class TaskManager extends EventEmitter {
     if (!task) return;
     task.status = "completed";
     task.progress = 100;
+    this.cancelHandlers.delete(id);
+    this.cancelRequests.delete(id);
     this.emit("task-update", { ...task });
     // Clean up after a short delay
     setTimeout(() => this.tasks.delete(id), 5000);
@@ -47,6 +50,8 @@ export class TaskManager extends EventEmitter {
     if (!task) return;
     task.status = "error";
     task.error = error;
+    this.cancelHandlers.delete(id);
+    this.cancelRequests.delete(id);
     this.emit("task-update", { ...task });
   }
 
@@ -55,7 +60,24 @@ export class TaskManager extends EventEmitter {
     if (!task) return;
     task.status = "cancelled";
     this.cancelRequests.add(id);
+    const handler = this.cancelHandlers.get(id);
+    if (handler) {
+      try {
+        handler();
+      } catch {
+        // no-op: cancellation must remain best-effort
+      }
+    }
+    this.cancelHandlers.delete(id);
     this.emit("task-update", { ...task });
+  }
+
+  registerCancelHandler(id: string, handler: () => void): void {
+    this.cancelHandlers.set(id, handler);
+  }
+
+  clearCancelHandler(id: string): void {
+    this.cancelHandlers.delete(id);
   }
 
   isCancelled(id: string): boolean {

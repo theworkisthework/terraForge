@@ -125,6 +125,22 @@ function buildClient(): FluidNCClient {
   return c;
 }
 
+function mockUploadVerification(
+  client: FluidNCClient,
+  size: number,
+  names: string[] = ["test.gcode", "my-file.gcode", "job.gcode"],
+): void {
+  vi.spyOn(client, "listSDFiles").mockResolvedValue(
+    names.map((name) => ({
+      name,
+      path: `/sd/${name}`,
+      size,
+      isDirectory: false,
+    })),
+  );
+  vi.spyOn(client, "listFiles").mockResolvedValue([]);
+}
+
 /** Build a mock fetch Response suitable for downloadFile. */
 function mockDownloadResponse(
   chunks: Uint8Array[],
@@ -178,6 +194,7 @@ afterEach(() => {
 describe("FluidNCClient.uploadFile", () => {
   it("resolves successfully on HTTP 200", async () => {
     const client = buildClient();
+    mockUploadVerification(client, 1024);
     await expect(
       client.uploadFile("/local/test.gcode", "/sd/", undefined, "test.gcode"),
     ).resolves.toBeUndefined();
@@ -185,6 +202,7 @@ describe("FluidNCClient.uploadFile", () => {
 
   it("calls onProgress with 100 when upload succeeds", async () => {
     const client = buildClient();
+    mockUploadVerification(client, 1024);
     const onProgress = vi.fn();
     await client.uploadFile(
       "/local/test.gcode",
@@ -198,6 +216,7 @@ describe("FluidNCClient.uploadFile", () => {
   it("tracks intermediate progress via stream data events", async () => {
     (globalThis as Record<string, unknown>).__statSize = 1000;
     const client = buildClient();
+    mockUploadVerification(client, 1000);
     const onProgress = vi.fn();
 
     const uploadPromise = client.uploadFile(
@@ -215,12 +234,15 @@ describe("FluidNCClient.uploadFile", () => {
     await uploadPromise;
     const calls = onProgress.mock.calls.map(([p]) => p as number);
     expect(calls).toContain(100);
-    if (calls.length > 1) expect(calls).toContain(50);
+    if (calls.length > 1) {
+      expect(calls.some((p) => p > 0 && p < 100)).toBe(true);
+    }
   });
 
   it("tracks progress for non-buffer stream chunks", async () => {
     (globalThis as Record<string, unknown>).__statSize = 3;
     const client = buildClient();
+    mockUploadVerification(client, 3);
     const onProgress = vi.fn();
 
     const uploadPromise = client.uploadFile(
@@ -263,6 +285,7 @@ describe("FluidNCClient.uploadFile", () => {
 
   it("opens the read stream from the local path (not the remote filename)", async () => {
     const client = buildClient();
+    mockUploadVerification(client, 1024, ["job.gcode"]);
     await client.uploadFile(
       "/local/path/my-file.gcode",
       "/sd/",
@@ -276,6 +299,7 @@ describe("FluidNCClient.uploadFile", () => {
 
   it("appends path and file to FormData", async () => {
     const client = buildClient();
+    mockUploadVerification(client, 1024);
     await client.uploadFile("/local/test.gcode", "/sd/dest/");
     const form = getState().latestFormInstance;
     expect(form).not.toBeNull();
@@ -285,6 +309,38 @@ describe("FluidNCClient.uploadFile", () => {
       expect.anything(),
       expect.objectContaining({ knownLength: 1024 }),
     );
+  });
+
+  it("splits full remote path into directory and filename", async () => {
+    const client = buildClient();
+    mockUploadVerification(client, 1024, ["job.gcode"]);
+    await client.uploadFile("/local/test.gcode", "/sd/dest/job.gcode");
+
+    const form = getState().latestFormInstance;
+    expect(form).not.toBeNull();
+    expect(form!.append).toHaveBeenCalledWith("path", "/sd/dest");
+    expect(form!.append).toHaveBeenCalledWith(
+      "file",
+      expect.anything(),
+      expect.objectContaining({ filename: "job.gcode" }),
+    );
+  });
+
+  it("rejects when post-upload size verification mismatches", async () => {
+    const client = buildClient();
+    vi.spyOn(client, "listSDFiles").mockResolvedValue([
+      {
+        name: "test.gcode",
+        path: "/sd/test.gcode",
+        size: 512,
+        isDirectory: false,
+      },
+    ]);
+    vi.spyOn(client, "listFiles").mockResolvedValue([]);
+
+    await expect(
+      client.uploadFile("/local/test.gcode", "/sd/test.gcode"),
+    ).rejects.toThrow("expected 1024 bytes, got 512 bytes");
   });
 });
 
@@ -368,7 +424,8 @@ describe("FluidNCClient.downloadFile", () => {
       end: ReturnType<typeof vi.fn>;
     };
     expect(writer).toBeDefined();
-    expect(writer.write).toHaveBeenCalledWith(chunk);
+    expect(writer.write).toHaveBeenCalled();
+    expect(writer.write.mock.calls[0]?.[0]).toEqual(chunk);
     expect(writer.end).toHaveBeenCalled();
   });
 

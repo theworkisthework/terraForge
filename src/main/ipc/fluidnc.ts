@@ -25,6 +25,8 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
     taskManager,
   } = options;
 
+  const transferAbortControllers = new Map<string, AbortController>();
+
   // All handlers transparently route to either the HTTP client (Wi-Fi) or the
   // serial command layer (USB) depending on which transport is active.
 
@@ -120,6 +122,9 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
       // to the SD card, not the local path.
       const remoteFilename = remotePath.split(/[\\/]/).pop()!;
       const tempPath = join(tmpdir(), `tf-${Date.now()}-${remoteFilename}`);
+      const abortController = new AbortController();
+      transferAbortControllers.set(taskId, abortController);
+      taskManager.registerCancelHandler(taskId, () => abortController.abort());
       taskManager.create(taskId, "file-upload", `Uploading ${remoteFilename}`);
       try {
         await writeFile(tempPath, content, "utf-8");
@@ -131,14 +136,21 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
             safeSend("task:update", taskManager.get(taskId));
           },
           remoteFilename, // ← override multipart filename so SD card gets the right name
+          abortController.signal,
         );
-        taskManager.complete(taskId);
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.complete(taskId);
+        }
         safeSend("task:update", taskManager.get(taskId));
       } catch (err: unknown) {
-        taskManager.fail(taskId, String(err));
-        safeSend("task:update", taskManager.get(taskId));
-        throw err;
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.fail(taskId, String(err));
+          safeSend("task:update", taskManager.get(taskId));
+          throw err;
+        }
       } finally {
+        taskManager.clearCancelHandler(taskId);
+        transferAbortControllers.delete(taskId);
         await unlink(tempPath).catch(() => {});
       }
     },
@@ -147,15 +159,31 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
   ipcMain.handle(
     "fluidnc:uploadFile",
     async (_e, taskId: string, localPath: string, remotePath: string) => {
+      const abortController = new AbortController();
+      transferAbortControllers.set(taskId, abortController);
+      taskManager.registerCancelHandler(taskId, () => abortController.abort());
       taskManager.create(taskId, "file-upload", `Uploading ${remotePath}`);
       try {
-        await fluidnc.uploadFile(localPath, remotePath, (progress) => {
-          taskManager.update(taskId, { progress });
-          safeSend("task:update", taskManager.get(taskId));
-        });
-        taskManager.complete(taskId);
+        await fluidnc.uploadFile(
+          localPath,
+          remotePath,
+          (progress) => {
+            taskManager.update(taskId, { progress });
+            safeSend("task:update", taskManager.get(taskId));
+          },
+          undefined,
+          abortController.signal,
+        );
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.complete(taskId);
+        }
       } catch (err: unknown) {
-        taskManager.fail(taskId, String(err));
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.fail(taskId, String(err));
+        }
+      } finally {
+        taskManager.clearCancelHandler(taskId);
+        transferAbortControllers.delete(taskId);
       }
     },
   );
@@ -169,6 +197,9 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
       localPath: string,
       filesystem?: "internal" | "sdcard",
     ) => {
+      const abortController = new AbortController();
+      transferAbortControllers.set(taskId, abortController);
+      taskManager.registerCancelHandler(taskId, () => abortController.abort());
       taskManager.create(taskId, "file-download", `Downloading ${remotePath}`);
       try {
         await fluidnc.downloadFile(
@@ -179,10 +210,18 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
             taskManager.update(taskId, { progress });
             safeSend("task:update", taskManager.get(taskId));
           },
+          abortController.signal,
         );
-        taskManager.complete(taskId);
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.complete(taskId);
+        }
       } catch (err: unknown) {
-        taskManager.fail(taskId, String(err));
+        if (!taskManager.isCancelled(taskId)) {
+          taskManager.fail(taskId, String(err));
+        }
+      } finally {
+        taskManager.clearCancelHandler(taskId);
+        transferAbortControllers.delete(taskId);
       }
     },
   );
