@@ -95,17 +95,15 @@ export class FluidNCClient extends EventEmitter {
   // ─── Commands ─────────────────────────────────────────────────────────────
 
   async sendCommand(cmd: string): Promise<string> {
-    // FluidNC 3.x and 4.x require different HTTP call conventions:
+    // FluidNC 3.x and 4.x require different command conventions.
     //
-    // 4.x: GET /command?plain=CMD  — executes synchronously, returns response
-    //      POST /command commandText=CMD returns HTTP 500 for non-ESP/non-$/ cmds
+    // 3.x: POST /command with x-www-form-urlencoded body:
+    //      commandText=CMD
     //
-    // 3.x: POST /command commandText=CMD — works for all commands
-    //      GET /command?plain=CMD returns HTTP 500 for jog / G-code commands
+    // 4.x / WebUI convention: GET /command?commandText=CMD
     //
-    // We branch on fwMajor which is set during connectWebSocket. When unknown
-    // (null, e.g. probe failed) we default to 4.x behaviour as that is the
-    // current/modern firmware.
+    // Some builds still accept GET /command?plain=CMD, so for 4.x/unknown we
+    // try commandText first (matching WebUI) and fall back to plain.
     if (this.fwMajor !== null && this.fwMajor < 4) {
       const res = await this.restClient.post(
         "/command",
@@ -114,11 +112,19 @@ export class FluidNCClient extends EventEmitter {
       return res.text();
     }
     // 4.x (or unknown — assume modern)
-    const res = await this.restClient.get(
-      `/command?plain=${encodeURIComponent(cmd)}`,
-      10_000,
-    );
-    return res.text();
+    try {
+      const res = await this.restClient.get(
+        `/command?commandText=${encodeURIComponent(cmd)}`,
+        10_000,
+      );
+      return res.text();
+    } catch {
+      const res = await this.restClient.get(
+        `/command?plain=${encodeURIComponent(cmd)}`,
+        10_000,
+      );
+      return res.text();
+    }
   }
 
   // ─── Job Control ──────────────────────────────────────────────────────────
