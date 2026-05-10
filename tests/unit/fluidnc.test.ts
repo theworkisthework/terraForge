@@ -593,6 +593,33 @@ describe("FluidNCClient", () => {
     probeSpy.mockRestore();
   });
 
+  it("connectWebSocket updates REST base URL to resolved IP for subsequent commands", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    const resolveHostSpy = vi
+      .spyOn(client as any, "resolveHost")
+      .mockResolvedValue("192.168.1.10");
+    const probeSpy = vi
+      .spyOn(client as any, "probeFirmwareVersion")
+      .mockResolvedValue({ major: 4, version: "4.0.1", wsPort: 80 });
+
+    await client.connectWebSocket("myplotter.local", 80);
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.sendCommand("$H");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("http://192.168.1.10:80/command?commandText="),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    openWsSpy.mockRestore();
+    resolveHostSpy.mockRestore();
+    probeSpy.mockRestore();
+  });
+
   it("connectWebSocket emits firmware event on probe success", async () => {
     const openWsSpy = vi
       .spyOn(client as any, "openWs")
