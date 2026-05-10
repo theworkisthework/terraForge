@@ -3,6 +3,8 @@ import { ImportHeaderRow } from "./ImportHeaderRow";
 import { ImportPathsList } from "./ImportPathsList";
 import { ImportRowCardDetails } from "./ImportRowCardDetails";
 import type { ImportRowCardProps } from "./ImportRowCard.types";
+import { useAppConfigStore } from "../../../store/appConfigStore";
+import { TabHeader } from "../../../components/TabHeader";
 
 export function ImportRowCard({
   imp,
@@ -43,6 +45,7 @@ export function ImportRowCard({
   onUpdatePathVisibility,
   onUpdatePathFillEnabled,
   onUpdatePathStroke,
+  onUpdatePath,
   onRemovePath,
   onUpdate,
   onTemplateAlignEnabledChange,
@@ -58,6 +61,9 @@ export function ImportRowCard({
   onApplyHatch,
 }: ImportRowCardProps) {
   const [groupBy, setGroupBy] = useState<"layer" | "color">("layer");
+  const enablePathPassOverrides = useAppConfigStore(
+    (state) => state.enablePerPathPasses,
+  );
 
   return (
     <div
@@ -88,27 +94,17 @@ export function ImportRowCard({
 
       {isExpanded && (
         <>
-          <div className="pl-6 pr-2 pt-1 flex gap-2 text-[8px]">
-            <button
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                groupBy === "layer"
-                  ? "bg-accent text-accent-content"
-                  : "bg-surface text-content-muted hover:text-content"
-              }`}
-              onClick={() => setGroupBy("layer")}
-            >
-              By Layer
-            </button>
-            <button
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                groupBy === "color"
-                  ? "bg-accent text-accent-content"
-                  : "bg-surface text-content-muted hover:text-content"
-              }`}
-              onClick={() => setGroupBy("color")}
-            >
-              By Color
-            </button>
+          <div className="pl-6 pr-2 pt-1">
+            <TabHeader<"layer" | "color">
+              ariaLabel="Path grouping mode"
+              activeTab={groupBy}
+              onTabChange={setGroupBy}
+              tabs={[
+                { id: "layer", label: "By Layer" },
+                { id: "color", label: "By Colour" },
+              ]}
+              className="text-[8px]"
+            />
           </div>
           <ImportPathsList
             imp={imp}
@@ -120,6 +116,8 @@ export function ImportRowCard({
             onUpdatePathVisibility={onUpdatePathVisibility}
             onUpdatePathFillEnabled={onUpdatePathFillEnabled}
             onUpdatePathStroke={onUpdatePathStroke}
+            onUpdatePath={onUpdatePath}
+            enablePathPassOverrides={enablePathPassOverrides}
             onRemovePath={onRemovePath}
           />
         </>

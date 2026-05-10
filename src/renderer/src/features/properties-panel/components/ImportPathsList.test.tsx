@@ -60,6 +60,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={onUpdatePathVisibility}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={onUpdatePathStroke}
+        onUpdatePath={() => {}}
         onRemovePath={onRemovePath}
       />,
     );
@@ -100,6 +101,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -133,6 +135,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -178,6 +181,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={onUpdatePathFillEnabled}
         onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -215,6 +219,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -250,6 +255,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -287,6 +293,7 @@ describe("ImportPathsList", () => {
         onUpdatePathVisibility={() => {}}
         onUpdatePathFillEnabled={() => {}}
         onUpdatePathStroke={onUpdatePathStroke}
+        onUpdatePath={() => {}}
         onRemovePath={() => {}}
       />,
     );
@@ -301,5 +308,28 @@ describe("ImportPathsList", () => {
       ),
     );
     expect(onUpdatePathStroke).toHaveBeenCalledWith("imp-1", "p1", false);
+  });
+
+  it("hides per-path pass controls by default", () => {
+    const imp = buildImport({
+      paths: [{ id: "p9", d: "M2 2", svgSource: "<path />", visible: true }],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        expandedLayerKeys={new Set()}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={() => {}}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={() => {}}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
+        onRemovePath={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText("Mode")).toBeNull();
   });
 });

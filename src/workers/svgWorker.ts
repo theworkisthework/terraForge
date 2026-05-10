@@ -119,6 +119,47 @@ function approximateObjectSubpaths(
   return subpaths;
 }
 
+/**
+ * Process subpaths to implement multiple passes.
+ * - 'repeat': adds identical subpaths n times
+ * - 'backtrack': alternates forward and backward for each pass
+ * - 'penLift': adds identical subpaths n times (pen naturally lifts between)
+ */
+function applyPassesToSubpaths(
+  subpaths: Subpath[],
+  passCount: number = 1,
+  passMode: string = "repeat",
+): Subpath[] {
+  if (passCount <= 1) {
+    return subpaths;
+  }
+
+  const result: Subpath[] = [];
+
+  for (const subpath of subpaths) {
+    if (passMode === "backtrack") {
+      // For backtrack: draw forward, then backward (without pen lift between)
+      // We emit both forward and reverse, but as separate subpaths
+      // (the natural pen-up/down cycle provides the backtrack behavior)
+      for (let p = 0; p < passCount; p++) {
+        // Forward pass
+        result.push(subpath);
+        // Backward pass - reverse the subpath
+        const reversed = [...subpath].reverse();
+        result.push(reversed);
+      }
+    } else {
+      // 'repeat' and 'penLift' both just duplicate the subpath
+      // penLift mode relies on natural pen up/down between strokes
+      for (let p = 0; p < passCount; p++) {
+        result.push(subpath);
+      }
+    }
+  }
+
+  return result;
+}
+
 self.onmessage = (e: MessageEvent<InMessage>) => {
   const msg = e.data;
   if (msg.type === "cancel") {
@@ -276,7 +317,17 @@ async function generate(msg: GenerateMessage): Promise<void> {
           options.pageClip.heightMM - options.pageClip.marginMM,
         )
       : clipSubpathsToBed(raw, config);
-    for (const sp of clipped) {
+
+    // Apply passes: if passCount > 1, duplicate subpaths according to passMode
+    const passCount = obj.passCount ?? 1;
+    const passMode = obj.passMode ?? "repeat";
+    const processedSubpaths = applyPassesToSubpaths(
+      clipped,
+      passCount,
+      passMode,
+    );
+
+    for (const sp of processedSubpaths) {
       if (sp.length >= 2) {
         allSubpaths.push(sp);
       }

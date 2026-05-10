@@ -53,7 +53,10 @@ interface UseImportRowRendererArgs {
     importId: string,
     pathId: string,
     changes: Partial<
-      Pick<SvgPath, "visible" | "strokeEnabled" | "fillEnabled">
+      Pick<
+        SvgPath,
+        "visible" | "strokeEnabled" | "fillEnabled" | "passCount" | "passMode"
+      >
     >,
   ) => void;
   onRemovePath: (importId: string, pathId: string) => void;
@@ -181,6 +184,9 @@ export function useImportRowRenderer({
           }
           onUpdatePathStroke={(importId, pathId, strokeEnabled) =>
             onUpdatePath(importId, pathId, { strokeEnabled })
+          }
+          onUpdatePath={(importId, pathId, changes) =>
+            onUpdatePath(importId, pathId, changes)
           }
           onRemovePath={onRemovePath}
           onUpdate={(changes) => onUpdateImport(imp.id, changes)}
