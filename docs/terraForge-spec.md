@@ -1,4 +1,4 @@
-﻿terraForge — Master Project Specification (Updated 2026-03-29)
+﻿terraForge — Master Project Specification (Updated 2026-05-10)
 You are the primary software engineer for terraForge, a cross‑platform Electron + React application that serves as a full UI, job manager, and SVG→G‑code engine for the TerraPen pen plotter (FluidNC‑based). You must design and implement the entire application in a consistent, modular, production‑ready way.
 
 Your outputs must always follow the architecture, constraints, and definitions below. Do not invent APIs, libraries, or patterns not explicitly allowed here.
@@ -24,9 +24,13 @@ Jog controls for X/Y/Z
 
 Machine configuration selection with multiple profiles
 
+Application configuration panel for global settings
+
 Clear UI feedback for all background tasks, with cancellation support
 
 Layer groups for multi-pen plotting
+
+Multiple passes per layer/colour/path with repeat mode controls
 
 Undo/redo, copy/paste, and canvas editing
 
@@ -161,6 +165,8 @@ All methods must be explicitly typed.
    hasFill?: boolean // true if the original shape had a visible fill
    outlineVisible?: boolean // false to suppress stroke without hiding hatch
    hatchLines?: string[] // synthesised hatch-fill line d-strings
+   passCount?: number // number of plotting passes (default 1)
+   passMode?: "repeat" | "backtrack" | "penLift" // pass behavior (default "repeat")
    }
    SvgLayer (logical sub-layer within an SvgImport — e.g. an Inkscape layer group)
    Code
@@ -208,6 +214,8 @@ All methods must be explicitly typed.
    originalWidth: number // SVG viewBox width in user units
    originalHeight: number
    layer?: string
+   passCount?: number
+   passMode?: "repeat" | "backtrack" | "penLift"
    }
    LayerGroup
    Code
@@ -328,6 +336,17 @@ Upload to SD card — direct upload to machine after generation
 Save to computer — native save dialog
 At least one output must be selected; a pre-generation validation enforces this.
 All four settings plus the join tolerance are persisted in localStorage under `terraforge.gcodePrefs`.
+
+Pass Rules
+Each visible path supports pass settings:
+
+passCount (1-99)
+
+passMode: repeat, backtrack, or penLift
+
+Group-level controls (layer/colour) write pass values to all paths in the group.
+Path-level overrides are optional and controlled by an application setting.
+Pass values are not multiplied between levels; last write wins per path.
 
 Path Optimisation (nearest-neighbour)
 When "Optimise paths" is enabled:
@@ -497,6 +516,14 @@ Alignment controls: left/center/right and top/center/bottom align buttons target
 Aspect ratio lock (padlock), fit-to-bed, 1:1 reset shortcuts
 
 Per-import visibility toggle; expandable path list; per-path visibility and delete
+
+By Layer / By Colour grouping mode for expanded path lists
+
+Pass settings flyouts on layer and colour rows (repeat icon)
+
+Optional pass settings flyouts on path rows when enabled in Application Configuration
+
+Pass settings fields: pass count and mode (repeat/backtrack/penLift)
 
 Hatch fill -- enable/disable, spacing (mm), angle (degrees); auto-regenerates on scale change
 

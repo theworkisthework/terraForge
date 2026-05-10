@@ -105,11 +105,16 @@ test("02-settings-btn — toolbar with settings button highlighted", async () =>
 
 test("03-machine-config-empty — config dialog before selecting a config", async () => {
   // Open the settings dialog
-  const settingsBtn = window.locator("button:has-text('⚙')");
+  const settingsBtn = window.locator("button[aria-label='Machine settings']");
   await settingsBtn.click();
-  await window
-    .locator("h2:has-text('Machine Configurations')")
+
+  const dialog = window.locator("div[role='dialog']").first();
+  await dialog.waitFor({ timeout: 5000 });
+  await dialog
+    .locator("button:has-text('Machine Configurations')")
+    .first()
     .waitFor({ timeout: 5000 });
+
   // Give dialog a moment to fully render
   await window.waitForTimeout(200);
   await shot(window, "03-machine-config-empty.png");
@@ -118,11 +123,25 @@ test("03-machine-config-empty — config dialog before selecting a config", asyn
 // ─── 04: Machine Config dialog — TerraPen selected ──────────────────────────
 
 test("04-machine-config-completed — default TerraPen config selected", async () => {
-  // Click the TerraPen entry in the sidebar to populate the form
-  const terrapenBtn = window
-    .locator(".w-52 button:has-text('TerraPen')")
+  // Ensure the settings dialog is open for this test when run in isolation.
+  const dialog = window.locator("div[role='dialog']").first();
+  if ((await dialog.count()) === 0) {
+    await window.locator("button[aria-label='Machine settings']").click();
+    await window.locator("div[role='dialog']").first().waitFor({ timeout: 5000 });
+  }
+
+  // Ensure we're on the Machine Configurations tab.
+  await window
+    .locator("div[role='dialog'] button:has-text('Machine Configurations')")
+    .first()
+    .click();
+
+  // Click the first machine entry in the sortable sidebar list (name can vary).
+  const firstConfigBtn = window
+    .locator("div[role='dialog'] .w-52 .group button.flex-1.text-left")
     .first();
-  await terrapenBtn.click();
+  await firstConfigBtn.waitFor({ timeout: 5000 });
+  await firstConfigBtn.click();
   await window.waitForTimeout(200);
   await shot(window, "04-machine-config-completed.png");
 
@@ -755,4 +774,65 @@ test("22-toast-stack — toast notification during G-code generation", async () 
   await window
     .locator("button:has-text('Generate G-code')")
     .waitFor({ timeout: 30_000 });
+});
+
+// ─── 23: Properties panel — pass settings flyout ────────────────────────────
+
+test("23-pass-settings-flyout — by-colour row pass settings flyout", async () => {
+  // Ensure at least one SVG import exists
+  const alreadyImported = await window.locator("text=sample").count();
+  if (alreadyImported === 0) {
+    const svgPath = fixturePath("sample.svg");
+    await mockOpenDialog(electronApp, svgPath);
+    await window.locator("button:has-text('Import')").click();
+    await window.locator("text=sample").first().waitFor({ timeout: 15_000 });
+    await window.waitForTimeout(500);
+  }
+
+  // Expand paths and switch to By Colour grouping
+  const expandBtn = window.locator("button[aria-label='Expand paths']").first();
+  await expandBtn.click();
+  await window.waitForTimeout(200);
+  await window.locator("button:has-text('By Colour')").first().click();
+  await window.waitForTimeout(200);
+
+  // Open the colour group pass settings flyout
+  await window
+    .locator("button[aria-label='Open colour pass settings']")
+    .first()
+    .click();
+  await window.waitForTimeout(200);
+
+  await shotElement(
+    window,
+    "aside:last-of-type",
+    "23-pass-settings-flyout.png",
+    0,
+  );
+});
+
+// ─── 24: Settings dialog — application pass option ──────────────────────────
+
+test("24-app-config-pass-setting — application configuration pass override option", async () => {
+  // Open settings dialog
+  await window.locator("button:has-text('⚙')").click();
+  await window.locator("div[role='dialog']").first().waitFor({ timeout: 5_000 });
+  await window.waitForTimeout(200);
+
+  // Switch to Application Configuration tab
+  await window
+    .locator("button:has-text('Application Configuration')")
+    .first()
+    .click();
+  await window
+    .locator("text=Enable per-path pass overrides in the Properties panel")
+    .first()
+    .waitFor({ timeout: 5_000 });
+  await window.waitForTimeout(200);
+
+  await shot(window, "24-app-config-pass-setting.png");
+
+  // Close dialog
+  await window.locator("button:has-text('Close')").first().click();
+  await window.waitForTimeout(200);
 });
