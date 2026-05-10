@@ -3,6 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { MachineConfigDialog } from "@renderer/components/MachineConfigDialog";
+import { useAppConfigStore } from "@renderer/store/appConfigStore";
 import { createMachineConfig } from "../helpers/factories";
 
 beforeEach(() => {
@@ -24,6 +25,7 @@ beforeEach(() => {
     wsLive: false,
     selectedJobFile: null,
   });
+  useAppConfigStore.setState({ enablePerPathPasses: false });
   vi.clearAllMocks();
   // listPorts is called on mount
   (
@@ -38,6 +40,27 @@ describe("MachineConfigDialog", () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+    expect(screen.getByText("Application Configuration")).toBeInTheDocument();
+  });
+
+  it("shows application setting on Application Configuration tab", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    expect(
+      screen.getByText(
+        "Enable per-path pass overrides in the Properties panel",
+      ),
+    ).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("updates persisted app setting when per-path override checkbox toggled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox");
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().enablePerPathPasses).toBe(true);
   });
 
   it("shows the existing config in the sidebar", async () => {

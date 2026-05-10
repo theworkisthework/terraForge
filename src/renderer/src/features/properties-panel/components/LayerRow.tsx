@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff, Repeat } from "lucide-react";
 
 interface LayerRowProps {
   name: string;
@@ -7,6 +7,7 @@ interface LayerRowProps {
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggleVisible: () => void;
+  onTogglePassSettings?: () => void;
 }
 
 export function LayerRow({
@@ -16,6 +17,7 @@ export function LayerRow({
   expanded,
   onToggleExpanded,
   onToggleVisible,
+  onTogglePassSettings,
 }: LayerRowProps) {
   return (
     <div className="flex items-center gap-1 py-0.5 text-[9px]">
@@ -33,6 +35,18 @@ export function LayerRow({
       >
         {visible ? <Eye size={9} /> : <EyeOff size={9} />}
       </span>
+      <button
+        className="text-content-faint hover:text-content"
+        title="Open layer pass settings"
+        aria-label="Open layer pass settings"
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onTogglePassSettings?.();
+        }}
+      >
+        <Repeat size={9} />
+      </button>
       <span
         className="flex-1 min-w-0 text-[9px] font-medium text-content-muted truncate cursor-pointer"
         onClick={onToggleExpanded}

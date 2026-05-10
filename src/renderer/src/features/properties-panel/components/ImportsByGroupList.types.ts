@@ -53,7 +53,12 @@ export interface ImportsByGroupListProps {
   onUpdatePath: (
     importId: string,
     pathId: string,
-    changes: Partial<Pick<SvgPath, "visible" | "strokeEnabled">>,
+    changes: Partial<
+      Pick<
+        SvgPath,
+        "visible" | "strokeEnabled" | "fillEnabled" | "passCount" | "passMode"
+      >
+    >,
   ) => void;
   onUpdateLayerGroup: (
     groupId: string,

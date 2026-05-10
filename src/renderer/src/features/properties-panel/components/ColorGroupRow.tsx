@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff, Repeat } from "lucide-react";
 
 interface ColorGroupRowProps {
   color: string;
@@ -7,6 +7,7 @@ interface ColorGroupRowProps {
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggleVisible: () => void;
+  onTogglePassSettings?: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export function ColorGroupRow({
   expanded,
   onToggleExpanded,
   onToggleVisible,
+  onTogglePassSettings,
 }: ColorGroupRowProps) {
   return (
     <div className="flex items-center gap-1 py-0.5 text-[9px]">
@@ -37,6 +39,18 @@ export function ColorGroupRow({
       >
         {visible ? <Eye size={9} /> : <EyeOff size={9} />}
       </span>
+      <button
+        className="text-content-faint hover:text-content"
+        title="Open colour pass settings"
+        aria-label="Open colour pass settings"
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onTogglePassSettings?.();
+        }}
+      >
+        <Repeat size={9} />
+      </button>
       <div
         className="w-3 h-3 rounded border border-content-faint shrink-0"
         style={{ backgroundColor: color }}

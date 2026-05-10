@@ -1,6 +1,6 @@
 # terraForge — User Guide
 
-> **Version:** 1.2
+> **Version:** 1.3
 > This guide covers all currently implemented features of terraForge.
 
 ---
@@ -78,6 +78,11 @@ Click the **⚙** (gear) button at the far right of the toolbar.
 
 ![Settings button highlighted in toolbar](../docs/resources/02-settings-btn.png)
 
+The Settings dialog has two tabs:
+
+- **Machine Configurations** — create and manage machine profiles.
+- **Application Configuration** — app-wide behavior settings.
+
 ### Creating Your First Profile
 
 ![Machine Configurations dialog](../docs/resources/03-machine-config-empty.png)
@@ -143,6 +148,18 @@ Click the **⚙** (gear) button at the far right of the toolbar.
 - **↓ Import** — merges profiles from a `.json` file; duplicates (by ID or name) are skipped.
 
 > **Note:** You cannot edit the **active** profile while the machine is connected. A 🔒 banner appears and all fields become read-only. Non-active profiles can be edited at any time.
+
+### Application Configuration
+
+Open the Settings dialog and select **Application Configuration**.
+
+![Application Configuration tab showing pass override option](../docs/resources/24-app-config-pass-setting.png)
+
+Current option:
+
+- **Enable per-path pass overrides in the Properties panel**
+
+When this is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
 
 ---
 
@@ -213,7 +230,7 @@ terraForge:
 1. Reads the SVG's physical size (`width`/`height` attributes with units: `mm`, `cm`, `in`, `pt`, `pc`, `px`). The import appears at **correct real-world scale** by default.
 2. Resolves all `transform` attributes (including Inkscape layer matrices) and bakes them into absolute path coordinates.
 3. Normalises path coordinates so the object's origin is at its top-left corner.
-4. Resolves visible **fill** and **stroke** colours from the SVG, including simple stylesheet rules, so paths can later be grouped **By Color** in the Properties panel and exported by colour.
+4. Resolves visible **fill** and **stroke** colours from the SVG, including simple stylesheet rules, so paths can later be grouped **By Colour** in the Properties panel and exported by colour.
 5. Preserves fill-only shapes even when they have no visible source stroke. You can later enable **Generate stroke for no-stroke paths** if you want terraForge to plot an outline for those shapes.
 6. **Detects sub-layers** — `<g>` elements with an explicit `display` style (e.g. Inkscape layers) become collapsible sub-layers in the Properties panel. Their initial visibility matches the source SVG.
 7. Displays the import at position (0, 0) on the bed (bottom-left corner).
@@ -483,17 +500,43 @@ When a G-code toolpath is selected on the canvas (loaded from the File Browser o
 
 Expand an import (![collapsed](../docs/resources/chevron-right.PNG)) to see its paths. The view adapts depending on whether the source SVG contained detectable sub-layers:
 
-At the top of an expanded import, use **By Layer** / **By Color** to switch between source-layer organisation and colour-based organisation.
+At the top of an expanded import, use **By Layer** / **By Colour** to switch between source-layer organisation and colour-based organisation.
 
 #### Colour view
 
-When **By Color** is selected, paths are grouped by their detected source colour. Each colour row shows:
+When **By Colour** is selected, paths are grouped by their detected source colour. Each colour row shows:
 
 - A swatch showing the detected colour
 - An eye toggle that enables/disables that colour group's plotted content
 - An expand/collapse control for the paths in that colour group
 
 Colour groups can include stroke paths, fill/hatch paths, or both. A path may appear in more than one colour group when its stroke colour and fill colour differ.
+
+### Pass Settings (Multiple Passes)
+
+Layer and colour rows include a small **repeat** icon. Click it to open a pass-settings flyout.
+
+![By Colour group pass settings flyout](../docs/resources/23-pass-settings-flyout.png)
+
+Each flyout includes:
+
+- **Passes** — repeat count (1 to 99)
+- **Mode**
+  - **Repeat** — repeat in the same direction
+  - **Backtrack** — alternate forward and reverse tracing
+  - **Pen Lift** — lift pen between passes
+
+If **Enable per-path pass overrides in the Properties panel** is enabled in **Settings → Application Configuration**, path rows also show a repeat icon with per-path pass controls.
+
+### Pass Precedence (Layer/Colour vs Path)
+
+Pass settings are stored directly on paths. In practice:
+
+- Editing a **layer/colour** pass setting writes that value to every path in that group.
+- Editing an individual **path** writes only that path.
+- The **last change wins** for that path.
+
+Example: if a path is set to 7 passes, then its layer is set to 2 passes, that path becomes 2 (not 14).
 
 #### Layered view (SVG had sub-layers)
 

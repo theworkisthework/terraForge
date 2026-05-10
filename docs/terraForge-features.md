@@ -56,6 +56,7 @@
 - [x] `toVectorObjects()` flattens grouped import model for worker compatibility
 - [x] **Path optimisation (nearest-neighbour)** — "Optimise paths" checkbox in the generation options dialog; worker collects all subpaths from every visible object into a single pool, reorders them greedily from the current pen position to minimise total rapid travel distance; emitted as a flat optimised sequence (no per-object grouping); optimisation flag reported in G-code header
 - [x] **Path joining (experimental)** — "Join nearby paths" checkbox with configurable tolerance (default 0.2 mm); applied after NN sort when both options are enabled; merges consecutive subpaths whose endpoint→startpoint distance is within tolerance, eliminating the pen-up/rapid-travel/pen-down cycle between nearly-touching strokes; join flag and tolerance reported in G-code header
+- [x] **Multiple passes per path** — each `SvgPath` / `VectorObject` carries `passCount` and `passMode` (`repeat`, `backtrack`, `penLift`); the worker expands clipped subpaths according to pass settings before ordering/joining so multi-pass behavior is reflected in generated G-code
 - [x] **Smart save filename** — default filename is derived from the import name(s) from the Properties panel; single import uses its name directly; multiple imports appends `+N` (e.g. `logo+1.gcode`); optimised jobs append `_opt` (e.g. `logo_opt.gcode`, `logo+1_opt.gcode`)
 
 ### G-code Preview
@@ -96,6 +97,8 @@
 - [x] Five origin modes — bottom-left, top-left, bottom-right, top-right, **center**; all five are supported in the canvas coordinate system, G-code toolpath overlay, ruler, and origin marker; center origin places (0,0) at the centre of the bed with ± coordinates on both axes
 - [x] WebSocket port override (`wsPort`) — optional per-config field in the Machine Config dialog; auto-detects from `[ESP800]` firmware version query at connect time; FluidNC 4.x shares the HTTP port (leave blank); older ESP3D-based firmware uses port 81; explicit value overrides auto-detect
 - [x] Export / Import machine configs — "↑ Export" saves all configs to a user-chosen `.json` file; "↓ Import" reads a JSON file and merges configs, skipping duplicates by ID or name; import result reports added/skipped counts
+- [x] Settings dialog tabbed sections — reusable tab header with **Machine Configurations** and **Application Configuration** sections
+- [x] App-level pass override toggle — **Application Configuration → G-code Pass Settings** includes "Enable per-path pass overrides in the Properties panel"; persisted in `terraforge-app-config`; default is off (layer/colour pass controls only)
 
 ### File Browser
 
@@ -173,6 +176,10 @@
 - [x] Expandable path list — each import row has a ▸/▾ toggle to show/hide the individual paths it contains, with layer/group names or short IDs
 - [x] Per-path visibility toggle — each path within an import can be shown/hidden independently; hidden paths are excluded from G-code output
 - [x] Remove individual paths — ✕ button per path deletes it from the import without removing the whole import
+- [x] By Layer / By Colour switcher — expanded import view can group rows by source layer or by detected source colour
+- [x] Layer/colour pass flyout controls — repeat icon on layer and colour rows opens a flyout with pass count (1-99) and mode (`repeat`, `backtrack`, `penLift`)
+- [x] Optional per-path pass flyout controls — repeat icon on path rows appears only when app-level per-path pass overrides are enabled
+- [x] Pass precedence is last-write-wins — group pass edits write values onto all paths in the group; later path edits can diverge; later group edits overwrite those path values again
 - [x] **Rotation controls** — numeric angle input in Properties panel; CCW / CW shortcut buttons; ±5° / ±15° / ±45° preset buttons; configurable step-size flyout; rotation snaps to the nearest 0° / 45° / 90° / 135° / 180° / 225° / 270° / 315° preset when within 3° of one
 - [x] **Position (X/Y) inputs** — explicit mm coordinate inputs in Properties panel, clamped to bed bounds; synced with canvas drag
 - [x] **Template-aware alignment controls** — alignment buttons can target either the full machine bed (default) or, when a page template is active, the page boundary / margin boundary; the Properties panel includes an "Align to template" checkbox plus Page/Margin radio selector

@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Repeat } from "lucide-react";
 
 interface PathRowProps {
   label: string;
@@ -6,6 +6,7 @@ interface PathRowProps {
   strokeEnabled: boolean;
   strokeAvailable: boolean;
   onToggleVisibility: () => void;
+  onTogglePassSettings?: () => void;
   onToggleStroke: () => void;
   onRemove: () => void;
   indented?: boolean;
@@ -17,6 +18,7 @@ export function PathRow({
   strokeEnabled,
   strokeAvailable,
   onToggleVisibility,
+  onTogglePassSettings,
   onToggleStroke,
   onRemove,
   indented = false,
@@ -33,6 +35,20 @@ export function PathRow({
       >
         {visible ? <Eye size={9} /> : <EyeOff size={9} />}
       </span>
+      {onTogglePassSettings && (
+        <button
+          className="text-content-faint hover:text-content"
+          title="Open path pass settings"
+          aria-label="Open path pass settings"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTogglePassSettings();
+          }}
+        >
+          <Repeat size={9} />
+        </button>
+      )}
       <button
         className={`text-[9px] ${
           strokeAvailable

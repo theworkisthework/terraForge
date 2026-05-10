@@ -1,5 +1,5 @@
 import type { DragEvent } from "react";
-import type { SvgImport } from "../../../../../types";
+import type { SvgImport, SvgPath } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
 
 export interface ImportRowCardProps {
@@ -56,6 +56,16 @@ export interface ImportRowCardProps {
     importId: string,
     pathId: string,
     strokeEnabled: boolean,
+  ) => void;
+  onUpdatePath: (
+    importId: string,
+    pathId: string,
+    changes: Partial<
+      Pick<
+        SvgPath,
+        "visible" | "strokeEnabled" | "fillEnabled" | "passCount" | "passMode"
+      >
+    >,
   ) => void;
   onRemovePath: (importId: string, pathId: string) => void;
   onUpdate: (changes: Partial<SvgImport>) => void;

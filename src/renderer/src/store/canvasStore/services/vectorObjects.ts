@@ -35,6 +35,8 @@ function projectPathToVectorObjects(
     viewBoxX: imp.viewBoxX,
     viewBoxY: imp.viewBoxY,
     layer: path.layer,
+    passCount: path.passCount ?? 1,
+    passMode: path.passMode ?? "repeat",
   };
   const importStrokeEnabled = imp.strokeEnabled ?? true;
   const pathStrokeEnabled = path.strokeEnabled ?? true;

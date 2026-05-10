@@ -8,6 +8,7 @@ export type OriginType =
   | "top-right"
   | "center";
 export type PenType = "solenoid" | "servo" | "stepper";
+export type PassMode = "repeat" | "backtrack" | "penLift";
 
 export interface MachineConnection {
   type: ConnectionType;
@@ -42,6 +43,21 @@ export interface MachineConfig {
   connection: MachineConnection;
 }
 
+// ─── Pass Configuration ──────────────────────────────────────────────────────
+
+/**
+ * Configuration for multiple passes per path.
+ * - `repeat`: Draw path start→end, repeat n times from the same start point
+ * - `backtrack`: Draw forward, then backward (trace back) without lifting pen, repeat as one cycle
+ * - `penLift`: Like repeat, but lift pen between each pass (to prime pens, etc.)
+ */
+export interface PassConfig {
+  /** Number of times to repeat the path (1 = single pass, default) */
+  passCount: number;
+  /** How to handle the passes: repeat, backtrack, or penLift */
+  passMode: PassMode;
+}
+
 // ─── Vector / Canvas Objects ─────────────────────────────────────────────────
 
 export interface VectorObject {
@@ -74,6 +90,10 @@ export interface VectorObject {
   layer?: string;
   /** Source fill color for color-based G-code batching (e.g. '#FF0000', 'black'). */
   sourceColor?: string;
+  /** Number of times to repeat this path (default 1). */
+  passCount?: number;
+  /** How to handle multiple passes: repeat, backtrack, or penLift (default 'repeat'). */
+  passMode?: PassMode;
 }
 
 // ─── SVG Import Model ─────────────────────────────────────────────────────────
@@ -117,6 +137,10 @@ export interface SvgPath {
    *  Rendered and emitted for G-code alongside the outline.  Toggled as a unit
    *  with the parent path's `visible` flag. */
   hatchLines?: string[];
+  /** Number of times to repeat this path (default 1). */
+  passCount?: number;
+  /** How to handle multiple passes: repeat, backtrack, or penLift (default 'repeat'). */
+  passMode?: PassMode;
 }
 
 /** A logical sub-layer within an imported SVG (e.g. an Inkscape layer group). */
