@@ -45,6 +45,45 @@ describe("gcode path optimization stage", () => {
     expect(result.includes(c)).toBe(true);
   });
 
+  it("reverses next subpath when its end is closer than its start", () => {
+    const first: Subpath = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const hatchLikeNext: Subpath = [
+      { x: 30, y: 0 },
+      { x: 11, y: 0 },
+    ];
+
+    const result = nearestNeighbourSort([first, hatchLikeNext]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe(first);
+    expect(result[1]).toEqual([
+      { x: 11, y: 0 },
+      { x: 30, y: 0 },
+    ]);
+  });
+
+  it("respects original direction when reversal is disabled", () => {
+    const first: Subpath = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const hatchLikeNext: Subpath = [
+      { x: 30, y: 0 },
+      { x: 11, y: 0 },
+    ];
+
+    const result = nearestNeighbourSort([first, hatchLikeNext], {
+      allowReverse: false,
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe(first);
+    expect(result[1]).toBe(hatchLikeNext);
+  });
+
   it("joins only when endpoint gap is within tolerance", () => {
     const result = joinSubpaths(
       [

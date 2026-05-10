@@ -348,6 +348,14 @@ describe("Toolbar", () => {
       expect(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       ).not.toBeChecked();
+      expect(
+        screen.getByRole("radio", {
+          name: "Minimize travel by reversing paths",
+        }),
+      ).toBeChecked();
+      expect(
+        screen.getByRole("radio", { name: "Respect source path direction" }),
+      ).not.toBeChecked();
 
       await userEvent.click(screen.getByRole("tab", { name: /^output$/i }));
       expect(
@@ -456,7 +464,52 @@ describe("Toolbar", () => {
       expect(instance?.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "generate",
-          options: expect.objectContaining({ optimisePaths: true }),
+          options: expect.objectContaining({
+            optimisePaths: true,
+            pathDirectionMode: "minimize-travel",
+          }),
+        }),
+      );
+    });
+
+    it("confirming with respect-direction mode passes pathDirectionMode:respect to worker", async () => {
+      const workerInstances: {
+        postMessage: ReturnType<typeof vi.fn>;
+        terminate: ReturnType<typeof vi.fn>;
+      }[] = [];
+      function MockWorker() {
+        const instance = {
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+          onmessage: null as unknown,
+          onerror: null,
+        };
+        workerInstances.push(instance);
+        return instance;
+      }
+      vi.stubGlobal("Worker", MockWorker);
+
+      const cfg = createMachineConfig({ name: "Test Plotter" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      const imp = createSvgImport({ name: "drawing" });
+      useCanvasStore.setState({ imports: [imp] });
+
+      render(<Toolbar />);
+      await userEvent.click(screen.getByText("Generate G-code"));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
+      await userEvent.click(
+        screen.getByRole("radio", { name: "Respect source path direction" }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      const instance = workerInstances[0];
+      expect(instance?.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "generate",
+          options: expect.objectContaining({
+            optimisePaths: true,
+            pathDirectionMode: "respect",
+          }),
         }),
       );
     });

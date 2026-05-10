@@ -3,6 +3,7 @@
 ; Bed      : 220 x 200 mm
 ; Origin   : bottom-left
 ; Optimised: no
+; Path dir : minimize travel (reversal enabled)
 ; Joined   : no
 ; Lift end : yes
 ; Ret home : no

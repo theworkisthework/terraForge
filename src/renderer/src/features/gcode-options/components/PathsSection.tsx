@@ -7,6 +7,7 @@ interface PathsSectionProps {
   prefs: GcodePrefs;
   onToggleOpen: () => void;
   onTogglePref: (key: keyof GcodePrefs) => void;
+  onPathDirectionModeChange: (mode: GcodePrefs["pathDirectionMode"]) => void;
   onJoinToleranceChange: (value: string) => void;
 }
 
@@ -16,6 +17,7 @@ export function PathsSection({
   prefs,
   onToggleOpen,
   onTogglePref,
+  onPathDirectionModeChange,
   onJoinToleranceChange,
 }: PathsSectionProps) {
   const content = (
@@ -36,6 +38,51 @@ export function PathsSection({
           </div>
         </div>
       </label>
+
+      <div
+        className={`ml-6 -mt-2 flex flex-col gap-2 ${prefs.optimise ? "opacity-100" : "opacity-40 pointer-events-none"}`}
+      >
+        <div className="text-xs text-content-muted">Path direction</div>
+        <label className="flex items-start gap-2 cursor-pointer select-none">
+          <input
+            type="radio"
+            name="path-direction-mode"
+            aria-label="Minimize travel by reversing paths"
+            className="mt-0.5 accent-accent cursor-pointer"
+            checked={prefs.pathDirectionMode === "minimize-travel"}
+            onChange={() => onPathDirectionModeChange("minimize-travel")}
+            disabled={!prefs.optimise}
+          />
+          <div>
+            <div className="text-xs text-content">
+              Minimize travel by reversing paths
+            </div>
+            <div className="text-[11px] text-content-muted">
+              Allows optimisation to reverse a path when that shortens rapid
+              moves.
+            </div>
+          </div>
+        </label>
+        <label className="flex items-start gap-2 cursor-pointer select-none">
+          <input
+            type="radio"
+            name="path-direction-mode"
+            aria-label="Respect source path direction"
+            className="mt-0.5 accent-accent cursor-pointer"
+            checked={prefs.pathDirectionMode === "respect"}
+            onChange={() => onPathDirectionModeChange("respect")}
+            disabled={!prefs.optimise}
+          />
+          <div>
+            <div className="text-xs text-content">
+              Respect source path direction
+            </div>
+            <div className="text-[11px] text-content-muted">
+              Keeps each path in its original direction during optimisation.
+            </div>
+          </div>
+        </label>
+      </div>
 
       <div className="flex items-start gap-3 select-none">
         <input

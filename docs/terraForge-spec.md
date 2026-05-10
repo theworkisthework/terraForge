@@ -255,6 +255,7 @@ All methods must be explicitly typed.
    arcFitting: boolean // scaffold only — worker always uses linear segments
    arcTolerance: number // mm
    optimisePaths: boolean // nearest-neighbour reorder
+   pathDirectionMode?: "minimize-travel" | "respect" // path orientation strategy when optimising; default "minimize-travel"
    joinPaths: boolean // experimental: merge endpoints within joinTolerance
    joinTolerance: number // mm gap threshold (default 0.2)
    liftPenAtEnd: boolean // send penUpCommand after the last stroke

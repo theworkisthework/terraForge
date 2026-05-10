@@ -118,6 +118,7 @@ export function useJobActions() {
       arcFitting: false,
       arcTolerance: 0.01,
       optimisePaths: prefs.optimise,
+      pathDirectionMode: prefs.pathDirectionMode,
       joinPaths: prefs.joinPaths,
       joinTolerance: prefs.joinTolerance,
       liftPenAtEnd: prefs.liftPenAtEnd,

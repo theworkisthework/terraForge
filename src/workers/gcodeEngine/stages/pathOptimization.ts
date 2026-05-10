@@ -2,11 +2,19 @@ import type { Pt } from "./geometryFlattening";
 
 export type Subpath = Pt[];
 
+interface NearestNeighbourSortOptions {
+  allowReverse?: boolean;
+}
+
 // Uses a sqrt(n)×sqrt(n) spatial grid so each lookup is O(1) amortised.
-export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
+export function nearestNeighbourSort(
+  subpaths: Subpath[],
+  options?: NearestNeighbourSortOptions,
+): Subpath[] {
   if (subpaths.length === 0) return [];
   const n = subpaths.length;
   if (n === 1) return [subpaths[0]];
+  const allowReverse = options?.allowReverse ?? true;
 
   let xMin = Infinity,
     yMin = Infinity,
@@ -26,7 +34,6 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
   const rows = Math.max(1, Math.ceil(Math.sqrt(n)));
   const cw = (xMax - xMin) / cols;
   const ch = (yMax - yMin) / rows;
-  const minCell = Math.min(cw, ch);
 
   const cells: number[][] = Array.from({ length: rows * cols }, () => []);
   for (let i = 0; i < n; i++) {
@@ -43,6 +50,7 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
 
   for (let s = 0; s < n; s++) {
     let bestIdx = -1;
+    let bestReverse = false;
     let bestDist = Infinity;
 
     const cc = Math.min(cols - 1, Math.max(0, Math.floor((curX - xMin) / cw)));
@@ -50,11 +58,6 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
     const maxRing = Math.max(cols, rows);
 
     for (let ring = 0; ring <= maxRing; ring++) {
-      if (bestIdx !== -1) {
-        const minPossible = Math.max(0, ring - 1) * minCell;
-        if (minPossible * minPossible > bestDist) break;
-      }
-
       const rLo = Math.max(0, cr - ring),
         rHi = Math.min(rows - 1, cr + ring);
       const cLo = Math.max(0, cc - ring),
@@ -66,11 +69,26 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
             continue;
           for (const idx of cells[gr * cols + gc]) {
             if (visited[idx]) continue;
-            const { x, y } = subpaths[idx][0];
-            const d = (x - curX) ** 2 + (y - curY) ** 2;
+            const subpath = subpaths[idx];
+            const start = subpath[0];
+            const end = subpath[subpath.length - 1];
+            const dStart = (start.x - curX) ** 2 + (start.y - curY) ** 2;
+            const dEnd = allowReverse
+              ? (end.x - curX) ** 2 + (end.y - curY) ** 2
+              : Infinity;
+
+            let d = dStart;
+            let reverse = false;
+            if (Number.isFinite(dEnd) && (!Number.isFinite(d) || dEnd < d)) {
+              d = dEnd;
+              reverse = true;
+            }
+            if (!Number.isFinite(d)) continue;
+
             if (d < bestDist) {
               bestDist = d;
               bestIdx = idx;
+              bestReverse = reverse;
             }
           }
         }
@@ -86,8 +104,10 @@ export function nearestNeighbourSort(subpaths: Subpath[]): Subpath[] {
     }
 
     visited[bestIdx] = 1;
-    sorted[s] = subpaths[bestIdx];
-    const last = subpaths[bestIdx][subpaths[bestIdx].length - 1];
+    sorted[s] = bestReverse
+      ? [...subpaths[bestIdx]].reverse()
+      : subpaths[bestIdx];
+    const last = sorted[s][sorted[s].length - 1];
     curX = last.x;
     curY = last.y;
   }

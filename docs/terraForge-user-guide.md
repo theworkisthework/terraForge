@@ -612,10 +612,18 @@ When layer groups are defined, you can generate a separate G-code file for each 
 
 ![G-code Options dialog — Paths section expanded](../docs/resources/14a-gcode-paths.png)
 
-| Option                | Description                                                                |
-| --------------------- | -------------------------------------------------------------------------- |
-| **Optimise paths**    | Nearest-neighbour reorder of all sub-paths to minimise total rapid travel  |
-| **Join nearby paths** | (Experimental) Merge path endpoints within the tolerance to skip pen lifts |
+| Option                | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **Optimise paths**    | Nearest-neighbour reorder of all sub-paths to minimise total rapid travel        |
+| **Path direction**    | Strategy for path orientation when optimising: minimise travel or respect source |
+| **Join nearby paths** | (Experimental) Merge path endpoints within the tolerance to skip pen lifts       |
+
+When **Optimise paths** is enabled, the **Path direction** option controls how the optimiser handles path orientation:
+
+- **Minimize travel by reversing paths** (default) — allows the optimiser to reverse individual paths if the endpoint is closer to the next path's starting point. This reduces total pen travel significantly, especially for hatching. Path reversal only applies during the optimisation phase and does not affect pass-mode semantics (repeat/backtrack/penLift still function as configured).
+- **Respect source path direction** — disables path reversal, preserving the original direction of each path as it appeared in the source SVG/import. Use this mode if you are using backtrack-mode passes and want to preserve the forward/reverse pairings created by the pass system.
+
+> **Note on pass semantics:** When using backtrack mode (which alternates forward and reverse tracing), the pass system creates paired paths. If you select **Minimize travel by reversing paths**, the global optimiser can reorder and reverse these pairs for travel efficiency. If that is undesirable, select **Respect source path direction** to prevent reversal and keep pass-generated direction patterns intact.
 
 When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.2 mm). Consecutive sub-paths whose endpoint-to-start-point gap is within this tolerance are merged, eliminating the pen-up / rapid / pen-down cycle between nearly-touching strokes.
 
@@ -678,7 +686,18 @@ When exporting by colour, filenames use a colour-based prefix such as `color_hex
 
 ### G-code Header
 
-Every generated file includes a header comment with machine name, bed dimensions, origin setting, optimisation flags, and a generation timestamp.
+Every generated file includes a header comment with machine name, bed dimensions, origin setting, optimisation flags (including the active path direction strategy when optimisation is enabled), and a generation timestamp.
+
+Example header:
+
+```gcode
+; terraForge G-code
+; Machine: TerraPen
+; Bed: 220mm × 200mm (Bottom-left origin)
+; Optimisation: enabled
+; Path dir : minimize travel (reversal enabled)
+; Generated: 2026-05-10 14:32:05
+```
 
 ### Cancelling Generation
 
