@@ -182,6 +182,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const lines: string[] = [];
 
   const optimise = options?.optimisePaths ?? false;
+  const pathDirectionMode = options?.pathDirectionMode ?? "minimize-travel";
+  const allowPathReversal = pathDirectionMode === "minimize-travel";
   const doJoin = options?.joinPaths ?? false;
   const joinTol = options?.joinTolerance ?? 0.2;
   const liftPenAtEnd = options?.liftPenAtEnd ?? true;
@@ -221,6 +223,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
     );
   }
   lines.push(`; Optimised: ${optimise ? "yes (nearest-neighbour)" : "no"}`);
+  lines.push(
+    `; Path dir : ${allowPathReversal ? "minimize travel (reversal enabled)" : "respect source direction"}`,
+  );
   lines.push(`; Joined   : ${doJoin ? `yes (tolerance ${joinTol} mm)` : "no"}`);
   lines.push(`; Lift end : ${liftPenAtEnd ? "yes" : "no"}`);
   lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
@@ -349,7 +354,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
   let orderedSubpaths = optimise
-    ? nearestNeighbourSort(allSubpaths)
+    ? nearestNeighbourSort(allSubpaths, { allowReverse: allowPathReversal })
     : allSubpaths;
 
   // ── Phase 3: optional path joining ────────────────────────────────────────

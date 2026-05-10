@@ -406,10 +406,24 @@ describe("nearestNeighbourSort", () => {
     ]);
     const result = nearestNeighbourSort(subpaths);
     expect(result).toHaveLength(9);
-    const starts = new Set(result.map((sp) => `${sp[0].x},${sp[0].y}`));
+
+    // Reordering may reverse a subpath to reduce travel, so compare endpoints
+    // independent of orientation to ensure all originals are preserved.
+    const norm = (sp: Pt[]) => {
+      const a = `${sp[0].x},${sp[0].y}`;
+      const b = `${sp[sp.length - 1].x},${sp[sp.length - 1].y}`;
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    };
+    const actual = new Set(result.map(norm));
+    const expected = new Set(subpaths.map(norm));
     for (const [x, y] of coords) {
-      expect(starts.has(`${x},${y}`)).toBe(true);
+      const base: Pt[] = [
+        { x, y },
+        { x: x + 5, y },
+      ];
+      expect(actual.has(norm(base))).toBe(true);
     }
+    expect(actual).toEqual(expected);
   });
 
   it("falls back to linear scan when distance comparisons are non-finite", () => {

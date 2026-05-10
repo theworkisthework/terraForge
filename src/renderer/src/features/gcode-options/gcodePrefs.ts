@@ -2,6 +2,8 @@ const STORAGE_KEY = "terraforge.gcodePrefs";
 
 export interface GcodePrefs {
   optimise: boolean;
+  /** Path direction strategy while optimise is enabled. */
+  pathDirectionMode: "respect" | "minimize-travel";
   uploadToSd: boolean;
   saveLocally: boolean;
   /** When true, generate a separate G-code file per layer group (multi-pen plots). */
@@ -37,6 +39,7 @@ export interface GcodePrefs {
 
 export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   optimise: true,
+  pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
   exportPerGroup: false,

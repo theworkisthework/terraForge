@@ -285,6 +285,10 @@ export interface GcodeOptions {
   arcFitting: boolean;
   arcTolerance: number; // mm tolerance for fitting arcs
   optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel
+  /** Path direction strategy during optimisation.
+   *  "minimize-travel" may reverse individual subpaths to reduce rapids.
+   *  "respect" preserves each subpath's original point order. */
+  pathDirectionMode?: "respect" | "minimize-travel";
   joinPaths: boolean; // [experimental] connect endpoints within joinTolerance to skip pen up/down
   joinTolerance: number; // mm — max gap between path end and next path start to join (default 0.2)
   liftPenAtEnd: boolean; // send penUpCommand after the last stroke (default true)

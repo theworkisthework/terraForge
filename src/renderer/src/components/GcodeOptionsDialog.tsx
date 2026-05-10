@@ -92,6 +92,10 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     setPrefs((p) => ({ ...p, clipMode: mode }));
   };
 
+  const setPathDirectionMode = (mode: GcodePrefs["pathDirectionMode"]) => {
+    setPrefs((p) => ({ ...p, pathDirectionMode: mode }));
+  };
+
   const setPenDownDelayMs = (val: string) => {
     const n = parseNonNegativeNumber(val);
     if (n !== null) setPrefs((p) => ({ ...p, penDownDelayMs: n }));
@@ -174,6 +178,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 prefs={prefs}
                 onToggleOpen={() => setActiveTab("paths")}
                 onTogglePref={toggle}
+                onPathDirectionModeChange={setPathDirectionMode}
                 onJoinToleranceChange={setJoinTolerance}
               />
             )}

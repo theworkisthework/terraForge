@@ -19,6 +19,7 @@ const STORAGE_KEY = "terraforge.gcodePrefs";
 
 const defaultPrefs: GcodePrefs = {
   optimise: true,
+  pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
   joinPaths: false,
@@ -140,6 +141,7 @@ describe("GcodeOptionsDialog", () => {
       STORAGE_KEY,
       JSON.stringify({
         optimise: false,
+        pathDirectionMode: "respect",
         uploadToSd: true,
         saveLocally: false,
         joinPaths: false,
@@ -281,6 +283,31 @@ describe("GcodeOptionsDialog", () => {
     expect(cb).not.toBeChecked();
     await userEvent.click(cb);
     expect(cb).toBeChecked();
+  });
+
+  it("defaults path direction mode to minimize-travel", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
+    expect(
+      screen.getByRole("radio", {
+        name: "Minimize travel by reversing paths",
+      }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "Respect source path direction" }),
+    ).not.toBeChecked();
+  });
+
+  it("passes pathDirectionMode=respect when selected", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
+    await userEvent.click(
+      screen.getByRole("radio", { name: "Respect source path direction" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ pathDirectionMode: "respect" }),
+    );
   });
 
   it("tolerance input becomes interactive when Join paths is checked", async () => {
@@ -426,6 +453,7 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
     expect(onConfirm).toHaveBeenCalledWith({
       optimise: true,
+      pathDirectionMode: "minimize-travel",
       uploadToSd: true,
       saveLocally: false,
       exportPerColor: false,
