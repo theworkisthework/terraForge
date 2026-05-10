@@ -36,15 +36,34 @@ async function setCheckboxState(
   labelText: string,
   checked: boolean,
 ): Promise<void> {
+  await ensureTabForControl(page, labelText);
   const checkbox = page.getByLabel(labelText, { exact: false });
   await expect(checkbox).toBeVisible({ timeout: 5_000 });
   await checkbox.setChecked(checked);
 }
 
+async function ensureTabForControl(
+  page: Page,
+  labelText: string,
+): Promise<void> {
+  const label = labelText.toLowerCase();
+  const tabName =
+    label.includes("optimise") || label.includes("join")
+      ? "Paths"
+      : label.includes("save") ||
+          label.includes("upload") ||
+          label.includes("export")
+        ? "Output"
+        : "Options";
+
+  const tab = page.getByRole("tab", { name: new RegExp(`^${tabName}$`, "i") });
+  await expect(tab).toBeVisible({ timeout: 5_000 });
+  await tab.click();
+}
+
 async function ensurePathsSectionOpen(page: Page): Promise<void> {
+  await ensureTabForControl(page, "Optimise paths");
   const optimiseCheckbox = page.getByLabel("Optimise paths", { exact: false });
-  if (await optimiseCheckbox.isVisible().catch(() => false)) return;
-  await page.locator("button:has-text('Paths')").click();
   await expect(optimiseCheckbox).toBeVisible({ timeout: 5_000 });
 }
 
