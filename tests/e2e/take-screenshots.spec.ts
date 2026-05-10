@@ -127,7 +127,10 @@ test("04-machine-config-completed — default TerraPen config selected", async (
   const dialog = window.locator("div[role='dialog']").first();
   if ((await dialog.count()) === 0) {
     await window.locator("button[aria-label='Machine settings']").click();
-    await window.locator("div[role='dialog']").first().waitFor({ timeout: 5000 });
+    await window
+      .locator("div[role='dialog']")
+      .first()
+      .waitFor({ timeout: 5000 });
   }
 
   // Ensure we're on the Machine Configurations tab.
@@ -816,7 +819,10 @@ test("23-pass-settings-flyout — by-colour row pass settings flyout", async () 
 test("24-app-config-pass-setting — application configuration pass override option", async () => {
   // Open settings dialog
   await window.locator("button:has-text('⚙')").click();
-  await window.locator("div[role='dialog']").first().waitFor({ timeout: 5_000 });
+  await window
+    .locator("div[role='dialog']")
+    .first()
+    .waitFor({ timeout: 5_000 });
   await window.waitForTimeout(200);
 
   // Switch to Application Configuration tab

@@ -522,9 +522,9 @@ Each flyout includes:
 
 - **Passes** — repeat count (1 to 99)
 - **Mode**
-   - **Repeat** — repeat in the same direction
-   - **Backtrack** — alternate forward and reverse tracing
-   - **Pen Lift** — lift pen between passes
+  - **Repeat** — repeat in the same direction
+  - **Backtrack** — alternate forward and reverse tracing
+  - **Pen Lift** — lift pen between passes
 
 If **Enable per-path pass overrides in the Properties panel** is enabled in **Settings → Application Configuration**, path rows also show a repeat icon with per-path pass controls.
 
