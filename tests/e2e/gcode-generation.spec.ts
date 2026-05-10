@@ -86,9 +86,8 @@ test("clicking Generate G-code opens dialog; choosing save locally produces outp
   await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
 
   // Check "Save to computer" so the save dialog is triggered
-  const saveCheckbox = window.locator(
-    "label:has-text('Save to computer') input[type='checkbox']",
-  );
+  await window.getByRole("tab", { name: /^output$/i }).click();
+  const saveCheckbox = window.getByLabel("Save to computer", { exact: false });
   await saveCheckbox.check();
 
   // Mock the save dialog before confirming generation
@@ -127,8 +126,8 @@ test("clicking Generate G-code opens the options dialog", async () => {
     timeout: 3_000,
   });
 
-  // Expand the Paths section and confirm Optimise paths is present
-  await window.locator("button:has-text('Paths')").click();
+  // Switch to the Paths tab and confirm Optimise paths is present
+  await window.getByRole("tab", { name: /^paths$/i }).click();
   await expect(window.locator("text=Optimise paths")).toBeVisible({
     timeout: 3_000,
   });
@@ -150,19 +149,18 @@ test("generating with Optimise paths checked produces optimised G-code", async (
   const cancelBtn = window.locator("button:has-text('Cancel')");
   await expect(cancelBtn).toBeVisible({ timeout: 5_000 });
 
-  // Expand the Paths section so the checkbox is accessible
-  await window.locator("button:has-text('Paths')").click();
+  // Switch to Paths so the checkbox is accessible
+  await window.getByRole("tab", { name: /^paths$/i }).click();
 
   // Ensure Optimise paths is checked
-  const optimiseCheckbox = window.locator(
-    "label:has-text('Optimise paths') input[type='checkbox']",
-  );
+  const optimiseCheckbox = window.getByLabel("Optimise paths", {
+    exact: false,
+  });
   await optimiseCheckbox.check();
 
   // Ensure Save to computer is checked so output is written to disk
-  const saveCheckbox = window.locator(
-    "label:has-text('Save to computer') input[type='checkbox']",
-  );
+  await window.getByRole("tab", { name: /^output$/i }).click();
+  const saveCheckbox = window.getByLabel("Save to computer", { exact: false });
   await saveCheckbox.check();
 
   // Mock the save dialog before clicking Generate in the dialog

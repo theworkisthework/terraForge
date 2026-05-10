@@ -328,8 +328,10 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       expect(screen.getByText("Optimise paths")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("tab", { name: /^output$/i }));
       expect(screen.getByText("Upload to SD card")).toBeInTheDocument();
       expect(screen.getByText("Save to computer")).toBeInTheDocument();
     });
@@ -339,13 +341,15 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       expect(
         screen.getByRole("checkbox", { name: "Optimise paths" }),
       ).toBeChecked();
       expect(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       ).not.toBeChecked();
+
+      await userEvent.click(screen.getByRole("tab", { name: /^output$/i }));
       expect(
         screen.getByRole("checkbox", { name: "Upload to SD card" }),
       ).toBeChecked();
@@ -481,7 +485,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Optimise paths" }),
       );
@@ -532,7 +536,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       expect(screen.getByText("Join nearby paths")).toBeInTheDocument();
       expect(screen.getByText("Experimental")).toBeInTheDocument();
     });
@@ -542,7 +546,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       // Tolerance input is always rendered
       expect(screen.getByText("Tolerance")).toBeInTheDocument();
       // The number input should be disabled while join is off
@@ -555,7 +559,7 @@ describe("Toolbar", () => {
       useCanvasStore.setState({ imports: [imp] });
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );
@@ -587,7 +591,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );
@@ -657,7 +661,7 @@ describe("Toolbar", () => {
 
       render(<Toolbar />);
       await userEvent.click(screen.getByText("Generate G-code"));
-      await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+      await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
       await userEvent.click(
         screen.getByRole("checkbox", { name: "Join nearby paths" }),
       );

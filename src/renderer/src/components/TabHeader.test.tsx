@@ -53,4 +53,80 @@ describe("TabHeader", () => {
 
     expect(screen.getByRole("tablist")).toHaveClass("border-b-0");
   });
+
+  it("uses roving tabindex with only the active tab focusable", () => {
+    render(
+      <TabHeader<"paths" | "options" | "output">
+        ariaLabel="G-code sections"
+        activeTab="options"
+        onTabChange={() => {}}
+        tabs={[
+          { id: "paths", label: "Paths" },
+          { id: "options", label: "Options" },
+          { id: "output", label: "Output" },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Paths" })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+    expect(screen.getByRole("tab", { name: "Options" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+    expect(screen.getByRole("tab", { name: "Output" })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+  });
+
+  it("ArrowRight selects the next tab", () => {
+    const onTabChange = vi.fn();
+    render(
+      <TabHeader<"paths" | "options" | "output">
+        ariaLabel="G-code sections"
+        activeTab="paths"
+        onTabChange={onTabChange}
+        tabs={[
+          { id: "paths", label: "Paths" },
+          { id: "options", label: "Options" },
+          { id: "output", label: "Output" },
+        ]}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Paths" }), {
+      key: "ArrowRight",
+    });
+
+    expect(onTabChange).toHaveBeenCalledWith("options");
+  });
+
+  it("Home and End move to first and last tabs", () => {
+    const onTabChange = vi.fn();
+    render(
+      <TabHeader<"paths" | "options" | "output">
+        ariaLabel="G-code sections"
+        activeTab="options"
+        onTabChange={onTabChange}
+        tabs={[
+          { id: "paths", label: "Paths" },
+          { id: "options", label: "Options" },
+          { id: "output", label: "Output" },
+        ]}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Options" }), {
+      key: "Home",
+    });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Options" }), {
+      key: "End",
+    });
+
+    expect(onTabChange).toHaveBeenNthCalledWith(1, "paths");
+    expect(onTabChange).toHaveBeenNthCalledWith(2, "output");
+  });
 });

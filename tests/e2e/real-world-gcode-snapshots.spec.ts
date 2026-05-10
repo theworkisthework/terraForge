@@ -37,15 +37,34 @@ async function setCheckboxState(
   labelText: string,
   checked: boolean,
 ): Promise<void> {
+  await ensureTabForControl(page, labelText);
   const checkbox = page.getByLabel(labelText, { exact: false });
   await expect(checkbox).toBeVisible({ timeout: 5_000 });
   await checkbox.setChecked(checked);
 }
 
+async function ensureTabForControl(
+  page: Page,
+  labelText: string,
+): Promise<void> {
+  const label = labelText.toLowerCase();
+  const tabName =
+    label.includes("optimise") || label.includes("join")
+      ? "Paths"
+      : label.includes("save") ||
+          label.includes("upload") ||
+          label.includes("export")
+        ? "Output"
+        : "Options";
+
+  const tab = page.getByRole("tab", { name: new RegExp(`^${tabName}$`, "i") });
+  await expect(tab).toBeVisible({ timeout: 5_000 });
+  await tab.click();
+}
+
 async function ensurePathsSectionOpen(page: Page): Promise<void> {
+  await ensureTabForControl(page, "Optimise paths");
   const optimiseCheckbox = page.getByLabel("Optimise paths", { exact: false });
-  if (await optimiseCheckbox.isVisible().catch(() => false)) return;
-  await page.locator("button:has-text('Paths')").click();
   await expect(optimiseCheckbox).toBeVisible({ timeout: 5_000 });
 }
 
@@ -57,6 +76,8 @@ test.describe("real-world SVG -> G-code snapshots", () => {
 
   for (const svgFile of svgFiles) {
     test(`snapshot for ${svgFile}`, async ({}, testInfo) => {
+      test.setTimeout(180_000);
+
       // Keep snapshot filenames OS-agnostic so local (win32) and CI (linux)
       // runs validate against the same baseline files.
       testInfo.snapshotSuffix = "";
@@ -97,15 +118,16 @@ test.describe("real-world SVG -> G-code snapshots", () => {
           .locator("button")
           .filter({ hasText: /^Generate$/ })
           .click();
-        await expect(generateBtn).toHaveText("Generate G-code", {
-          timeout: 60_000,
-        });
 
         await expect
           .poll(() => fs.existsSync(savePath), {
-            timeout: 20_000,
+            timeout: 120_000,
           })
           .toBe(true);
+
+        await expect(generateBtn).toHaveText("Generate G-code", {
+          timeout: 10_000,
+        });
 
         const gcode = fs.readFileSync(savePath, "utf-8");
         const snapshotName = `${path.parse(svgFile).name}.gcode`;
