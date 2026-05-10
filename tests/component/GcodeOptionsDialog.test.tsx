@@ -126,7 +126,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("saves prefs to localStorage on confirm", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /paths/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /paths/i }));
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Optimise paths" }),
     );
@@ -158,11 +158,12 @@ describe("GcodeOptionsDialog", () => {
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     expect(
       screen.getByRole("checkbox", { name: "Optimise paths" }),
     ).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     expect(
       screen.getByRole("checkbox", { name: "Return to home (X0 Y0)" }),
     ).toBeChecked();
@@ -235,7 +236,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("toggles Lift pen at end checkbox", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     const cb = screen.getByRole("checkbox", { name: "Lift pen at end" });
     expect(cb).toBeChecked(); // default true
     await userEvent.click(cb);
@@ -244,7 +245,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("toggles Return to home checkbox", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     const cb = screen.getByRole("checkbox", { name: "Return to home (X0 Y0)" });
     expect(cb).not.toBeChecked(); // default false
     await userEvent.click(cb);
@@ -253,7 +254,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("enables pen-down delay override and includes override value on confirm", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     const overrideCb = screen.getByRole("checkbox", {
       name: "Override pen-down delay",
     });
@@ -275,7 +276,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("toggles Join nearby paths checkbox", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     const cb = screen.getByRole("checkbox", { name: "Join nearby paths" });
     expect(cb).not.toBeChecked();
     await userEvent.click(cb);
@@ -284,7 +285,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("tolerance input becomes interactive when Join paths is checked", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     const joinCb = screen.getByRole("checkbox", { name: "Join nearby paths" });
     const toleranceInput = screen.getByRole("spinbutton");
     expect(toleranceInput).toBeDisabled();
@@ -294,7 +295,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("updates join tolerance value on valid input", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
@@ -308,7 +309,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("ignores invalid tolerance input (NaN stays at previous value)", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
@@ -324,7 +325,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("ignores zero tolerance input", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^paths$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^paths$/i }));
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Join nearby paths" }),
     );
@@ -360,7 +361,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("Custom G-code section is collapsed by default", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     expect(
       screen.queryByLabelText("Custom start G-code"),
     ).not.toBeInTheDocument();
@@ -368,7 +369,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("clicking Custom G-code expands the section", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     await userEvent.click(screen.getByText("Custom G-code"));
     expect(screen.getByLabelText("Custom start G-code")).toBeInTheDocument();
     expect(screen.getByLabelText("Custom end G-code")).toBeInTheDocument();
@@ -376,7 +377,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("clicking Custom G-code again collapses the section", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     await userEvent.click(screen.getByText("Custom G-code"));
     await userEvent.click(screen.getByText("Custom G-code"));
     expect(
@@ -398,7 +399,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("types into custom start G-code textarea", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     await userEvent.click(screen.getByText("Custom G-code"));
     const startInput = screen.getByLabelText("Custom start G-code");
     await userEvent.type(startInput, "M3 S0");
@@ -410,7 +411,7 @@ describe("GcodeOptionsDialog", () => {
 
   it("types into custom end G-code textarea", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("button", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     await userEvent.click(screen.getByText("Custom G-code"));
     const endInput = screen.getByLabelText("Custom end G-code");
     await userEvent.type(endInput, "M5");

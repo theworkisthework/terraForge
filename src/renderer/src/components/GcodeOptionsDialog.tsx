@@ -27,6 +27,7 @@ import {
 import { PathsSection } from "../features/gcode-options/components/PathsSection";
 import { OptionsSection } from "../features/gcode-options/components/OptionsSection";
 import { OutputSection } from "../features/gcode-options/components/OutputSection";
+import { TabHeader } from "./TabHeader";
 
 export {
   loadGcodePrefs,
@@ -41,6 +42,8 @@ interface Props {
   onCancel: () => void;
 }
 
+type GcodeOptionsTab = "paths" | "options" | "output";
+
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
@@ -48,9 +51,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
   const [prefs, setPrefs] = useState<GcodePrefs>(loadGcodePrefs);
-  const [pathsOpen, setPathsOpen] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const [outputOpen, setOutputOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<GcodeOptionsTab>("output");
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
   const toggle = (key: keyof GcodePrefs) =>
@@ -132,7 +133,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="gcode-options-title"
-        className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] p-5 flex flex-col gap-4"
+        className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[420px] h-[min(66vh,760px)] max-h-[90vh] p-5 flex flex-col gap-4"
       >
         {/* Title */}
         <h2
@@ -142,48 +143,76 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
           Generate G-code
         </h2>
 
-        {/* ── Collapsible sections ── */}
-        <div className="flex flex-col gap-1">
-          <PathsSection
-            open={pathsOpen}
-            prefs={prefs}
-            onToggleOpen={() => setPathsOpen((o) => !o)}
-            onTogglePref={toggle}
-            onJoinToleranceChange={setJoinTolerance}
+        {/* ── Tabs ── */}
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <TabHeader<GcodeOptionsTab>
+            ariaLabel="G-code options sections"
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            tabs={[
+              { id: "paths", label: "Paths" },
+              { id: "options", label: "Options" },
+              { id: "output", label: "Output" },
+            ]}
           />
 
-          <div className="border-t border-border-ui" />
+          <div
+            role="tabpanel"
+            aria-label={
+              activeTab === "paths"
+                ? "Paths"
+                : activeTab === "options"
+                  ? "Options"
+                  : "Output"
+            }
+            className="flex-1 min-h-0 overflow-y-auto pr-1"
+          >
+            {activeTab === "paths" && (
+              <PathsSection
+                open={true}
+                showHeader={false}
+                prefs={prefs}
+                onToggleOpen={() => setActiveTab("paths")}
+                onTogglePref={toggle}
+                onJoinToleranceChange={setJoinTolerance}
+              />
+            )}
 
-          <OptionsSection
-            open={optionsOpen}
-            customGcodeOpen={customGcodeOpen}
-            prefs={prefs}
-            machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
-            machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
-            machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
-            hasPageTemplate={!!pageTemplate}
-            onToggleOpen={() => setOptionsOpen((o) => !o)}
-            onToggleCustomGcodeOpen={() => setCustomGcodeOpen((o) => !o)}
-            onTogglePref={toggle}
-            onSetPenDownDelayMs={setPenDownDelayMs}
-            onSetPenUpDelayMs={setPenUpDelayMs}
-            onSetDrawSpeedOverride={setDrawSpeedOverride}
-            onSetClipMode={setClipMode}
-            onSetClipOffset={setClipOffsetMM}
-            onSetTextField={setTextField}
-          />
+            {activeTab === "options" && (
+              <OptionsSection
+                open={true}
+                showHeader={false}
+                customGcodeOpen={customGcodeOpen}
+                prefs={prefs}
+                machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
+                machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
+                machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
+                hasPageTemplate={!!pageTemplate}
+                onToggleOpen={() => setActiveTab("options")}
+                onToggleCustomGcodeOpen={() => setCustomGcodeOpen((o) => !o)}
+                onTogglePref={toggle}
+                onSetPenDownDelayMs={setPenDownDelayMs}
+                onSetPenUpDelayMs={setPenUpDelayMs}
+                onSetDrawSpeedOverride={setDrawSpeedOverride}
+                onSetClipMode={setClipMode}
+                onSetClipOffset={setClipOffsetMM}
+                onSetTextField={setTextField}
+              />
+            )}
 
-          <div className="border-t border-border-ui" />
-
-          <OutputSection
-            open={outputOpen}
-            connected={connected}
-            layerGroupCount={layerGroupCount}
-            colorGroupCount={colorGroupCount}
-            prefs={prefs}
-            onToggleOpen={() => setOutputOpen((o) => !o)}
-            onTogglePref={toggle}
-          />
+            {activeTab === "output" && (
+              <OutputSection
+                open={true}
+                showHeader={false}
+                connected={connected}
+                layerGroupCount={layerGroupCount}
+                colorGroupCount={colorGroupCount}
+                prefs={prefs}
+                onToggleOpen={() => setActiveTab("output")}
+                onTogglePref={toggle}
+              />
+            )}
+          </div>
         </div>
 
         {/* Validation warning */}
