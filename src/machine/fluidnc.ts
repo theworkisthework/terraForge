@@ -648,6 +648,7 @@ export class FluidNCClient extends EventEmitter {
         // Use the resolved IP for all subsequent HTTP calls — Node's fetch
         // (undici) cannot resolve mDNS .local names on Windows.
         this.baseUrl = probeBaseUrl;
+        this.restClient.setBaseUrl(probeBaseUrl);
       }
 
       // Auto-detect via [ESP800] using the resolved IP.
