@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { SvgImport, PassMode } from "../../../../types";
+import { FlyoutPanel } from "../../../components/FlyoutPanel";
 import { LayerRow } from "./LayerRow";
 import { ColorGroupRow } from "./ColorGroupRow";
 import { PathRow } from "./PathRow";
@@ -79,6 +81,9 @@ export function ImportPathsList({
   onRemovePath,
 }: ImportPathsListProps) {
   const colorGroups = useColorGroups(imp);
+  const [openPassFlyoutKey, setOpenPassFlyoutKey] = useState<string | null>(
+    null,
+  );
 
   const applyPassToPaths = (
     paths: Array<{ id: string }>,
@@ -89,24 +94,8 @@ export function ImportPathsList({
     }
   };
 
-  const renderPathOverride = (
-    pathId: string,
-    label: string,
-    passCount?: number,
-    passMode?: PassMode,
-    indented?: boolean,
-  ) => {
-    if (!enablePathPassOverrides) return null;
-    return (
-      <PathPassSettings
-        pathId={pathId}
-        pathLabel={label}
-        passCount={passCount}
-        passMode={passMode}
-        onUpdatePath={(id, patch) => onUpdatePath(imp.id, id, patch)}
-        indented={indented}
-      />
-    );
+  const togglePassFlyout = (key: string) => {
+    setOpenPassFlyoutKey((current) => (current === key ? null : key));
   };
 
   return (
@@ -150,13 +139,16 @@ export function ImportPathsList({
               groupPaths.map((entry) => entry.path),
             );
 
+            const groupFlyoutKey = `${imp.id}:group-pass:color:${group.color}`;
+
             return (
-              <div key={group.color}>
+              <div key={group.color} className="relative">
                 <ColorGroupRow
                   color={group.color}
                   visible={anyVisible}
                   pathCount={group.count}
                   expanded={isColorExpanded}
+                  onTogglePassSettings={() => togglePassFlyout(groupFlyoutKey)}
                   onToggleExpanded={() =>
                     onToggleLayerCollapse(imp.id, `color:${group.color}`)
                   }
@@ -180,27 +172,33 @@ export function ImportPathsList({
                   }}
                 />
 
-                <GroupPassSettings
-                  label="Colour"
-                  passCount={groupPass.passCount}
-                  passMode={groupPass.passMode}
-                  onPassCountChange={(next) =>
-                    applyPassToPaths(
-                      groupPaths.map((entry) => entry.path),
-                      {
-                        passCount: next,
-                      },
-                    )
-                  }
-                  onPassModeChange={(next) =>
-                    applyPassToPaths(
-                      groupPaths.map((entry) => entry.path),
-                      {
-                        passMode: next,
-                      },
-                    )
-                  }
-                />
+                <FlyoutPanel
+                  open={openPassFlyoutKey === groupFlyoutKey}
+                  onClose={() => setOpenPassFlyoutKey(null)}
+                  className="absolute left-4 top-5 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                >
+                  <GroupPassSettings
+                    label="Colour"
+                    passCount={groupPass.passCount}
+                    passMode={groupPass.passMode}
+                    onPassCountChange={(next) =>
+                      applyPassToPaths(
+                        groupPaths.map((entry) => entry.path),
+                        {
+                          passCount: next,
+                        },
+                      )
+                    }
+                    onPassModeChange={(next) =>
+                      applyPassToPaths(
+                        groupPaths.map((entry) => entry.path),
+                        {
+                          passMode: next,
+                        },
+                      )
+                    }
+                  />
+                </FlyoutPanel>
 
                 {isColorExpanded &&
                   groupPaths.map(({ groupPath, path: p }) => {
@@ -210,15 +208,21 @@ export function ImportPathsList({
                         hasVisibleStroke(imp, p) &&
                         (p.strokeEnabled ?? true);
                     const label = p.label ?? `path ${p.id.slice(0, 6)}`;
+                    const pathFlyoutKey = `${imp.id}:path-pass:${p.id}`;
 
                     return (
-                      <div key={`${group.color}:${p.id}`}>
+                      <div key={`${group.color}:${p.id}`} className="relative">
                         <PathRow
                           label={label}
                           visible={roleVisible}
                           strokeEnabled={p.strokeEnabled ?? true}
                           strokeAvailable={hasVisibleStroke(imp, p)}
                           indented
+                          onTogglePassSettings={
+                            enablePathPassOverrides
+                              ? () => togglePassFlyout(pathFlyoutKey)
+                              : undefined
+                          }
                           onToggleVisibility={() => {
                             if (groupPath.includesFill) {
                               onUpdatePathFillEnabled(
@@ -243,13 +247,22 @@ export function ImportPathsList({
                           }
                           onRemove={() => onRemovePath(imp.id, p.id)}
                         />
-                        {renderPathOverride(
-                          p.id,
-                          label,
-                          p.passCount,
-                          p.passMode,
-                          true,
-                        )}
+                        <FlyoutPanel
+                          open={openPassFlyoutKey === pathFlyoutKey}
+                          onClose={() => setOpenPassFlyoutKey(null)}
+                          className="absolute left-6 top-4 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                        >
+                          <PathPassSettings
+                            pathId={p.id}
+                            pathLabel={label}
+                            passCount={p.passCount}
+                            passMode={p.passMode}
+                            onUpdatePath={(id, patch) =>
+                              onUpdatePath(imp.id, id, patch)
+                            }
+                            indented
+                          />
+                        </FlyoutPanel>
                       </div>
                     );
                   })}
@@ -259,8 +272,9 @@ export function ImportPathsList({
         ) : (
           imp.paths.map((p) => {
             const label = p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`;
+            const pathFlyoutKey = `${imp.id}:path-pass:${p.id}`;
             return (
-              <div key={p.id}>
+              <div key={p.id} className="relative">
                 <PathRow
                   label={label}
                   visible={p.visible}
@@ -271,6 +285,11 @@ export function ImportPathsList({
                       imp.generatedStrokeForNoStroke ??
                       false)
                   }
+                  onTogglePassSettings={
+                    enablePathPassOverrides
+                      ? () => togglePassFlyout(pathFlyoutKey)
+                      : undefined
+                  }
                   onToggleVisibility={() =>
                     onUpdatePathVisibility(imp.id, p.id, !p.visible)
                   }
@@ -279,7 +298,21 @@ export function ImportPathsList({
                   }
                   onRemove={() => onRemovePath(imp.id, p.id)}
                 />
-                {renderPathOverride(p.id, label, p.passCount, p.passMode)}
+                <FlyoutPanel
+                  open={openPassFlyoutKey === pathFlyoutKey}
+                  onClose={() => setOpenPassFlyoutKey(null)}
+                  className="absolute left-4 top-4 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                >
+                  <PathPassSettings
+                    pathId={p.id}
+                    pathLabel={label}
+                    passCount={p.passCount}
+                    passMode={p.passMode}
+                    onUpdatePath={(id, patch) =>
+                      onUpdatePath(imp.id, id, patch)
+                    }
+                  />
+                </FlyoutPanel>
               </div>
             );
           })
@@ -292,13 +325,16 @@ export function ImportPathsList({
             const isLayerExpanded = expandedLayerKeys.has(layerKey);
             const layerPass = deriveGroupPass(layerPaths);
 
+            const layerFlyoutKey = `${imp.id}:group-pass:layer:${layer.id}`;
+
             return (
-              <div key={layer.id}>
+              <div key={layer.id} className="relative">
                 <LayerRow
                   name={layer.name}
                   visible={layer.visible}
                   pathCount={layerPaths.length}
                   expanded={isLayerExpanded}
+                  onTogglePassSettings={() => togglePassFlyout(layerFlyoutKey)}
                   onToggleExpanded={() =>
                     onToggleLayerCollapse(imp.id, layer.id)
                   }
@@ -307,23 +343,30 @@ export function ImportPathsList({
                   }
                 />
 
-                <GroupPassSettings
-                  label="Layer"
-                  passCount={layerPass.passCount}
-                  passMode={layerPass.passMode}
-                  onPassCountChange={(next) =>
-                    applyPassToPaths(layerPaths, { passCount: next })
-                  }
-                  onPassModeChange={(next) =>
-                    applyPassToPaths(layerPaths, { passMode: next })
-                  }
-                />
+                <FlyoutPanel
+                  open={openPassFlyoutKey === layerFlyoutKey}
+                  onClose={() => setOpenPassFlyoutKey(null)}
+                  className="absolute left-4 top-5 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                >
+                  <GroupPassSettings
+                    label="Layer"
+                    passCount={layerPass.passCount}
+                    passMode={layerPass.passMode}
+                    onPassCountChange={(next) =>
+                      applyPassToPaths(layerPaths, { passCount: next })
+                    }
+                    onPassModeChange={(next) =>
+                      applyPassToPaths(layerPaths, { passMode: next })
+                    }
+                  />
+                </FlyoutPanel>
 
                 {isLayerExpanded &&
                   layerPaths.map((p) => {
                     const label = p.label ?? `path ${p.id.slice(0, 6)}`;
+                    const pathFlyoutKey = `${imp.id}:path-pass:${p.id}`;
                     return (
-                      <div key={p.id}>
+                      <div key={p.id} className="relative">
                         <PathRow
                           label={label}
                           visible={p.visible}
@@ -336,6 +379,11 @@ export function ImportPathsList({
                               false)
                           }
                           indented
+                          onTogglePassSettings={
+                            enablePathPassOverrides
+                              ? () => togglePassFlyout(pathFlyoutKey)
+                              : undefined
+                          }
                           onToggleVisibility={() =>
                             onUpdatePathVisibility(imp.id, p.id, !p.visible)
                           }
@@ -348,13 +396,22 @@ export function ImportPathsList({
                           }
                           onRemove={() => onRemovePath(imp.id, p.id)}
                         />
-                        {renderPathOverride(
-                          p.id,
-                          label,
-                          p.passCount,
-                          p.passMode,
-                          true,
-                        )}
+                        <FlyoutPanel
+                          open={openPassFlyoutKey === pathFlyoutKey}
+                          onClose={() => setOpenPassFlyoutKey(null)}
+                          className="absolute left-6 top-4 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                        >
+                          <PathPassSettings
+                            pathId={p.id}
+                            pathLabel={label}
+                            passCount={p.passCount}
+                            passMode={p.passMode}
+                            onUpdatePath={(id, patch) =>
+                              onUpdatePath(imp.id, id, patch)
+                            }
+                            indented
+                          />
+                        </FlyoutPanel>
                       </div>
                     );
                   })}
@@ -368,8 +425,9 @@ export function ImportPathsList({
             )
             .map((p) => {
               const label = p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`;
+              const pathFlyoutKey = `${imp.id}:path-pass:${p.id}`;
               return (
-                <div key={p.id}>
+                <div key={p.id} className="relative">
                   <PathRow
                     label={label}
                     visible={p.visible}
@@ -379,6 +437,11 @@ export function ImportPathsList({
                       (p.generatedStrokeEnabled ??
                         imp.generatedStrokeForNoStroke ??
                         false)
+                    }
+                    onTogglePassSettings={
+                      enablePathPassOverrides
+                        ? () => togglePassFlyout(pathFlyoutKey)
+                        : undefined
                     }
                     onToggleVisibility={() =>
                       onUpdatePathVisibility(imp.id, p.id, !p.visible)
@@ -392,7 +455,21 @@ export function ImportPathsList({
                     }
                     onRemove={() => onRemovePath(imp.id, p.id)}
                   />
-                  {renderPathOverride(p.id, label, p.passCount, p.passMode)}
+                  <FlyoutPanel
+                    open={openPassFlyoutKey === pathFlyoutKey}
+                    onClose={() => setOpenPassFlyoutKey(null)}
+                    className="absolute left-4 top-4 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+                  >
+                    <PathPassSettings
+                      pathId={p.id}
+                      pathLabel={label}
+                      passCount={p.passCount}
+                      passMode={p.passMode}
+                      onUpdatePath={(id, patch) =>
+                        onUpdatePath(imp.id, id, patch)
+                      }
+                    />
+                  </FlyoutPanel>
                 </div>
               );
             })}
@@ -400,8 +477,9 @@ export function ImportPathsList({
       ) : (
         imp.paths.map((p) => {
           const label = p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`;
+          const pathFlyoutKey = `${imp.id}:path-pass:${p.id}`;
           return (
-            <div key={p.id}>
+            <div key={p.id} className="relative">
               <PathRow
                 label={label}
                 visible={p.visible}
@@ -412,6 +490,11 @@ export function ImportPathsList({
                     imp.generatedStrokeForNoStroke ??
                     false)
                 }
+                onTogglePassSettings={
+                  enablePathPassOverrides
+                    ? () => togglePassFlyout(pathFlyoutKey)
+                    : undefined
+                }
                 onToggleVisibility={() =>
                   onUpdatePathVisibility(imp.id, p.id, !p.visible)
                 }
@@ -420,7 +503,19 @@ export function ImportPathsList({
                 }
                 onRemove={() => onRemovePath(imp.id, p.id)}
               />
-              {renderPathOverride(p.id, label, p.passCount, p.passMode)}
+              <FlyoutPanel
+                open={openPassFlyoutKey === pathFlyoutKey}
+                onClose={() => setOpenPassFlyoutKey(null)}
+                className="absolute left-4 top-4 z-20 w-48 rounded-md border border-border-ui bg-panel p-2 shadow-xl"
+              >
+                <PathPassSettings
+                  pathId={p.id}
+                  pathLabel={label}
+                  passCount={p.passCount}
+                  passMode={p.passMode}
+                  onUpdatePath={(id, patch) => onUpdatePath(imp.id, id, patch)}
+                />
+              </FlyoutPanel>
             </div>
           );
         })

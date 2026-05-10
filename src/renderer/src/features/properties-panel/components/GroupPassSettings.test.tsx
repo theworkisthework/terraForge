@@ -14,7 +14,7 @@ describe("GroupPassSettings", () => {
       />,
     );
 
-    expect(screen.getByText("Layer")).toBeInTheDocument();
+    expect(screen.getByText("Layer pass settings")).toBeInTheDocument();
     expect(screen.getByDisplayValue("2")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Repeat")).toBeInTheDocument();
   });

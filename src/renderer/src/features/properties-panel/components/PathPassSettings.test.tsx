@@ -14,6 +14,7 @@ describe("PathPassSettings", () => {
 
     expect(screen.getByDisplayValue("1")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Repeat")).toBeInTheDocument();
+    expect(screen.getByText("path p1 pass settings")).toBeInTheDocument();
   });
 
   it("forwards updates with path id and clamped values", () => {

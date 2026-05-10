@@ -5,6 +5,7 @@ import { PathRow } from "./PathRow";
 describe("PathRow", () => {
   it("renders label and triggers toggle/remove callbacks", () => {
     const onToggleVisibility = vi.fn();
+    const onTogglePassSettings = vi.fn();
     const onToggleStroke = vi.fn();
     const onRemove = vi.fn();
 
@@ -15,6 +16,7 @@ describe("PathRow", () => {
         strokeEnabled
         strokeAvailable
         onToggleVisibility={onToggleVisibility}
+        onTogglePassSettings={onTogglePassSettings}
         onToggleStroke={onToggleStroke}
         onRemove={onRemove}
       />,
@@ -24,6 +26,9 @@ describe("PathRow", () => {
 
     fireEvent.click(screen.getByLabelText("Hide path"));
     expect(onToggleVisibility).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTitle("Open path pass settings"));
+    expect(onTogglePassSettings).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText("Disable path stroke"));
     expect(onToggleStroke).toHaveBeenCalledTimes(1);
@@ -47,5 +52,6 @@ describe("PathRow", () => {
 
     expect(screen.getByLabelText("Show path")).toBeDefined();
     expect(screen.getByLabelText("Enable path stroke")).toBeDisabled();
+    expect(screen.queryByTitle("Open path pass settings")).toBeNull();
   });
 });

@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { LayerRow } from "./LayerRow";
+import { ColorGroupRow } from "./ColorGroupRow";
 
-describe("LayerRow", () => {
-  it("renders metadata and forwards visibility/expand handlers", () => {
+describe("ColorGroupRow", () => {
+  it("renders color metadata and forwards actions", () => {
     const onToggleExpanded = vi.fn();
     const onToggleVisible = vi.fn();
     const onTogglePassSettings = vi.fn();
 
     render(
-      <LayerRow
-        name="Ink Layer"
+      <ColorGroupRow
+        color="#ff0000"
         visible
-        pathCount={4}
+        pathCount={3}
         expanded={false}
         onToggleExpanded={onToggleExpanded}
         onToggleVisible={onToggleVisible}
@@ -20,23 +20,23 @@ describe("LayerRow", () => {
       />,
     );
 
-    expect(screen.getByText("Ink Layer")).toBeDefined();
-    expect(screen.getByText("4p")).toBeDefined();
+    expect(screen.getByText("#ff0000")).toBeInTheDocument();
+    expect(screen.getByText("3p")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("Expand layer"));
+    fireEvent.click(screen.getByTitle("Expand color group"));
     expect(onToggleExpanded).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTitle("Toggle layer visibility"));
+    fireEvent.click(screen.getByTitle("Toggle color group visibility"));
     expect(onToggleVisible).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTitle("Open layer pass settings"));
+    fireEvent.click(screen.getByTitle("Open colour pass settings"));
     expect(onTogglePassSettings).toHaveBeenCalledTimes(1);
   });
 
   it("shows collapse title when expanded", () => {
     render(
-      <LayerRow
-        name="Expanded"
+      <ColorGroupRow
+        color="#000000"
         visible={false}
         pathCount={1}
         expanded
@@ -45,6 +45,6 @@ describe("LayerRow", () => {
       />,
     );
 
-    expect(screen.getByTitle("Collapse layer")).toBeDefined();
+    expect(screen.getByTitle("Collapse color group")).toBeDefined();
   });
 });

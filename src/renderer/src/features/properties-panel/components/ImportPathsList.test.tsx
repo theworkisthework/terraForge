@@ -332,4 +332,175 @@ describe("ImportPathsList", () => {
 
     expect(screen.queryByText("Mode")).toBeNull();
   });
+
+  it("opens layer pass flyout from repeat icon and applies updates", () => {
+    const onUpdatePath = vi.fn();
+    const imp = buildImport({
+      paths: [
+        {
+          id: "p1",
+          d: "M0 0",
+          svgSource: "<path />",
+          visible: true,
+          layer: "l1",
+        },
+      ],
+      layers: [{ id: "l1", name: "Ink", visible: true }],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        expandedLayerKeys={new Set(["imp-1:l1"])}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={() => {}}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={() => {}}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={onUpdatePath}
+        onRemovePath={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Open layer pass settings"));
+    expect(screen.getByText("Layer pass settings")).toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByTitle("Number of times to repeat all paths in this group"),
+      { target: { value: "4" } },
+    );
+    expect(onUpdatePath).toHaveBeenCalledWith("imp-1", "p1", {
+      passCount: 4,
+    });
+
+    fireEvent.change(screen.getByTitle("Pass behavior for this group"), {
+      target: { value: "backtrack" },
+    });
+    expect(onUpdatePath).toHaveBeenCalledWith("imp-1", "p1", {
+      passMode: "backtrack",
+    });
+  });
+
+  it("opens colour pass flyout from repeat icon", () => {
+    const imp = buildImport({
+      paths: [
+        {
+          id: "p1",
+          d: "M0 0",
+          svgSource: "<path />",
+          visible: true,
+          hasFill: true,
+          fillColor: "#ff0000",
+        },
+      ],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        groupBy="color"
+        expandedLayerKeys={new Set(["imp-1:color:#ff0000"])}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={() => {}}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={() => {}}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
+        onRemovePath={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Open colour pass settings"));
+    expect(screen.getByText("Colour pass settings")).toBeInTheDocument();
+  });
+
+  it("dismisses pass flyout when clicking outside", () => {
+    const imp = buildImport({
+      paths: [
+        {
+          id: "p1",
+          d: "M0 0",
+          svgSource: "<path />",
+          visible: true,
+          layer: "l1",
+        },
+      ],
+      layers: [{ id: "l1", name: "Ink", visible: true }],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        expandedLayerKeys={new Set(["imp-1:l1"])}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={() => {}}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={() => {}}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
+        onRemovePath={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Open layer pass settings"));
+    expect(screen.getByText("Layer pass settings")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByText("Layer pass settings")).toBeNull();
+  });
+
+  it("opens per-path pass flyout from repeat icon and applies updates", () => {
+    const onUpdatePath = vi.fn();
+    const imp = buildImport({
+      paths: [
+        {
+          id: "p5",
+          d: "M2 2",
+          svgSource: "<path />",
+          visible: true,
+        },
+      ],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        expandedLayerKeys={new Set()}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={() => {}}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={() => {}}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={onUpdatePath}
+        enablePathPassOverrides
+        onRemovePath={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Open path pass settings"));
+    expect(screen.getByDisplayValue("Repeat")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTitle("Number of times to repeat this path"), {
+      target: { value: "5" },
+    });
+    expect(onUpdatePath).toHaveBeenCalledWith("imp-1", "p5", {
+      passCount: 5,
+    });
+
+    fireEvent.change(
+      screen.getByTitle(
+        "How to handle multiple passes: repeat (draw same), backtrack (forward then reverse), or penLift (repeat with pen lift)",
+      ),
+      {
+        target: { value: "penLift" },
+      },
+    );
+    expect(onUpdatePath).toHaveBeenCalledWith("imp-1", "p5", {
+      passMode: "penLift",
+    });
+  });
 });

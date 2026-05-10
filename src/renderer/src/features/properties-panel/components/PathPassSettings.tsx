@@ -31,27 +31,24 @@ export function PathPassSettings({
   };
 
   return (
-    <div
-      className={`${indented ? "pl-3 " : ""}flex flex-col gap-1 py-1 text-[9px] border-l-2 border-border-ui/20 pl-2`}
-    >
-      <div className="flex items-center gap-2">
-        <label className="text-content-muted uppercase text-[8px] tracking-wider flex-1">
-          Passes
-        </label>
+    <div className={`${indented ? "pl-3 " : ""}space-y-2 text-[10px]`}>
+      <div className="text-content-muted uppercase text-[8px] tracking-wider">
+        {pathLabel} pass settings
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-content-faint text-[9px]">Passes</span>
         <input
           type="number"
           min="1"
           max="99"
           value={passCount}
           onChange={handlePassCountChange}
-          className="w-10 px-1 py-0.5 bg-secondary text-content text-[9px] rounded border border-border-ui/30 focus:outline-none focus:ring-1 focus:ring-accent"
+          className="w-12 px-1 py-0.5 bg-secondary text-content text-[9px] rounded border border-border-ui/30 focus:outline-none focus:ring-1 focus:ring-accent"
           title="Number of times to repeat this path"
         />
       </div>
-      <div className="flex items-center gap-2">
-        <label className="text-content-muted uppercase text-[8px] tracking-wider flex-1">
-          Mode
-        </label>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-content-faint text-[9px]">Mode</span>
         <select
           value={passMode}
           onChange={handlePassModeChange}
