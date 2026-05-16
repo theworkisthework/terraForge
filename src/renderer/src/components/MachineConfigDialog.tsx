@@ -56,8 +56,8 @@ const PEN_DEFAULTS: Record<
     penUpDelayMs: 0,
   },
   "solenoid-software": {
-    penUpCommand: "G0Z1",
-    penDownCommand: "G0Z0",
+    penUpCommand: "G53 G0Z1",
+    penDownCommand: "G53 G0Z0",
     penDownDelayMs: 50,
     penUpDelayMs: 0,
   },

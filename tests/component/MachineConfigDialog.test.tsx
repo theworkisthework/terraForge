@@ -399,16 +399,16 @@ describe("MachineConfigDialog", () => {
         screen.getByDisplayValue("Solenoid (Hardware)"),
         "solenoid-software",
       );
-      expect(screen.getByDisplayValue("G0Z1")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G53 G0Z1")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G53 G0Z0")).toBeInTheDocument();
 
       const prefixToggle = screen.getByRole("checkbox", {
         name: /Use machine coordinates for pen commands/i,
       });
       await userEvent.click(prefixToggle);
 
-      expect(screen.getByDisplayValue("G53 G0Z1")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("G53 G0Z0")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G0Z1")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
     });
   });
 
