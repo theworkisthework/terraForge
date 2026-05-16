@@ -133,6 +133,7 @@ export function MachineConfigDialog({ onClose }: Props) {
     configs,
     activeConfigId,
     connected,
+    setConnected,
     addConfig,
     updateConfig,
     deleteConfig,
@@ -348,6 +349,18 @@ export function MachineConfigDialog({ onClose }: Props) {
     });
   };
 
+  const handleDisconnectForEdit = async () => {
+    const activeCfg = configs.find((c) => c.id === activeConfigId);
+    if (!activeCfg) return;
+
+    if (activeCfg.connection.type === "wifi") {
+      await window.terraForge.fluidnc.disconnectWebSocket();
+    } else {
+      await window.terraForge.serial.disconnect();
+    }
+    setConnected(false);
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -465,13 +478,18 @@ export function MachineConfigDialog({ onClose }: Props) {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Locked banner */}
                 {isLocked && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-900/40 border border-amber-700 text-amber-300 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => void handleDisconnectForEdit()}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-900/40 border border-amber-700 text-amber-300 text-xs hover:bg-amber-900/55 transition-colors"
+                    title="Click to disconnect"
+                  >
                     <span className="text-base leading-none">🔒</span>
                     <span>
-                      Machine is connected — disconnect to edit the active
-                      profile.
+                      Machine is connected - click to disconnect and edit the
+                      active profile.
                     </span>
-                  </div>
+                  </button>
                 )}
                 {/* Basic info — wrapped in fieldset so disabled propagates to every input */}
                 <fieldset

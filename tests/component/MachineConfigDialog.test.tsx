@@ -143,11 +143,29 @@ describe("MachineConfigDialog", () => {
     expect(screen.getByText("Set as Active")).toBeInTheDocument();
   });
 
-  it("shows locked banner when connected to active config", async () => {
+  it("shows clickable locked banner when connected to active config", async () => {
     useMachineStore.setState({ connected: true });
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
-    expect(screen.getByText(/disconnect to edit/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Machine is connected - click to disconnect and edit the active profile.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("disconnects when locked banner is clicked", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<MachineConfigDialog onClose={onClose} />);
+
+    await userEvent.click(
+      screen.getByText(
+        "Machine is connected - click to disconnect and edit the active profile.",
+      ),
+    );
+
+    expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
+    expect(useMachineStore.getState().connected).toBe(false);
   });
 
   it("shows pen command fields", async () => {
