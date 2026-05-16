@@ -16,13 +16,21 @@ import {
   useEffect,
   type RefObject,
 } from "react";
-import { MIN_ZOOM } from "../constants";
+import { FIT_VIEW_INSET_PX, MIN_ZOOM } from "../constants";
 import type { Vp } from "../types";
+
+interface ViewportInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
 
 export function useViewport(
   containerRef: RefObject<HTMLDivElement | null>,
   canvasW: number,
   canvasH: number,
+  insets?: Partial<ViewportInsets>,
 ) {
   // ── Viewport state ──────────────────────────────────────────────────────────
   // vpRef mirrors vp for use inside event-handler closures without stale captures.
@@ -47,18 +55,23 @@ export function useViewport(
   // ── Fit helpers ─────────────────────────────────────────────────────────────
   const computeFit = useCallback(
     (w: number, h: number): Vp => {
-      const pad = 8;
+      const top = insets?.top ?? 0;
+      const right = insets?.right ?? 0;
+      const bottom = insets?.bottom ?? 0;
+      const left = insets?.left ?? 0;
+      const fitW = Math.max(1, w - left - right - FIT_VIEW_INSET_PX * 2);
+      const fitH = Math.max(1, h - top - bottom - FIT_VIEW_INSET_PX * 2);
       const zoom = Math.max(
         MIN_ZOOM,
-        Math.min((w - pad * 2) / canvasW, (h - pad * 2) / canvasH),
+        Math.min(fitW / canvasW, fitH / canvasH),
       );
       return {
         zoom,
-        panX: (w - canvasW * zoom) / 2,
-        panY: (h - canvasH * zoom) / 2,
+        panX: left + FIT_VIEW_INSET_PX + (fitW - canvasW * zoom) / 2,
+        panY: top + FIT_VIEW_INSET_PX + (fitH - canvasH * zoom) / 2,
       };
     },
-    [canvasW, canvasH],
+    [canvasW, canvasH, insets?.bottom, insets?.left, insets?.right, insets?.top],
   );
 
   const fitToView = useCallback(() => {

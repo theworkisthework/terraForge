@@ -26,6 +26,7 @@ import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 import {
   MM_TO_PX,
   PAD,
+  RULER_W,
   ZOOM_STEP,
   ROTATE_CURSOR,
   BedLayer,
@@ -109,6 +110,12 @@ export function PlotCanvas() {
 
   const canvasW = bedW * MM_TO_PX + PAD * 2;
   const canvasH = bedH * MM_TO_PX + PAD * 2;
+  const fitInsets = {
+    top: isBottom || isCenter ? 0 : RULER_W,
+    right: isRight ? RULER_W : 0,
+    bottom: isBottom || isCenter ? RULER_W : 0,
+    left: isRight ? 0 : RULER_W,
+  };
 
   // ── Viewport (vp state, fit calculation, ResizeObserver) ────────────────────
   const {
@@ -120,7 +127,7 @@ export function PlotCanvas() {
     computeFit,
     fitToView,
     containerSize,
-  } = useViewport(containerRef, canvasW, canvasH);
+  } = useViewport(containerRef, canvasW, canvasH, fitInsets);
 
   // ── Pan/Zoom (wheel event listener) ─────────────────────────────────────────
   const { zoomBy } = useCanvasPanZoom(containerRef, vpRef, setVp, setFitted);

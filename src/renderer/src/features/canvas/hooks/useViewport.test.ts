@@ -78,9 +78,9 @@ describe("useViewport", () => {
       const ref = makeContainerRef();
       const { result } = renderHook(() => useViewport(ref, CANVAS_W, CANVAS_H));
       // For container 800×600, canvas 200×150:
-      // zoom = min((800-16)/200, (600-16)/150) = min(3.92, 3.89) ≈ 3.89
+      // zoom = min((800-24)/200, (600-24)/150) = min(3.88, 3.84) ≈ 3.84
       const vp = result.current.computeFit(800, 600);
-      expect(vp.zoom).toBeCloseTo(3.89, 1);
+      expect(vp.zoom).toBeCloseTo(3.84, 1);
       expect(vp.panX).toBeGreaterThan(0); // centred horizontally
       expect(vp.panY).toBeGreaterThan(0); // centred vertically
     });
@@ -101,6 +101,23 @@ describe("useViewport", () => {
       // panX = (w - canvasW * zoom) / 2   →  should centre horizontally
       expect(vp.panX).toBeCloseTo((containerW - CANVAS_W * vp.zoom) / 2, 5);
       expect(vp.panY).toBeCloseTo((containerH - CANVAS_H * vp.zoom) / 2, 5);
+    });
+
+    it("accounts for directional fit insets", () => {
+      const ref = makeContainerRef();
+      const { result } = renderHook(() =>
+        useViewport(ref, CANVAS_W, CANVAS_H, {
+          top: 10,
+          right: 30,
+          bottom: 50,
+          left: 20,
+        }),
+      );
+      const vp = result.current.computeFit(800, 600);
+
+      expect(vp.zoom).toBeCloseTo(3.44, 1);
+      expect(vp.panX).toBeCloseTo(51, 3);
+      expect(vp.panY).toBeCloseTo(22, 3);
     });
   });
 
