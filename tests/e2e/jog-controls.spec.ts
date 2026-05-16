@@ -274,10 +274,13 @@ test("Pen up button sends the configured penUpCommand (M3S0)", async () => {
   expect(cmds).toContain("M3S0");
 });
 
-test("'Zero Z' button sends 'G10 L20 P1 Z0'", async () => {
-  await window.locator('[aria-label="Zero Z"]').click();
+test("'Zero Z' button is disabled for solenoid pen type", async () => {
+  const zeroZBtn = window.locator('[aria-label="Zero Z"]');
+  await expect(zeroZBtn).toBeDisabled();
+
+  // Ensure no Zero-Z command is emitted while disabled.
   const cmds = await getTrackedCommands(electronApp);
-  expect(cmds).toContain("G10 L20 P1 Z0");
+  expect(cmds).not.toContain("G10 L20 P1 Z0");
 });
 
 // ─── Close button ─────────────────────────────────────────────────────────────
