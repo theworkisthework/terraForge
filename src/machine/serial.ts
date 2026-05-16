@@ -7,7 +7,7 @@ import type { MachineStatus, RemoteFile } from "../types";
 export function parseFluidNCStatus(raw: string): MachineStatus {
   const stateMatch = raw.match(/<([^|>]+)/);
   const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
-  const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
+  const wcoMatch = raw.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
   const lnMatch = raw.match(/Ln:(\d+),(\d+)/);
 
   const stateStr = stateMatch?.[1] ?? "Unknown";
@@ -31,9 +31,17 @@ export function parseFluidNCStatus(raw: string): MachineStatus {
     ? { x: +mposMatch[1], y: +mposMatch[2], z: +mposMatch[3] }
     : { x: 0, y: 0, z: 0 };
 
-  const wpos = wposMatch
-    ? { x: +wposMatch[1], y: +wposMatch[2], z: +wposMatch[3] }
-    : { ...mpos };
+  // WCO (Work Coordinate Offset) is sent intermittently by FluidNC.
+  // When present, calculate WPos = MPos - WCO. When absent, WPos = MPos.
+  const wco = wcoMatch
+    ? { x: +wcoMatch[1], y: +wcoMatch[2], z: +wcoMatch[3] }
+    : { x: 0, y: 0, z: 0 };
+
+  const wpos = {
+    x: mpos.x - wco.x,
+    y: mpos.y - wco.y,
+    z: mpos.z - wco.z,
+  };
 
   return {
     raw,

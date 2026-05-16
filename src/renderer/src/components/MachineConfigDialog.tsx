@@ -92,11 +92,17 @@ export function MachineConfigDialog({ onClose }: Props) {
   const debugLoggingEnabled = useAppConfigStore(
     (state) => state.debugLoggingEnabled,
   );
+  const showMachineCoordinates = useAppConfigStore(
+    (state) => state.showMachineCoordinates,
+  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
   );
   const setDebugLoggingEnabled = useAppConfigStore(
     (state) => state.setDebugLoggingEnabled,
+  );
+  const setShowMachineCoordinates = useAppConfigStore(
+    (state) => state.setShowMachineCoordinates,
   );
 
   const {
@@ -782,6 +788,28 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <p className="text-xs text-content-faint">
                       Shows low-level command transport details (HTTP endpoint,
                       retries, and response preview). Keep off for normal use.
+                    </p>
+                  </div>
+                </label>
+              </Section>
+
+              <Section title="Console Display">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showMachineCoordinates}
+                    onChange={(e) =>
+                      setShowMachineCoordinates(e.currentTarget.checked)
+                    }
+                    className="mt-0.5 accent-accent"
+                  />
+                  <div className="space-y-1">
+                    <div className="text-sm text-content">
+                      Show machine coordinates alongside work coordinates
+                    </div>
+                    <p className="text-xs text-content-faint">
+                      When enabled, machine coordinates (MPos) appear in
+                      brackets after the work position in the console header.
                     </p>
                   </div>
                 </label>

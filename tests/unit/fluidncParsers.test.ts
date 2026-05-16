@@ -7,14 +7,38 @@ import { parseFirmwareProbeResponse } from "../../src/machine/fluidnc/parsers/fi
 import { parseMachineStatus } from "../../src/machine/fluidnc/parsers/statusParser";
 
 describe("FluidNC parser modules", () => {
-  it("parses machine status reports", () => {
+  it("parses machine status with MPos only (WCO not present)", () => {
     const status = parseMachineStatus(
       "<Run|MPos:5.000,10.000,0.000|Ln:42,100>",
     );
     expect(status.state).toBe("Run");
     expect(status.mpos).toEqual({ x: 5, y: 10, z: 0 });
+    expect(status.wpos).toEqual({ x: 5, y: 10, z: 0 }); // WPos = MPos - WCO(0,0,0)
     expect(status.lineNum).toBe(42);
     expect(status.lineTotal).toBe(100);
+  });
+
+  it("parses machine status with MPos and WCO (work offset)", () => {
+    const status = parseMachineStatus(
+      "<Run|MPos:-1307.137,-1473.113,0.000|FS:6001,0|WCO:30.000,30.000,0.000>",
+    );
+    expect(status.state).toBe("Run");
+    expect(status.mpos).toEqual({ x: -1307.137, y: -1473.113, z: 0 });
+    // WPos = MPos - WCO
+    expect(status.wpos.x).toBeCloseTo(-1337.137, 2);
+    expect(status.wpos.y).toBeCloseTo(-1503.113, 2);
+    expect(status.wpos.z).toBe(0);
+  });
+
+  it("calculates WPos after work offset is applied (user set zero)", () => {
+    // When user sets zero at machine position MPos:-1470,-1470,0,
+    // FluidNC applies WCO such that WPos becomes 0,0,0
+    const status = parseMachineStatus(
+      "<Idle|MPos:-1470.000,-1470.000,0.000|FS:0,0|WCO:-1470.000,-1470.000,0.000>",
+    );
+    expect(status.mpos).toEqual({ x: -1470, y: -1470, z: 0 });
+    // WPos = MPos - WCO = (-1470) - (-1470) = 0
+    expect(status.wpos).toEqual({ x: 0, y: 0, z: 0 });
   });
 
   it("parses firmware probe response", () => {

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { JobControls } from "./JobControls";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useStableMachineState } from "../hooks/useStableMachineState";
@@ -12,6 +13,9 @@ export function ConsolePanel() {
   const status = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
   const setConnected = useMachineStore((s) => s.setConnected);
+  const showMachineCoordinates = useAppConfigStore(
+    (s) => s.showMachineCoordinates,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const [cmd, setCmd] = useState("");
   const [resetting, setResetting] = useState(false);
@@ -102,8 +106,16 @@ export function ConsolePanel() {
               ))}
             {status?.wpos && (
               <span className="text-xs text-content-faint">
+                {showMachineCoordinates ? "Local: " : ""}
                 X:{status.wpos.x.toFixed(2)} Y:{status.wpos.y.toFixed(2)} Z:
                 {status.wpos.z.toFixed(2)}
+                {showMachineCoordinates && status?.mpos && (
+                  <span>
+                    {" "}
+                    [Machine: X:{status.mpos.x.toFixed(2)} Y:
+                    {status.mpos.y.toFixed(2)} Z:{status.mpos.z.toFixed(2)}]
+                  </span>
+                )}
               </span>
             )}
           </div>

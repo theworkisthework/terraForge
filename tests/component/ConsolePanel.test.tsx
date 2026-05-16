@@ -3,10 +3,12 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useConsoleStore } from "@renderer/store/consoleStore";
 import { useMachineStore } from "@renderer/store/machineStore";
+import { useAppConfigStore } from "@renderer/store/appConfigStore";
 import { ConsolePanel } from "@renderer/components/ConsolePanel";
 
 beforeEach(() => {
   useConsoleStore.setState({ lines: [], maxLines: 500 });
+  useAppConfigStore.setState({ showMachineCoordinates: false });
   useMachineStore.setState({
     configs: [],
     activeConfigId: null,
@@ -135,6 +137,28 @@ describe("ConsolePanel", () => {
     });
     render(<ConsolePanel />);
     expect(screen.getByText(/X:10\.50/)).toBeInTheDocument();
+    expect(screen.queryByText(/Local:/)).not.toBeInTheDocument();
+  });
+
+  it("shows Local and Machine labels when both coordinate sets are displayed", () => {
+    useAppConfigStore.setState({ showMachineCoordinates: true });
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        raw: "",
+        state: "Idle",
+        mpos: { x: 100, y: 200, z: 0 },
+        wpos: { x: 10.5, y: 20.5, z: 0 },
+      },
+    });
+
+    render(<ConsolePanel />);
+    expect(
+      screen.getByText(/Local: X:10\.50 Y:20\.50 Z:0\.00/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/\[Machine: X:100\.00 Y:200\.00 Z:0\.00\]/),
+    ).toBeInTheDocument();
   });
 
   it("shows Restart FW button when connected", () => {
