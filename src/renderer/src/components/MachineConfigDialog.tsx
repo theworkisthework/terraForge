@@ -49,9 +49,15 @@ const PEN_DEFAULTS: Record<
     penUpDelayMs: number;
   }
 > = {
-  solenoid: {
+  "solenoid-hardware": {
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
+    penDownDelayMs: 50,
+    penUpDelayMs: 0,
+  },
+  "solenoid-software": {
+    penUpCommand: "G0Z1",
+    penDownCommand: "G0Z0",
     penDownDelayMs: 50,
     penUpDelayMs: 0,
   },
@@ -74,15 +80,33 @@ const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   bedWidth: 220,
   bedHeight: 200,
   origin: "bottom-left",
-  penType: "solenoid",
-  penUpCommand: PEN_DEFAULTS.solenoid.penUpCommand,
-  penDownCommand: PEN_DEFAULTS.solenoid.penDownCommand,
-  penDownDelayMs: PEN_DEFAULTS.solenoid.penDownDelayMs,
-  penUpDelayMs: PEN_DEFAULTS.solenoid.penUpDelayMs,
+  penType: "solenoid-hardware",
+  penUpCommand: PEN_DEFAULTS["solenoid-hardware"].penUpCommand,
+  penDownCommand: PEN_DEFAULTS["solenoid-hardware"].penDownCommand,
+  penDownDelayMs: PEN_DEFAULTS["solenoid-hardware"].penDownDelayMs,
+  penUpDelayMs: PEN_DEFAULTS["solenoid-hardware"].penUpDelayMs,
   jogSpeed: 3000,
   drawSpeed: 3000,
   connection: { type: "wifi", host: "fluidnc.local", port: 80 },
 };
+
+const G53_PREFIX = "G53 ";
+
+function hasMachineCoordinatePrefix(command: string): boolean {
+  return /^G53\s+/.test(command.trimStart());
+}
+
+function addMachineCoordinatePrefix(command: string): string {
+  const trimmed = command.trim();
+  if (!trimmed) return G53_PREFIX.trimEnd();
+  return hasMachineCoordinatePrefix(trimmed)
+    ? trimmed
+    : `${G53_PREFIX}${trimmed}`;
+}
+
+function removeMachineCoordinatePrefix(command: string): string {
+  return command.trim().replace(/^G53\s+/, "");
+}
 
 export function MachineConfigDialog({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<ConfigTab>("machines");
@@ -191,6 +215,22 @@ export function MachineConfigDialog({ onClose }: Props) {
       penDownCommand: form.penUpCommand,
     });
   };
+
+  const handleMachineCoordinateToggle = (enabled: boolean) => {
+    change({
+      penUpCommand: enabled
+        ? addMachineCoordinatePrefix(form.penUpCommand)
+        : removeMachineCoordinatePrefix(form.penUpCommand),
+      penDownCommand: enabled
+        ? addMachineCoordinatePrefix(form.penDownCommand)
+        : removeMachineCoordinatePrefix(form.penDownCommand),
+    });
+  };
+
+  const softwareSolenoidUsesMachineCoordinates =
+    form.penType === "solenoid-software" &&
+    hasMachineCoordinatePrefix(form.penUpCommand) &&
+    hasMachineCoordinatePrefix(form.penDownCommand);
 
   const handleSave = async () => {
     if (isNew) {
@@ -493,7 +533,12 @@ export function MachineConfigDialog({ onClose }: Props) {
                           }
                           className={inputCls}
                         >
-                          <option value="solenoid">Solenoid</option>
+                          <option value="solenoid-hardware">
+                            Solenoid (Hardware)
+                          </option>
+                          <option value="solenoid-software">
+                            Solenoid (Software)
+                          </option>
                           <option value="servo">Servo</option>
                           <option value="stepper">Stepper</option>
                         </select>
@@ -590,11 +635,30 @@ export function MachineConfigDialog({ onClose }: Props) {
                         ↺ Reset to defaults
                       </button>
                       <span className="text-xs text-content-faint">
-                        {form.penType === "solenoid"
-                          ? "Solenoid: M3Sn spindle speed controls the solenoid"
-                          : "Servo / Stepper: G0 Z moves the Z axis"}
+                        {form.penType === "solenoid-hardware"
+                          ? "Solenoid (Hardware): M3S0/M3S1 drive the DRV120 output"
+                          : form.penType === "solenoid-software"
+                            ? "Solenoid (Software): G0Z0/G0Z1 use FluidNC's solenoid feature"
+                            : "Servo / Stepper: G0 Z moves the Z axis"}
                       </span>
                     </div>
+                    {form.penType === "solenoid-software" && (
+                      <label className="flex items-center gap-2 text-xs text-content-faint cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={softwareSolenoidUsesMachineCoordinates}
+                          onChange={(e) =>
+                            handleMachineCoordinateToggle(
+                              e.currentTarget.checked,
+                            )
+                          }
+                          className="accent-accent"
+                        />
+                        <span>
+                          Use machine coordinates for pen commands (prefix G53)
+                        </span>
+                      </label>
+                    )}
                     <p className="text-xs text-content-faint">
                       Pen-down delay is inserted after pen-down before XY motion
                       starts. Pen-up delay is inserted after pen-up before rapid

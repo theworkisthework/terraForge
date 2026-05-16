@@ -2,9 +2,24 @@ import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
 import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
 
-function defaultPenDownDelayMs(penType: PenType): number {
+function normalizePenType(penType: unknown): PenType {
   switch (penType) {
     case "solenoid":
+    case "solenoid-hardware":
+      return "solenoid-hardware";
+    case "solenoid-software":
+    case "servo":
+    case "stepper":
+      return penType;
+    default:
+      return "solenoid-hardware";
+  }
+}
+
+function defaultPenDownDelayMs(penType: PenType): number {
+  switch (penType) {
+    case "solenoid-hardware":
+    case "solenoid-software":
       return 50;
     case "servo":
     case "stepper":
@@ -24,16 +39,18 @@ function normalizeConfig(config: MachineConfig): MachineConfig {
     | number
     | undefined;
   const legacySpeed = typeof legacy === "number" && legacy >= 1 ? legacy : 3000;
+  const penType = normalizePenType(config.penType);
   return {
     ...config,
+    penType,
     penDownDelayMs:
       typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
         ? config.penDownDelayMs
-        : defaultPenDownDelayMs(config.penType),
+        : defaultPenDownDelayMs(penType),
     penUpDelayMs:
       typeof config.penUpDelayMs === "number" && config.penUpDelayMs >= 0
         ? config.penUpDelayMs
-        : defaultPenUpDelayMs(config.penType),
+        : defaultPenUpDelayMs(penType),
     jogSpeed:
       typeof config.jogSpeed === "number" && config.jogSpeed >= 1
         ? config.jogSpeed

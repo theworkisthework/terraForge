@@ -11,7 +11,7 @@
  * test can read and assert the emitted sequence without real hardware.
  *
  * The machine config is mocked so that `activeConfig` in JogControls returns
- * a solenoid machine with penUpCommand "M3 S0" and penDownCommand "M3 S1",
+ * a hardware solenoid machine with penUpCommand "M3S0" and penDownCommand "M3S1",
  * which is required for pen-up / pen-down assertions.
  */
 import { test, expect } from "@playwright/test";
@@ -38,11 +38,11 @@ const TEST_CONFIG = {
   },
   bedWidth: 300,
   bedHeight: 300,
-  penUpCommand: "M3 S0",
-  penDownCommand: "M3 S1",
+  penUpCommand: "M3S0",
+  penDownCommand: "M3S1",
   penDownDelayMs: 50,
   penUpDelayMs: 0,
-  penType: "solenoid" as const,
+  penType: "solenoid-hardware" as const,
   maxSpeed: 3000,
   travelSpeed: 3000,
 };
@@ -256,22 +256,22 @@ test("'Set Zero' button sends 'G10 L20 P1 X0 Y0'", async () => {
   expect(cmds).toContain("G10 L20 P1 X0 Y0");
 });
 
-// ─── Pen commands (solenoid) ──────────────────────────────────────────────────
+// ─── Pen commands (hardware solenoid) ────────────────────────────────────────
 
-test("Pen down button sends the configured penDownCommand (M3 S1)", async () => {
+test("Pen down button sends the configured penDownCommand (M3S1)", async () => {
   const btn = window.locator('[aria-label="Pen down"]');
   await expect(btn).toBeEnabled({ timeout: 3000 }); // enabled when penDown is configured
   await btn.click();
   const cmds = await getTrackedCommands(electronApp);
-  expect(cmds).toContain("M3 S1");
+  expect(cmds).toContain("M3S1");
 });
 
-test("Pen up button sends the configured penUpCommand (M3 S0)", async () => {
+test("Pen up button sends the configured penUpCommand (M3S0)", async () => {
   const btn = window.locator('[aria-label="Pen up"]');
   await expect(btn).toBeEnabled({ timeout: 3000 });
   await btn.click();
   const cmds = await getTrackedCommands(electronApp);
-  expect(cmds).toContain("M3 S0");
+  expect(cmds).toContain("M3S0");
 });
 
 test("'Zero Z' button sends 'G10 L20 P1 Z0'", async () => {

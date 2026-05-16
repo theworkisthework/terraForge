@@ -12,7 +12,7 @@ beforeEach(() => {
     bedWidth: 300,
     bedHeight: 200,
     origin: "bottom-left",
-    penType: "solenoid",
+    penType: "solenoid-hardware",
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
     connection: { type: "wifi", host: "fluidnc.local", port: 80 },
@@ -304,7 +304,7 @@ describe("MachineConfigDialog", () => {
       expect(screen.getByDisplayValue("M3S0")).toBeInTheDocument();
       // Change pen type — commands match current defaults so no confirm needed
       await userEvent.selectOptions(
-        screen.getByDisplayValue("Solenoid"),
+        screen.getByDisplayValue("Solenoid (Hardware)"),
         "servo",
       );
       // Should auto-populate servo defaults
@@ -315,7 +315,7 @@ describe("MachineConfigDialog", () => {
     it("switching to stepper populates stepper defaults (G0Z15 / G0Z0)", async () => {
       render(<MachineConfigDialog onClose={onClose} />);
       await userEvent.selectOptions(
-        screen.getByDisplayValue("Solenoid"),
+        screen.getByDisplayValue("Solenoid (Hardware)"),
         "stepper",
       );
       expect(screen.getByDisplayValue("G0Z15")).toBeInTheDocument();
@@ -329,7 +329,7 @@ describe("MachineConfigDialog", () => {
       expect(delayInput).not.toBeDisabled();
 
       await userEvent.selectOptions(
-        screen.getByDisplayValue("Solenoid"),
+        screen.getByDisplayValue("Solenoid (Hardware)"),
         "stepper",
       );
       expect(delayInput).toBeDisabled();
@@ -349,7 +349,7 @@ describe("MachineConfigDialog", () => {
       await userEvent.type(upInput, "CUSTOM");
       // Now change pen type — should open the themed confirm dialog
       await userEvent.selectOptions(
-        screen.getByDisplayValue("Solenoid"),
+        screen.getByDisplayValue("Solenoid (Hardware)"),
         "servo",
       );
       await screen.findByText("Reset Pen Commands?");
@@ -366,13 +366,31 @@ describe("MachineConfigDialog", () => {
       await userEvent.type(upInput, "CUSTOM");
       // Change pen type — themed confirm dialog appears
       await userEvent.selectOptions(
-        screen.getByDisplayValue("Solenoid"),
+        screen.getByDisplayValue("Solenoid (Hardware)"),
         "servo",
       );
       await screen.findByText("Reset Pen Commands?");
       // User declines → commands stay as custom, penType label updates
       await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.getByDisplayValue("CUSTOM")).toBeInTheDocument();
+    });
+
+    it("switching to software solenoid exposes G53 prefix toggle", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.selectOptions(
+        screen.getByDisplayValue("Solenoid (Hardware)"),
+        "solenoid-software",
+      );
+      expect(screen.getByDisplayValue("G0Z1")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G0Z0")).toBeInTheDocument();
+
+      const prefixToggle = screen.getByRole("checkbox", {
+        name: /Use machine coordinates for pen commands/i,
+      });
+      await userEvent.click(prefixToggle);
+
+      expect(screen.getByDisplayValue("G53 G0Z1")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("G53 G0Z0")).toBeInTheDocument();
     });
   });
 

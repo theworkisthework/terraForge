@@ -7,8 +7,18 @@ export type OriginType =
   | "bottom-right"
   | "top-right"
   | "center";
-export type PenType = "solenoid" | "servo" | "stepper";
+export type PenType =
+  | "solenoid-hardware"
+  | "solenoid-software"
+  | "servo"
+  | "stepper";
 export type PassMode = "repeat" | "backtrack" | "penLift";
+
+export function isSolenoidPenType(
+  penType: PenType,
+): penType is "solenoid-hardware" | "solenoid-software" {
+  return penType === "solenoid-hardware" || penType === "solenoid-software";
+}
 
 export interface MachineConnection {
   type: ConnectionType;

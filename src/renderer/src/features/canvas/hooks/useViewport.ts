@@ -61,17 +61,21 @@ export function useViewport(
       const left = insets?.left ?? 0;
       const fitW = Math.max(1, w - left - right - FIT_VIEW_INSET_PX * 2);
       const fitH = Math.max(1, h - top - bottom - FIT_VIEW_INSET_PX * 2);
-      const zoom = Math.max(
-        MIN_ZOOM,
-        Math.min(fitW / canvasW, fitH / canvasH),
-      );
+      const zoom = Math.max(MIN_ZOOM, Math.min(fitW / canvasW, fitH / canvasH));
       return {
         zoom,
         panX: left + FIT_VIEW_INSET_PX + (fitW - canvasW * zoom) / 2,
         panY: top + FIT_VIEW_INSET_PX + (fitH - canvasH * zoom) / 2,
       };
     },
-    [canvasW, canvasH, insets?.bottom, insets?.left, insets?.right, insets?.top],
+    [
+      canvasW,
+      canvasH,
+      insets?.bottom,
+      insets?.left,
+      insets?.right,
+      insets?.top,
+    ],
   );
 
   const fitToView = useCallback(() => {

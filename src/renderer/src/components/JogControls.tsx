@@ -11,7 +11,7 @@ import {
   ArrowDown,
   ArrowUp,
 } from "lucide-react";
-import type { JogStep } from "../../../types";
+import { isSolenoidPenType, type JogStep } from "../../../types";
 import { useMachineStore } from "../store/machineStore";
 import { Tooltip } from "./Tooltip";
 
@@ -36,10 +36,10 @@ export function JogControls({ onClose }: Props) {
 
   const penUp = activeConfig?.penUpCommand ?? "";
   const penDown = activeConfig?.penDownCommand ?? "";
-  const penType = activeConfig?.penType ?? "solenoid";
+  const penType = activeConfig?.penType ?? "solenoid-hardware";
 
   const movePen = async (dir: 1 | -1) => {
-    if (penType !== "solenoid") {
+    if (!isSolenoidPenType(penType)) {
       // servo / stepper: jog Z incrementally, same as X/Y — $J is cancellable
       // and works on all FluidNC versions (3.x and 4.x).  G0 Z<abs> was
       // unreliable on 3.x (motor clunk but no movement without prior homing).
@@ -48,25 +48,23 @@ export function JogControls({ onClose }: Props) {
         `$J=G91 G21 Z${dist} F${feedrate}`,
       );
     } else {
-      // Solenoid — send the configured pen up/down command (e.g. M3S0/M3S1)
+      // Solenoid variants — send the configured pen up/down command.
       const cmd = dir === -1 ? penDown : penUp;
       if (cmd) await window.terraForge.fluidnc.sendCommand(cmd);
     }
   };
 
-  const penDownTitle =
-    penType !== "solenoid"
-      ? `Pen Down: jog Z by -${step} mm`
-      : penDown
-        ? `Pen Down: ${penDown}`
-        : "No pen-down command configured";
+  const penDownTitle = !isSolenoidPenType(penType)
+    ? `Pen Down: jog Z by -${step} mm`
+    : penDown
+      ? `Pen Down: ${penDown}`
+      : "No pen-down command configured";
 
-  const penUpTitle =
-    penType !== "solenoid"
-      ? `Pen Up: jog Z by +${step} mm`
-      : penUp
-        ? `Pen Up: ${penUp}`
-        : "No pen-up command configured";
+  const penUpTitle = !isSolenoidPenType(penType)
+    ? `Pen Up: jog Z by +${step} mm`
+    : penUp
+      ? `Pen Up: ${penUp}`
+      : "No pen-up command configured";
 
   const jog = async (axis: string, dir: 1 | -1) => {
     const dist = (step * dir).toFixed(3);
@@ -161,7 +159,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen down"
             onClick={() => movePen(-1)}
-            disabled={!connected || (penType === "solenoid" && !penDown)}
+            disabled={!connected || (isSolenoidPenType(penType) && !penDown)}
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <PenLine size={15} />
@@ -172,7 +170,7 @@ export function JogControls({ onClose }: Props) {
           <button
             aria-label="Pen up"
             onClick={() => movePen(1)}
-            disabled={!connected || (penType === "solenoid" && !penUp)}
+            disabled={!connected || (isSolenoidPenType(penType) && !penUp)}
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <Pen size={15} />
