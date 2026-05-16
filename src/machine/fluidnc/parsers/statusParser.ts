@@ -3,6 +3,7 @@ import type { MachineStatus } from "../../../types";
 export function parseMachineStatus(raw: string): MachineStatus {
   const stateMatch = raw.match(/<([^|>]+)/);
   const mposMatch = raw.match(/MPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
+  const wposMatch = raw.match(/WPos:([-\d.]+),([-\d.]+),([-\d.]+)/);
   const wcoMatch = raw.match(/WCO:([-\d.]+),([-\d.]+),([-\d.]+)/);
   const lnMatch = raw.match(/Ln:(\d+)(?:,(\d+))?/);
 
@@ -27,17 +28,17 @@ export function parseMachineStatus(raw: string): MachineStatus {
     ? { x: +mposMatch[1], y: +mposMatch[2], z: +mposMatch[3] }
     : { x: 0, y: 0, z: 0 };
 
-  // WCO (Work Coordinate Offset) is sent intermittently by FluidNC.
-  // When present, calculate WPos = MPos - WCO. When absent, WPos = MPos.
-  const wco = wcoMatch
-    ? { x: +wcoMatch[1], y: +wcoMatch[2], z: +wcoMatch[3] }
-    : { x: 0, y: 0, z: 0 };
-
-  const wpos = {
-    x: mpos.x - wco.x,
-    y: mpos.y - wco.y,
-    z: mpos.z - wco.z,
-  };
+  // Prefer explicit WPos when present. Otherwise derive from WCO, else fall
+  // back to MPos for firmwares that report neither field in each packet.
+  const wpos = wposMatch
+    ? { x: +wposMatch[1], y: +wposMatch[2], z: +wposMatch[3] }
+    : wcoMatch
+      ? {
+          x: mpos.x - +wcoMatch[1],
+          y: mpos.y - +wcoMatch[2],
+          z: mpos.z - +wcoMatch[3],
+        }
+      : { ...mpos };
 
   const lineNum = lnMatch ? parseInt(lnMatch[1], 10) : undefined;
   const lineTotal =

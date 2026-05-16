@@ -72,6 +72,11 @@ describe("parseFluidNCStatus", () => {
     expect(s.wpos).toEqual({ x: 5.5, y: 6.6, z: 7.7 });
   });
 
+  it("derives WPos from WCO when WPos is absent", () => {
+    const s = parseFluidNCStatus("<Idle|MPos:20,30,0|WCO:10,10,0>");
+    expect(s.wpos).toEqual({ x: 10, y: 20, z: 0 });
+  });
+
   it("falls back to MPos for WPos when WPos absent", () => {
     const s = parseFluidNCStatus("<Idle|MPos:10,20,30>");
     expect(s.wpos).toEqual({ x: 10, y: 20, z: 30 });
