@@ -109,8 +109,8 @@ function makeConfig(
     origin: "top-left",
     bedWidth: 200,
     bedHeight: 200,
-    penUpCommand: "M5",
-    penDownCommand: "M3 S1000",
+    penUpCommand: "M3S0",
+    penDownCommand: "M3S1",
     drawSpeed: 3000,
     name: "Test Plotter",
     ...overrides,
@@ -154,7 +154,7 @@ describe("svgWorker — G-code header", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     // First occurrence of penUpCommand is the preamble pen-safe line
-    expect(gcode).toContain("M5");
+    expect(gcode).toContain("M3S0");
   });
 });
 
@@ -174,8 +174,8 @@ describe("svgWorker — G-code body", () => {
     // Each subpath: rapid (G0) + pen down + G1 moves + pen up
     expect(gcode).toContain("G0 X");
     expect(gcode).toContain("G1 X");
-    expect(gcode).toContain("M3 S1000 ; Pen down");
-    expect(gcode).toContain("M5 ; Pen up");
+    expect(gcode).toContain("M3S1 ; Pen down");
+    expect(gcode).toContain("M3S0 ; Pen up");
   });
 
   it("inserts dwell after pen-down and before the first G1 move", async () => {
@@ -188,7 +188,7 @@ describe("svgWorker — G-code body", () => {
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    const downIdx = gcode.indexOf("M3 S1000 ; Pen down");
+    const downIdx = gcode.indexOf("M3S1 ; Pen down");
     const dwellIdx = gcode.indexOf("G4 P0.05 ; Pen settle delay");
     const drawIdx = gcode.indexOf("\nG1 X", downIdx);
     expect(downIdx).toBeGreaterThan(-1);
@@ -262,7 +262,7 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("G0 X0 Y0 ; Return to origin");
-    expect(gcode).toContain("M5 ; Pen up - safe");
+    expect(gcode).toContain("M3S0 ; Pen up - safe");
     expect(gcode).toContain("; -- End of job");
   });
 
@@ -276,7 +276,7 @@ describe("svgWorker — G-code body", () => {
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    expect(gcode).not.toContain("M5 ; Pen up - safe");
+    expect(gcode).not.toContain("M3S0 ; Pen up - safe");
     expect(gcode).not.toContain("G0 X0 Y0 ; Return to origin");
     expect(gcode).toContain("; -- End of job");
   });
@@ -331,7 +331,7 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("M43 P0 S0 ; custom end");
-    const liftIdx = gcode.indexOf("M5 ; Pen up - safe");
+    const liftIdx = gcode.indexOf("M3S0 ; Pen up - safe");
     const returnIdx = gcode.indexOf("G0 X0 Y0 ; Return to origin");
     const customIdx = gcode.indexOf("M43 P0 S0 ; custom end");
     expect(customIdx).toBeGreaterThan(liftIdx);
@@ -559,9 +559,9 @@ describe("svgWorker — coordinate output", () => {
     });
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    // F3000 (from config.drawSpeed) should appear before M3 S1000 in G-code body
+    // F3000 (from config.drawSpeed) should appear before M3S1 in G-code body
     const fIdx = gcode.indexOf("F3000");
-    const penDownIdx = gcode.indexOf("M3 S1000 ; Pen down");
+    const penDownIdx = gcode.indexOf("M3S1 ; Pen down");
     expect(fIdx).toBeGreaterThan(-1);
     expect(penDownIdx).toBeGreaterThan(-1);
     expect(fIdx).toBeLessThan(penDownIdx);

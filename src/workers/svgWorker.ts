@@ -14,6 +14,7 @@
  */
 
 import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
+import { isSolenoidPenType } from "../types";
 import {
   flattenToSubpaths,
   clipSubpathsToBed,
@@ -193,7 +194,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const hasDelayOverride = typeof options?.penDownDelayMsOverride === "number";
   const rawDelayMs = hasDelayOverride
     ? options.penDownDelayMsOverride
-    : config.penType === "servo" || config.penType === "solenoid"
+    : config.penType === "servo" || isSolenoidPenType(config.penType)
       ? (config.penDownDelayMs ?? 0)
       : 0;
   const penDownDelayMs = Number.isFinite(rawDelayMs)
@@ -203,7 +204,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const hasUpDelayOverride = typeof options?.penUpDelayMsOverride === "number";
   const rawUpDelayMs = hasUpDelayOverride
     ? options.penUpDelayMsOverride
-    : config.penType === "servo" || config.penType === "solenoid"
+    : config.penType === "servo" || isSolenoidPenType(config.penType)
       ? (config.penUpDelayMs ?? 0)
       : 0;
   const penUpDelayMs = Number.isFinite(rawUpDelayMs)
