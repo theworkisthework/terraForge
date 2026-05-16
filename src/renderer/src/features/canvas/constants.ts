@@ -10,6 +10,7 @@ export const PAD = 30; // margin around bed in SVG pixels
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 20;
 export const ZOOM_STEP = 1.25; // per keyboard / button press
+export const FIT_VIEW_INSET_PX = 12; // extra screen-space inset when fitting bed to viewport
 
 // Ruler overlay (screen space)
 export const RULER_W = 20; // ruler strip width in screen pixels
