@@ -177,13 +177,24 @@ export function JogControls({ onClose }: Props) {
             <ArrowUp size={11} />
           </button>
         </Tooltip>
-        <Tooltip text="Zero Z axis (set current Z position as Z0)">
+        <Tooltip
+          text={
+            activeConfig?.penType === "solenoid-software" &&
+            penUp.startsWith("G53")
+              ? "Zeroing Z is disabled if solenoid uses machine coordinates"
+              : "Zero Z axis (set current Z position as Z0)"
+          }
+        >
           <button
             aria-label="Zero Z"
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 Z0");
             }}
-            disabled={!connected}
+            disabled={
+              !connected ||
+              (activeConfig?.penType === "solenoid-software" &&
+                penUp.startsWith("G53"))
+            }
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center"
           >
             <CircleSlash2 size={14} />

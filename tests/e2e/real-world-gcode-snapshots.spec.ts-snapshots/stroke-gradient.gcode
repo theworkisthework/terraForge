@@ -13,13 +13,13 @@
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
 G21      ; Units: mm
-M5 ; Pen up
+M3S0 ; Pen up
 
 ; -- Color: url(#_linear1) (1 object) --
 ; -- Sequential path (1 subpaths) -----------
 G0 X25.786 Y22.661 ; Rapid travel
 F3000
-M3 S1000 ; Pen down
+M3S1 ; Pen down
 G4 P0.05 ; Pen settle delay
 G1 X25.793 Y22.628
 G1 X25.816 Y22.540
@@ -212,7 +212,7 @@ G1 X51.932 Y11.498
 G1 X52.061 Y11.887
 G1 X52.132 Y12.133
 G1 X52.154 Y12.219
-M5 ; Pen up
+M3S0 ; Pen up
 
 ; -- End of job -----------------------------------------------
-M5 ; Pen up - safe
+M3S0 ; Pen up - safe
