@@ -56,9 +56,23 @@ registerConfigIpcHandlers({
   loadConfigs: persistence.loadConfigs,
   saveConfigs: persistence.saveConfigs,
   loadPageSizes: persistence.loadPageSizes,
+  loadAppConfig: persistence.loadAppConfig,
+  saveAppConfig: persistence.saveAppConfig,
+  onAppConfigSaved: (config) => {
+    fluidnc.setDebugLoggingEnabled(config.debugLoggingEnabled);
+  },
   pageSizesPath: persistence.pageSizesPath,
   builtInPageSizes: BUILT_IN_PAGE_SIZES,
 });
+
+void persistence
+  .loadAppConfig()
+  .then((config) => {
+    fluidnc.setDebugLoggingEnabled(config.debugLoggingEnabled);
+  })
+  .catch(() => {
+    fluidnc.setDebugLoggingEnabled(false);
+  });
 
 registerAppIpcHandlers();
 

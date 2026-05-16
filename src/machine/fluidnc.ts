@@ -35,6 +35,7 @@ export class FluidNCClient extends EventEmitter {
   private wsPort = 80;
   private wsRetryDelay = 3000; // ms — doubles on each 503, resets on success
   private wsEnabled = false; // set false on disconnect to stop retry loop
+  private debugLoggingEnabled = false;
   /**
    * Firmware major version detected during connectWebSocket.
    * null = unknown (probe failed or not yet connected).
@@ -70,6 +71,15 @@ export class FluidNCClient extends EventEmitter {
     this.wsPort = port;
   }
 
+  setDebugLoggingEnabled(enabled: boolean): void {
+    this.debugLoggingEnabled = enabled;
+  }
+
+  private emitDebugConsole(message: string): void {
+    if (!this.debugLoggingEnabled) return;
+    this.emit("console", message);
+  }
+
   /**
    * Resolve a hostname to an IP address using Node's native DNS resolver,
    * which honours the system resolver (including mDNS/.local on Windows).
@@ -97,6 +107,17 @@ export class FluidNCClient extends EventEmitter {
   // ─── Commands ─────────────────────────────────────────────────────────────
 
   async sendCommand(cmd: string): Promise<string> {
+    // Keep raw command execution unchanged; this only makes log output readable
+    // and safe by escaping control characters and capping length.
+    const logCmd = cmd
+      .replace(/\r/g, "\\r")
+      .replace(/\n/g, "\\n")
+      .replace(
+        /[\x00-\x1F\x7F]/g,
+        (ch) => `\\x${ch.charCodeAt(0).toString(16).padStart(2, "0")}`,
+      )
+      .slice(0, 200);
+    const encodedCmd = encodeURIComponent(cmd);
     // FluidNC 3.x and 4.x require different command conventions.
     //
     // 3.x: POST /command with x-www-form-urlencoded body:
@@ -107,25 +128,54 @@ export class FluidNCClient extends EventEmitter {
     // Some builds still accept GET /command?plain=CMD, so for 4.x/unknown we
     // try commandText first (matching WebUI) and fall back to plain.
     if (this.fwMajor !== null && this.fwMajor < 4) {
+      this.emitDebugConsole(
+        `[terraForge] CMD HTTP POST /command commandText=${logCmd}`,
+      );
       const res = await this.restClient.post(
         "/command",
-        `commandText=${encodeURIComponent(cmd)}`,
+        `commandText=${encodedCmd}`,
       );
-      return res.text();
+      const body = await res.text();
+      const preview = body.trim().slice(0, 160).replace(/\n/g, "↵");
+      this.emitDebugConsole(
+        `[terraForge] CMD OK POST /command (${preview || "(empty)"})`,
+      );
+      return body;
     }
     // 4.x (or unknown — assume modern)
     try {
+      this.emitDebugConsole(
+        `[terraForge] CMD HTTP GET /command?commandText=${encodedCmd} (decoded: ${logCmd})`,
+      );
       const res = await this.restClient.get(
-        `/command?commandText=${encodeURIComponent(cmd)}`,
+        `/command?commandText=${encodedCmd}`,
         10_000,
       );
-      return res.text();
-    } catch {
+      const body = await res.text();
+      const preview = body.trim().slice(0, 160).replace(/\n/g, "↵");
+      this.emitDebugConsole(
+        `[terraForge] CMD OK GET commandText (${preview || "(empty)"})`,
+      );
+      return body;
+    } catch (error) {
+      this.emitDebugConsole(
+        `[terraForge] CMD RETRY GET plain (commandText failed: ${
+          error instanceof Error ? error.message : String(error)
+        })`,
+      );
+      this.emitDebugConsole(
+        `[terraForge] CMD HTTP GET /command?plain=${encodedCmd} (decoded: ${logCmd})`,
+      );
       const res = await this.restClient.get(
-        `/command?plain=${encodeURIComponent(cmd)}`,
+        `/command?plain=${encodedCmd}`,
         10_000,
       );
-      return res.text();
+      const body = await res.text();
+      const preview = body.trim().slice(0, 160).replace(/\n/g, "↵");
+      this.emitDebugConsole(
+        `[terraForge] CMD OK GET plain (${preview || "(empty)"})`,
+      );
+      return body;
     }
   }
 

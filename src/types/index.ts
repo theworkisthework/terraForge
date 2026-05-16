@@ -43,6 +43,11 @@ export interface MachineConfig {
   connection: MachineConnection;
 }
 
+export interface AppConfig {
+  /** Enables verbose debug command transport logs in the console panel. */
+  debugLoggingEnabled: boolean;
+}
+
 // ─── Pass Configuration ──────────────────────────────────────────────────────
 
 /**
@@ -470,6 +475,8 @@ export interface ConfigApi {
   getMachineConfigs: () => Promise<MachineConfig[]>;
   saveMachineConfig: (config: MachineConfig) => Promise<void>;
   deleteMachineConfig: (id: string) => Promise<void>;
+  getAppConfig: () => Promise<AppConfig>;
+  saveAppConfig: (config: AppConfig) => Promise<void>;
   /** Export all configs to a user-chosen .json file. Returns the path written, or null if cancelled. */
   exportConfigs: () => Promise<string | null>;
   /** Import configs from a .json file chosen by the user. Returns counts of added and skipped configs. */
