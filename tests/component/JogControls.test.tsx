@@ -93,7 +93,21 @@ describe("JogControls", () => {
     );
   });
 
-  it("sends zero-Z command when Zero Z button clicked", async () => {
+  it("sends zero-Z command when Zero Z button clicked for non-solenoid pen types", async () => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
     render(<JogControls />);
     await userEvent.click(screen.getByRole("button", { name: "Zero Z" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
@@ -345,9 +359,9 @@ describe("JogControls — pen commands with software solenoid pen type", () => {
   });
 });
 
-// ── Zero-Z button disabled state with software solenoid + G53 ──────────────────
+// ── Zero-Z button disabled state with solenoid pen types ──────────────────
 
-describe("JogControls — zero-Z button disabled with software solenoid + G53", () => {
+describe("JogControls — zero-Z button disabled with solenoid pen types", () => {
   beforeEach(() => {
     const cfg = createMachineConfig({
       penType: "solenoid-software",
@@ -365,7 +379,7 @@ describe("JogControls — zero-Z button disabled with software solenoid + G53", 
     vi.clearAllMocks();
   });
 
-  it("disables Zero Z button when software solenoid uses G53 prefix", () => {
+  it("disables Zero Z button when using software solenoid", () => {
     render(<JogControls />);
     const zeroZButton = screen.getByRole("button", { name: "Zero Z" });
     expect(zeroZButton).toBeDisabled();
@@ -379,7 +393,7 @@ describe("JogControls — zero-Z button disabled with software solenoid + G53", 
     expect(zeroZButton).toBeDisabled();
   });
 
-  it("allows Zero Z button when software solenoid without G53 prefix", () => {
+  it("disables Zero Z button when software solenoid has no G53 prefix", () => {
     const cfg = createMachineConfig({
       penType: "solenoid-software",
       penUpCommand: "G0Z1", // No G53 prefix
@@ -393,14 +407,31 @@ describe("JogControls — zero-Z button disabled with software solenoid + G53", 
 
     render(<JogControls />);
     const zeroZButton = screen.getByRole("button", { name: "Zero Z" });
-    expect(zeroZButton).not.toBeDisabled();
+    expect(zeroZButton).toBeDisabled();
   });
 
-  it("allows Zero Z button when using hardware solenoid with G53", () => {
+  it("disables Zero Z button when using hardware solenoid", () => {
     const cfg = createMachineConfig({
       penType: "solenoid-hardware",
       penUpCommand: "G53 M3S0", // G53 prefix (unusual but possible)
       penDownCommand: "G53 M3S1",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+    });
+    vi.clearAllMocks();
+
+    render(<JogControls />);
+    const zeroZButton = screen.getByRole("button", { name: "Zero Z" });
+    expect(zeroZButton).toBeDisabled();
+  });
+
+  it("allows Zero Z button when using non-solenoid pen types", () => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
     });
     useMachineStore.setState({
       configs: [cfg],

@@ -179,9 +179,8 @@ export function JogControls({ onClose }: Props) {
         </Tooltip>
         <Tooltip
           text={
-            activeConfig?.penType === "solenoid-software" &&
-            penUp.startsWith("G53")
-              ? "Zeroing Z is disabled if solenoid uses machine coordinates"
+            isSolenoidPenType(penType)
+              ? "Zeroing Z disabled for solenoid."
               : "Zero Z axis (set current Z position as Z0)"
           }
         >
@@ -190,11 +189,7 @@ export function JogControls({ onClose }: Props) {
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 Z0");
             }}
-            disabled={
-              !connected ||
-              (activeConfig?.penType === "solenoid-software" &&
-                penUp.startsWith("G53"))
-            }
+            disabled={!connected || isSolenoidPenType(penType)}
             className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center"
           >
             <CircleSlash2 size={14} />
