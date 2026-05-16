@@ -1,14 +1,17 @@
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import type { MachineConfig, PageSize, PenType } from "../../types";
+import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
 
 export interface MainPersistence {
   configPath: string;
   pageSizesPath: string;
+  appConfigPath: string;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
   loadPageSizes: () => Promise<PageSize[]>;
+  loadAppConfig: () => Promise<AppConfig>;
+  saveAppConfig: (config: AppConfig) => Promise<void>;
 }
 
 export const DEFAULT_MACHINE_CONFIGS: MachineConfig[] = [
@@ -43,6 +46,10 @@ export const BUILT_IN_PAGE_SIZES: PageSize[] = [
   { id: "legal", name: "Legal", widthMM: 215.9, heightMM: 355.6 },
   { id: "tabloid", name: "Tabloid", widthMM: 279.4, heightMM: 431.8 },
 ];
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  debugLoggingEnabled: false,
+};
 
 function cloneMachineConfigs(configs: MachineConfig[]): MachineConfig[] {
   return configs.map((config) => ({
@@ -105,6 +112,7 @@ function clonePageSizes(pageSizes: PageSize[]): PageSize[] {
 export function createPersistence(userDataPath: string): MainPersistence {
   const configPath = join(userDataPath, "machine-configs.json");
   const pageSizesPath = join(userDataPath, "page-sizes.json");
+  const appConfigPath = join(userDataPath, "app-config.json");
 
   async function loadConfigs(): Promise<MachineConfig[]> {
     if (!existsSync(configPath))
@@ -144,11 +152,34 @@ export function createPersistence(userDataPath: string): MainPersistence {
     }
   }
 
+  async function loadAppConfig(): Promise<AppConfig> {
+    if (!existsSync(appConfigPath)) return { ...DEFAULT_APP_CONFIG };
+    try {
+      const raw = await readFile(appConfigPath, "utf-8");
+      const parsed = JSON.parse(raw) as Partial<AppConfig>;
+      return {
+        debugLoggingEnabled:
+          typeof parsed.debugLoggingEnabled === "boolean"
+            ? parsed.debugLoggingEnabled
+            : DEFAULT_APP_CONFIG.debugLoggingEnabled,
+      };
+    } catch {
+      return { ...DEFAULT_APP_CONFIG };
+    }
+  }
+
+  async function saveAppConfig(config: AppConfig): Promise<void> {
+    await writeFile(appConfigPath, JSON.stringify(config, null, 2), "utf-8");
+  }
+
   return {
     configPath,
     pageSizesPath,
+    appConfigPath,
     loadConfigs,
     saveConfigs,
     loadPageSizes,
+    loadAppConfig,
+    saveAppConfig,
   };
 }

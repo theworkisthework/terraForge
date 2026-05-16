@@ -25,7 +25,10 @@ beforeEach(() => {
     wsLive: false,
     selectedJobFile: null,
   });
-  useAppConfigStore.setState({ enablePerPathPasses: false });
+  useAppConfigStore.setState({
+    enablePerPathPasses: false,
+    debugLoggingEnabled: false,
+  });
   vi.clearAllMocks();
   // listPorts is called on mount
   (
@@ -51,16 +54,33 @@ describe("MachineConfigDialog", () => {
         "Enable per-path pass overrides in the Properties panel",
       ),
     ).toBeInTheDocument();
-    const checkbox = screen.getByRole("checkbox");
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable per-path pass overrides in the Properties panel/i,
+    });
     expect(checkbox).not.toBeChecked();
   });
 
   it("updates persisted app setting when per-path override checkbox toggled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await userEvent.click(screen.getByText("Application Configuration"));
-    const checkbox = screen.getByRole("checkbox");
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable per-path pass overrides in the Properties panel/i,
+    });
     await userEvent.click(checkbox);
     expect(useAppConfigStore.getState().enablePerPathPasses).toBe(true);
+  });
+
+  it("saves debug logging setting when toggled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable debug command logging in console/i,
+    });
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().debugLoggingEnabled).toBe(true);
+    expect(window.terraForge.config.saveAppConfig).toHaveBeenCalledWith({
+      debugLoggingEnabled: true,
+    });
   });
 
   it("shows the existing config in the sidebar", async () => {

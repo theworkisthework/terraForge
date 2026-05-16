@@ -9,6 +9,7 @@ import { JogControls } from "./components/JogControls";
 import { useMachineStore } from "./store/machineStore";
 import { useTaskStore } from "./store/taskStore";
 import { useConsoleStore } from "./store/consoleStore";
+import { useAppConfigStore } from "./store/appConfigStore";
 import { useThemeStore, applyTheme } from "./store/themeStore";
 
 export default function App() {
@@ -18,6 +19,9 @@ export default function App() {
   const setFwInfo = useMachineStore((s) => s.setFwInfo);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
+  const setDebugLoggingEnabled = useAppConfigStore(
+    (s) => s.setDebugLoggingEnabled,
+  );
   const theme = useThemeStore((s) => s.theme);
 
   // Keep <html> class in sync with theme store
@@ -73,6 +77,10 @@ export default function App() {
   useEffect(() => {
     // Load machine configs
     window.terraForge.config.getMachineConfigs().then(setConfigs);
+    window.terraForge.config
+      .getAppConfig()
+      .then((cfg) => setDebugLoggingEnabled(cfg.debugLoggingEnabled))
+      .catch(() => {});
 
     // Subscribe to status updates pushed from main process
     const offStatus = window.terraForge.fluidnc.onStatusUpdate(setStatus);
@@ -103,7 +111,15 @@ export default function App() {
       offFirmware();
       if (pingTimer) clearTimeout(pingTimer);
     };
-  }, [setConfigs, setStatus, setWsLive, setFwInfo, upsertTask, appendLine]);
+  }, [
+    setConfigs,
+    setStatus,
+    setWsLive,
+    setFwInfo,
+    upsertTask,
+    appendLine,
+    setDebugLoggingEnabled,
+  ]);
 
   return (
     <div className="flex flex-col h-screen bg-app text-content overflow-hidden">

@@ -1,6 +1,6 @@
 import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
-import type { MachineConfig, PageSize, PenType } from "../../types";
+import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
 
 function defaultPenDownDelayMs(penType: PenType): number {
   switch (penType) {
@@ -50,6 +50,9 @@ interface ConfigIpcOptions {
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
   loadPageSizes: () => Promise<PageSize[]>;
+  loadAppConfig: () => Promise<AppConfig>;
+  saveAppConfig: (config: AppConfig) => Promise<void>;
+  onAppConfigSaved?: (config: AppConfig) => void;
   pageSizesPath: string;
   builtInPageSizes: PageSize[];
 }
@@ -59,6 +62,9 @@ export function registerConfigIpcHandlers({
   loadConfigs,
   saveConfigs,
   loadPageSizes,
+  loadAppConfig,
+  saveAppConfig,
+  onAppConfigSaved,
   pageSizesPath,
   builtInPageSizes,
 }: ConfigIpcOptions): void {
@@ -79,6 +85,13 @@ export function registerConfigIpcHandlers({
   ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
     const configs = await loadConfigs();
     await saveConfigs(configs.filter((config) => config.id !== id));
+  });
+
+  ipcMain.handle("config:getAppConfig", () => loadAppConfig());
+
+  ipcMain.handle("config:saveAppConfig", async (_e, config: AppConfig) => {
+    await saveAppConfig(config);
+    onAppConfigSaved?.(config);
   });
 
   ipcMain.handle("config:exportConfigs", async () => {

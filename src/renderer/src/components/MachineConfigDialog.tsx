@@ -89,8 +89,14 @@ export function MachineConfigDialog({ onClose }: Props) {
   const enablePerPathPasses = useAppConfigStore(
     (state) => state.enablePerPathPasses,
   );
+  const debugLoggingEnabled = useAppConfigStore(
+    (state) => state.debugLoggingEnabled,
+  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
+  );
+  const setDebugLoggingEnabled = useAppConfigStore(
+    (state) => state.setDebugLoggingEnabled,
   );
 
   const {
@@ -287,6 +293,13 @@ export function MachineConfigDialog({ onClose }: Props) {
 
   const handleActivate = () => {
     if (selectedId) setActiveConfig(selectedId);
+  };
+
+  const handleDebugLoggingChange = (enabled: boolean) => {
+    setDebugLoggingEnabled(enabled);
+    void window.terraForge.config.saveAppConfig({
+      debugLoggingEnabled: enabled,
+    });
   };
 
   return (
@@ -729,7 +742,7 @@ export function MachineConfigDialog({ onClose }: Props) {
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <Section title="G-code Pass Settings">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -747,6 +760,28 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <p className="text-xs text-content-faint">
                       Off by default. When disabled, pass settings are managed
                       at the layer/colour level only.
+                    </p>
+                  </div>
+                </label>
+              </Section>
+
+              <Section title="Logging">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={debugLoggingEnabled}
+                    onChange={(e) =>
+                      handleDebugLoggingChange(e.currentTarget.checked)
+                    }
+                    className="mt-0.5 accent-accent"
+                  />
+                  <div className="space-y-1">
+                    <div className="text-sm text-content">
+                      Enable debug command logging in console
+                    </div>
+                    <p className="text-xs text-content-faint">
+                      Shows low-level command transport details (HTTP endpoint,
+                      retries, and response preview). Keep off for normal use.
                     </p>
                   </div>
                 </label>

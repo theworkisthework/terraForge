@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   TerraForgeAPI,
+  AppConfig,
   MachineConfig,
   MachineStatus,
   RemoteFile,
@@ -170,6 +171,8 @@ const config: TerraForgeAPI["config"] = {
   getMachineConfigs: () => invoke<MachineConfig[]>("config:getMachineConfigs"),
   saveMachineConfig: (cfg) => invoke<void>("config:saveMachineConfig", cfg),
   deleteMachineConfig: (id) => invoke<void>("config:deleteMachineConfig", id),
+  getAppConfig: () => invoke<AppConfig>("config:getAppConfig"),
+  saveAppConfig: (cfg) => invoke<void>("config:saveAppConfig", cfg),
   exportConfigs: () => invoke<string | null>("config:exportConfigs"),
   importConfigs: () =>
     invoke<{ added: number; skipped: number }>("config:importConfigs"),
