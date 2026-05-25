@@ -370,6 +370,74 @@ describe("svgWorker — G-code body", () => {
     const gcode = msg.gcode as string;
     expect(gcode).not.toContain("G1");
   });
+
+  it("emits compensated drag-knife moves when vinyl cutting mode is enabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-cutting",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 10 0 L 10 10",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain(
+      "; Vinyl    : yes (offset 0.25 mm, threshold 10 deg, micro-jog 0.02 mm)",
+    );
+    expect(gcode).toContain("G1 X0.250 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.020");
+    expect(gcode).toContain("G1 X10.000 Y0.000");
+    expect(gcode).toContain("G1 X10.000 Y10.250");
+  });
+
+  it("merges short segments before applying vinyl compensation", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-merge-short",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 0.1 0 L 10 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("X0.100 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.000");
+  });
 });
 
 // ── Optimised mode ────────────────────────────────────────────────────────────

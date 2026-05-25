@@ -138,6 +138,7 @@ export function createGcodeOptions(
     penDownDelayMsOverride: undefined,
     customStartGcode: "",
     customEndGcode: "",
+    vinylCutting: undefined,
     ...overrides,
   };
 }

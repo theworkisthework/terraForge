@@ -7,6 +7,7 @@ interface OptionsSectionProps {
   showHeader?: boolean;
   customGcodeOpen: boolean;
   prefs: GcodePrefs;
+  vinylCuttingEnabled: boolean;
   machinePenDownDelayMs: number;
   machinePenUpDelayMs: number;
   machineDrawSpeed: number;
@@ -27,6 +28,7 @@ export function OptionsSection({
   showHeader = true,
   customGcodeOpen,
   prefs,
+  vinylCuttingEnabled,
   machinePenDownDelayMs,
   machinePenUpDelayMs,
   machineDrawSpeed,
@@ -190,6 +192,30 @@ export function OptionsSection({
           </span>
         </div>
       </div>
+
+      {vinylCuttingEnabled && (
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            aria-label="Generate drag-knife/vinyl-cutter G-code"
+            className="mt-0.5 accent-accent cursor-pointer"
+            checked={prefs.generateVinylCuttingGcode}
+            onChange={() => onTogglePref("generateVinylCuttingGcode")}
+          />
+          <div>
+            <div className="text-sm text-content font-medium flex items-center gap-2 flex-wrap">
+              Generate drag-knife/vinyl-cutter G-code
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
+                Experimental
+              </span>
+            </div>
+            <div className="text-xs text-content-muted mt-0.5">
+              Applies drag-knife blade-offset corner compensation using the
+              application vinyl cutting settings.
+            </div>
+          </div>
+        </label>
+      )}
 
       {hasPageTemplate && (
         <div className="flex flex-col gap-1.5 select-none">

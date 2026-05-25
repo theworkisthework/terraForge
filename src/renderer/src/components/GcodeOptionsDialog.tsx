@@ -14,6 +14,7 @@ import React, { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { selectGcodeOptionsDialogCanvasState } from "../store/canvasSelectors";
 import {
   loadGcodePrefs,
@@ -47,6 +48,7 @@ type GcodeOptionsTab = "paths" | "options" | "output";
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
+  const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
   const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
@@ -189,6 +191,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 showHeader={false}
                 customGcodeOpen={customGcodeOpen}
                 prefs={prefs}
+                vinylCuttingEnabled={vinylCuttingEnabled}
                 machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
                 machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
                 machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}

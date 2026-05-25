@@ -14,6 +14,7 @@ import {
   type GcodePrefs,
 } from "@renderer/components/GcodeOptionsDialog";
 import { useMachineStore } from "@renderer/store/machineStore";
+import { useAppConfigStore } from "@renderer/store/appConfigStore";
 
 const STORAGE_KEY = "terraforge.gcodePrefs";
 
@@ -35,8 +36,11 @@ const defaultPrefs: GcodePrefs = {
   customStartGcode: "",
   customEndGcode: "",
   exportPerGroup: false,
+  exportPerColor: false,
+  exportPerHatch: false,
   clipMode: "none",
   clipOffsetMM: 0,
+  generateVinylCuttingGcode: false,
 };
 
 beforeEach(() => {
@@ -49,6 +53,12 @@ beforeEach(() => {
     wsLive: false,
     selectedJobFile: null,
     fwInfo: null,
+  });
+  useAppConfigStore.setState({
+    vinylCuttingEnabled: false,
+    vinylBladeOffsetMM: 0.25,
+    vinylCornerAngleThresholdDeg: 10,
+    vinylMicroJogMagnitudeMM: 0.02,
   });
   vi.clearAllMocks();
 });
@@ -155,8 +165,11 @@ describe("GcodeOptionsDialog", () => {
         customStartGcode: "",
         customEndGcode: "",
         exportPerGroup: false,
+        exportPerColor: false,
+        exportPerHatch: false,
         clipMode: "none",
         clipOffsetMM: 0,
+        generateVinylCuttingGcode: false,
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -199,6 +212,42 @@ describe("GcodeOptionsDialog", () => {
       screen.getByRole("checkbox", { name: "Save to computer" }),
     );
     expect(screen.getByRole("button", { name: "Generate" })).not.toBeDisabled();
+  });
+
+  it("hides the vinyl cutting checkbox when the application setting is disabled", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "Generate drag-knife/vinyl-cutter G-code",
+      }),
+    ).toBeNull();
+  });
+
+  it("shows the vinyl cutting checkbox when the application setting is enabled", async () => {
+    useAppConfigStore.setState({ vinylCuttingEnabled: true });
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Generate drag-knife/vinyl-cutter G-code",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("returns vinyl cutting preference on confirm when enabled", async () => {
+    useAppConfigStore.setState({ vinylCuttingEnabled: true });
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Generate drag-knife/vinyl-cutter G-code",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ generateVinylCuttingGcode: true }),
+    );
   });
 
   // ── Keyboard handling ─────────────────────────────────────────────────────
@@ -473,6 +522,7 @@ describe("GcodeOptionsDialog", () => {
       exportPerGroup: false,
       clipMode: "none",
       clipOffsetMM: 0,
+      generateVinylCuttingGcode: false,
     });
   });
 });

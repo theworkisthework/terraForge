@@ -119,6 +119,18 @@ export function MachineConfigDialog({ onClose }: Props) {
   const showMachineCoordinates = useAppConfigStore(
     (state) => state.showMachineCoordinates,
   );
+  const vinylCuttingEnabled = useAppConfigStore(
+    (state) => state.vinylCuttingEnabled,
+  );
+  const vinylBladeOffsetMM = useAppConfigStore(
+    (state) => state.vinylBladeOffsetMM,
+  );
+  const vinylCornerAngleThresholdDeg = useAppConfigStore(
+    (state) => state.vinylCornerAngleThresholdDeg,
+  );
+  const vinylMicroJogMagnitudeMM = useAppConfigStore(
+    (state) => state.vinylMicroJogMagnitudeMM,
+  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
   );
@@ -127,6 +139,18 @@ export function MachineConfigDialog({ onClose }: Props) {
   );
   const setShowMachineCoordinates = useAppConfigStore(
     (state) => state.setShowMachineCoordinates,
+  );
+  const setVinylCuttingEnabled = useAppConfigStore(
+    (state) => state.setVinylCuttingEnabled,
+  );
+  const setVinylBladeOffsetMM = useAppConfigStore(
+    (state) => state.setVinylBladeOffsetMM,
+  );
+  const setVinylCornerAngleThresholdDeg = useAppConfigStore(
+    (state) => state.setVinylCornerAngleThresholdDeg,
+  );
+  const setVinylMicroJogMagnitudeMM = useAppConfigStore(
+    (state) => state.setVinylMicroJogMagnitudeMM,
   );
 
   const {
@@ -895,6 +919,73 @@ export function MachineConfigDialog({ onClose }: Props) {
                     </p>
                   </div>
                 </label>
+              </Section>
+
+              <Section title="Vinyl Cutting Mode">
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={vinylCuttingEnabled}
+                      onChange={(e) =>
+                        setVinylCuttingEnabled(e.currentTarget.checked)
+                      }
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="space-y-1">
+                      <div className="text-sm text-content">
+                        Enable vinyl cutting features (experimental)
+                      </div>
+                      <p className="text-xs text-content-faint">
+                        Exposes drag-knife compensation controls in G-code
+                        generation and stores default compensation values here.
+                      </p>
+                    </div>
+                  </label>
+
+                  {vinylCuttingEnabled && (
+                    <div className="grid grid-cols-1 gap-3 pl-6">
+                      <Field label="Blade offset (mm)">
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={vinylBladeOffsetMM}
+                          onChange={(e) =>
+                            setVinylBladeOffsetMM(Number(e.target.value))
+                          }
+                          className={inputCls}
+                        />
+                      </Field>
+                      <Field label="Corner angle threshold (degrees)">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={vinylCornerAngleThresholdDeg}
+                          onChange={(e) =>
+                            setVinylCornerAngleThresholdDeg(
+                              Number(e.target.value),
+                            )
+                          }
+                          className={inputCls}
+                        />
+                      </Field>
+                      <Field label="Micro-jog magnitude (mm)">
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={vinylMicroJogMagnitudeMM}
+                          onChange={(e) =>
+                            setVinylMicroJogMagnitudeMM(Number(e.target.value))
+                          }
+                          className={inputCls}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
               </Section>
             </div>
           )}

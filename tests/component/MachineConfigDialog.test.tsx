@@ -28,6 +28,11 @@ beforeEach(() => {
   useAppConfigStore.setState({
     enablePerPathPasses: false,
     debugLoggingEnabled: false,
+    showMachineCoordinates: false,
+    vinylCuttingEnabled: false,
+    vinylBladeOffsetMM: 0.25,
+    vinylCornerAngleThresholdDeg: 10,
+    vinylMicroJogMagnitudeMM: 0.02,
   });
   vi.clearAllMocks();
   // listPorts is called on mount
@@ -68,6 +73,22 @@ describe("MachineConfigDialog", () => {
     });
     await userEvent.click(checkbox);
     expect(useAppConfigStore.getState().enablePerPathPasses).toBe(true);
+  });
+
+  it("shows vinyl cutting app settings when the experimental toggle is enabled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable vinyl cutting features \(experimental\)/i,
+    });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().vinylCuttingEnabled).toBe(true);
+    expect(screen.getByText("Blade offset (mm)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Corner angle threshold (degrees)"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Micro-jog magnitude (mm)")).toBeInTheDocument();
   });
 
   it("saves debug logging setting when toggled", async () => {

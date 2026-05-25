@@ -27,6 +27,7 @@ import {
   transformPt,
   type Subpath,
 } from "./gcodeEngine";
+import { applyVinylCompensation } from "./gcodeEngine/stages/vinylCompensation";
 
 interface GenerateMessage {
   type: "generate";
@@ -232,6 +233,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
   lines.push(`; Pen delay: ${penDownDelayMs} ms`);
   lines.push(`; Pen up delay: ${penUpDelayMs} ms`);
+  if (options?.vinylCutting) {
+    lines.push(
+      `; Vinyl    : yes (offset ${options.vinylCutting.bladeOffsetMM} mm, threshold ${options.vinylCutting.cornerAngleThresholdDeg} deg, micro-jog ${options.vinylCutting.microJogMagnitudeMM} mm)`,
+    );
+  } else {
+    lines.push("; Vinyl    : no");
+  }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -363,6 +371,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   // (which NN sort placed next to each other) get merged where possible.
   if (doJoin) {
     orderedSubpaths = joinSubpaths(orderedSubpaths, joinTol);
+  }
+
+  if (options?.vinylCutting) {
+    orderedSubpaths = applyVinylCompensation(
+      orderedSubpaths,
+      options.vinylCutting,
+    );
   }
 
   // ── Phase 4: emit G-code ─────────────────────────────────────────────────
