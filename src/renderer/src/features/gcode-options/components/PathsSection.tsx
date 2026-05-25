@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { GcodePrefs } from "../gcodePrefs";
+import { Badge } from "../../../components/Badge";
 
 interface PathsSectionProps {
   open: boolean;
@@ -101,9 +102,7 @@ export function PathsSection({
             <span className="text-sm text-content font-medium">
               Join nearby paths
             </span>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
-              Experimental
-            </span>
+            <Badge variant="warning">Experimental</Badge>
           </label>
           <div className="text-xs text-content-muted mt-0.5">
             skipping pen up/down between nearly-touching strokes.

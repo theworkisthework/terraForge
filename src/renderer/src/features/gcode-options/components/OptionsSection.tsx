@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { GcodePrefs } from "../gcodePrefs";
+import { Badge } from "../../../components/Badge";
 import { CustomGcodeSection } from "./CustomGcodeSection";
 
 interface OptionsSectionProps {
@@ -205,9 +206,7 @@ export function OptionsSection({
           <div>
             <div className="text-sm text-content font-medium flex items-center gap-2 flex-wrap">
               Generate drag-knife/vinyl-cutter G-code
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
-                Experimental
-              </span>
+              <Badge variant="warning">Experimental</Badge>
             </div>
             <div className="text-xs text-content-muted mt-0.5">
               Applies drag-knife blade-offset corner compensation using the

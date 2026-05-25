@@ -78,8 +78,9 @@ describe("MachineConfigDialog", () => {
   it("shows vinyl cutting app settings when the experimental toggle is enabled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await userEvent.click(screen.getByText("Application Configuration"));
+    expect(screen.getAllByText("Experimental")).not.toHaveLength(0);
     const checkbox = screen.getByRole("checkbox", {
-      name: /Enable vinyl cutting features \(experimental\)/i,
+      name: /Enable vinyl cutting features/i,
     });
     expect(checkbox).not.toBeChecked();
     await userEvent.click(checkbox);

@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useMachineStore } from "../store/machineStore";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Badge } from "./Badge";
 import { TabHeader } from "./TabHeader";
 import type {
   MachineConfig,
@@ -933,8 +934,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                       className="mt-0.5 accent-accent"
                     />
                     <div className="space-y-1">
-                      <div className="text-sm text-content">
-                        Enable vinyl cutting features (experimental)
+                      <div className="text-sm text-content flex items-center gap-2 flex-wrap">
+                        <span>Enable vinyl cutting features</span>
+                        <Badge variant="warning">Experimental</Badge>
                       </div>
                       <p className="text-xs text-content-faint">
                         Exposes drag-knife compensation controls in G-code
@@ -1147,7 +1149,7 @@ function Section({
   title,
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
