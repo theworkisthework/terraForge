@@ -571,13 +571,15 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X10.000 Y0.000");
   });
 
-  it("compensates moderate corners when adjacent segments are long", async () => {
+  it("compensates a V-peak corner when adjacent segments are long", async () => {
+    // True isolated corner: long segment arriving from upper-left, long segment
+    // leaving upper-right. Not a smooth curve — no continuation of curvature.
     dispatch({
       type: "generate",
       taskId: "body-vinyl-moderate-long-corner",
       objects: [
         createVectorObject({
-          path: "M 0 0 L 10 0 L 18 3.2 L 24 8.5 L 28 15",
+          path: "M 0 5 L 15 0 L 30 5",
           x: 0,
           y: 0,
           scale: 1,
@@ -599,9 +601,44 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
 
-    // Corner at X18.000 Y3.200 should still get overshoot + return moves.
-    expect(gcode).toContain("G1 X18.232 Y3.293");
-    expect(gcode).toContain("G1 X18.000 Y3.200");
+    // The V-peak at (15, 0) is a true corner; it should receive overshoot
+    // (swivel) compensation and then return to the corner point.
+    expect(gcode).toContain("G1 X15.000 Y0.000");
+    // Swivel point overshoots along the incoming direction.
+    expect(gcode).toContain("G1 X15.237 Y-0.079");
+  });
+
+  it("compensates a corner when only one adjacent segment is short", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-one-short-adjacent-corner",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 10 0 L 10 0.15 L 16 0.15",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // The corner at X10.000 Y0.150 should still get overshoot and backtrack.
+    expect(gcode).toContain("G1 X10.000 Y0.400");
+    expect(gcode).toContain("G1 X10.000 Y0.150");
   });
 
   it("emits a weed border around the final job bounds when enabled", async () => {

@@ -6,9 +6,6 @@ const STRAIGHT_MERGE_ANGLE_DEG = 5;
 const MIN_SEGMENT_LENGTH_FACTOR = 1;
 const CURVE_CONTINUATION_RATIO = 0.3;
 const MIN_NEIGHBOR_CURVE_TURN_DEG = 4;
-const ONE_SIDED_CURVE_MAX_ANGLE_FACTOR = 3;
-const CURVE_SUPPRESSION_MAX_ANGLE_FACTOR = 3;
-const CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR = 2.5;
 
 interface VinylCompensationSettings {
   bladeOffsetMM: number;
@@ -70,7 +67,7 @@ function compensateSubpath(
     // Very short adjacent segments are usually curve tessellation artifacts.
     // Skipping compensation here avoids introducing synthetic kinks on gentle arcs.
     if (
-      incomingLength < settings.bladeOffsetMM * MIN_SEGMENT_LENGTH_FACTOR ||
+      incomingLength < settings.bladeOffsetMM * MIN_SEGMENT_LENGTH_FACTOR &&
       outgoingLength < settings.bladeOffsetMM * MIN_SEGMENT_LENGTH_FACTOR
     ) {
       return [];
@@ -115,33 +112,22 @@ function compensateSubpath(
     const hasPreviousNeighborTurn = previousPrevious !== undefined;
     const hasNextNeighborTurn = nextNext !== undefined;
 
-    const isCurveSuppressionCandidate =
-      absoluteAngleDeg <=
-      settings.cornerAngleThresholdDeg * CURVE_SUPPRESSION_MAX_ANGLE_FACTOR;
-    const hasShortAdjacentSegment =
-      incomingLength <=
-        settings.bladeOffsetMM * CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR ||
-      outgoingLength <=
-        settings.bladeOffsetMM * CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR;
-
-    // Suppress compensation when turn continuity is seen on both sides for
-    // moderate turns; sharp polygon corners should still compensate.
-    if (
-      isCurveSuppressionCandidate &&
-      hasShortAdjacentSegment &&
-      continuesCurveFromPrevious &&
-      continuesCurveToNext
-    ) {
+    // A tessellated bezier curve has consistent same-direction turns on both
+    // sides of every sample point. A true corner is an isolated direction
+    // change — neighbours have essentially zero turn (straight segments).
+    // Suppress compensation whenever both neighbours confirm the same curvature
+    // direction, regardless of segment length.
+    if (continuesCurveFromPrevious && continuesCurveToNext) {
       return [];
     }
 
-    // Near subpath boundaries we only have one neighboring turn. For moderate
-    // turns, suppress compensation if the available side clearly continues the
-    // same curvature. Large turns are still treated as real corners.
+    // Near subpath boundaries only one neighbour is available. Suppress only
+    // for moderate turns (not sharp corners) where that one side clearly shows
+    // the same curvature direction.
     const isModerateTurn =
       absoluteAngleDeg <=
-      settings.cornerAngleThresholdDeg * ONE_SIDED_CURVE_MAX_ANGLE_FACTOR;
-    if (isModerateTurn && hasShortAdjacentSegment) {
+      settings.cornerAngleThresholdDeg * 3;
+    if (isModerateTurn) {
       if (continuesCurveFromPrevious && !hasNextNeighborTurn) {
         return [];
       }
