@@ -49,6 +49,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
   const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
+  const vinylWeedBorderEnabled = useAppConfigStore(
+    (s) => s.vinylWeedBorderEnabled,
+  );
   const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
@@ -192,6 +195,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 customGcodeOpen={customGcodeOpen}
                 prefs={prefs}
                 vinylCuttingEnabled={vinylCuttingEnabled}
+                vinylWeedBorderEnabled={vinylWeedBorderEnabled}
                 machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
                 machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
                 machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}

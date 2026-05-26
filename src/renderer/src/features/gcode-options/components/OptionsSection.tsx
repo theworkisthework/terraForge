@@ -9,6 +9,7 @@ interface OptionsSectionProps {
   customGcodeOpen: boolean;
   prefs: GcodePrefs;
   vinylCuttingEnabled: boolean;
+  vinylWeedBorderEnabled: boolean;
   machinePenDownDelayMs: number;
   machinePenUpDelayMs: number;
   machineDrawSpeed: number;
@@ -30,6 +31,7 @@ export function OptionsSection({
   customGcodeOpen,
   prefs,
   vinylCuttingEnabled,
+  vinylWeedBorderEnabled,
   machinePenDownDelayMs,
   machinePenUpDelayMs,
   machineDrawSpeed,
@@ -211,6 +213,28 @@ export function OptionsSection({
             <div className="text-xs text-content-muted mt-0.5">
               Applies drag-knife blade-offset corner compensation using the
               application vinyl cutting settings.
+            </div>
+          </div>
+        </label>
+      )}
+
+      {vinylWeedBorderEnabled && (
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            aria-label="Generate weed border G-code"
+            className="mt-0.5 accent-accent cursor-pointer"
+            checked={prefs.generateVinylWeedBorderGcode}
+            onChange={() => onTogglePref("generateVinylWeedBorderGcode")}
+          />
+          <div>
+            <div className="text-sm text-content font-medium flex items-center gap-2 flex-wrap">
+              Generate weed border G-code
+              <Badge variant="warning">Experimental</Badge>
+            </div>
+            <div className="text-xs text-content-muted mt-0.5">
+              Adds a rectangular border around the final job bounds to make
+              weeding easier.
             </div>
           </div>
         </label>

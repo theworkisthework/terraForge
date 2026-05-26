@@ -24,6 +24,12 @@ export function useJobActions() {
   const vinylMicroJogMagnitudeMM = useAppConfigStore(
     (s) => s.vinylMicroJogMagnitudeMM,
   );
+  const vinylWeedBorderEnabled = useAppConfigStore(
+    (s) => s.vinylWeedBorderEnabled,
+  );
+  const vinylWeedBorderMarginMM = useAppConfigStore(
+    (s) => s.vinylWeedBorderMarginMM,
+  );
 
   const {
     imports,
@@ -164,6 +170,12 @@ export function useJobActions() {
               bladeOffsetMM: vinylBladeOffsetMM,
               cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg,
               microJogMagnitudeMM: vinylMicroJogMagnitudeMM,
+            }
+          : undefined,
+      vinylWeedBorder:
+        vinylWeedBorderEnabled && prefs.generateVinylWeedBorderGcode
+          ? {
+              marginMM: vinylWeedBorderMarginMM,
             }
           : undefined,
     };

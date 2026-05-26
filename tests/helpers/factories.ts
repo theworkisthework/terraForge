@@ -139,6 +139,7 @@ export function createGcodeOptions(
     customStartGcode: "",
     customEndGcode: "",
     vinylCutting: undefined,
+    vinylWeedBorder: undefined,
     ...overrides,
   };
 }

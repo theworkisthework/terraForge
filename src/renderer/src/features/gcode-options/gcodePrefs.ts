@@ -36,6 +36,7 @@ export interface GcodePrefs {
   /** Safety inset in mm applied when clipMode is "page" (default 0). */
   clipOffsetMM: number;
   generateVinylCuttingGcode: boolean;
+  generateVinylWeedBorderGcode: boolean;
 }
 
 export const DEFAULT_GCODE_PREFS: GcodePrefs = {
@@ -61,6 +62,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   clipMode: "none",
   clipOffsetMM: 0,
   generateVinylCuttingGcode: false,
+  generateVinylWeedBorderGcode: false,
 };
 
 export function loadGcodePrefs(): GcodePrefs {

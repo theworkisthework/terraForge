@@ -33,6 +33,8 @@ beforeEach(() => {
     vinylBladeOffsetMM: 0.25,
     vinylCornerAngleThresholdDeg: 10,
     vinylMicroJogMagnitudeMM: 0.02,
+    vinylWeedBorderEnabled: false,
+    vinylWeedBorderMarginMM: 2,
   });
   vi.clearAllMocks();
   // listPorts is called on mount
@@ -90,6 +92,18 @@ describe("MachineConfigDialog", () => {
       screen.getByText("Corner angle threshold (degrees)"),
     ).toBeInTheDocument();
     expect(screen.getByText("Micro-jog magnitude (mm)")).toBeInTheDocument();
+  });
+
+  it("shows weed border app settings when enabled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable weed border/i,
+    });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().vinylWeedBorderEnabled).toBe(true);
+    expect(screen.getByText("Weed border margin (mm)")).toBeInTheDocument();
   });
 
   it("saves debug logging setting when toggled", async () => {

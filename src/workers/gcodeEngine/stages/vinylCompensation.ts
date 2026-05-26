@@ -2,6 +2,14 @@ import type { Pt } from "./geometryFlattening";
 
 type Subpath = Pt[];
 
+const STRAIGHT_MERGE_ANGLE_DEG = 5;
+const MIN_SEGMENT_LENGTH_FACTOR = 1;
+const CURVE_CONTINUATION_RATIO = 0.3;
+const MIN_NEIGHBOR_CURVE_TURN_DEG = 4;
+const ONE_SIDED_CURVE_MAX_ANGLE_FACTOR = 3;
+const CURVE_SUPPRESSION_MAX_ANGLE_FACTOR = 3;
+const CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR = 2.5;
+
 interface VinylCompensationSettings {
   bladeOffsetMM: number;
   cornerAngleThresholdDeg: number;
@@ -51,14 +59,95 @@ function compensateSubpath(
     previous: Pt,
     corner: Pt,
     next: Pt,
+    previousPrevious?: Pt,
+    nextNext?: Pt,
   ): Pt[] => {
-    const incoming = normalize(vectorBetween(previous, corner));
-    const outgoing = normalize(vectorBetween(corner, next));
+    const incomingVector = vectorBetween(previous, corner);
+    const outgoingVector = vectorBetween(corner, next);
+    const incomingLength = Math.hypot(incomingVector.x, incomingVector.y);
+    const outgoingLength = Math.hypot(outgoingVector.x, outgoingVector.y);
+
+    // Very short adjacent segments are usually curve tessellation artifacts.
+    // Skipping compensation here avoids introducing synthetic kinks on gentle arcs.
+    if (
+      incomingLength < settings.bladeOffsetMM * MIN_SEGMENT_LENGTH_FACTOR ||
+      outgoingLength < settings.bladeOffsetMM * MIN_SEGMENT_LENGTH_FACTOR
+    ) {
+      return [];
+    }
+
+    const incoming = normalize(incomingVector);
+    const outgoing = normalize(outgoingVector);
     const signedAngleDeg = signedAngleDegrees(incoming, outgoing);
     const absoluteAngleDeg = Math.abs(signedAngleDeg);
 
     if (absoluteAngleDeg < settings.cornerAngleThresholdDeg) {
       return []; // No special compensation, just the corner itself
+    }
+
+    // If adjacent turns continue the same signed curvature, this point is likely
+    // a tessellated curve sample rather than an isolated sharp corner.
+    const continuationThreshold = Math.max(
+      MIN_NEIGHBOR_CURVE_TURN_DEG,
+      absoluteAngleDeg * CURVE_CONTINUATION_RATIO,
+    );
+
+    let continuesCurveFromPrevious = false;
+    if (previousPrevious) {
+      const prevIncoming = normalize(vectorBetween(previousPrevious, previous));
+      const prevOutgoing = normalize(vectorBetween(previous, corner));
+      const prevTurnDeg = signedAngleDegrees(prevIncoming, prevOutgoing);
+      continuesCurveFromPrevious =
+        Math.sign(prevTurnDeg) === Math.sign(signedAngleDeg) &&
+        Math.abs(prevTurnDeg) >= continuationThreshold;
+    }
+
+    let continuesCurveToNext = false;
+    if (nextNext) {
+      const nextIncoming = normalize(vectorBetween(corner, next));
+      const nextOutgoing = normalize(vectorBetween(next, nextNext));
+      const nextTurnDeg = signedAngleDegrees(nextIncoming, nextOutgoing);
+      continuesCurveToNext =
+        Math.sign(nextTurnDeg) === Math.sign(signedAngleDeg) &&
+        Math.abs(nextTurnDeg) >= continuationThreshold;
+    }
+
+    const hasPreviousNeighborTurn = previousPrevious !== undefined;
+    const hasNextNeighborTurn = nextNext !== undefined;
+
+    const isCurveSuppressionCandidate =
+      absoluteAngleDeg <=
+      settings.cornerAngleThresholdDeg * CURVE_SUPPRESSION_MAX_ANGLE_FACTOR;
+    const hasShortAdjacentSegment =
+      incomingLength <=
+        settings.bladeOffsetMM * CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR ||
+      outgoingLength <=
+        settings.bladeOffsetMM * CURVE_SUPPRESSION_MAX_SEGMENT_FACTOR;
+
+    // Suppress compensation when turn continuity is seen on both sides for
+    // moderate turns; sharp polygon corners should still compensate.
+    if (
+      isCurveSuppressionCandidate &&
+      hasShortAdjacentSegment &&
+      continuesCurveFromPrevious &&
+      continuesCurveToNext
+    ) {
+      return [];
+    }
+
+    // Near subpath boundaries we only have one neighboring turn. For moderate
+    // turns, suppress compensation if the available side clearly continues the
+    // same curvature. Large turns are still treated as real corners.
+    const isModerateTurn =
+      absoluteAngleDeg <=
+      settings.cornerAngleThresholdDeg * ONE_SIDED_CURVE_MAX_ANGLE_FACTOR;
+    if (isModerateTurn && hasShortAdjacentSegment) {
+      if (continuesCurveFromPrevious && !hasNextNeighborTurn) {
+        return [];
+      }
+      if (continuesCurveToNext && !hasPreviousNeighborTurn) {
+        return [];
+      }
     }
 
     const overshootDistance = settings.bladeOffsetMM;
@@ -100,6 +189,8 @@ function compensateSubpath(
         merged[merged.length - 2], // incoming from second-to-last
         merged[0], // corner at start
         merged[1], // outgoing to second point
+        merged.length > 3 ? merged[merged.length - 3] : undefined,
+        merged.length > 3 ? merged[2] : undefined,
       );
       if (compensationMoves.length > 0) {
         result.push(...compensationMoves);
@@ -125,6 +216,8 @@ function compensateSubpath(
         previous,
         corner,
         next,
+        index >= 2 ? merged[index - 2] : undefined,
+        index + 2 < merged.length ? merged[index + 2] : undefined,
       );
 
       if (compensationMoves.length > 0) {
@@ -165,7 +258,15 @@ function mergeShortSegments(subpath: Subpath, bladeOffsetMM: number): Subpath {
     const point = subpath[index];
     const previous = merged[merged.length - 1];
     if (distance(previous, point) < bladeOffsetMM) {
-      continue;
+      // Only collapse short near-collinear points. Preserve short curved points
+      // so gentle arcs do not collapse into artificial sharp corners.
+      const next = subpath[index + 1];
+      const incoming = normalize(vectorBetween(previous, point));
+      const outgoing = normalize(vectorBetween(point, next));
+      const turnDeg = Math.abs(signedAngleDegrees(incoming, outgoing));
+      if (turnDeg <= STRAIGHT_MERGE_ANGLE_DEG) {
+        continue;
+      }
     }
     merged.push(point);
   }

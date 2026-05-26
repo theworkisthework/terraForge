@@ -41,6 +41,7 @@ const defaultPrefs: GcodePrefs = {
   clipMode: "none",
   clipOffsetMM: 0,
   generateVinylCuttingGcode: false,
+  generateVinylWeedBorderGcode: false,
 };
 
 beforeEach(() => {
@@ -59,6 +60,8 @@ beforeEach(() => {
     vinylBladeOffsetMM: 0.25,
     vinylCornerAngleThresholdDeg: 10,
     vinylMicroJogMagnitudeMM: 0.02,
+    vinylWeedBorderEnabled: false,
+    vinylWeedBorderMarginMM: 2,
   });
   vi.clearAllMocks();
 });
@@ -170,6 +173,7 @@ describe("GcodeOptionsDialog", () => {
         clipMode: "none",
         clipOffsetMM: 0,
         generateVinylCuttingGcode: false,
+        generateVinylWeedBorderGcode: false,
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -247,6 +251,28 @@ describe("GcodeOptionsDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ generateVinylCuttingGcode: true }),
+    );
+  });
+
+  it("shows the weed border checkbox when the application setting is enabled", async () => {
+    useAppConfigStore.setState({ vinylWeedBorderEnabled: true });
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    expect(
+      screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
+    ).toBeInTheDocument();
+  });
+
+  it("returns weed border preference on confirm when enabled", async () => {
+    useAppConfigStore.setState({ vinylWeedBorderEnabled: true });
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ generateVinylWeedBorderGcode: true }),
     );
   });
 
@@ -523,6 +549,7 @@ describe("GcodeOptionsDialog", () => {
       clipMode: "none",
       clipOffsetMM: 0,
       generateVinylCuttingGcode: false,
+      generateVinylWeedBorderGcode: false,
     });
   });
 });

@@ -56,6 +56,10 @@ export interface MachineConfig {
 export interface AppConfig {
   /** Enables verbose debug command transport logs in the console panel. */
   debugLoggingEnabled: boolean;
+  /** Enables the vinyl weed-border option in the app and job dialogs. */
+  vinylWeedBorderEnabled: boolean;
+  /** Default margin used when generating a weed border around the job bounds. */
+  vinylWeedBorderMarginMM: number;
 }
 
 export interface VinylCuttingSettings {
@@ -63,6 +67,11 @@ export interface VinylCuttingSettings {
   bladeOffsetMM: number;
   cornerAngleThresholdDeg: number;
   microJogMagnitudeMM: number;
+}
+
+export interface VinylWeedBorderSettings {
+  enabled: boolean;
+  marginMM: number;
 }
 
 // ─── Pass Configuration ──────────────────────────────────────────────────────
@@ -328,6 +337,8 @@ export interface GcodeOptions {
   drawSpeedOverride?: number;
   /** Optional drag-knife / vinyl cutter compensation settings for this job. */
   vinylCutting?: Omit<VinylCuttingSettings, "enabled">;
+  /** Optional weed-border rectangle around the final job bounds. */
+  vinylWeedBorder?: Omit<VinylWeedBorderSettings, "enabled">;
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────

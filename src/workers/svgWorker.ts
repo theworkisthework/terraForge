@@ -28,6 +28,7 @@ import {
   type Subpath,
 } from "./gcodeEngine";
 import { applyVinylCompensation } from "./gcodeEngine/stages/vinylCompensation";
+import { applyVinylWeedBorder } from "./gcodeEngine/stages/vinylWeedBorder";
 
 interface GenerateMessage {
   type: "generate";
@@ -240,6 +241,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   } else {
     lines.push("; Vinyl    : no");
   }
+  if (options?.vinylWeedBorder) {
+    lines.push(
+      `; Weed bd  : yes (margin ${options.vinylWeedBorder.marginMM} mm)`,
+    );
+  } else {
+    lines.push("; Weed bd  : no");
+  }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -377,6 +385,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
     orderedSubpaths = applyVinylCompensation(
       orderedSubpaths,
       options.vinylCutting,
+    );
+  }
+
+  if (options?.vinylWeedBorder) {
+    orderedSubpaths = applyVinylWeedBorder(
+      orderedSubpaths,
+      options.vinylWeedBorder,
     );
   }
 
