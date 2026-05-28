@@ -48,10 +48,6 @@ jobs:
   test-e2e:
     name: E2E Tests (Playwright / Electron)
     runs-on: ubuntu-latest
-    env:
-      # @electron/get reads this to locate the cached Electron binary.
-      # Must be set at job level so every step (npm ci, build, test) sees it.
-      ELECTRON_CACHE: ~/.cache/electron
     steps:
       - uses: actions/checkout@v4
 
@@ -66,14 +62,14 @@ jobs:
         # xvfb         → virtual display for Electron window
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
-      - name: Cache Electron binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ hashFiles('package-lock.json') }}
-
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Verify Electron binary
+        # The postinstall download can fail silently on Linux CI, leaving
+        # node_modules/electron/path.txt missing. Running this forces a retry
+        # before any test or build step tries to launch Electron.
+        run: node node_modules/electron/install.js
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
