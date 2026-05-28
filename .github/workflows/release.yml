@@ -23,9 +23,8 @@ jobs:
           node-version: 24
           cache: npm
 
-      # Can't npm ci due to platform differences
       - name: Install dependencies
-        run: npm i
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -48,9 +47,8 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
-      # Can't npm ci due to platform differences
       - name: Install dependencies
-        run: npm i
+        run: npm ci
 
       - name: Install Playwright system libraries
         run: npx playwright install-deps
@@ -92,7 +90,7 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:win
@@ -123,7 +121,7 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:mac
@@ -161,7 +159,7 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:linux
