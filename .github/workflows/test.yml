@@ -74,10 +74,10 @@ jobs:
           ELECTRON_CACHE: ~/.cache/electron
 
       - name: Verify Electron binary
-        # Explicitly run the install script after npm ci — if the postinstall
-        # download failed silently, this will either restore from the cache
-        # above or retry the download and fail fast with a clear error.
-        run: node node_modules/electron/install.js
+        # Verify Electron is launchable before build/tests. If postinstall left
+        # an incomplete install, rebuild once and re-verify to fail fast here.
+        run: |
+          npx electron --version || (npm rebuild electron && npx electron --version)
         env:
           ELECTRON_CACHE: ~/.cache/electron
 
