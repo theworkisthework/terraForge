@@ -72,6 +72,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           # Temporary pin: Electron install is broken on Node >=24.16.0.
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
           node-version: 24.15.0
           cache: npm
 
@@ -109,6 +110,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
           node-version: 24.15.0
           cache: npm
 
@@ -148,6 +150,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
           node-version: 24.15.0
           cache: npm
 
