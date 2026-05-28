@@ -62,14 +62,24 @@ jobs:
         # xvfb         → virtual display for Electron window
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
+      - name: Cache Electron binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ hashFiles('package-lock.json') }}
+
       - name: Install Node dependencies
         run: npm ci
+        env:
+          ELECTRON_CACHE: ~/.cache/electron
 
       - name: Verify Electron binary
-        # The postinstall download can fail silently on Linux CI, leaving
-        # node_modules/electron/path.txt missing. Running this forces a retry
-        # before any test or build step tries to launch Electron.
+        # Explicitly run the install script after npm ci — if the postinstall
+        # download failed silently, this will either restore from the cache
+        # above or retry the download and fail fast with a clear error.
         run: node node_modules/electron/install.js
+        env:
+          ELECTRON_CACHE: ~/.cache/electron
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
