@@ -62,8 +62,18 @@ jobs:
         # xvfb         → virtual display for Electron window
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
+      - name: Cache Electron binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ hashFiles('package-lock.json') }}
+
       - name: Install Node dependencies
         run: npm ci
+        env:
+          # Tell @electron/get where to cache the downloaded binary so the
+          # cache step above can restore it on subsequent runs.
+          ELECTRON_CACHE: ~/.cache/electron
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
