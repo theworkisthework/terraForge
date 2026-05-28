@@ -46,9 +46,22 @@ export async function launchApp(): Promise<AppHandle> {
 
   // On Linux CI runners the SUID sandbox helper is not configured, so we must
   // disable the sandbox.  --no-sandbox is safe in ephemeral CI environments.
+  //
+  // --disable-dev-shm-usage: GitHub Actions caps /dev/shm at 64 MB.  Chromium
+  //   uses /dev/shm for renderer IPC shared memory; when it fills up the
+  //   renderer crashes silently and the window never loads, causing every test
+  //   to fail.  This flag redirects shared memory to /tmp instead.
+  //
+  // --disable-gpu: In headless / xvfb environments Electron's GPU process can
+  //   fail to initialise, producing the same silent renderer crash.
   const sandboxArgs =
     process.platform === "linux"
-      ? ["--no-sandbox", "--disable-setuid-sandbox"]
+      ? [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ]
       : [];
 
   const electronApp = await electron.launch({
@@ -66,7 +79,10 @@ export async function launchApp(): Promise<AppHandle> {
   await window.waitForLoadState("domcontentloaded");
 
   // Wait for React to hydrate — look for the machine selector that Toolbar always renders
-  await window.locator("select[aria-label='Machine selector']").first().waitFor({ timeout: 15_000 });
+  await window
+    .locator("select[aria-label='Machine selector']")
+    .first()
+    .waitFor({ timeout: 15_000 });
 
   return { electronApp, window, userDataDir };
 }

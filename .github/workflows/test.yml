@@ -22,7 +22,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm i
+        run: npm ci
 
       - name: Run unit & component tests
         run: npm test
@@ -63,7 +63,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
       - name: Install Node dependencies
-        run: npm i
+        run: npm ci
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
@@ -75,7 +75,9 @@ jobs:
       - name: Run E2E tests
         env:
           TF_E2E_SVG_DIR: tests/fixtures/real_world_svgs
-        run: xvfb-run --auto-servernum -- npx playwright test --config=tests/e2e/playwright.config.ts
+        # --server-args: set a 1920×1080 virtual display so Electron's 1440×900
+        # window fits without being constrained by the framebuffer dimensions.
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' -- npx playwright test --config=tests/e2e/playwright.config.ts
 
       - name: Upload Playwright report
         if: always()
