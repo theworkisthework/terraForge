@@ -71,7 +71,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          # Temporary pin: Electron install is broken on Node >=24.16.0.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -108,7 +109,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -147,7 +148,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Install native dependencies

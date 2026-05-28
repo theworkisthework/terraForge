@@ -20,7 +20,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          # Temporary pin: Electron install is broken on Node >=24.16.0.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -41,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Install system deps
@@ -81,7 +82,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       # Stamp package.json with the tag version (strips the leading "v")
@@ -114,7 +115,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Set version from tag
@@ -148,7 +149,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       # serialport native module needs libudev on Linux

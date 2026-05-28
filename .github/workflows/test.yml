@@ -10,7 +10,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [24]
+        # Temporary pin: Electron install is broken on Node >=24.16.0.
+        node-version: [24.15.0]
 
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +55,7 @@ jobs:
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: "npm"
 
       - name: Install system deps
@@ -62,24 +63,15 @@ jobs:
         # xvfb         → virtual display for Electron window
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
-      - name: Cache Electron binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ hashFiles('package-lock.json') }}
-
       - name: Install Node dependencies
         run: npm ci
-        env:
-          ELECTRON_CACHE: ~/.cache/electron
 
-      - name: Verify Electron binary
-        # Verify Electron is launchable before build/tests. If postinstall left
-        # an incomplete install, rebuild once and re-verify to fail fast here.
+      - name: Ensure local Electron install
+        # Verify using local module resolution (same path Playwright uses).
+        # If missing/broken, re-run Electron's installer once, then assert.
         run: |
-          npx electron --version || (npm rebuild electron && npx electron --version)
-        env:
-          ELECTRON_CACHE: ~/.cache/electron
+          node -e "const fs=require('fs'); try { const bin=require('electron'); if (fs.existsSync(bin)) { console.log('Electron binary:', bin); process.exit(0); } } catch {} process.exit(1);" || node node_modules/electron/install.js
+          node -e "const fs=require('fs'); const bin=require('electron'); if (!fs.existsSync(bin)) { throw new Error('Electron binary missing at '+bin); } console.log('Electron ready:', bin);"
 
       - name: Install Playwright system libraries
         # Covers the Chromium/Electron shared-library requirements on Linux
