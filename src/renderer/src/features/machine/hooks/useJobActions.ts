@@ -24,6 +24,7 @@ export function useJobActions() {
   const vinylMicroJogMagnitudeMM = useAppConfigStore(
     (s) => s.vinylMicroJogMagnitudeMM,
   );
+  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
 
   const {
     imports,
@@ -169,6 +170,17 @@ export function useJobActions() {
       vinylWeedBorder: prefs.generateVinylWeedBorderGcode
         ? {
             marginMM: prefs.vinylWeedBorderMarginMM,
+          }
+        : undefined,
+      inkService: prefs.inkServiceEnabled
+        ? {
+            mode: prefs.inkServiceMode,
+            triggerTravelMM: prefs.inkServiceTriggerTravelMM,
+            triggerJitterPct: prefs.inkServiceTriggerJitterPct,
+            stations: inkServiceStations,
+            randomizeDipStation: prefs.inkServiceRandomizeDipStation,
+            includeWashMove: prefs.inkServiceIncludeWashMove,
+            washEveryNDips: prefs.inkServiceWashEveryNDips,
           }
         : undefined,
     };

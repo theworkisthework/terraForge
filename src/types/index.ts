@@ -70,6 +70,77 @@ export interface VinylWeedBorderSettings {
   marginMM: number;
 }
 
+export type InkServiceMode = "prime-wipe" | "brush-dip";
+export type InkServiceStationType = "prime" | "wipe" | "dip" | "wash";
+
+export interface InkServiceStation {
+  id: string;
+  name: string;
+  type: InkServiceStationType;
+  x: number;
+  y: number;
+  /** Contact dwell time in milliseconds after pen-down at this station. */
+  dwellMs: number;
+  /** Optional station color label (used for brush dip trays). */
+  color?: string;
+  enabled?: boolean;
+}
+
+export interface InkServiceSettings {
+  mode: InkServiceMode;
+  /** Trigger service moves when rapid-travel distance crosses this threshold (mm). */
+  triggerTravelMM: number;
+  /** Optional trigger jitter as +/- percent, e.g. 10 = +/-10%. */
+  triggerJitterPct?: number;
+  stations: InkServiceStation[];
+  /** For brush mode: randomise dip station selection instead of cycling. */
+  randomizeDipStation?: boolean;
+  /** For brush mode: include wash station periodically when available. */
+  includeWashMove?: boolean;
+  /** For brush mode: perform wash after every N dips (minimum 1). */
+  washEveryNDips?: number;
+}
+
+export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
+  {
+    id: "prime",
+    name: "Prime",
+    type: "prime",
+    x: 10,
+    y: 10,
+    dwellMs: 600,
+    enabled: true,
+  },
+  {
+    id: "wipe",
+    name: "Wipe",
+    type: "wipe",
+    x: 24,
+    y: 10,
+    dwellMs: 350,
+    enabled: true,
+  },
+  {
+    id: "dip-black",
+    name: "Dip Black",
+    type: "dip",
+    x: 38,
+    y: 10,
+    dwellMs: 500,
+    color: "black",
+    enabled: true,
+  },
+  {
+    id: "wash",
+    name: "Wash",
+    type: "wash",
+    x: 52,
+    y: 10,
+    dwellMs: 900,
+    enabled: true,
+  },
+];
+
 // ─── Pass Configuration ──────────────────────────────────────────────────────
 
 /**
@@ -335,6 +406,8 @@ export interface GcodeOptions {
   vinylCutting?: Omit<VinylCuttingSettings, "enabled">;
   /** Optional weed-border rectangle around the final job bounds. */
   vinylWeedBorder?: Omit<VinylWeedBorderSettings, "enabled">;
+  /** Optional travel-triggered pen/brush service moves (prime/wipe or dip/wash). */
+  inkService?: InkServiceSettings;
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────

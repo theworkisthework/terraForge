@@ -30,7 +30,8 @@ import type {
   ConnectionType,
   OriginType,
   PenType,
-} from "../../../../types";
+  InkServiceStation,
+} from "../../../types";
 import { useAppConfigStore } from "../store/appConfigStore";
 
 interface Props {
@@ -132,6 +133,12 @@ export function MachineConfigDialog({ onClose }: Props) {
   const vinylMicroJogMagnitudeMM = useAppConfigStore(
     (state) => state.vinylMicroJogMagnitudeMM,
   );
+  const showInkServiceStationsOnCanvas = useAppConfigStore(
+    (state) => state.showInkServiceStationsOnCanvas,
+  );
+  const inkServiceStations = useAppConfigStore(
+    (state) => state.inkServiceStations,
+  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
   );
@@ -152,6 +159,18 @@ export function MachineConfigDialog({ onClose }: Props) {
   );
   const setVinylMicroJogMagnitudeMM = useAppConfigStore(
     (state) => state.setVinylMicroJogMagnitudeMM,
+  );
+  const setShowInkServiceStationsOnCanvas = useAppConfigStore(
+    (state) => state.setShowInkServiceStationsOnCanvas,
+  );
+  const updateInkServiceStation = useAppConfigStore(
+    (state) => state.updateInkServiceStation,
+  );
+  const addInkServiceStation = useAppConfigStore(
+    (state) => state.addInkServiceStation,
+  );
+  const removeInkServiceStation = useAppConfigStore(
+    (state) => state.removeInkServiceStation,
   );
 
   const {
@@ -372,6 +391,48 @@ export function MachineConfigDialog({ onClose }: Props) {
     void window.terraForge.config.saveAppConfig({
       debugLoggingEnabled: enabled,
     });
+  };
+
+  const updateStationField = <K extends keyof InkServiceStation>(
+    stationId: string,
+    key: K,
+    value: InkServiceStation[K],
+  ) => {
+    updateInkServiceStation(stationId, {
+      [key]: value,
+    } as Partial<InkServiceStation>);
+  };
+
+  const handleTestStationLocation = async (station: InkServiceStation) => {
+    if (!connected) {
+      setAlertInfo({
+        title: "Machine Offline",
+        message: "Connect to your machine before testing station locations.",
+      });
+      return;
+    }
+    const cfg = activeConfigId
+      ? configs.find((c) => c.id === activeConfigId)
+      : null;
+    if (!cfg) {
+      setAlertInfo({
+        title: "No Active Machine",
+        message:
+          "Set an active machine profile before testing station locations.",
+      });
+      return;
+    }
+    try {
+      await window.terraForge.fluidnc.sendCommand(cfg.penUpCommand);
+      await window.terraForge.fluidnc.sendCommand(
+        `G0 X${station.x.toFixed(3)} Y${station.y.toFixed(3)}`,
+      );
+    } catch (err) {
+      setAlertInfo({
+        title: "Station Test Failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   const handleDisconnectForEdit = async () => {
@@ -987,6 +1048,170 @@ export function MachineConfigDialog({ onClose }: Props) {
                       </Field>
                     </div>
                   )}
+                </div>
+              </Section>
+
+              <Section title="Ink Service Stations">
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showInkServiceStationsOnCanvas}
+                      onChange={(e) =>
+                        setShowInkServiceStationsOnCanvas(
+                          e.currentTarget.checked,
+                        )
+                      }
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="space-y-1">
+                      <div className="text-sm text-content">
+                        Show station markers on plot canvas
+                      </div>
+                      <p className="text-xs text-content-faint">
+                        Renders Prime, Wipe, Dip, and Wash points on the bed
+                        preview to verify tray placement.
+                      </p>
+                    </div>
+                  </label>
+
+                  <div className="flex items-center justify-between pl-6">
+                    <p className="text-xs text-content-faint">
+                      Edit coordinates in mm. Use Test to jog to a station.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={addInkServiceStation}
+                      className="px-2 py-1 text-xs rounded bg-secondary hover:bg-secondary-hover text-content"
+                    >
+                      Add Dip Station
+                    </button>
+                  </div>
+
+                  <div className="pl-6 space-y-2">
+                    {inkServiceStations.map((station) => (
+                      <div
+                        key={station.id}
+                        className="rounded border border-border-ui p-2 grid grid-cols-12 gap-2 items-end"
+                      >
+                        <div className="col-span-3">
+                          <label className="text-xs text-content-faint">
+                            Name
+                          </label>
+                          <input
+                            type="text"
+                            value={station.name}
+                            onChange={(e) =>
+                              updateStationField(
+                                station.id,
+                                "name",
+                                e.target.value,
+                              )
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="text-xs text-content-faint">
+                            Type
+                          </label>
+                          <select
+                            value={station.type}
+                            onChange={(e) =>
+                              updateStationField(
+                                station.id,
+                                "type",
+                                e.target.value as InkServiceStation["type"],
+                              )
+                            }
+                            className={inputCls}
+                          >
+                            <option value="prime">Prime</option>
+                            <option value="wipe">Wipe</option>
+                            <option value="dip">Dip</option>
+                            <option value="wash">Wash</option>
+                          </select>
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="text-xs text-content-faint">
+                            X (mm)
+                          </label>
+                          <input
+                            type="number"
+                            step={0.1}
+                            value={station.x}
+                            onChange={(e) =>
+                              updateStationField(
+                                station.id,
+                                "x",
+                                Number(e.target.value),
+                              )
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="text-xs text-content-faint">
+                            Y (mm)
+                          </label>
+                          <input
+                            type="number"
+                            step={0.1}
+                            value={station.y}
+                            onChange={(e) =>
+                              updateStationField(
+                                station.id,
+                                "y",
+                                Number(e.target.value),
+                              )
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+
+                        <div className="col-span-1">
+                          <label className="text-xs text-content-faint">
+                            ms
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={50}
+                            value={station.dwellMs}
+                            onChange={(e) =>
+                              updateStationField(
+                                station.id,
+                                "dwellMs",
+                                Number(e.target.value),
+                              )
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+
+                        <div className="col-span-2 flex gap-1 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleTestStationLocation(station)}
+                            className="px-2 py-1 text-xs rounded bg-secondary hover:bg-secondary-hover text-content"
+                          >
+                            Test
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeInkServiceStation(station.id)}
+                            disabled={inkServiceStations.length <= 1}
+                            className="px-2 py-1 text-xs rounded bg-red-700/80 hover:bg-red-700 text-white disabled:opacity-40"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </Section>
             </div>

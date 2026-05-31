@@ -13,7 +13,13 @@
  *   OUT ← { type: 'error', taskId, error }
  */
 
-import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
+import type {
+  VectorObject,
+  MachineConfig,
+  GcodeOptions,
+  InkServiceSettings,
+  InkServiceStation,
+} from "../types";
 import { isSolenoidPenType } from "../types";
 import {
   flattenToSubpaths,
@@ -50,6 +56,131 @@ function fmtSeconds(n: number): string {
     .toFixed(3)
     .replace(/\.0+$/, "")
     .replace(/(\.\d*?)0+$/, "$1");
+}
+
+interface TravelSubpath {
+  points: Subpath;
+}
+
+function clampNumber(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function distanceMM(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.hypot(dx, dy);
+}
+
+function isEnabledStation(station: InkServiceStation): boolean {
+  return station.enabled !== false;
+}
+
+function chooseTriggerDistance(baseMM: number, jitterPct: number): number {
+  if (jitterPct <= 0) return baseMM;
+  const ratio = jitterPct / 100;
+  const scalar = 1 + (Math.random() * 2 - 1) * ratio;
+  return Math.max(1, baseMM * scalar);
+}
+
+function emitStationContact(
+  lines: string[],
+  config: MachineConfig,
+  station: InkServiceStation,
+): void {
+  lines.push(
+    `G0 X${fmt(station.x)} Y${fmt(station.y)} ; Service move: ${station.type} (${station.name})`,
+  );
+  lines.push(config.penDownCommand + " ; Service contact");
+  const dwellMs = Number.isFinite(station.dwellMs)
+    ? Math.max(0, station.dwellMs)
+    : 0;
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Service dwell`);
+  }
+  lines.push(config.penUpCommand + " ; Service pen up");
+}
+
+function emitPrimeAndWipe(
+  lines: string[],
+  config: MachineConfig,
+  stations: InkServiceStation[],
+): boolean {
+  const prime = stations.find((s) => s.type === "prime");
+  const wipe = stations.find((s) => s.type === "wipe");
+  if (!prime && !wipe) return false;
+  lines.push("; -- Ink service: prime and wipe --");
+  if (prime) emitStationContact(lines, config, prime);
+  if (wipe) emitStationContact(lines, config, wipe);
+  lines.push("; -- End ink service --");
+  lines.push("");
+  return true;
+}
+
+function emitBrushDip(
+  lines: string[],
+  config: MachineConfig,
+  settings: InkServiceSettings,
+  stations: InkServiceStation[],
+  dipCursorRef: { value: number },
+  dipsSinceWashRef: { value: number },
+): boolean {
+  const dips = stations.filter((s) => s.type === "dip");
+  if (dips.length === 0) return false;
+  const wash = stations.find((s) => s.type === "wash");
+
+  const dip = settings.randomizeDipStation
+    ? dips[Math.floor(Math.random() * dips.length)]
+    : dips[dipCursorRef.value++ % dips.length];
+
+  lines.push("; -- Ink service: brush dip --");
+  emitStationContact(lines, config, dip);
+  dipsSinceWashRef.value += 1;
+
+  const washEvery = Math.max(1, settings.washEveryNDips ?? 1);
+  const shouldWash =
+    settings.includeWashMove && !!wash && dipsSinceWashRef.value >= washEvery;
+  if (shouldWash && wash) {
+    emitStationContact(lines, config, wash);
+    dipsSinceWashRef.value = 0;
+  }
+
+  lines.push("; -- End ink service --");
+  lines.push("");
+  return true;
+}
+
+function emitInkServiceMove(
+  lines: string[],
+  config: MachineConfig,
+  settings: InkServiceSettings,
+  dipCursorRef: { value: number },
+  dipsSinceWashRef: { value: number },
+): boolean {
+  const triggerTravelMM = Number.isFinite(settings.triggerTravelMM)
+    ? settings.triggerTravelMM
+    : 0;
+  if (triggerTravelMM <= 0) return false;
+
+  const enabledStations = settings.stations.filter(isEnabledStation);
+  if (enabledStations.length === 0) return false;
+
+  lines.push(config.penUpCommand + " ; Pen up for service move");
+
+  if (settings.mode === "prime-wipe") {
+    return emitPrimeAndWipe(lines, config, enabledStations);
+  }
+  return emitBrushDip(
+    lines,
+    config,
+    settings,
+    enabledStations,
+    dipCursorRef,
+    dipsSinceWashRef,
+  );
 }
 
 function approximateObjectSubpaths(
@@ -193,6 +324,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const returnToHome = options?.returnToHome ?? false;
   const customStartGcode = (options?.customStartGcode ?? "").trim();
   const customEndGcode = (options?.customEndGcode ?? "").trim();
+  const inkService = options?.inkService;
   const hasDelayOverride = typeof options?.penDownDelayMsOverride === "number";
   const rawDelayMs = hasDelayOverride
     ? options.penDownDelayMsOverride
@@ -248,6 +380,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   } else {
     lines.push("; Weed bd  : no");
   }
+  if (inkService) {
+    lines.push(
+      `; Ink svc  : ${inkService.mode}, every ${inkService.triggerTravelMM} mm (jitter +/-${inkService.triggerJitterPct ?? 0}%)`,
+    );
+  } else {
+    lines.push("; Ink svc  : no");
+  }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -296,7 +435,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   };
 
   // ── Phase 1: collect all subpaths from all visible objects ────────────────
-  const allSubpaths: Subpath[] = [];
+  const allSubpaths: TravelSubpath[] = [];
   const yieldPh1 = makeYielder();
   let lastPct1 = -1;
   let lastColor: string | undefined = undefined;
@@ -351,7 +490,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
     for (const sp of processedSubpaths) {
       if (sp.length >= 2) {
-        allSubpaths.push(sp);
+        allSubpaths.push({ points: sp });
       }
     }
     const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
@@ -371,28 +510,34 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
   let orderedSubpaths = optimise
-    ? nearestNeighbourSort(allSubpaths, { allowReverse: allowPathReversal })
+    ? nearestNeighbourSort(
+        allSubpaths.map((sp) => sp.points),
+        { allowReverse: allowPathReversal },
+      ).map((points) => ({ points }))
     : allSubpaths;
 
   // ── Phase 3: optional path joining ────────────────────────────────────────
   // Joining is applied after NN sort so that already-adjacent subpaths
   // (which NN sort placed next to each other) get merged where possible.
   if (doJoin) {
-    orderedSubpaths = joinSubpaths(orderedSubpaths, joinTol);
+    orderedSubpaths = joinSubpaths(
+      orderedSubpaths.map((sp) => sp.points),
+      joinTol,
+    ).map((points) => ({ points }));
   }
 
   if (options?.vinylCutting) {
     orderedSubpaths = applyVinylCompensation(
-      orderedSubpaths,
+      orderedSubpaths.map((sp) => sp.points),
       options.vinylCutting,
-    );
+    ).map((points) => ({ points }));
   }
 
   if (options?.vinylWeedBorder) {
     orderedSubpaths = applyVinylWeedBorder(
-      orderedSubpaths,
+      orderedSubpaths.map((sp) => sp.points),
       options.vinylWeedBorder,
-    );
+    ).map((points) => ({ points }));
   }
 
   // ── Phase 4: emit G-code ─────────────────────────────────────────────────
@@ -404,6 +549,21 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lines.push(`; NOTE: skipped ${skippedObjects} invalid path object(s)`);
   }
 
+  const inkTriggerBase = Math.max(0, inkService?.triggerTravelMM ?? 0);
+  const inkTriggerJitter = clampNumber(
+    inkService?.triggerJitterPct ?? 0,
+    0,
+    100,
+  );
+  const dipCursorRef = { value: 0 };
+  const dipsSinceWashRef = { value: 0 };
+  let nextInkServiceAt = chooseTriggerDistance(
+    inkTriggerBase,
+    inkTriggerJitter,
+  );
+  let accumulatedRapidTravel = 0;
+  let previousPathEnd: { x: number; y: number } | null = null;
+
   const yieldPh4 = makeYielder();
   let lastPct4 = -1;
   for (let i = 0; i < orderedSubpaths.length; i++) {
@@ -412,8 +572,29 @@ async function generate(msg: GenerateMessage): Promise<void> {
       self.postMessage({ type: "cancelled", taskId });
       return;
     }
-    const subpath = orderedSubpaths[i];
+    const subpath = orderedSubpaths[i].points;
     const first = subpath[0];
+
+    if (previousPathEnd && inkService && inkTriggerBase > 0) {
+      accumulatedRapidTravel += distanceMM(previousPathEnd, first);
+      if (accumulatedRapidTravel >= nextInkServiceAt) {
+        const inserted = emitInkServiceMove(
+          lines,
+          config,
+          inkService,
+          dipCursorRef,
+          dipsSinceWashRef,
+        );
+        if (inserted) {
+          accumulatedRapidTravel = 0;
+          nextInkServiceAt = chooseTriggerDistance(
+            inkTriggerBase,
+            inkTriggerJitter,
+          );
+        }
+      }
+    }
+
     lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
     const drawSpeed =
       typeof options?.drawSpeedOverride === "number"
@@ -432,6 +613,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     }
     lines.push(config.penUpCommand + " ; Pen up");
     lines.push("");
+    previousPathEnd = subpath[subpath.length - 1];
     const pct = 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60);
     if (pct !== lastPct4) {
       lastPct4 = pct;

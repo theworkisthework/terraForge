@@ -698,6 +698,131 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X-1.000 Y11.000");
     expect(gcode).toContain("G1 X-1.000 Y-1.000");
   });
+
+  it("inserts prime and wipe service moves when travel threshold is exceeded", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-ink-prime-wipe",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 8 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+        createVectorObject({
+          path: "M 80 0 L 88 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        inkService: {
+          mode: "prime-wipe",
+          triggerTravelMM: 20,
+          triggerJitterPct: 0,
+          stations: [
+            {
+              id: "prime",
+              name: "Prime",
+              type: "prime",
+              x: 5,
+              y: 6,
+              dwellMs: 400,
+              enabled: true,
+            },
+            {
+              id: "wipe",
+              name: "Wipe",
+              type: "wipe",
+              x: 7,
+              y: 6,
+              dwellMs: 300,
+              enabled: true,
+            },
+          ],
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("; Ink svc  : prime-wipe, every 20 mm");
+    expect(gcode).toContain("; -- Ink service: prime and wipe --");
+    expect(gcode).toContain("Service move: prime (Prime)");
+    expect(gcode).toContain("Service move: wipe (Wipe)");
+  });
+
+  it("inserts brush dip and wash moves with wash cadence", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-ink-brush-dip",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 8 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+        createVectorObject({
+          path: "M 45 0 L 53 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        inkService: {
+          mode: "brush-dip",
+          triggerTravelMM: 10,
+          triggerJitterPct: 0,
+          randomizeDipStation: false,
+          includeWashMove: true,
+          washEveryNDips: 1,
+          stations: [
+            {
+              id: "dip-black",
+              name: "Dip Black",
+              type: "dip",
+              x: 15,
+              y: 10,
+              dwellMs: 250,
+              enabled: true,
+            },
+            {
+              id: "wash",
+              name: "Wash",
+              type: "wash",
+              x: 18,
+              y: 10,
+              dwellMs: 500,
+              enabled: true,
+            },
+          ],
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("; Ink svc  : brush-dip, every 10 mm");
+    expect(gcode).toContain("; -- Ink service: brush dip --");
+    expect(gcode).toContain("Service move: dip (Dip Black)");
+    expect(gcode).toContain("Service move: wash (Wash)");
+  });
 });
 
 // ── Optimised mode ────────────────────────────────────────────────────────────

@@ -114,6 +114,26 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     if (n !== null) setPrefs((p) => ({ ...p, drawSpeedOverride: n }));
   };
 
+  const setInkServiceMode = (mode: GcodePrefs["inkServiceMode"]) => {
+    setPrefs((p) => ({ ...p, inkServiceMode: mode }));
+  };
+
+  const setInkServiceTriggerTravelMM = (val: string) => {
+    const n = parsePositiveNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, inkServiceTriggerTravelMM: n }));
+  };
+
+  const setInkServiceTriggerJitterPct = (val: string) => {
+    const n = parseNonNegativeNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, inkServiceTriggerJitterPct: n }));
+  };
+
+  const setInkServiceWashEveryNDips = (val: string) => {
+    const n = parsePositiveNumber(val);
+    if (n !== null)
+      setPrefs((p) => ({ ...p, inkServiceWashEveryNDips: Math.round(n) }));
+  };
+
   const setVinylWeedBorderMargin = (val: string) => {
     const n = parseNonNegativeNumber(val);
     if (n !== null) setPrefs((p) => ({ ...p, vinylWeedBorderMarginMM: n }));
@@ -213,6 +233,10 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 onSetPenDownDelayMs={setPenDownDelayMs}
                 onSetPenUpDelayMs={setPenUpDelayMs}
                 onSetDrawSpeedOverride={setDrawSpeedOverride}
+                onSetInkServiceMode={setInkServiceMode}
+                onSetInkServiceTriggerTravelMM={setInkServiceTriggerTravelMM}
+                onSetInkServiceTriggerJitterPct={setInkServiceTriggerJitterPct}
+                onSetInkServiceWashEveryNDips={setInkServiceWashEveryNDips}
                 onSetClipMode={setClipMode}
                 onSetClipOffset={setClipOffsetMM}
                 onSetTextField={setTextField}

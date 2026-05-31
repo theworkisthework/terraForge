@@ -43,6 +43,13 @@ const defaultPrefs: GcodePrefs = {
   generateVinylCuttingGcode: false,
   generateVinylWeedBorderGcode: false,
   vinylWeedBorderMarginMM: 2,
+  inkServiceEnabled: false,
+  inkServiceMode: "prime-wipe",
+  inkServiceTriggerTravelMM: 900,
+  inkServiceTriggerJitterPct: 0,
+  inkServiceRandomizeDipStation: false,
+  inkServiceIncludeWashMove: false,
+  inkServiceWashEveryNDips: 3,
 };
 
 beforeEach(() => {
@@ -174,6 +181,13 @@ describe("GcodeOptionsDialog", () => {
         generateVinylCuttingGcode: false,
         generateVinylWeedBorderGcode: false,
         vinylWeedBorderMarginMM: 2,
+        inkServiceEnabled: false,
+        inkServiceMode: "prime-wipe",
+        inkServiceTriggerTravelMM: 900,
+        inkServiceTriggerJitterPct: 0,
+        inkServiceRandomizeDipStation: false,
+        inkServiceIncludeWashMove: false,
+        inkServiceWashEveryNDips: 3,
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -570,6 +584,13 @@ describe("GcodeOptionsDialog", () => {
       generateVinylCuttingGcode: false,
       generateVinylWeedBorderGcode: false,
       vinylWeedBorderMarginMM: 2,
+      inkServiceEnabled: false,
+      inkServiceMode: "prime-wipe",
+      inkServiceTriggerTravelMM: 900,
+      inkServiceTriggerJitterPct: 0,
+      inkServiceRandomizeDipStation: false,
+      inkServiceIncludeWashMove: false,
+      inkServiceWashEveryNDips: 3,
     });
   });
 });

@@ -15,6 +15,7 @@ import { useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../store/canvasStore";
 import { useThemeStore } from "../store/themeStore";
+import { useAppConfigStore } from "../store/appConfigStore";
 import {
   selectPlotCanvasCanvasState,
   selectPlotCanvasToolpathState,
@@ -39,6 +40,7 @@ import {
   ToolpathHitAreaOverlay,
   ToolpathSelectionOverlay,
   PenCrosshairOverlay,
+  InkServiceStationsOverlay,
   ToolpathOverlay,
   useViewport,
   useCanvasPanZoom,
@@ -87,6 +89,10 @@ export function PlotCanvas() {
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const machineStatus = useMachineStore((s) => s.status);
   const connected = useMachineStore((s) => s.connected);
+  const showInkServiceStationsOnCanvas = useAppConfigStore(
+    (s) => s.showInkServiceStationsOnCanvas,
+  );
+  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
   const displayMachineState = useStableMachineState(machineStatus?.state);
   const isJobActive =
     displayMachineState === "Run" || displayMachineState === "Hold";
@@ -345,6 +351,13 @@ export function PlotCanvas() {
           pageTemplate={pageTemplate}
           pageSizes={pageSizes}
           vp={vp}
+          getBedX={getBedX}
+          getBedY={getBedY}
+        />
+
+        <InkServiceStationsOverlay
+          stations={inkServiceStations}
+          visible={showInkServiceStationsOnCanvas}
           getBedX={getBedX}
           getBedY={getBedY}
         />
