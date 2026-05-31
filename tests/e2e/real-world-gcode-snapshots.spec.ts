@@ -29,6 +29,8 @@ function normalizeGcodeForSnapshot(gcode: string): string {
     .replace(/\r\n/g, "\n")
     .replace(/^; Machine\s+:.*$/m, "; Machine  : <normalized>")
     .replace(/^; Generated:.*$/m, "; Generated: <normalized>")
+    .replace(/^; Vinyl\s+:.*\n?/gm, "")
+    .replace(/^; Weed bd\s+:.*\n?/gm, "")
     .trim();
 }
 
