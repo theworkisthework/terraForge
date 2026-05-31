@@ -107,7 +107,7 @@ export const useAppConfigStore = create<AppConfigState>()(
       vinylBladeOffsetMM: 0.25,
       vinylCornerAngleThresholdDeg: 10,
       vinylMicroJogMagnitudeMM: 0.02,
-      showInkServiceStationsOnCanvas: true,
+      showInkServiceStationsOnCanvas: false,
       inkServiceStations: structuredClone(DEFAULT_INK_SERVICE_STATIONS),
       setEnablePerPathPasses: (enabled) =>
         set({ enablePerPathPasses: enabled }),

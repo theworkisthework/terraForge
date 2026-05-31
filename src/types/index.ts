@@ -167,7 +167,7 @@ export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
       repetitions: 3,
       distanceMM: 2,
     },
-    enabled: true,
+    enabled: false,
   },
   {
     id: "wash",
