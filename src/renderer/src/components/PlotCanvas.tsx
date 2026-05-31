@@ -80,6 +80,8 @@ export function PlotCanvas() {
     gcodeSource,
     toolpathSelected,
     selectToolpath,
+    toolpathVisible,
+    toolpathOpacity,
     plotProgressCuts,
     plotProgressRapids,
   } = useCanvasStore(useShallow(selectPlotCanvasToolpathState));
@@ -311,6 +313,8 @@ export function PlotCanvas() {
         layerGroups={layerGroups}
         gcodeToolpath={gcodeToolpath}
         toolpathSelected={toolpathSelected}
+        toolpathVisible={toolpathVisible}
+        toolpathOpacity={toolpathOpacity}
         plotProgressCuts={plotProgressCuts ?? null}
         plotProgressRapids={plotProgressRapids ?? null}
         respectSvgColorsOnCanvas={respectSvgColorsOnCanvas}

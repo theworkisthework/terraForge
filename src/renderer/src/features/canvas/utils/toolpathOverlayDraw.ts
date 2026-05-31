@@ -233,6 +233,7 @@ interface DrawToolpathLayerParams {
   ctx: CanvasRenderingContext2D;
   gcodeToolpath: GcodeToolpath;
   toolpathSelected: boolean;
+  toolpathOpacity: number;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
   ppCutsCache: Path2DTextCache;
@@ -251,6 +252,7 @@ export function drawToolpathLayer({
   ctx,
   gcodeToolpath,
   toolpathSelected,
+  toolpathOpacity,
   plotProgressCuts,
   plotProgressRapids,
   ppCutsCache,
@@ -274,6 +276,8 @@ export function drawToolpathLayer({
   ctx.beginPath();
   ctx.rect(bedXMin, bedYMin, bedXMax - bedXMin, bedYMax - bedYMin);
   ctx.clip();
+
+  ctx.globalAlpha = Math.max(0.1, Math.min(1, toolpathOpacity));
 
   const pxPerMm = Math.abs(sx * vpZoom);
   const lodMm = LOD_PX / pxPerMm;

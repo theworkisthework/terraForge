@@ -45,6 +45,8 @@ export interface ToolpathOverlayProps {
   layerGroups: LayerGroup[];
   gcodeToolpath: GcodeToolpath | null;
   toolpathSelected: boolean;
+  toolpathVisible: boolean;
+  toolpathOpacity: number;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
   respectSvgColorsOnCanvas: boolean;
@@ -71,6 +73,8 @@ export function ToolpathOverlay({
   layerGroups,
   gcodeToolpath,
   toolpathSelected,
+  toolpathVisible,
+  toolpathOpacity,
   plotProgressCuts,
   plotProgressRapids,
   respectSvgColorsOnCanvas,
@@ -167,11 +171,13 @@ export function ToolpathOverlay({
       });
 
       if (!gcodeToolpath) return;
+      if (!toolpathVisible) return;
 
       drawToolpathLayer({
         ctx,
         gcodeToolpath,
         toolpathSelected,
+        toolpathOpacity,
         plotProgressCuts,
         plotProgressRapids,
         ppCutsCache: ppCutsPath2DRef.current,
@@ -194,6 +200,8 @@ export function ToolpathOverlay({
   }, [
     gcodeToolpath,
     toolpathSelected,
+    toolpathVisible,
+    toolpathOpacity,
     vp,
     plotProgressCuts,
     plotProgressRapids,
