@@ -158,8 +158,11 @@ Open the Settings dialog and select **Application Configuration**.
 Current option:
 
 - **Enable per-path pass overrides in the Properties panel**
+- **Enable vinyl cutting features (Experimental)**
 
-When this is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
+When **Enable per-path pass** is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
+
+When **Enable vinyl cutting features** is on, the app exposes drag-knife default settings in Application Configuration and a dedicated **Vinyl** tab in the **Generate G-code** dialog.
 
 ---
 
@@ -606,7 +609,7 @@ When layer groups are defined, you can generate a separate G-code file for each 
 
 1. Import one or more SVGs and position them on the bed.
 2. Click **Generate G-code** in the toolbar.
-3. The dialog opens with three collapsible sections: **Paths**, **Options**, and **Output**.
+3. The dialog opens with tabs: **Paths**, **Options**, **Output**, and (when vinyl features are enabled in Application Configuration) **Vinyl**.
 
 #### Paths section
 
@@ -621,9 +624,9 @@ When layer groups are defined, you can generate a separate G-code file for each 
 When **Optimise paths** is enabled, the **Path direction** option controls how the optimiser handles path orientation:
 
 - **Minimize travel by reversing paths** (default) — allows the optimiser to reverse individual paths if the endpoint is closer to the next path's starting point. This reduces total pen travel significantly, especially for hatching. Path reversal only applies during the optimisation phase and does not affect pass-mode semantics (repeat/backtrack/penLift still function as configured).
-- **Respect source path direction** — disables path reversal, preserving the original direction of each path as it appeared in the source SVG/import. Use this mode if you are using backtrack-mode passes and want to preserve the forward/reverse pairings created by the pass system.
+- **Respect source path direction** — disables path reversal, preserving the original direction of each path as it appeared in the source SVG/import. Use this mode if you are using backtrack-mode passes and want to preserve the forward/reverse pairings created by the layer and path multi-pass option.
 
-> **Note on pass semantics:** When using backtrack mode (which alternates forward and reverse tracing), the pass system creates paired paths. If you select **Minimize travel by reversing paths**, the global optimiser can reorder and reverse these pairs for travel efficiency. If that is undesirable, select **Respect source path direction** to prevent reversal and keep pass-generated direction patterns intact.
+> **Note on multi-pass semantics:** When using backtrack mode (which alternates forward and reverse tracing), the multi-pass option creates paired paths. If you select **Minimize travel by reversing paths**, the global optimiser can reorder and reverse these pairs for travel efficiency. If that is undesirable, select **Respect source path direction** to prevent reversal and keep pass-generated direction patterns intact.
 
 When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.2 mm). Consecutive sub-paths whose endpoint-to-start-point gap is within this tolerance are merged, eliminating the pen-up / rapid / pen-down cycle between nearly-touching strokes.
 
@@ -642,6 +645,16 @@ When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.
 | **Custom G-code**           | Sub-collapsible for custom start/end G-code blocks inserted around the job          |
 
 When a delay or draw-speed override is enabled, the dialog shows both the override value and the current machine default for reference.
+
+#### Vinyl section
+
+| Option                                      | Description                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Generate drag-knife/vinyl-cutter G-code** | Enables blade-offset compensation for drag-knife cutting                              |
+| **Generate weed border G-code**             | Adds a rectangular border around the final job bounds to aid weeding                  |
+| **Weed border margin (mm)**                 | Border offset from the job bounds; shown when weed border is enabled; applied per job |
+
+The Vinyl tab appears only when **Enable vinyl cutting features** is enabled in **Application Configuration**.
 
 #### Output section
 
