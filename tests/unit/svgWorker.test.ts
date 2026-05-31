@@ -399,7 +399,7 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain(
-      "; Vinyl    : yes (offset 0.25 mm, threshold 10 deg, micro-jog 0.02 mm)",
+      "; Vinyl    : yes (offset 0.25 mm, threshold 10 deg, blade rotation offset 0.02 mm)",
     );
     expect(gcode).toContain("G1 X0.250 Y0.000");
     expect(gcode).toContain("G1 X10.250 Y0.000");

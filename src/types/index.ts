@@ -56,10 +56,6 @@ export interface MachineConfig {
 export interface AppConfig {
   /** Enables verbose debug command transport logs in the console panel. */
   debugLoggingEnabled: boolean;
-  /** Enables the vinyl weed-border option in the app and job dialogs. */
-  vinylWeedBorderEnabled: boolean;
-  /** Default margin used when generating a weed border around the job bounds. */
-  vinylWeedBorderMarginMM: number;
 }
 
 export interface VinylCuttingSettings {

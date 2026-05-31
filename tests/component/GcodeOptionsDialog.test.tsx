@@ -42,6 +42,7 @@ const defaultPrefs: GcodePrefs = {
   clipOffsetMM: 0,
   generateVinylCuttingGcode: false,
   generateVinylWeedBorderGcode: false,
+  vinylWeedBorderMarginMM: 2,
 };
 
 beforeEach(() => {
@@ -60,8 +61,6 @@ beforeEach(() => {
     vinylBladeOffsetMM: 0.25,
     vinylCornerAngleThresholdDeg: 10,
     vinylMicroJogMagnitudeMM: 0.02,
-    vinylWeedBorderEnabled: false,
-    vinylWeedBorderMarginMM: 2,
   });
   vi.clearAllMocks();
 });
@@ -174,6 +173,7 @@ describe("GcodeOptionsDialog", () => {
         clipOffsetMM: 0,
         generateVinylCuttingGcode: false,
         generateVinylWeedBorderGcode: false,
+        vinylWeedBorderMarginMM: 2,
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -220,7 +220,6 @@ describe("GcodeOptionsDialog", () => {
 
   it("hides the vinyl cutting checkbox when the application setting is disabled", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
     expect(
       screen.queryByRole("checkbox", {
         name: "Generate drag-knife/vinyl-cutter G-code",
@@ -231,7 +230,7 @@ describe("GcodeOptionsDialog", () => {
   it("shows the vinyl cutting checkbox when the application setting is enabled", async () => {
     useAppConfigStore.setState({ vinylCuttingEnabled: true });
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^vinyl$/i }));
     expect(
       screen.getByRole("checkbox", {
         name: "Generate drag-knife/vinyl-cutter G-code",
@@ -242,7 +241,7 @@ describe("GcodeOptionsDialog", () => {
   it("returns vinyl cutting preference on confirm when enabled", async () => {
     useAppConfigStore.setState({ vinylCuttingEnabled: true });
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^vinyl$/i }));
     await userEvent.click(
       screen.getByRole("checkbox", {
         name: "Generate drag-knife/vinyl-cutter G-code",
@@ -254,25 +253,45 @@ describe("GcodeOptionsDialog", () => {
     );
   });
 
-  it("shows the weed border checkbox when the application setting is enabled", async () => {
-    useAppConfigStore.setState({ vinylWeedBorderEnabled: true });
+  it("shows the weed border checkbox when vinyl cutting features are enabled", async () => {
+    useAppConfigStore.setState({ vinylCuttingEnabled: true });
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^vinyl$/i }));
     expect(
       screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
     ).toBeInTheDocument();
   });
 
   it("returns weed border preference on confirm when enabled", async () => {
-    useAppConfigStore.setState({ vinylWeedBorderEnabled: true });
+    useAppConfigStore.setState({ vinylCuttingEnabled: true });
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
-    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^vinyl$/i }));
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
     );
     await userEvent.click(screen.getByRole("button", { name: "Generate" }));
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ generateVinylWeedBorderGcode: true }),
+    );
+  });
+
+  it("returns weed border margin on confirm", async () => {
+    useAppConfigStore.setState({ vinylCuttingEnabled: true });
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^vinyl$/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
+    );
+    const marginInput = screen.getByRole("spinbutton", {
+      name: "Weed border margin (mm)",
+    });
+    fireEvent.change(marginInput, { target: { value: "3.5" } });
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generateVinylWeedBorderGcode: true,
+        vinylWeedBorderMarginMM: 3.5,
+      }),
     );
   });
 
@@ -550,6 +569,7 @@ describe("GcodeOptionsDialog", () => {
       clipOffsetMM: 0,
       generateVinylCuttingGcode: false,
       generateVinylWeedBorderGcode: false,
+      vinylWeedBorderMarginMM: 2,
     });
   });
 });

@@ -24,8 +24,6 @@ describe("OptionsSection", () => {
         open
         customGcodeOpen={false}
         prefs={buildPrefs({ clipMode: "page" })}
-        vinylCuttingEnabled
-        vinylWeedBorderEnabled
         hasPageTemplate
         onToggleOpen={onToggleOpen}
         onToggleCustomGcodeOpen={onToggleCustomGcodeOpen}
@@ -57,9 +55,5 @@ describe("OptionsSection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Custom G-code" }));
     expect(onToggleCustomGcodeOpen).toHaveBeenCalledTimes(1);
-
-    expect(
-      screen.getByRole("checkbox", { name: "Generate weed border G-code" }),
-    ).toBeInTheDocument();
   });
 });

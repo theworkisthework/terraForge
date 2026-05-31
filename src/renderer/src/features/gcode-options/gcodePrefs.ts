@@ -37,6 +37,7 @@ export interface GcodePrefs {
   clipOffsetMM: number;
   generateVinylCuttingGcode: boolean;
   generateVinylWeedBorderGcode: boolean;
+  vinylWeedBorderMarginMM: number;
 }
 
 export const DEFAULT_GCODE_PREFS: GcodePrefs = {
@@ -63,6 +64,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   clipOffsetMM: 0,
   generateVinylCuttingGcode: false,
   generateVinylWeedBorderGcode: false,
+  vinylWeedBorderMarginMM: 2,
 };
 
 export function loadGcodePrefs(): GcodePrefs {

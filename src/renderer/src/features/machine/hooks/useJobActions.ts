@@ -24,12 +24,6 @@ export function useJobActions() {
   const vinylMicroJogMagnitudeMM = useAppConfigStore(
     (s) => s.vinylMicroJogMagnitudeMM,
   );
-  const vinylWeedBorderEnabled = useAppConfigStore(
-    (s) => s.vinylWeedBorderEnabled,
-  );
-  const vinylWeedBorderMarginMM = useAppConfigStore(
-    (s) => s.vinylWeedBorderMarginMM,
-  );
 
   const {
     imports,
@@ -172,12 +166,11 @@ export function useJobActions() {
               microJogMagnitudeMM: vinylMicroJogMagnitudeMM,
             }
           : undefined,
-      vinylWeedBorder:
-        vinylWeedBorderEnabled && prefs.generateVinylWeedBorderGcode
-          ? {
-              marginMM: vinylWeedBorderMarginMM,
-            }
-          : undefined,
+      vinylWeedBorder: prefs.generateVinylWeedBorderGcode
+        ? {
+            marginMM: prefs.vinylWeedBorderMarginMM,
+          }
+        : undefined,
     };
   };
 

@@ -236,7 +236,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Pen up delay: ${penUpDelayMs} ms`);
   if (options?.vinylCutting) {
     lines.push(
-      `; Vinyl    : yes (offset ${options.vinylCutting.bladeOffsetMM} mm, threshold ${options.vinylCutting.cornerAngleThresholdDeg} deg, micro-jog ${options.vinylCutting.microJogMagnitudeMM} mm)`,
+      `; Vinyl    : yes (offset ${options.vinylCutting.bladeOffsetMM} mm, threshold ${options.vinylCutting.cornerAngleThresholdDeg} deg, blade rotation offset ${options.vinylCutting.microJogMagnitudeMM} mm)`,
     );
   } else {
     lines.push("; Vinyl    : no");

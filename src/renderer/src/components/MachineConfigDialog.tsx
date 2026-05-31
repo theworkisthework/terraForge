@@ -132,12 +132,6 @@ export function MachineConfigDialog({ onClose }: Props) {
   const vinylMicroJogMagnitudeMM = useAppConfigStore(
     (state) => state.vinylMicroJogMagnitudeMM,
   );
-  const vinylWeedBorderEnabled = useAppConfigStore(
-    (state) => state.vinylWeedBorderEnabled,
-  );
-  const vinylWeedBorderMarginMM = useAppConfigStore(
-    (state) => state.vinylWeedBorderMarginMM,
-  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
   );
@@ -158,12 +152,6 @@ export function MachineConfigDialog({ onClose }: Props) {
   );
   const setVinylMicroJogMagnitudeMM = useAppConfigStore(
     (state) => state.setVinylMicroJogMagnitudeMM,
-  );
-  const setVinylWeedBorderEnabled = useAppConfigStore(
-    (state) => state.setVinylWeedBorderEnabled,
-  );
-  const setVinylWeedBorderMarginMM = useAppConfigStore(
-    (state) => state.setVinylWeedBorderMarginMM,
   );
 
   const {
@@ -959,7 +947,7 @@ export function MachineConfigDialog({ onClose }: Props) {
 
                   {vinylCuttingEnabled && (
                     <div className="grid grid-cols-1 gap-3 pl-6">
-                      <Field label="Blade offset (mm)">
+                      <Field label="Blade offset (mm) (Distance between blade tip and its pivot)">
                         <input
                           type="number"
                           min={0}
@@ -971,7 +959,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                           className={inputCls}
                         />
                       </Field>
-                      <Field label="Corner angle threshold (degrees)">
+                      <Field label="Corner angle threshold (degrees) (minimum angle to apply corner compensation)">
                         <input
                           type="number"
                           min={0}
@@ -985,7 +973,7 @@ export function MachineConfigDialog({ onClose }: Props) {
                           className={inputCls}
                         />
                       </Field>
-                      <Field label="Micro-jog magnitude (mm)">
+                      <Field label="Blade rotation offset (mm) (extra movement to ensure proper blade swivel - this should be close to 0)">
                         <input
                           type="number"
                           min={0}
@@ -993,44 +981,6 @@ export function MachineConfigDialog({ onClose }: Props) {
                           value={vinylMicroJogMagnitudeMM}
                           onChange={(e) =>
                             setVinylMicroJogMagnitudeMM(Number(e.target.value))
-                          }
-                          className={inputCls}
-                        />
-                      </Field>
-                    </div>
-                  )}
-
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={vinylWeedBorderEnabled}
-                      onChange={(e) =>
-                        setVinylWeedBorderEnabled(e.currentTarget.checked)
-                      }
-                      className="mt-0.5 accent-accent"
-                    />
-                    <div className="space-y-1">
-                      <div className="text-sm text-content flex items-center gap-2 flex-wrap">
-                        <span>Enable weed border</span>
-                        <Badge variant="warning">Experimental</Badge>
-                      </div>
-                      <p className="text-xs text-content-faint">
-                        Adds a rectangular border around the final job bounds to
-                        make weeding easier.
-                      </p>
-                    </div>
-                  </label>
-
-                  {vinylWeedBorderEnabled && (
-                    <div className="grid grid-cols-1 gap-3 pl-6">
-                      <Field label="Weed border margin (mm)">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={vinylWeedBorderMarginMM}
-                          onChange={(e) =>
-                            setVinylWeedBorderMarginMM(Number(e.target.value))
                           }
                           className={inputCls}
                         />
