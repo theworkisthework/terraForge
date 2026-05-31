@@ -505,6 +505,40 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X2.000 Y2.200");
   });
 
+  it("extends open path ends using local tangent on tessellated curves", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-overcut-curve-tangent",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 4 0 L 8 0 L 8.02 0.02",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // End overcut should follow the local tangent through the final curve segment,
+    // not the tiny terminal segment direction alone.
+    expect(gcode).toContain("G1 X8.269 Y0.041");
+    expect(gcode).not.toContain("G1 X8.197 Y0.197");
+  });
+
   it("still compensates a true corner after curved approach", async () => {
     dispatch({
       type: "generate",

@@ -125,8 +125,7 @@ function compensateSubpath(
     // for moderate turns (not sharp corners) where that one side clearly shows
     // the same curvature direction.
     const isModerateTurn =
-      absoluteAngleDeg <=
-      settings.cornerAngleThresholdDeg * 3;
+      absoluteAngleDeg <= settings.cornerAngleThresholdDeg * 3;
     if (isModerateTurn) {
       if (continuesCurveFromPrevious && !hasNextNeighborTurn) {
         return [];
@@ -182,12 +181,20 @@ function compensateSubpath(
         result.push(...compensationMoves);
       } else {
         // Start is below threshold: just add forward offset
-        const firstDir = normalize(vectorBetween(merged[0], merged[1]));
+        const firstDir = estimateEndpointDirection(
+          merged,
+          "start",
+          settings.bladeOffsetMM,
+        );
         result.push(addScaled(merged[0], firstDir, settings.bladeOffsetMM));
       }
     } else {
       // For open paths, just add forward offset from start
-      const firstDir = normalize(vectorBetween(merged[0], merged[1]));
+      const firstDir = estimateEndpointDirection(
+        merged,
+        "start",
+        settings.bladeOffsetMM,
+      );
       result.push(addScaled(merged[0], firstDir, settings.bladeOffsetMM));
     }
 
@@ -221,8 +228,11 @@ function compensateSubpath(
     // completes the physical cut from the last interior corner back to the start point.
     if (!isClosed) {
       const last = merged[merged.length - 1];
-      const beforeLast = merged[merged.length - 2];
-      const lastDir = normalize(vectorBetween(beforeLast, last));
+      const lastDir = estimateEndpointDirection(
+        merged,
+        "end",
+        settings.bladeOffsetMM,
+      );
       result.push(last);
       result.push(addScaled(last, lastDir, settings.bladeOffsetMM));
     } else {
@@ -279,6 +289,79 @@ function dedupeAdjacentPoints(points: Pt[]): Pt[] {
     }
   }
   return deduped;
+}
+
+function estimateEndpointDirection(
+  subpath: Subpath,
+  side: "start" | "end",
+  lookDistance: number,
+): Pt {
+  const minDistance = Math.max(lookDistance, 1e-6);
+  let remaining = minDistance;
+  let accumulatedX = 0;
+  let accumulatedY = 0;
+
+  const segmentIndexes: number[] = [];
+  if (side === "start") {
+    for (let index = 0; index < subpath.length - 1; index++) {
+      segmentIndexes.push(index);
+    }
+  } else {
+    for (let index = subpath.length - 2; index >= 0; index--) {
+      segmentIndexes.push(index);
+    }
+  }
+
+  for (const index of segmentIndexes) {
+    const start = subpath[index];
+    const end = subpath[index + 1];
+    const vec = vectorBetween(start, end);
+    const length = Math.hypot(vec.x, vec.y);
+    if (length <= 1e-9) {
+      continue;
+    }
+
+    const direction = normalize(vec);
+    const usedLength = Math.min(length, remaining);
+    accumulatedX += direction.x * usedLength;
+    accumulatedY += direction.y * usedLength;
+    remaining -= usedLength;
+
+    if (remaining <= 1e-9) {
+      break;
+    }
+  }
+
+  const accumulatedLength = Math.hypot(accumulatedX, accumulatedY);
+  if (accumulatedLength > 1e-9) {
+    return {
+      x: accumulatedX / accumulatedLength,
+      y: accumulatedY / accumulatedLength,
+    };
+  }
+
+  // Fallback for degenerate paths with repeated points.
+  if (side === "start") {
+    for (let index = 0; index < subpath.length - 1; index++) {
+      const direction = normalize(
+        vectorBetween(subpath[index], subpath[index + 1]),
+      );
+      if (Math.hypot(direction.x, direction.y) > 0) {
+        return direction;
+      }
+    }
+  } else {
+    for (let index = subpath.length - 2; index >= 0; index--) {
+      const direction = normalize(
+        vectorBetween(subpath[index], subpath[index + 1]),
+      );
+      if (Math.hypot(direction.x, direction.y) > 0) {
+        return direction;
+      }
+    }
+  }
+
+  return { x: 0, y: 0 };
 }
 
 function vectorBetween(start: Pt, end: Pt): Pt {
