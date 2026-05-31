@@ -2,8 +2,70 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   DEFAULT_INK_SERVICE_STATIONS,
+  type InkServiceStationAction,
+  type InkServiceStationType,
   type InkServiceStation,
 } from "../../../types";
+
+function defaultActionForType(
+  type: InkServiceStationType,
+): InkServiceStationAction | undefined {
+  if (type === "prime") {
+    return {
+      kind: "prime-press",
+      zDepthMM: 1,
+      pressCount: 3,
+    };
+  }
+  if (type === "dip" || type === "wash") {
+    return {
+      kind: "brush-motion",
+      zDepthMM: 2,
+      pattern: type === "wash" ? "circular" : "back-forth",
+      repetitions: 3,
+      distanceMM: 2,
+    };
+  }
+  return undefined;
+}
+
+function normalizeStation(station: InkServiceStation): InkServiceStation {
+  const dwellMs = Math.max(0, Number(station.dwellMs) || 0);
+  const baseAction = defaultActionForType(station.type);
+  let action = station.action;
+
+  if (station.type === "prime") {
+    if (!action || action.kind !== "prime-press") {
+      action = baseAction;
+    } else {
+      action = {
+        kind: "prime-press",
+        zDepthMM: Math.max(0, Number(action.zDepthMM) || 0),
+        pressCount: Math.max(1, Math.round(Number(action.pressCount) || 1)),
+      };
+    }
+  } else if (station.type === "dip" || station.type === "wash") {
+    if (!action || action.kind !== "brush-motion") {
+      action = baseAction;
+    } else {
+      action = {
+        kind: "brush-motion",
+        zDepthMM: Math.max(0, Number(action.zDepthMM) || 0),
+        pattern: action.pattern,
+        repetitions: Math.max(1, Math.round(Number(action.repetitions) || 1)),
+        distanceMM: Math.max(0, Number(action.distanceMM) || 0),
+      };
+    }
+  } else {
+    action = undefined;
+  }
+
+  return {
+    ...station,
+    dwellMs,
+    action,
+  };
+}
 
 interface AppConfigState {
   enablePerPathPasses: boolean;
@@ -62,27 +124,13 @@ export const useAppConfigStore = create<AppConfigState>()(
         set({ showInkServiceStationsOnCanvas: enabled }),
       setInkServiceStations: (stations) =>
         set({
-          inkServiceStations: stations.map((station) => ({
-            ...station,
-            dwellMs: Math.max(0, station.dwellMs),
-          })),
+          inkServiceStations: stations.map(normalizeStation),
         }),
       updateInkServiceStation: (id, patch) =>
         set((state) => ({
           inkServiceStations: state.inkServiceStations.map((station) =>
             station.id === id
-              ? {
-                  ...station,
-                  ...patch,
-                  dwellMs: Math.max(
-                    0,
-                    Number.isFinite(
-                      (patch.dwellMs ?? station.dwellMs) as number,
-                    )
-                      ? ((patch.dwellMs ?? station.dwellMs) as number)
-                      : station.dwellMs,
-                  ),
-                }
+              ? normalizeStation({ ...station, ...patch })
               : station,
           ),
         })),
@@ -100,6 +148,13 @@ export const useAppConfigStore = create<AppConfigState>()(
                 x: 0,
                 y: 0,
                 dwellMs: 500,
+                action: {
+                  kind: "brush-motion",
+                  zDepthMM: 2,
+                  pattern: "back-forth",
+                  repetitions: 3,
+                  distanceMM: 2,
+                },
                 enabled: true,
               },
             ],

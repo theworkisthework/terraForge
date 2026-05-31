@@ -60,6 +60,7 @@ function fmtSeconds(n: number): string {
 
 interface TravelSubpath {
   points: Subpath;
+  layer?: string;
 }
 
 function clampNumber(n: number, min: number, max: number): number {
@@ -86,18 +87,130 @@ function chooseTriggerDistance(baseMM: number, jitterPct: number): number {
   return Math.max(1, baseMM * scalar);
 }
 
+function emitRelativeZMove(lines: string[], deltaMM: number): void {
+  lines.push("G91 ; Relative mode");
+  lines.push(`G1 Z${fmt(deltaMM)}`);
+  lines.push("G90 ; Absolute mode");
+}
+
+function emitPrimePressAction(
+  lines: string[],
+  station: InkServiceStation,
+  dwellMs: number,
+): void {
+  const action = station.action;
+  if (!action || action.kind !== "prime-press") return;
+
+  const zDepth = Math.max(0, action.zDepthMM);
+  const pressCount = Math.max(1, Math.round(action.pressCount));
+
+  lines.push(
+    `; Prime action: ${pressCount} press${pressCount === 1 ? "" : "es"}, depth ${fmt(zDepth)} mm`,
+  );
+  for (let i = 0; i < pressCount; i++) {
+    if (zDepth > 0) {
+      emitRelativeZMove(lines, -zDepth);
+      if (dwellMs > 0) {
+        lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Prime press dwell`);
+      }
+      emitRelativeZMove(lines, zDepth);
+    } else if (dwellMs > 0) {
+      lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Prime press dwell`);
+    }
+  }
+}
+
+function emitCircularBrushMotion(
+  lines: string[],
+  station: InkServiceStation,
+  repetitions: number,
+  radiusMM: number,
+): void {
+  const segments = 12;
+  for (let rep = 0; rep < repetitions; rep++) {
+    lines.push(`G1 X${fmt(station.x + radiusMM)} Y${fmt(station.y)}`);
+    for (let i = 1; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      lines.push(
+        `G1 X${fmt(station.x + radiusMM * Math.cos(theta))} Y${fmt(station.y + radiusMM * Math.sin(theta))}`,
+      );
+    }
+    lines.push(`G1 X${fmt(station.x)} Y${fmt(station.y)}`);
+  }
+}
+
+function emitBackForthBrushMotion(
+  lines: string[],
+  station: InkServiceStation,
+  repetitions: number,
+  distanceMM: number,
+): void {
+  for (let rep = 0; rep < repetitions; rep++) {
+    lines.push(`G1 X${fmt(station.x + distanceMM)} Y${fmt(station.y)}`);
+    lines.push(`G1 X${fmt(station.x - distanceMM)} Y${fmt(station.y)}`);
+    lines.push(`G1 X${fmt(station.x)} Y${fmt(station.y)}`);
+  }
+}
+
+function emitBrushMotionAction(
+  lines: string[],
+  station: InkServiceStation,
+  dwellMs: number,
+): void {
+  const action = station.action;
+  if (!action || action.kind !== "brush-motion") return;
+
+  const zDepth = Math.max(0, action.zDepthMM);
+  const repetitions = Math.max(1, Math.round(action.repetitions));
+  const distanceMM = Math.max(0, action.distanceMM);
+
+  lines.push(
+    `; Brush action: ${action.pattern}, reps ${repetitions}, distance ${fmt(distanceMM)} mm, depth ${fmt(zDepth)} mm`,
+  );
+  if (zDepth > 0) {
+    emitRelativeZMove(lines, -zDepth);
+  }
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Brush settle dwell`);
+  }
+
+  if (action.pattern === "circular") {
+    emitCircularBrushMotion(lines, station, repetitions, distanceMM);
+  } else {
+    emitBackForthBrushMotion(lines, station, repetitions, distanceMM);
+  }
+
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Brush release dwell`);
+  }
+  if (zDepth > 0) {
+    emitRelativeZMove(lines, zDepth);
+  }
+}
+
 function emitStationContact(
   lines: string[],
   config: MachineConfig,
   station: InkServiceStation,
 ): void {
-  lines.push(
-    `G0 X${fmt(station.x)} Y${fmt(station.y)} ; Service move: ${station.type} (${station.name})`,
-  );
-  lines.push(config.penDownCommand + " ; Service contact");
   const dwellMs = Number.isFinite(station.dwellMs)
     ? Math.max(0, station.dwellMs)
     : 0;
+
+  lines.push(
+    `G0 X${fmt(station.x)} Y${fmt(station.y)} ; Service move: ${station.type} (${station.name})`,
+  );
+
+  if (station.action?.kind === "prime-press") {
+    emitPrimePressAction(lines, station, dwellMs);
+    return;
+  }
+  if (station.action?.kind === "brush-motion") {
+    emitBrushMotionAction(lines, station, dwellMs);
+    return;
+  }
+
+  lines.push(config.penDownCommand + " ; Service contact");
   if (dwellMs > 0) {
     lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Service dwell`);
   }
@@ -127,17 +240,50 @@ function emitBrushDip(
   stations: InkServiceStation[],
   dipCursorRef: { value: number },
   dipsSinceWashRef: { value: number },
+  currentDipIdRef: { value: string | null },
+  preferredDipStationId?: string,
 ): boolean {
   const dips = stations.filter((s) => s.type === "dip");
   if (dips.length === 0) return false;
   const wash = stations.find((s) => s.type === "wash");
 
-  const dip = settings.randomizeDipStation
-    ? dips[Math.floor(Math.random() * dips.length)]
-    : dips[dipCursorRef.value++ % dips.length];
+  const mappedDip = preferredDipStationId
+    ? dips.find((dip) => dip.id === preferredDipStationId)
+    : undefined;
+  const selectedDip = mappedDip
+    ? mappedDip
+    : settings.randomizeDipStation
+      ? dips[Math.floor(Math.random() * dips.length)]
+      : dips[dipCursorRef.value++ % dips.length];
+  let dip = selectedDip;
+
+  const trayChangeRequired =
+    currentDipIdRef.value !== null && currentDipIdRef.value !== selectedDip.id;
 
   lines.push("; -- Ink service: brush dip --");
+
+  // Never change dip trays without washing first. If no wash station exists,
+  // stick to the current tray to avoid cross-contamination.
+  if (trayChangeRequired) {
+    if (wash) {
+      lines.push(
+        `; Tray change: ${currentDipIdRef.value} -> ${selectedDip.id}, wash first`,
+      );
+      emitStationContact(lines, config, wash);
+      dipsSinceWashRef.value = 0;
+    } else {
+      const currentDip = dips.find((s) => s.id === currentDipIdRef.value);
+      if (currentDip) {
+        dip = currentDip;
+        lines.push(
+          `; Tray change blocked (no wash station), staying on ${currentDip.id}`,
+        );
+      }
+    }
+  }
+
   emitStationContact(lines, config, dip);
+  currentDipIdRef.value = dip.id;
   dipsSinceWashRef.value += 1;
 
   const washEvery = Math.max(1, settings.washEveryNDips ?? 1);
@@ -159,6 +305,8 @@ function emitInkServiceMove(
   settings: InkServiceSettings,
   dipCursorRef: { value: number },
   dipsSinceWashRef: { value: number },
+  currentDipIdRef: { value: string | null },
+  preferredDipStationId?: string,
 ): boolean {
   const triggerTravelMM = Number.isFinite(settings.triggerTravelMM)
     ? settings.triggerTravelMM
@@ -180,7 +328,35 @@ function emitInkServiceMove(
     enabledStations,
     dipCursorRef,
     dipsSinceWashRef,
+    currentDipIdRef,
+    preferredDipStationId,
   );
+}
+
+function remapLayerMetadata(
+  previous: TravelSubpath[],
+  nextPoints: Subpath[],
+): TravelSubpath[] {
+  if (previous.length === 0) {
+    return nextPoints.map((points) => ({ points }));
+  }
+  return nextPoints.map((points) => {
+    const first = points[0];
+    let best = previous[0];
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const candidate of previous) {
+      const start = candidate.points[0];
+      const end = candidate.points[candidate.points.length - 1];
+      const startScore = distanceMM(first, start);
+      const endScore = distanceMM(first, end);
+      const score = Math.min(startScore, endScore);
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return { points, layer: best.layer };
+  });
 }
 
 function approximateObjectSubpaths(
@@ -490,7 +666,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
     for (const sp of processedSubpaths) {
       if (sp.length >= 2) {
-        allSubpaths.push({ points: sp });
+        allSubpaths.push({ points: sp, layer: obj.layer });
       }
     }
     const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
@@ -510,34 +686,48 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
   let orderedSubpaths = optimise
-    ? nearestNeighbourSort(
-        allSubpaths.map((sp) => sp.points),
-        { allowReverse: allowPathReversal },
-      ).map((points) => ({ points }))
+    ? remapLayerMetadata(
+        allSubpaths,
+        nearestNeighbourSort(
+          allSubpaths.map((sp) => sp.points),
+          {
+            allowReverse: allowPathReversal,
+          },
+        ),
+      )
     : allSubpaths;
 
   // ── Phase 3: optional path joining ────────────────────────────────────────
   // Joining is applied after NN sort so that already-adjacent subpaths
   // (which NN sort placed next to each other) get merged where possible.
   if (doJoin) {
-    orderedSubpaths = joinSubpaths(
-      orderedSubpaths.map((sp) => sp.points),
-      joinTol,
-    ).map((points) => ({ points }));
+    orderedSubpaths = remapLayerMetadata(
+      orderedSubpaths,
+      joinSubpaths(
+        orderedSubpaths.map((sp) => sp.points),
+        joinTol,
+      ),
+    );
   }
 
   if (options?.vinylCutting) {
-    orderedSubpaths = applyVinylCompensation(
-      orderedSubpaths.map((sp) => sp.points),
-      options.vinylCutting,
-    ).map((points) => ({ points }));
+    orderedSubpaths = remapLayerMetadata(
+      orderedSubpaths,
+      applyVinylCompensation(
+        orderedSubpaths.map((sp) => sp.points),
+        options.vinylCutting,
+      ),
+    );
   }
 
   if (options?.vinylWeedBorder) {
-    orderedSubpaths = applyVinylWeedBorder(
-      orderedSubpaths.map((sp) => sp.points),
-      options.vinylWeedBorder,
-    ).map((points) => ({ points }));
+    orderedSubpaths = remapLayerMetadata(
+      orderedSubpaths,
+      applyVinylWeedBorder(
+        orderedSubpaths.map((sp) => sp.points),
+        options.vinylWeedBorder,
+      ),
+    );
   }
 
   // ── Phase 4: emit G-code ─────────────────────────────────────────────────
@@ -557,6 +747,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
   );
   const dipCursorRef = { value: 0 };
   const dipsSinceWashRef = { value: 0 };
+  const currentDipIdRef = { value: null as string | null };
+  const layerDipStations = inkService?.layerDipStations ?? {};
   let nextInkServiceAt = chooseTriggerDistance(
     inkTriggerBase,
     inkTriggerJitter,
@@ -566,6 +758,31 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   const yieldPh4 = makeYielder();
   let lastPct4 = -1;
+
+  // Prime/dip before first stroke so paint/ink is loaded before drawing.
+  if (inkService && inkTriggerBase > 0 && orderedSubpaths.length > 0) {
+    const firstLayer = orderedSubpaths[0]?.layer;
+    const preferredFirstDip = firstLayer
+      ? layerDipStations[firstLayer]
+      : undefined;
+    const inserted = emitInkServiceMove(
+      lines,
+      config,
+      inkService,
+      dipCursorRef,
+      dipsSinceWashRef,
+      currentDipIdRef,
+      preferredFirstDip,
+    );
+    if (inserted) {
+      accumulatedRapidTravel = 0;
+      nextInkServiceAt = chooseTriggerDistance(
+        inkTriggerBase,
+        inkTriggerJitter,
+      );
+    }
+  }
+
   for (let i = 0; i < orderedSubpaths.length; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
@@ -573,6 +790,10 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const subpath = orderedSubpaths[i].points;
+    const currentLayer = orderedSubpaths[i].layer;
+    const preferredDipStationId = currentLayer
+      ? layerDipStations[currentLayer]
+      : undefined;
     const first = subpath[0];
 
     if (previousPathEnd && inkService && inkTriggerBase > 0) {
@@ -584,6 +805,8 @@ async function generate(msg: GenerateMessage): Promise<void> {
           inkService,
           dipCursorRef,
           dipsSinceWashRef,
+          currentDipIdRef,
+          preferredDipStationId,
         );
         if (inserted) {
           accumulatedRapidTravel = 0;

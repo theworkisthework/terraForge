@@ -30,6 +30,8 @@ import type {
   ConnectionType,
   OriginType,
   PenType,
+  InkServiceStationType,
+  InkServiceStationAction,
   InkServiceStation,
 } from "../../../types";
 import { useAppConfigStore } from "../store/appConfigStore";
@@ -108,6 +110,28 @@ function addMachineCoordinatePrefix(command: string): string {
 
 function removeMachineCoordinatePrefix(command: string): string {
   return command.trim().replace(/^G53\s+/, "");
+}
+
+function defaultStationActionForType(
+  type: InkServiceStationType,
+): InkServiceStationAction | undefined {
+  if (type === "prime") {
+    return {
+      kind: "prime-press",
+      zDepthMM: 1,
+      pressCount: 3,
+    };
+  }
+  if (type === "dip" || type === "wash") {
+    return {
+      kind: "brush-motion",
+      zDepthMM: 2,
+      pattern: type === "wash" ? "circular" : "back-forth",
+      repetitions: 3,
+      distanceMM: 2,
+    };
+  }
+  return undefined;
 }
 
 export function MachineConfigDialog({ onClose }: Props) {
@@ -401,6 +425,21 @@ export function MachineConfigDialog({ onClose }: Props) {
     updateInkServiceStation(stationId, {
       [key]: value,
     } as Partial<InkServiceStation>);
+  };
+
+  const updateStationActionField = (
+    station: InkServiceStation,
+    patch: Partial<InkServiceStationAction>,
+  ) => {
+    const baseAction =
+      station.action ?? defaultStationActionForType(station.type);
+    if (!baseAction) return;
+    updateInkServiceStation(station.id, {
+      action: {
+        ...baseAction,
+        ...patch,
+      } as InkServiceStationAction,
+    });
   };
 
   const handleTestStationLocation = async (station: InkServiceStation) => {
@@ -1118,13 +1157,14 @@ export function MachineConfigDialog({ onClose }: Props) {
                           </label>
                           <select
                             value={station.type}
-                            onChange={(e) =>
-                              updateStationField(
-                                station.id,
-                                "type",
-                                e.target.value as InkServiceStation["type"],
-                              )
-                            }
+                            onChange={(e) => {
+                              const nextType = e.target
+                                .value as InkServiceStation["type"];
+                              updateInkServiceStation(station.id, {
+                                type: nextType,
+                                action: defaultStationActionForType(nextType),
+                              });
+                            }}
                             className={inputCls}
                           >
                             <option value="prime">Prime</option>
@@ -1209,6 +1249,191 @@ export function MachineConfigDialog({ onClose }: Props) {
                             Remove
                           </button>
                         </div>
+
+                        {(station.type === "prime" ||
+                          station.type === "dip" ||
+                          station.type === "wash") && (
+                          <div className="col-span-12 border-t border-border-ui/70 pt-2 mt-1 grid grid-cols-12 gap-2">
+                            <div className="col-span-3 text-xs text-content-faint self-center">
+                              Action
+                            </div>
+
+                            {station.type === "prime" && (
+                              <>
+                                <div className="col-span-3">
+                                  <label className="text-xs text-content-faint">
+                                    Press Count
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={
+                                      station.action?.kind === "prime-press"
+                                        ? station.action.pressCount
+                                        : 3
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "prime-press",
+                                        pressCount: Math.max(
+                                          1,
+                                          Math.round(
+                                            Number(e.target.value) || 1,
+                                          ),
+                                        ),
+                                      })
+                                    }
+                                    className={inputCls}
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <label className="text-xs text-content-faint">
+                                    Z Depth (mm)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.1}
+                                    value={
+                                      station.action?.kind === "prime-press"
+                                        ? station.action.zDepthMM
+                                        : 1
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "prime-press",
+                                        zDepthMM: Math.max(
+                                          0,
+                                          Number(e.target.value) || 0,
+                                        ),
+                                      })
+                                    }
+                                    className={inputCls}
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {(station.type === "dip" ||
+                              station.type === "wash") && (
+                              <>
+                                <div className="col-span-3">
+                                  <label className="text-xs text-content-faint">
+                                    Pattern
+                                  </label>
+                                  <select
+                                    value={
+                                      station.action?.kind === "brush-motion"
+                                        ? station.action.pattern
+                                        : "back-forth"
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "brush-motion",
+                                        pattern: e.target
+                                          .value as InkServiceStationAction extends infer T
+                                          ? T extends {
+                                              kind: "brush-motion";
+                                              pattern: infer P;
+                                            }
+                                            ? P
+                                            : never
+                                          : never,
+                                      })
+                                    }
+                                    className={inputCls}
+                                  >
+                                    <option value="back-forth">
+                                      Back and forth
+                                    </option>
+                                    <option value="circular">Circular</option>
+                                  </select>
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-xs text-content-faint">
+                                    Reps
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={
+                                      station.action?.kind === "brush-motion"
+                                        ? station.action.repetitions
+                                        : 3
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "brush-motion",
+                                        repetitions: Math.max(
+                                          1,
+                                          Math.round(
+                                            Number(e.target.value) || 1,
+                                          ),
+                                        ),
+                                      })
+                                    }
+                                    className={inputCls}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-xs text-content-faint">
+                                    {station.action?.kind === "brush-motion" &&
+                                    station.action.pattern === "circular"
+                                      ? "Radius (mm)"
+                                      : "Distance (mm)"}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.1}
+                                    value={
+                                      station.action?.kind === "brush-motion"
+                                        ? station.action.distanceMM
+                                        : 2
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "brush-motion",
+                                        distanceMM: Math.max(
+                                          0,
+                                          Number(e.target.value) || 0,
+                                        ),
+                                      })
+                                    }
+                                    className={inputCls}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-xs text-content-faint">
+                                    Z Depth (mm)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.1}
+                                    value={
+                                      station.action?.kind === "brush-motion"
+                                        ? station.action.zDepthMM
+                                        : 2
+                                    }
+                                    onChange={(e) =>
+                                      updateStationActionField(station, {
+                                        kind: "brush-motion",
+                                        zDepthMM: Math.max(
+                                          0,
+                                          Number(e.target.value) || 0,
+                                        ),
+                                      })
+                                    }
+                                    className={inputCls}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

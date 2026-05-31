@@ -50,6 +50,7 @@ const defaultPrefs: GcodePrefs = {
   inkServiceRandomizeDipStation: false,
   inkServiceIncludeWashMove: false,
   inkServiceWashEveryNDips: 3,
+  inkServiceLayerDipMap: {},
 };
 
 beforeEach(() => {
@@ -188,6 +189,7 @@ describe("GcodeOptionsDialog", () => {
         inkServiceRandomizeDipStation: false,
         inkServiceIncludeWashMove: false,
         inkServiceWashEveryNDips: 3,
+        inkServiceLayerDipMap: {},
       }),
     );
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
@@ -591,6 +593,7 @@ describe("GcodeOptionsDialog", () => {
       inkServiceRandomizeDipStation: false,
       inkServiceIncludeWashMove: false,
       inkServiceWashEveryNDips: 3,
+      inkServiceLayerDipMap: {},
     });
   });
 });

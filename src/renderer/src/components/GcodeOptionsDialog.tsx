@@ -10,7 +10,7 @@
  * between app sessions.
  */
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
@@ -29,6 +29,7 @@ import { PathsSection } from "../features/gcode-options/components/PathsSection"
 import { OptionsSection } from "../features/gcode-options/components/OptionsSection";
 import { OutputSection } from "../features/gcode-options/components/OutputSection";
 import { VinylSection } from "../features/gcode-options/components/VinylSection";
+import { InkSection } from "../features/gcode-options/components/InkSection";
 import { TabHeader } from "./TabHeader";
 
 export {
@@ -44,15 +45,51 @@ interface Props {
   onCancel: () => void;
 }
 
-type GcodeOptionsTab = "paths" | "options" | "vinyl" | "output";
+type GcodeOptionsTab = "paths" | "options" | "ink" | "vinyl" | "output";
 
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
   const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
+  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
   const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
+  const imports = useCanvasStore((s) => s.imports);
+  const layerDipOptions = useMemo(() => {
+    const orderedLayerIds: string[] = [];
+    const layerNamesById = new Map<string, string>();
+    const layerColorById = new Map<string, string>();
+
+    for (const imp of imports) {
+      for (const layer of imp.layers ?? []) {
+        if (!orderedLayerIds.includes(layer.id)) orderedLayerIds.push(layer.id);
+        if (!layerNamesById.has(layer.id) && layer.name) {
+          layerNamesById.set(layer.id, layer.name);
+        }
+      }
+
+      for (const path of imp.paths) {
+        if (!path.layer) continue;
+        if (!orderedLayerIds.includes(path.layer))
+          orderedLayerIds.push(path.layer);
+        if (!layerNamesById.has(path.layer)) {
+          layerNamesById.set(path.layer, path.layer);
+        }
+        if (!layerColorById.has(path.layer)) {
+          const color = path.sourceColor ?? path.strokeColor ?? path.fillColor;
+          if (color) layerColorById.set(path.layer, color);
+        }
+      }
+    }
+
+    return orderedLayerIds.map((id, index) => ({
+      id,
+      index: index + 1,
+      name: layerNamesById.get(id),
+      colorCode: layerColorById.get(id),
+    }));
+  }, [imports]);
   const [prefs, setPrefs] = useState<GcodePrefs>(loadGcodePrefs);
   const [activeTab, setActiveTab] = useState<GcodeOptionsTab>("output");
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
@@ -134,6 +171,21 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
       setPrefs((p) => ({ ...p, inkServiceWashEveryNDips: Math.round(n) }));
   };
 
+  const setInkServiceLayerDipStation = (
+    layerName: string,
+    stationId: string,
+  ) => {
+    setPrefs((p) => {
+      const nextMap = { ...p.inkServiceLayerDipMap };
+      if (!stationId) {
+        delete nextMap[layerName];
+      } else {
+        nextMap[layerName] = stationId;
+      }
+      return { ...p, inkServiceLayerDipMap: nextMap };
+    });
+  };
+
   const setVinylWeedBorderMargin = (val: string) => {
     const n = parseNonNegativeNumber(val);
     if (n !== null) setPrefs((p) => ({ ...p, vinylWeedBorderMarginMM: n }));
@@ -184,6 +236,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             tabs={[
               { id: "paths", label: "Paths" },
               { id: "options", label: "Options" },
+              { id: "ink", label: "Paint/Ink" },
               ...(vinylCuttingEnabled
                 ? ([{ id: "vinyl", label: "Vinyl" }] as const)
                 : []),
@@ -198,9 +251,11 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 ? "Paths"
                 : activeTab === "options"
                   ? "Options"
-                  : activeTab === "vinyl"
-                    ? "Vinyl"
-                    : "Output"
+                  : activeTab === "ink"
+                    ? "Ink"
+                    : activeTab === "vinyl"
+                      ? "Vinyl"
+                      : "Output"
             }
             className="flex-1 min-h-0 overflow-y-auto pr-1"
           >
@@ -222,7 +277,6 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 showHeader={false}
                 customGcodeOpen={customGcodeOpen}
                 prefs={prefs}
-                vinylCuttingEnabled={vinylCuttingEnabled}
                 machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
                 machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
                 machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
@@ -233,13 +287,31 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 onSetPenDownDelayMs={setPenDownDelayMs}
                 onSetPenUpDelayMs={setPenUpDelayMs}
                 onSetDrawSpeedOverride={setDrawSpeedOverride}
+                onSetClipMode={setClipMode}
+                onSetClipOffset={setClipOffsetMM}
+                onSetTextField={setTextField}
+              />
+            )}
+
+            {activeTab === "ink" && (
+              <InkSection
+                open={true}
+                showHeader={false}
+                prefs={prefs}
+                layers={layerDipOptions}
+                dipStations={inkServiceStations
+                  .filter(
+                    (station) =>
+                      station.type === "dip" && station.enabled !== false,
+                  )
+                  .map((station) => ({ id: station.id, name: station.name }))}
+                onToggleOpen={() => setActiveTab("ink")}
+                onTogglePref={toggle}
                 onSetInkServiceMode={setInkServiceMode}
                 onSetInkServiceTriggerTravelMM={setInkServiceTriggerTravelMM}
                 onSetInkServiceTriggerJitterPct={setInkServiceTriggerJitterPct}
                 onSetInkServiceWashEveryNDips={setInkServiceWashEveryNDips}
-                onSetClipMode={setClipMode}
-                onSetClipOffset={setClipOffsetMM}
-                onSetTextField={setTextField}
+                onSetInkServiceLayerDipStation={setInkServiceLayerDipStation}
               />
             )}
 

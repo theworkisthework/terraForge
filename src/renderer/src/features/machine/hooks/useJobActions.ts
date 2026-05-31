@@ -181,6 +181,7 @@ export function useJobActions() {
             randomizeDipStation: prefs.inkServiceRandomizeDipStation,
             includeWashMove: prefs.inkServiceIncludeWashMove,
             washEveryNDips: prefs.inkServiceWashEveryNDips,
+            layerDipStations: prefs.inkServiceLayerDipMap,
           }
         : undefined,
     };

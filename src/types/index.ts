@@ -72,6 +72,29 @@ export interface VinylWeedBorderSettings {
 
 export type InkServiceMode = "prime-wipe" | "brush-dip";
 export type InkServiceStationType = "prime" | "wipe" | "dip" | "wash";
+export type InkServicePattern = "back-forth" | "circular";
+
+export interface InkServicePrimeAction {
+  kind: "prime-press";
+  /** Relative plunge depth per press (mm). */
+  zDepthMM: number;
+  /** Number of press cycles to run at the station. */
+  pressCount: number;
+}
+
+export interface InkServiceBrushMotionAction {
+  kind: "brush-motion";
+  /** Relative plunge depth for the dip motion (mm). */
+  zDepthMM: number;
+  pattern: InkServicePattern;
+  repetitions: number;
+  /** Pattern amplitude in mm (radius for circular, half-stroke for back-forth). */
+  distanceMM: number;
+}
+
+export type InkServiceStationAction =
+  | InkServicePrimeAction
+  | InkServiceBrushMotionAction;
 
 export interface InkServiceStation {
   id: string;
@@ -83,6 +106,8 @@ export interface InkServiceStation {
   dwellMs: number;
   /** Optional station color label (used for brush dip trays). */
   color?: string;
+  /** Optional motion recipe performed at this station. */
+  action?: InkServiceStationAction;
   enabled?: boolean;
 }
 
@@ -99,6 +124,8 @@ export interface InkServiceSettings {
   includeWashMove?: boolean;
   /** For brush mode: perform wash after every N dips (minimum 1). */
   washEveryNDips?: number;
+  /** Optional mapping from SVG layer id/name to a dip station id. */
+  layerDipStations?: Record<string, string>;
 }
 
 export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
@@ -109,6 +136,11 @@ export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
     x: 10,
     y: 10,
     dwellMs: 600,
+    action: {
+      kind: "prime-press",
+      zDepthMM: 1,
+      pressCount: 3,
+    },
     enabled: true,
   },
   {
@@ -128,6 +160,13 @@ export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
     y: 10,
     dwellMs: 500,
     color: "black",
+    action: {
+      kind: "brush-motion",
+      zDepthMM: 2,
+      pattern: "back-forth",
+      repetitions: 3,
+      distanceMM: 2,
+    },
     enabled: true,
   },
   {
@@ -137,6 +176,13 @@ export const DEFAULT_INK_SERVICE_STATIONS: InkServiceStation[] = [
     x: 52,
     y: 10,
     dwellMs: 900,
+    action: {
+      kind: "brush-motion",
+      zDepthMM: 2,
+      pattern: "circular",
+      repetitions: 2,
+      distanceMM: 2,
+    },
     enabled: true,
   },
 ];
