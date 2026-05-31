@@ -9,6 +9,7 @@
 ; Ret home : no
 ; Pen delay: 50 ms
 ; Pen up delay: 0 ms
+; Dip svc  : no
 ; Generated: <normalized>
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates

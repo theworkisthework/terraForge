@@ -558,10 +558,10 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
   if (inkService) {
     lines.push(
-      `; Ink svc  : ${inkService.mode}, every ${inkService.triggerTravelMM} mm (jitter +/-${inkService.triggerJitterPct ?? 0}%)`,
+      `; Dip svc  : ${inkService.mode}, every ${inkService.triggerTravelMM} mm (jitter +/-${inkService.triggerJitterPct ?? 0}%)`,
     );
   } else {
-    lines.push("; Ink svc  : no");
+    lines.push("; Dip svc  : no");
   }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(

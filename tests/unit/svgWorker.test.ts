@@ -759,7 +759,7 @@ describe("svgWorker — G-code body", () => {
 
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    expect(gcode).toContain("; Ink svc  : prime-wipe, every 20 mm");
+    expect(gcode).toContain("; Dip svc  : prime-wipe, every 20 mm");
     expect(gcode).toContain("; -- Ink service: prime and wipe --");
     expect(gcode).toContain("Service move: prime (Prime)");
     expect(gcode).toContain("Service move: wipe (Wipe)");
@@ -840,7 +840,7 @@ describe("svgWorker — G-code body", () => {
 
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    expect(gcode).toContain("; Ink svc  : brush-dip, every 10 mm");
+    expect(gcode).toContain("; Dip svc  : brush-dip, every 10 mm");
     expect(gcode).toContain("; -- Ink service: brush dip --");
     expect(gcode).toContain("Service move: dip (Dip Black)");
     expect(gcode).toContain("Service move: wash (Wash)");
