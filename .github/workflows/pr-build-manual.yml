@@ -43,7 +43,7 @@ jobs:
 
       - name: Validate PR and compute ref
         id: pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
         with:
@@ -65,13 +65,15 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_name: ${{ steps.meta.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.precheck.outputs.pr_ref }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # Temporary pin: Electron install is broken on Node >=24.16.0.
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -87,7 +89,7 @@ jobs:
 
       - name: Upload Windows artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.name }}
           path: release/*.exe
@@ -102,13 +104,14 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_name: ${{ steps.meta.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.precheck.outputs.pr_ref }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -126,7 +129,7 @@ jobs:
 
       - name: Upload macOS artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.name }}
           path: release/*.dmg
@@ -141,13 +144,14 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_name: ${{ steps.meta.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.precheck.outputs.pr_ref }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install native dependencies
@@ -166,7 +170,7 @@ jobs:
 
       - name: Upload Linux artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.name }}
           path: release/*.AppImage
@@ -180,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
           GITHUB_RUN_ID: ${{ github.run_id }}

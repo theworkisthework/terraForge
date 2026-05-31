@@ -16,16 +16,17 @@ jobs:
     name: Unit & Component Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # Temporary pin: Electron install is broken on Node >=24.16.0.
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
-      # Can't npm ci due to platform differences
       - name: Install dependencies
-        run: npm i
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -38,19 +39,19 @@ jobs:
     name: E2E Tests (Playwright / Electron)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libudev-dev xvfb
 
-      # Can't npm ci due to platform differences
       - name: Install dependencies
-        run: npm i
+        run: npm ci
 
       - name: Install Playwright system libraries
         run: npx playwright install-deps
@@ -67,7 +68,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/playwright-e2e-results.html
@@ -79,11 +80,12 @@ jobs:
     needs: [test, test-e2e]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       # Stamp package.json with the tag version (strips the leading "v")
@@ -92,13 +94,13 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:win
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows
           # Grab the NSIS installer; exclude .blockmap (checksums, not needed by users)
@@ -112,18 +114,19 @@ jobs:
     needs: [test, test-e2e]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:mac
@@ -133,7 +136,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload DMGs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mac
           path: |
@@ -146,11 +149,12 @@ jobs:
     needs: [test, test-e2e]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # TODO: Unpin after https://github.com/electron/electron/issues/51619 is resolved.
+          node-version: 24.15.0
           cache: npm
 
       # serialport native module needs libudev on Linux
@@ -161,13 +165,13 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --allow-same-version --no-git-tag-version
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & package
         run: npm run dist:linux
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux
           path: |
@@ -181,7 +185,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Download all three platform artifacts into a flat directory
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
