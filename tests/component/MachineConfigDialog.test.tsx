@@ -28,6 +28,11 @@ beforeEach(() => {
   useAppConfigStore.setState({
     enablePerPathPasses: false,
     debugLoggingEnabled: false,
+    showMachineCoordinates: false,
+    vinylCuttingEnabled: false,
+    vinylBladeOffsetMM: 0.25,
+    vinylCornerAngleThresholdDeg: 10,
+    vinylMicroJogMagnitudeMM: 0.02,
   });
   vi.clearAllMocks();
   // listPorts is called on mount
@@ -68,6 +73,33 @@ describe("MachineConfigDialog", () => {
     });
     await userEvent.click(checkbox);
     expect(useAppConfigStore.getState().enablePerPathPasses).toBe(true);
+  });
+
+  it("shows vinyl cutting app settings when the experimental toggle is enabled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    expect(screen.getAllByText("Experimental")).not.toHaveLength(0);
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Enable vinyl cutting features/i,
+    });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().vinylCuttingEnabled).toBe(true);
+    expect(
+      screen.getByText(
+        "Blade offset (mm) (Distance between blade tip and its pivot)",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Corner angle threshold (degrees) (minimum angle to apply corner compensation)",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Blade rotation offset (mm) (extra movement to ensure proper blade swivel - this should be close to 0)",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("saves debug logging setting when toggled", async () => {

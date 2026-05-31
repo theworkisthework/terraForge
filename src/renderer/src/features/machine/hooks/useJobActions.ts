@@ -5,6 +5,7 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectJobActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
+import { useAppConfigStore } from "../../../store/appConfigStore";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { type GcodeOptions, type VectorObject } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
@@ -15,6 +16,14 @@ export function useJobActions() {
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const setConnected = useMachineStore((s) => s.setConnected);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
+  const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
+  const vinylBladeOffsetMM = useAppConfigStore((s) => s.vinylBladeOffsetMM);
+  const vinylCornerAngleThresholdDeg = useAppConfigStore(
+    (s) => s.vinylCornerAngleThresholdDeg,
+  );
+  const vinylMicroJogMagnitudeMM = useAppConfigStore(
+    (s) => s.vinylMicroJogMagnitudeMM,
+  );
 
   const {
     imports,
@@ -149,6 +158,19 @@ export function useJobActions() {
                   : (prefs.clipOffsetMM ?? 0),
             }
           : undefined,
+      vinylCutting:
+        vinylCuttingEnabled && prefs.generateVinylCuttingGcode
+          ? {
+              bladeOffsetMM: vinylBladeOffsetMM,
+              cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg,
+              microJogMagnitudeMM: vinylMicroJogMagnitudeMM,
+            }
+          : undefined,
+      vinylWeedBorder: prefs.generateVinylWeedBorderGcode
+        ? {
+            marginMM: prefs.vinylWeedBorderMarginMM,
+          }
+        : undefined,
     };
   };
 

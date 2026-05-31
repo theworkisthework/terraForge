@@ -27,6 +27,8 @@ import {
   transformPt,
   type Subpath,
 } from "./gcodeEngine";
+import { applyVinylCompensation } from "./gcodeEngine/stages/vinylCompensation";
+import { applyVinylWeedBorder } from "./gcodeEngine/stages/vinylWeedBorder";
 
 interface GenerateMessage {
   type: "generate";
@@ -232,6 +234,20 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(`; Ret home : ${returnToHome ? "yes" : "no"}`);
   lines.push(`; Pen delay: ${penDownDelayMs} ms`);
   lines.push(`; Pen up delay: ${penUpDelayMs} ms`);
+  if (options?.vinylCutting) {
+    lines.push(
+      `; Vinyl    : yes (offset ${options.vinylCutting.bladeOffsetMM} mm, threshold ${options.vinylCutting.cornerAngleThresholdDeg} deg, blade rotation offset ${options.vinylCutting.microJogMagnitudeMM} mm)`,
+    );
+  } else {
+    lines.push("; Vinyl    : no");
+  }
+  if (options?.vinylWeedBorder) {
+    lines.push(
+      `; Weed bd  : yes (margin ${options.vinylWeedBorder.marginMM} mm)`,
+    );
+  } else {
+    lines.push("; Weed bd  : no");
+  }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -363,6 +379,20 @@ async function generate(msg: GenerateMessage): Promise<void> {
   // (which NN sort placed next to each other) get merged where possible.
   if (doJoin) {
     orderedSubpaths = joinSubpaths(orderedSubpaths, joinTol);
+  }
+
+  if (options?.vinylCutting) {
+    orderedSubpaths = applyVinylCompensation(
+      orderedSubpaths,
+      options.vinylCutting,
+    );
+  }
+
+  if (options?.vinylWeedBorder) {
+    orderedSubpaths = applyVinylWeedBorder(
+      orderedSubpaths,
+      options.vinylWeedBorder,
+    );
   }
 
   // ── Phase 4: emit G-code ─────────────────────────────────────────────────

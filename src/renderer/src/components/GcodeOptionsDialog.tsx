@@ -14,6 +14,7 @@ import React, { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { selectGcodeOptionsDialogCanvasState } from "../store/canvasSelectors";
 import {
   loadGcodePrefs,
@@ -27,6 +28,7 @@ import {
 import { PathsSection } from "../features/gcode-options/components/PathsSection";
 import { OptionsSection } from "../features/gcode-options/components/OptionsSection";
 import { OutputSection } from "../features/gcode-options/components/OutputSection";
+import { VinylSection } from "../features/gcode-options/components/VinylSection";
 import { TabHeader } from "./TabHeader";
 
 export {
@@ -42,11 +44,12 @@ interface Props {
   onCancel: () => void;
 }
 
-type GcodeOptionsTab = "paths" | "options" | "output";
+type GcodeOptionsTab = "paths" | "options" | "vinyl" | "output";
 
 export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig());
+  const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
   const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
     useShallow(selectGcodeOptionsDialogCanvasState),
   );
@@ -111,6 +114,11 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     if (n !== null) setPrefs((p) => ({ ...p, drawSpeedOverride: n }));
   };
 
+  const setVinylWeedBorderMargin = (val: string) => {
+    const n = parseNonNegativeNumber(val);
+    if (n !== null) setPrefs((p) => ({ ...p, vinylWeedBorderMarginMM: n }));
+  };
+
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;
 
   const handleConfirm = () => {
@@ -156,6 +164,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             tabs={[
               { id: "paths", label: "Paths" },
               { id: "options", label: "Options" },
+              ...(vinylCuttingEnabled
+                ? ([{ id: "vinyl", label: "Vinyl" }] as const)
+                : []),
               { id: "output", label: "Output" },
             ]}
           />
@@ -167,7 +178,9 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 ? "Paths"
                 : activeTab === "options"
                   ? "Options"
-                  : "Output"
+                  : activeTab === "vinyl"
+                    ? "Vinyl"
+                    : "Output"
             }
             className="flex-1 min-h-0 overflow-y-auto pr-1"
           >
@@ -189,6 +202,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 showHeader={false}
                 customGcodeOpen={customGcodeOpen}
                 prefs={prefs}
+                vinylCuttingEnabled={vinylCuttingEnabled}
                 machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
                 machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}
                 machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
@@ -202,6 +216,14 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
                 onSetClipMode={setClipMode}
                 onSetClipOffset={setClipOffsetMM}
                 onSetTextField={setTextField}
+              />
+            )}
+
+            {activeTab === "vinyl" && vinylCuttingEnabled && (
+              <VinylSection
+                prefs={prefs}
+                onTogglePref={toggle}
+                onSetVinylWeedBorderMargin={setVinylWeedBorderMargin}
               />
             )}
 

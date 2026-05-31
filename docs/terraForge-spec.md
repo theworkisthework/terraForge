@@ -262,6 +262,17 @@ All methods must be explicitly typed.
    returnToHome: boolean // send G0 X0 Y0 at end of job
    customStartGcode: string // inserted after preamble, before paths
    customEndGcode: string // appended after lift/return
+   penDownDelayMsOverride?: number // optional per-job pen-down delay override (ms)
+   penUpDelayMsOverride?: number // optional per-job pen-up delay override (ms)
+   drawSpeedOverride?: number // optional per-job draw speed override (mm/min)
+   vinylCutting?: { // optional drag-knife compensation for this job
+      bladeOffsetMM: number
+      cornerAngleThresholdDeg: number
+      microJogMagnitudeMM: number
+   }
+   vinylWeedBorder?: { // optional weed-border rectangle around final job bounds
+      marginMM: number
+   }
    pageClip?: { // when a page template is active — clips output to printable area
    widthMM: number
    heightMM: number
@@ -335,8 +346,11 @@ Optimise paths — nearest-neighbour reorder to minimise rapid travel
 Join nearby paths — (experimental) merge path endpoints within configurable tolerance (default 0.2 mm)
 Upload to SD card — direct upload to machine after generation
 Save to computer — native save dialog
+Generate drag-knife/vinyl-cutter G-code — enables drag-knife compensation stage
+Generate weed border G-code — adds a weed-border rectangle around final job bounds
+Weed border margin (mm) — per-job margin used when weed border is enabled
 At least one output must be selected; a pre-generation validation enforces this.
-All four settings plus the join tolerance are persisted in localStorage under `terraforge.gcodePrefs`.
+Dialog settings are persisted in localStorage under `terraforge.gcodePrefs`, including join tolerance and vinyl weed-border margin.
 
 Pass Rules
 Each visible path supports pass settings:

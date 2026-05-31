@@ -370,6 +370,334 @@ describe("svgWorker — G-code body", () => {
     const gcode = msg.gcode as string;
     expect(gcode).not.toContain("G1");
   });
+
+  it("emits compensated drag-knife moves when vinyl cutting mode is enabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-cutting",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 10 0 L 10 10",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain(
+      "; Vinyl    : yes (offset 0.25 mm, threshold 10 deg, blade rotation offset 0.02 mm)",
+    );
+    expect(gcode).toContain("G1 X0.250 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.020");
+    expect(gcode).toContain("G1 X10.000 Y0.000");
+    expect(gcode).toContain("G1 X10.000 Y10.250");
+  });
+
+  it("merges short segments before applying vinyl compensation", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-merge-short",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 0.1 0 L 10 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).not.toContain("X0.100 Y0.000");
+    expect(gcode).toContain("G1 X10.250 Y0.000");
+  });
+
+  it("preserves short non-collinear curve points to avoid false corner compensation", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-preserve-gentle-curve",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 0.1 0.03 L 0.2 0.08 L 0.3 0.15 L 0.45 0.24",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // Short non-collinear points should remain in the path.
+    expect(gcode).toContain("G1 X0.100 Y0.030");
+    expect(gcode).toContain("G1 X0.200 Y0.080");
+  });
+
+  it("preserves continuous gentle curvature geometry", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-smooth-curve-no-corners",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 0.8 0.2 L 1.4 0.7 L 1.8 1.4 L 2.0 2.2",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("G1 X0.800 Y0.200");
+    expect(gcode).toContain("G1 X1.400 Y0.700");
+    expect(gcode).toContain("G1 X1.800 Y1.400");
+    expect(gcode).toContain("G1 X2.000 Y2.200");
+  });
+
+  it("extends open path ends using local tangent on tessellated curves", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-overcut-curve-tangent",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 4 0 L 8 0 L 8.02 0.02",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // End overcut should follow the local tangent through the final curve segment,
+    // not the tiny terminal segment direction alone.
+    expect(gcode).toContain("G1 X8.269 Y0.041");
+    expect(gcode).not.toContain("G1 X8.197 Y0.197");
+  });
+
+  it("still compensates a true corner after curved approach", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-curve-to-corner-compensates",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 0.5 0.2 L 0.9 0.6 L 1.0 1.2 L 1.0 2.5 L 2.0 2.5",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // True right-angle corner at X1.000 Y2.500 should still get overshoot.
+    expect(gcode).toContain("G1 X1.000 Y2.750");
+    expect(gcode).toContain("G1 X1.000 Y2.500");
+  });
+
+  it("keeps compensation on sharp corners of closed rectangular paths", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-closed-rectangle-corners",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 10 0 L 10 20 L 0 20 Z",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // At least one sharp rectangle corner should include overshoot + backtrack.
+    expect(gcode).toContain("G1 X10.250 Y0.000");
+    expect(gcode).toContain("G1 X10.000 Y0.000");
+  });
+
+  it("compensates a V-peak corner when adjacent segments are long", async () => {
+    // True isolated corner: long segment arriving from upper-left, long segment
+    // leaving upper-right. Not a smooth curve — no continuation of curvature.
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-moderate-long-corner",
+      objects: [
+        createVectorObject({
+          path: "M 0 5 L 15 0 L 30 5",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // The V-peak at (15, 0) is a true corner; it should receive overshoot
+    // (swivel) compensation and then return to the corner point.
+    expect(gcode).toContain("G1 X15.000 Y0.000");
+    // Swivel point overshoots along the incoming direction.
+    expect(gcode).toContain("G1 X15.237 Y-0.079");
+  });
+
+  it("compensates a corner when only one adjacent segment is short", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-one-short-adjacent-corner",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 10 0 L 10 0.15 L 16 0.15",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.25,
+          cornerAngleThresholdDeg: 10,
+          microJogMagnitudeMM: 0.02,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    // The corner at X10.000 Y0.150 should still get overshoot and backtrack.
+    expect(gcode).toContain("G1 X10.000 Y0.400");
+    expect(gcode).toContain("G1 X10.000 Y0.150");
+  });
+
+  it("emits a weed border around the final job bounds when enabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-weed-border",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylWeedBorder: {
+          marginMM: 1,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("; Weed bd  : yes (margin 1 mm)");
+    expect(gcode).toContain("G0 X-1.000 Y-1.000 ; Rapid travel");
+    expect(gcode).toContain("G1 X11.000 Y-1.000");
+    expect(gcode).toContain("G1 X11.000 Y11.000");
+    expect(gcode).toContain("G1 X-1.000 Y11.000");
+    expect(gcode).toContain("G1 X-1.000 Y-1.000");
+  });
 });
 
 // ── Optimised mode ────────────────────────────────────────────────────────────

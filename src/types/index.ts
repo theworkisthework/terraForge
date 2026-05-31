@@ -58,6 +58,18 @@ export interface AppConfig {
   debugLoggingEnabled: boolean;
 }
 
+export interface VinylCuttingSettings {
+  enabled: boolean;
+  bladeOffsetMM: number;
+  cornerAngleThresholdDeg: number;
+  microJogMagnitudeMM: number;
+}
+
+export interface VinylWeedBorderSettings {
+  enabled: boolean;
+  marginMM: number;
+}
+
 // ─── Pass Configuration ──────────────────────────────────────────────────────
 
 /**
@@ -319,6 +331,10 @@ export interface GcodeOptions {
   pageClip?: { widthMM: number; heightMM: number; marginMM: number };
   /** Optional per-job drawing speed override (mm/min). Overrides machine drawSpeed when set. */
   drawSpeedOverride?: number;
+  /** Optional drag-knife / vinyl cutter compensation settings for this job. */
+  vinylCutting?: Omit<VinylCuttingSettings, "enabled">;
+  /** Optional weed-border rectangle around the final job bounds. */
+  vinylWeedBorder?: Omit<VinylWeedBorderSettings, "enabled">;
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
