@@ -92,6 +92,9 @@ export function PlotCanvas() {
   const showInkServiceStationsOnCanvas = useAppConfigStore(
     (s) => s.showInkServiceStationsOnCanvas,
   );
+  const respectSvgColorsOnCanvas = useAppConfigStore(
+    (s) => s.respectSvgColorsOnCanvas,
+  );
   const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
   const displayMachineState = useStableMachineState(machineStatus?.state);
   const isJobActive =
@@ -310,6 +313,7 @@ export function PlotCanvas() {
         toolpathSelected={toolpathSelected}
         plotProgressCuts={plotProgressCuts ?? null}
         plotProgressRapids={plotProgressRapids ?? null}
+        respectSvgColorsOnCanvas={respectSvgColorsOnCanvas}
         theme={theme}
       />
 

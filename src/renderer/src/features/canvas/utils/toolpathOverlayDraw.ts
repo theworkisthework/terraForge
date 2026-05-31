@@ -14,6 +14,8 @@ export interface ImportPath2DCacheEntry {
   layersRef: SvgImport["layers"];
   outline: Path2D;
   hatch: Path2D;
+  outlineByColor: Array<{ color: string | null; path: Path2D }>;
+  hatchByColor: Array<{ color: string | null; path: Path2D }>;
 }
 
 export interface Path2DTextCache {
@@ -32,6 +34,7 @@ interface DrawImportsLayerParams {
   selectedGroupId: string | null;
   isBottom: boolean;
   canvasH: number;
+  respectSvgColorsOnCanvas: boolean;
   cache: Map<string, ImportPath2DCacheEntry>;
 }
 
@@ -46,6 +49,7 @@ export function drawImportsLayer({
   selectedGroupId,
   isBottom,
   canvasH,
+  respectSvgColorsOnCanvas,
   cache,
 }: DrawImportsLayerParams): void {
   const vpA = vp.zoom * dpr;
@@ -109,12 +113,42 @@ export function drawImportsLayer({
         )
         .flatMap((p) => p.hatchLines!)
         .join(" ");
+
+      const outlineByColorMap = new Map<string | null, string[]>();
+      const hatchByColorMap = new Map<string | null, string[]>();
+      for (const p of imp.paths) {
+        if (!p.visible || !isLayerVisible(p)) continue;
+
+        if (hasOutline(p)) {
+          const key = p.strokeColor ?? p.sourceColor ?? null;
+          const segs = outlineByColorMap.get(key) ?? [];
+          segs.push(p.d);
+          outlineByColorMap.set(key, segs);
+        }
+
+        if ((p.fillEnabled ?? true) && (p.hatchLines?.length ?? 0) > 0) {
+          const key = p.fillColor ?? null;
+          const segs = hatchByColorMap.get(key) ?? [];
+          segs.push(...(p.hatchLines ?? []));
+          hatchByColorMap.set(key, segs);
+        }
+      }
+
+      const outlineByColor = Array.from(outlineByColorMap.entries()).map(
+        ([color, segs]) => ({ color, path: new Path2D(segs.join(" ")) }),
+      );
+      const hatchByColor = Array.from(hatchByColorMap.entries()).map(
+        ([color, segs]) => ({ color, path: new Path2D(segs.join(" ")) }),
+      );
+
       impCache = {
         impRef: imp,
         pathsRef: imp.paths,
         layersRef: imp.layers,
         outline: new Path2D(outlineD),
         hatch: new Path2D(hatchD),
+        outlineByColor,
+        hatchByColor,
       };
       cache.set(imp.id, impCache);
     }
@@ -167,16 +201,30 @@ export function drawImportsLayer({
         ? "#4a88cc"
         : "#2a5a8a";
 
-    ctx.strokeStyle = outlineColor;
     ctx.lineWidth =
       ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * MM_TO_PX) / avgImpScale;
-    ctx.stroke(impCache.outline);
+    if (respectSvgColorsOnCanvas) {
+      for (const entry of impCache.outlineByColor) {
+        ctx.strokeStyle = entry.color ?? outlineColor;
+        ctx.stroke(entry.path);
+      }
+    } else {
+      ctx.strokeStyle = outlineColor;
+      ctx.stroke(impCache.outline);
+    }
 
-    ctx.strokeStyle = hatchColor;
     ctx.lineWidth =
       ((imp.strokeWidthMM ?? DEFAULT_STROKE_WIDTH_MM) * 0.5 * MM_TO_PX) /
       avgImpScale;
-    ctx.stroke(impCache.hatch);
+    if (respectSvgColorsOnCanvas) {
+      for (const entry of impCache.hatchByColor) {
+        ctx.strokeStyle = entry.color ?? hatchColor;
+        ctx.stroke(entry.path);
+      }
+    } else {
+      ctx.strokeStyle = hatchColor;
+      ctx.stroke(impCache.hatch);
+    }
     ctx.restore();
   }
 }

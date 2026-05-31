@@ -47,6 +47,7 @@ export interface ToolpathOverlayProps {
   toolpathSelected: boolean;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
+  respectSvgColorsOnCanvas: boolean;
   theme: Theme;
 }
 
@@ -72,6 +73,7 @@ export function ToolpathOverlay({
   toolpathSelected,
   plotProgressCuts,
   plotProgressRapids,
+  respectSvgColorsOnCanvas,
   theme,
 }: ToolpathOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,6 +162,7 @@ export function ToolpathOverlay({
         selectedGroupId,
         isBottom,
         canvasH,
+        respectSvgColorsOnCanvas,
         cache: importPath2DCacheRef.current,
       });
 
@@ -209,6 +212,7 @@ export function ToolpathOverlay({
     allImportsSelected,
     layerGroups,
     canvasH,
+    respectSvgColorsOnCanvas,
     theme,
   ]);
 

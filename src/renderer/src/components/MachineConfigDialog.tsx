@@ -145,6 +145,9 @@ export function MachineConfigDialog({ onClose }: Props) {
   const showMachineCoordinates = useAppConfigStore(
     (state) => state.showMachineCoordinates,
   );
+  const respectSvgColorsOnCanvas = useAppConfigStore(
+    (state) => state.respectSvgColorsOnCanvas,
+  );
   const vinylCuttingEnabled = useAppConfigStore(
     (state) => state.vinylCuttingEnabled,
   );
@@ -171,6 +174,9 @@ export function MachineConfigDialog({ onClose }: Props) {
   );
   const setShowMachineCoordinates = useAppConfigStore(
     (state) => state.setShowMachineCoordinates,
+  );
+  const setRespectSvgColorsOnCanvas = useAppConfigStore(
+    (state) => state.setRespectSvgColorsOnCanvas,
   );
   const setVinylCuttingEnabled = useAppConfigStore(
     (state) => state.setVinylCuttingEnabled,
@@ -1017,6 +1023,28 @@ export function MachineConfigDialog({ onClose }: Props) {
                     <p className="text-xs text-content-faint">
                       When enabled, machine coordinates (MPos) appear in
                       brackets after the work position in the console header.
+                    </p>
+                  </div>
+                </label>
+              </Section>
+
+              <Section title="Canvas Display">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={respectSvgColorsOnCanvas}
+                    onChange={(e) =>
+                      setRespectSvgColorsOnCanvas(e.currentTarget.checked)
+                    }
+                    className="mt-0.5 accent-accent"
+                  />
+                  <div className="space-y-1">
+                    <div className="text-sm text-content">
+                      Show imported SVG colours on canvas
+                    </div>
+                    <p className="text-xs text-content-faint">
+                      Uses original SVG path colours in the bed preview only.
+                      G-code generation remains unchanged.
                     </p>
                   </div>
                 </label>

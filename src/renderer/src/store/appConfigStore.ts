@@ -71,6 +71,7 @@ interface AppConfigState {
   enablePerPathPasses: boolean;
   debugLoggingEnabled: boolean;
   showMachineCoordinates: boolean;
+  respectSvgColorsOnCanvas: boolean;
   vinylCuttingEnabled: boolean;
   vinylBladeOffsetMM: number;
   vinylCornerAngleThresholdDeg: number;
@@ -80,6 +81,7 @@ interface AppConfigState {
   setEnablePerPathPasses: (enabled: boolean) => void;
   setDebugLoggingEnabled: (enabled: boolean) => void;
   setShowMachineCoordinates: (enabled: boolean) => void;
+  setRespectSvgColorsOnCanvas: (enabled: boolean) => void;
   setVinylCuttingEnabled: (enabled: boolean) => void;
   setVinylBladeOffsetMM: (value: number) => void;
   setVinylCornerAngleThresholdDeg: (value: number) => void;
@@ -100,6 +102,7 @@ export const useAppConfigStore = create<AppConfigState>()(
       enablePerPathPasses: false,
       debugLoggingEnabled: false,
       showMachineCoordinates: false,
+      respectSvgColorsOnCanvas: false,
       vinylCuttingEnabled: false,
       vinylBladeOffsetMM: 0.25,
       vinylCornerAngleThresholdDeg: 10,
@@ -112,6 +115,8 @@ export const useAppConfigStore = create<AppConfigState>()(
         set({ debugLoggingEnabled: enabled }),
       setShowMachineCoordinates: (enabled) =>
         set({ showMachineCoordinates: enabled }),
+      setRespectSvgColorsOnCanvas: (enabled) =>
+        set({ respectSvgColorsOnCanvas: enabled }),
       setVinylCuttingEnabled: (enabled) =>
         set({ vinylCuttingEnabled: enabled }),
       setVinylBladeOffsetMM: (value) =>
