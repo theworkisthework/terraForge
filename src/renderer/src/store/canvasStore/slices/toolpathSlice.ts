@@ -8,6 +8,7 @@ export const createToolpathSlice: CanvasStateCreator<ToolpathSlice> = (
   gcodeSource: null,
   showCentreMarker: true,
   toolpathVisible: true,
+  toolpathColorized: true,
   toolpathOpacity: 1,
   plotProgressCuts: "",
   plotProgressRapids: "",
@@ -42,6 +43,11 @@ export const createToolpathSlice: CanvasStateCreator<ToolpathSlice> = (
   setToolpathVisible: (visible) =>
     set((state) => {
       state.toolpathVisible = visible;
+    }),
+
+  setToolpathColorized: (colorized) =>
+    set((state) => {
+      state.toolpathColorized = colorized;
     }),
 
   setToolpathOpacity: (opacity) =>

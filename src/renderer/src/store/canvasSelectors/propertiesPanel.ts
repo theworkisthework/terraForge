@@ -21,6 +21,8 @@ export const selectPropertiesPanelStoreBindingsState = (
   selectToolpath: state.selectToolpath,
   toolpathVisible: state.toolpathVisible,
   setToolpathVisible: state.setToolpathVisible,
+  toolpathColorized: state.toolpathColorized,
+  setToolpathColorized: state.setToolpathColorized,
   toolpathOpacity: state.toolpathOpacity,
   setToolpathOpacity: state.setToolpathOpacity,
   layerGroups: state.layerGroups,

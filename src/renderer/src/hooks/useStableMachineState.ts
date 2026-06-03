@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MachineStatus } from "../../../types";
 
-export const MACHINE_IDLE_GRACE_MS = 500;
+export const MACHINE_IDLE_GRACE_MS = 800;
 
 type MachineState = MachineStatus["state"] | null | undefined;
 

@@ -28,11 +28,13 @@ describe("ToolpathSection", () => {
         fileName="sample.gcode"
         selected
         visible
+        colorized
         opacity={1}
         isJobActive={false}
         fallbackFeedrate={300}
         onToggleSelected={onToggleSelected}
         onSetVisible={() => {}}
+        onSetColorized={() => {}}
         onSetOpacity={() => {}}
         onClear={onClear}
       />,
@@ -59,11 +61,13 @@ describe("ToolpathSection", () => {
         fileName="nofeed.gcode"
         selected
         visible
+        colorized
         opacity={1}
         isJobActive={false}
         fallbackFeedrate={300}
         onToggleSelected={() => {}}
         onSetVisible={() => {}}
+        onSetColorized={() => {}}
         onSetOpacity={() => {}}
         onClear={() => {}}
       />,
@@ -74,6 +78,7 @@ describe("ToolpathSection", () => {
 
   it("forwards visibility and opacity controls", () => {
     const onSetVisible = vi.fn();
+    const onSetColorized = vi.fn();
     const onSetOpacity = vi.fn();
 
     render(
@@ -82,11 +87,13 @@ describe("ToolpathSection", () => {
         fileName="sample.gcode"
         selected
         visible
+        colorized
         opacity={0.75}
         isJobActive={false}
         fallbackFeedrate={300}
         onToggleSelected={() => {}}
         onSetVisible={onSetVisible}
+        onSetColorized={onSetColorized}
         onSetOpacity={onSetOpacity}
         onClear={() => {}}
       />,
@@ -99,5 +106,10 @@ describe("ToolpathSection", () => {
       target: { value: "40" },
     });
     expect(onSetOpacity).toHaveBeenCalledWith(0.4);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Disable colorized toolpath/i }),
+    );
+    expect(onSetColorized).toHaveBeenCalledWith(false);
   });
 });

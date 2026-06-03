@@ -233,6 +233,7 @@ interface DrawToolpathLayerParams {
   ctx: CanvasRenderingContext2D;
   gcodeToolpath: GcodeToolpath;
   toolpathSelected: boolean;
+  useMetadataColors?: boolean;
   toolpathOpacity: number;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
@@ -248,10 +249,59 @@ interface DrawToolpathLayerParams {
   bedYMax: number;
 }
 
+function isHexColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function rapidStrokeFromCutColor(color: string): string {
+  return isHexColor(color) ? scaleHexColor(color, 1.15) : color;
+}
+
+function strokePlotProgressHalo(
+  ctx: CanvasRenderingContext2D,
+  path: Path2D,
+  pxPerMm: number,
+  kind: "cut" | "rapid",
+): void {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (kind === "cut") {
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.226)";
+    ctx.lineWidth = 3.3 / pxPerMm;
+    ctx.setLineDash([]);
+    ctx.shadowColor = "rgba(255, 255, 255, 0.264)";
+    ctx.shadowBlur = 4.95;
+  } else {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(251, 191, 36, 0.1625)";
+    ctx.lineWidth = 1.75 / pxPerMm;
+    ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
+    ctx.shadowColor = "rgba(251, 191, 36, 0.2)";
+    ctx.shadowBlur = 3;
+  }
+
+  ctx.stroke(path);
+
+  if (kind === "cut") {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(34, 211, 238, 0.124)";
+    ctx.lineWidth = 1.925 / pxPerMm;
+    ctx.shadowColor = "rgba(34, 211, 238, 0.192)";
+    ctx.shadowBlur = 2.75;
+    ctx.stroke(path);
+  }
+
+  ctx.restore();
+}
+
 export function drawToolpathLayer({
   ctx,
   gcodeToolpath,
   toolpathSelected,
+  useMetadataColors = true,
   toolpathOpacity,
   plotProgressCuts,
   plotProgressRapids,
@@ -289,15 +339,17 @@ export function drawToolpathLayer({
   const vpT = Math.min((0 - f) / d, (physH - f) / d) - VP_PAD_MM;
   const vpB = Math.max((0 - f) / d, (physH - f) / d) + VP_PAD_MM;
 
-  if (gcodeToolpath.cutPaths.length > 0) {
+  const drawCutPaths = (pathIndexes: number[], strokeStyle: string): number => {
+    let cutCalls = 0;
     ctx.beginPath();
-    ctx.strokeStyle = toolpathSelected ? "#38bdf8" : "#0ea5e9";
+    ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = 1.5 / pxPerMm;
     ctx.setLineDash([]);
-    let cutCalls = 0;
-    for (const path of gcodeToolpath.cutPaths) {
+
+    for (const index of pathIndexes) {
       if (cutCalls >= MAX_CUT_CALLS) break;
-      if (path.length < 4) continue;
+      const path = gcodeToolpath.cutPaths[index];
+      if (!path || path.length < 4) continue;
 
       let pMinX = path[0],
         pMaxX = path[0],
@@ -327,21 +379,30 @@ export function drawToolpathLayer({
         }
       }
     }
-    ctx.stroke();
-  }
 
-  const rp = gcodeToolpath.rapidPaths;
-  if (rp.length >= 4) {
+    if (cutCalls > 0) ctx.stroke();
+    return cutCalls;
+  };
+
+  const drawRapidSegments = (
+    segmentIndexes: number[],
+    strokeStyle: string,
+  ): number => {
+    let rapidCalls = 0;
     ctx.beginPath();
-    ctx.strokeStyle = "#4a5568";
+    ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = 0.5 / pxPerMm;
     ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
-    let rapidCalls = 0;
-    for (let i = 0; i < rp.length && rapidCalls < MAX_RAPID_CALLS; i += 4) {
-      const x0 = rp[i],
-        y0 = rp[i + 1],
-        x1 = rp[i + 2],
-        y1 = rp[i + 3];
+
+    for (const segIndex of segmentIndexes) {
+      if (rapidCalls >= MAX_RAPID_CALLS) break;
+      const i = segIndex * 4;
+      if (i + 3 >= gcodeToolpath.rapidPaths.length) continue;
+
+      const x0 = gcodeToolpath.rapidPaths[i],
+        y0 = gcodeToolpath.rapidPaths[i + 1],
+        x1 = gcodeToolpath.rapidPaths[i + 2],
+        y1 = gcodeToolpath.rapidPaths[i + 3];
       const rMinX = x0 < x1 ? x0 : x1,
         rMaxX = x0 > x1 ? x0 : x1;
       const rMinY = y0 < y1 ? y0 : y1,
@@ -355,7 +416,78 @@ export function drawToolpathLayer({
         rapidCalls++;
       }
     }
-    ctx.stroke();
+
+    if (rapidCalls > 0) ctx.stroke();
+    return rapidCalls;
+  };
+
+  if (gcodeToolpath.cutPaths.length > 0) {
+    const defaultCutColor = toolpathSelected ? "#38bdf8" : "#0ea5e9";
+    const cutPathColors = useMetadataColors
+      ? gcodeToolpath.cutPathColors
+      : null;
+    const usePerPathColors =
+      !!cutPathColors &&
+      cutPathColors.length === gcodeToolpath.cutPaths.length &&
+      cutPathColors.some((value) => !!value);
+
+    if (!usePerPathColors) {
+      const allIndexes = gcodeToolpath.cutPaths.map((_, idx) => idx);
+      drawCutPaths(allIndexes, defaultCutColor);
+    } else {
+      const byColor = new Map<string, number[]>();
+      for (let i = 0; i < gcodeToolpath.cutPaths.length; i++) {
+        const key = cutPathColors[i] ?? defaultCutColor;
+        const bucket = byColor.get(key) ?? [];
+        bucket.push(i);
+        byColor.set(key, bucket);
+      }
+
+      let remainingCalls = MAX_CUT_CALLS;
+      for (const [strokeStyle, indexes] of byColor.entries()) {
+        if (remainingCalls <= 0) break;
+        const before = remainingCalls;
+        const used = drawCutPaths(indexes, strokeStyle);
+        remainingCalls = Math.max(0, before - used);
+      }
+    }
+  }
+
+  const rp = gcodeToolpath.rapidPaths;
+  if (rp.length >= 4) {
+    const defaultRapidColor = "#4a5568";
+    const rapidColors = useMetadataColors ? gcodeToolpath.rapidColors : null;
+    const rapidSegmentCount = rp.length / 4;
+    const useRapidColors =
+      !!rapidColors &&
+      rapidColors.length === rapidSegmentCount &&
+      rapidColors.some((value) => !!value);
+
+    if (!useRapidColors) {
+      const allSegmentIndexes = Array.from(
+        { length: rapidSegmentCount },
+        (_, idx) => idx,
+      );
+      drawRapidSegments(allSegmentIndexes, defaultRapidColor);
+    } else {
+      const byColor = new Map<string, number[]>();
+      for (let i = 0; i < rapidSegmentCount; i++) {
+        const key = rapidColors[i]
+          ? rapidStrokeFromCutColor(rapidColors[i])
+          : defaultRapidColor;
+        const bucket = byColor.get(key) ?? [];
+        bucket.push(i);
+        byColor.set(key, bucket);
+      }
+
+      let remainingCalls = MAX_RAPID_CALLS;
+      for (const [strokeStyle, indexes] of byColor.entries()) {
+        if (remainingCalls <= 0) break;
+        const before = remainingCalls;
+        const used = drawRapidSegments(indexes, strokeStyle);
+        remainingCalls = Math.max(0, before - used);
+      }
+    }
   }
 
   if (plotProgressRapids) {
@@ -369,10 +501,7 @@ export function drawToolpathLayer({
       }
     }
     if (ppRapidsCache.path) {
-      ctx.strokeStyle = "#f97316";
-      ctx.lineWidth = 0.5 / pxPerMm;
-      ctx.setLineDash([2 / pxPerMm, 1 / pxPerMm]);
-      ctx.stroke(ppRapidsCache.path);
+      strokePlotProgressHalo(ctx, ppRapidsCache.path, pxPerMm, "rapid");
     }
   }
 
@@ -387,10 +516,7 @@ export function drawToolpathLayer({
       }
     }
     if (ppCutsCache.path) {
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 2 / pxPerMm;
-      ctx.setLineDash([]);
-      ctx.stroke(ppCutsCache.path);
+      strokePlotProgressHalo(ctx, ppCutsCache.path, pxPerMm, "cut");
     }
   }
 

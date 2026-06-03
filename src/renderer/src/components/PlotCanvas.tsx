@@ -81,6 +81,7 @@ export function PlotCanvas() {
     toolpathSelected,
     selectToolpath,
     toolpathVisible,
+    toolpathColorized,
     toolpathOpacity,
     plotProgressCuts,
     plotProgressRapids,
@@ -314,6 +315,7 @@ export function PlotCanvas() {
         gcodeToolpath={gcodeToolpath}
         toolpathSelected={toolpathSelected}
         toolpathVisible={toolpathVisible}
+        toolpathColorized={toolpathColorized}
         toolpathOpacity={toolpathOpacity}
         plotProgressCuts={plotProgressCuts ?? null}
         plotProgressRapids={plotProgressRapids ?? null}

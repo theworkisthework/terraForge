@@ -78,6 +78,7 @@ export interface ToolpathSlice {
   } | null;
   showCentreMarker: boolean;
   toolpathVisible: boolean;
+  toolpathColorized: boolean;
   toolpathOpacity: number;
   plotProgressCuts: string;
   plotProgressRapids: string;
@@ -88,6 +89,7 @@ export interface ToolpathSlice {
   ) => void;
   toggleCentreMarker: () => void;
   setToolpathVisible: (visible: boolean) => void;
+  setToolpathColorized: (colorized: boolean) => void;
   setToolpathOpacity: (opacity: number) => void;
   setGcodePreviewLoading: (loading: boolean) => void;
   setPlotProgress: (cuts: string, rapids: string) => void;

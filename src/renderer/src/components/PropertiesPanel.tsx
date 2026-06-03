@@ -43,6 +43,8 @@ export function PropertiesPanel() {
     selectToolpath,
     toolpathVisible,
     setToolpathVisible,
+    toolpathColorized,
+    setToolpathColorized,
     toolpathOpacity,
     setToolpathOpacity,
     layerGroups,
@@ -183,11 +185,13 @@ export function PropertiesPanel() {
                 fileName={toolpathFileName}
                 selected={toolpathSelected}
                 visible={toolpathVisible}
+                colorized={toolpathColorized}
                 opacity={toolpathOpacity}
                 isJobActive={isJobActive}
                 fallbackFeedrate={fallbackFeedrate}
                 onToggleSelected={() => selectToolpath(!toolpathSelected)}
                 onSetVisible={setToolpathVisible}
+                onSetColorized={setToolpathColorized}
                 onSetOpacity={setToolpathOpacity}
                 onClear={() => setGcodeToolpath(null)}
               />

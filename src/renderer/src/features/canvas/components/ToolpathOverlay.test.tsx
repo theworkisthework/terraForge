@@ -31,6 +31,7 @@ function makeProps(
     gcodeToolpath: null,
     toolpathSelected: false,
     toolpathVisible: true,
+    toolpathColorized: true,
     toolpathOpacity: 1,
     plotProgressCuts: null,
     plotProgressRapids: null,

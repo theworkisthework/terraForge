@@ -61,6 +61,29 @@ function fmtSeconds(n: number): string {
 interface TravelSubpath {
   points: Subpath;
   layer?: string;
+  color?: string;
+}
+
+interface ToolpathMetadata {
+  color?: string;
+  layer?: string;
+  dip?: string;
+}
+
+function encodeMarkerValue(value: string): string {
+  return encodeURIComponent(value).replace(/%20/g, "+");
+}
+
+function metadataKey(meta: ToolpathMetadata): string {
+  return [meta.color ?? "", meta.layer ?? "", meta.dip ?? ""].join("|");
+}
+
+function emitTfMarker(lines: string[], meta: ToolpathMetadata): void {
+  const tokens = [";@tf", "v=1"];
+  if (meta.color) tokens.push(`color=${encodeMarkerValue(meta.color)}`);
+  if (meta.layer) tokens.push(`layer=${encodeMarkerValue(meta.layer)}`);
+  if (meta.dip) tokens.push(`dip=${encodeMarkerValue(meta.dip)}`);
+  lines.push(tokens.join(" "));
 }
 
 function clampNumber(n: number, min: number, max: number): number {
@@ -87,9 +110,40 @@ function chooseTriggerDistance(baseMM: number, jitterPct: number): number {
   return Math.max(1, baseMM * scalar);
 }
 
+function normalizeDipMapKey(value: string | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized || null;
+}
+
+function colorDipMapKey(color: string | undefined): string | null {
+  const normalizedColor = normalizeDipMapKey(color);
+  if (!normalizedColor) return null;
+  return `color:${normalizedColor}`;
+}
+
+function resolvePreferredDipStation(
+  layerDipStations: Record<string, string>,
+  layer: string | undefined,
+  color: string | undefined,
+): string | undefined {
+  if (layer) {
+    const mappedByLayer = layerDipStations[layer];
+    if (mappedByLayer) return mappedByLayer;
+  }
+
+  const colorKey = colorDipMapKey(color);
+  if (colorKey) {
+    const mappedByColor = layerDipStations[colorKey];
+    if (mappedByColor) return mappedByColor;
+  }
+
+  return undefined;
+}
+
 function emitRelativeZMove(lines: string[], deltaMM: number): void {
   lines.push("G91 ; Relative mode");
-  lines.push(`G1 Z${fmt(deltaMM)}`);
+  lines.push(`G0 Z${fmt(deltaMM)}`);
   lines.push("G90 ; Absolute mode");
 }
 
@@ -154,6 +208,7 @@ function emitBackForthBrushMotion(
 
 function emitBrushMotionAction(
   lines: string[],
+  config: MachineConfig,
   station: InkServiceStation,
   dwellMs: number,
 ): void {
@@ -167,6 +222,12 @@ function emitBrushMotionAction(
   lines.push(
     `; Brush action: ${action.pattern}, reps ${repetitions}, distance ${fmt(distanceMM)} mm, depth ${fmt(zDepth)} mm`,
   );
+
+  // Service brush patterns use G1 XY moves, so emit an explicit feedrate
+  // before those moves to avoid firmware errors when no F word has appeared yet.
+  const serviceFeed = Math.max(1, Number(config.drawSpeed) || 1000);
+  lines.push(`G1 F${fmt(serviceFeed)} ; Service feedrate`);
+
   if (zDepth > 0) {
     emitRelativeZMove(lines, -zDepth);
   }
@@ -206,7 +267,7 @@ function emitStationContact(
     return;
   }
   if (station.action?.kind === "brush-motion") {
-    emitBrushMotionAction(lines, station, dwellMs);
+    emitBrushMotionAction(lines, config, station, dwellMs);
     return;
   }
 
@@ -282,17 +343,17 @@ function emitBrushDip(
     }
   }
 
-  emitStationContact(lines, config, dip);
-  currentDipIdRef.value = dip.id;
-  dipsSinceWashRef.value += 1;
-
   const washEvery = Math.max(1, settings.washEveryNDips ?? 1);
-  const shouldWash =
+  const shouldWashBeforeDip =
     settings.includeWashMove && !!wash && dipsSinceWashRef.value >= washEvery;
-  if (shouldWash && wash) {
-    emitStationContact(lines, config, wash);
+  if (shouldWashBeforeDip) {
+    emitStationContact(lines, config, wash); // Wash first to clean brush
     dipsSinceWashRef.value = 0;
   }
+
+  emitStationContact(lines, config, dip); // Then dip to pick up fresh paint
+  currentDipIdRef.value = dip.id;
+  dipsSinceWashRef.value += 1;
 
   lines.push("; -- End ink service --");
   lines.push("");
@@ -355,7 +416,7 @@ function remapLayerMetadata(
         best = candidate;
       }
     }
-    return { points, layer: best.layer };
+    return { points, layer: best.layer, color: best.color };
   });
 }
 
@@ -666,7 +727,11 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
     for (const sp of processedSubpaths) {
       if (sp.length >= 2) {
-        allSubpaths.push({ points: sp, layer: obj.layer });
+        allSubpaths.push({
+          points: sp,
+          layer: obj.layer,
+          color: obj.sourceColor,
+        });
       }
     }
     const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
@@ -720,7 +785,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     );
   }
 
-  if (options?.vinylWeedBorder) {
+  if (options?.vinylCutting && options?.vinylWeedBorder) {
     orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
       applyVinylWeedBorder(
@@ -753,18 +818,15 @@ async function generate(msg: GenerateMessage): Promise<void> {
     inkTriggerBase,
     inkTriggerJitter,
   );
-  let accumulatedRapidTravel = 0;
-  let previousPathEnd: { x: number; y: number } | null = null;
+  let lastMarkerKey: string | null = null;
+  let accumulatedDrawTravel = 0;
+  const canEmitInkService =
+    !!inkService &&
+    inkTriggerBase > 0 &&
+    inkService.stations.some(isEnabledStation);
 
-  const yieldPh4 = makeYielder();
-  let lastPct4 = -1;
-
-  // Prime/dip before first stroke so paint/ink is loaded before drawing.
-  if (inkService && inkTriggerBase > 0 && orderedSubpaths.length > 0) {
-    const firstLayer = orderedSubpaths[0]?.layer;
-    const preferredFirstDip = firstLayer
-      ? layerDipStations[firstLayer]
-      : undefined;
+  const emitTriggeredInkService = (preferredDipStationId?: string): void => {
+    if (!canEmitInkService || !inkService) return;
     const inserted = emitInkServiceMove(
       lines,
       config,
@@ -772,15 +834,40 @@ async function generate(msg: GenerateMessage): Promise<void> {
       dipCursorRef,
       dipsSinceWashRef,
       currentDipIdRef,
-      preferredFirstDip,
+      preferredDipStationId,
     );
     if (inserted) {
-      accumulatedRapidTravel = 0;
+      accumulatedDrawTravel = 0;
       nextInkServiceAt = chooseTriggerDistance(
         inkTriggerBase,
         inkTriggerJitter,
       );
     }
+  };
+
+  const yieldPh4 = makeYielder();
+  let lastPct4 = -1;
+
+  // Prime/dip before first stroke so paint/ink is loaded before drawing.
+  if (canEmitInkService && orderedSubpaths.length > 0) {
+    const firstColor = orderedSubpaths[0]?.color;
+    const firstLayer = orderedSubpaths[0]?.layer;
+    const preferredFirstDip = resolvePreferredDipStation(
+      layerDipStations,
+      firstLayer,
+      firstColor,
+    );
+    const firstMeta: ToolpathMetadata = {
+      color: firstColor,
+      layer: firstLayer,
+      dip: preferredFirstDip,
+    };
+    const firstMetaKey = metadataKey(firstMeta);
+    if (firstMetaKey !== lastMarkerKey) {
+      emitTfMarker(lines, firstMeta);
+      lastMarkerKey = firstMetaKey;
+    }
+    emitTriggeredInkService(preferredFirstDip);
   }
 
   for (let i = 0; i < orderedSubpaths.length; i++) {
@@ -790,33 +877,37 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const subpath = orderedSubpaths[i].points;
+    const currentColor = orderedSubpaths[i].color;
     const currentLayer = orderedSubpaths[i].layer;
-    const preferredDipStationId = currentLayer
-      ? layerDipStations[currentLayer]
-      : undefined;
-    const first = subpath[0];
-
-    if (previousPathEnd && inkService && inkTriggerBase > 0) {
-      accumulatedRapidTravel += distanceMM(previousPathEnd, first);
-      if (accumulatedRapidTravel >= nextInkServiceAt) {
-        const inserted = emitInkServiceMove(
-          lines,
-          config,
-          inkService,
-          dipCursorRef,
-          dipsSinceWashRef,
-          currentDipIdRef,
-          preferredDipStationId,
-        );
-        if (inserted) {
-          accumulatedRapidTravel = 0;
-          nextInkServiceAt = chooseTriggerDistance(
-            inkTriggerBase,
-            inkTriggerJitter,
-          );
-        }
-      }
+    const preferredDipStationId = resolvePreferredDipStation(
+      layerDipStations,
+      currentLayer,
+      currentColor,
+    );
+    const currentMeta: ToolpathMetadata = {
+      color: currentColor,
+      layer: currentLayer,
+      dip: preferredDipStationId,
+    };
+    const currentMetaKey = metadataKey(currentMeta);
+    const markerChanged = currentMetaKey !== lastMarkerKey;
+    if (markerChanged) {
+      emitTfMarker(lines, currentMeta);
+      lastMarkerKey = currentMetaKey;
     }
+
+    // Ensure mapped color/layer dip assignments are honored even when the
+    // travel trigger is large by forcing a service move on dip-target changes.
+    if (
+      markerChanged &&
+      canEmitInkService &&
+      preferredDipStationId &&
+      currentDipIdRef.value !== preferredDipStationId
+    ) {
+      emitTriggeredInkService(preferredDipStationId);
+    }
+
+    const first = subpath[0];
 
     lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
     const drawSpeed =
@@ -828,21 +919,73 @@ async function generate(msg: GenerateMessage): Promise<void> {
     if (penDownDelayMs > 0) {
       lines.push(`G4 P${fmtSeconds(penDownDelayMs / 1000)} ; Pen settle delay`);
     }
+    let currentPoint = first;
     for (let s = 1; s < subpath.length; s++) {
-      lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
+      const targetPoint = subpath[s];
+      if (!canEmitInkService || !inkService) {
+        lines.push(`G1 X${fmt(targetPoint.x)} Y${fmt(targetPoint.y)}`);
+        currentPoint = targetPoint;
+        continue;
+      }
+
+      let segmentStart = currentPoint;
+      while (true) {
+        const remainingDistance = distanceMM(segmentStart, targetPoint);
+        if (remainingDistance <= 1e-9) {
+          currentPoint = targetPoint;
+          break;
+        }
+
+        const distanceToTrigger = nextInkServiceAt - accumulatedDrawTravel;
+        if (distanceToTrigger <= 1e-9) {
+          emitTriggeredInkService(preferredDipStationId);
+          continue;
+        }
+
+        if (remainingDistance + 1e-9 < distanceToTrigger) {
+          lines.push(`G1 X${fmt(targetPoint.x)} Y${fmt(targetPoint.y)}`);
+          accumulatedDrawTravel += remainingDistance;
+          currentPoint = targetPoint;
+          break;
+        }
+
+        const splitRatio = distanceToTrigger / remainingDistance;
+        const splitPoint = {
+          x: segmentStart.x + (targetPoint.x - segmentStart.x) * splitRatio,
+          y: segmentStart.y + (targetPoint.y - segmentStart.y) * splitRatio,
+        };
+        lines.push(`G1 X${fmt(splitPoint.x)} Y${fmt(splitPoint.y)}`);
+        accumulatedDrawTravel += distanceToTrigger;
+        segmentStart = splitPoint;
+        currentPoint = splitPoint;
+        emitTriggeredInkService(preferredDipStationId);
+      }
     }
     if (penUpDelayMs > 0) {
       lines.push(`G4 P${fmtSeconds(penUpDelayMs / 1000)} ; Pen lift delay`);
     }
     lines.push(config.penUpCommand + " ; Pen up");
     lines.push("");
-    previousPathEnd = subpath[subpath.length - 1];
     const pct = 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60);
     if (pct !== lastPct4) {
       lastPct4 = pct;
       self.postMessage({ type: "progress", taskId, percent: pct });
     }
     await yieldPh4();
+  }
+
+  const finalWashStation =
+    inkService?.mode === "brush-dip"
+      ? inkService.stations
+          .filter(isEnabledStation)
+          .find((station) => station.type === "wash")
+      : undefined;
+  if (finalWashStation && orderedSubpaths.length > 0) {
+    lines.push("; -- Final ink service: end wash --");
+    lines.push(config.penUpCommand + " ; Pen up for final wash");
+    emitStationContact(lines, config, finalWashStation);
+    lines.push("; -- End final ink service --");
+    lines.push("");
   }
 
   lines.push("; -- End of job -----------------------------------------------");

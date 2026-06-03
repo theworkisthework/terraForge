@@ -46,6 +46,7 @@ export interface ToolpathOverlayProps {
   gcodeToolpath: GcodeToolpath | null;
   toolpathSelected: boolean;
   toolpathVisible: boolean;
+  toolpathColorized: boolean;
   toolpathOpacity: number;
   plotProgressCuts: string | null;
   plotProgressRapids: string | null;
@@ -74,6 +75,7 @@ export function ToolpathOverlay({
   gcodeToolpath,
   toolpathSelected,
   toolpathVisible,
+  toolpathColorized,
   toolpathOpacity,
   plotProgressCuts,
   plotProgressRapids,
@@ -177,6 +179,7 @@ export function ToolpathOverlay({
         ctx,
         gcodeToolpath,
         toolpathSelected,
+        useMetadataColors: toolpathColorized,
         toolpathOpacity,
         plotProgressCuts,
         plotProgressRapids,
@@ -201,6 +204,7 @@ export function ToolpathOverlay({
     gcodeToolpath,
     toolpathSelected,
     toolpathVisible,
+    toolpathColorized,
     toolpathOpacity,
     vp,
     plotProgressCuts,

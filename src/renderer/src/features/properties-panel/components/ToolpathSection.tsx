@@ -1,4 +1,11 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff, FileText } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  FileText,
+  Palette,
+} from "lucide-react";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import { estimateDuration, formatBytes } from "../utils/toolpathMetrics";
 
@@ -7,11 +14,13 @@ interface ToolpathSectionProps {
   fileName: string;
   selected: boolean;
   visible: boolean;
+  colorized: boolean;
   opacity: number;
   isJobActive: boolean;
   fallbackFeedrate: number;
   onToggleSelected: () => void;
   onSetVisible: (visible: boolean) => void;
+  onSetColorized: (colorized: boolean) => void;
   onSetOpacity: (opacity: number) => void;
   onClear: () => void;
 }
@@ -21,11 +30,13 @@ export function ToolpathSection({
   fileName,
   selected,
   visible,
+  colorized,
   opacity,
   isJobActive,
   fallbackFeedrate,
   onToggleSelected,
   onSetVisible,
+  onSetColorized,
   onSetOpacity,
   onClear,
 }: ToolpathSectionProps) {
@@ -59,6 +70,29 @@ export function ToolpathSection({
         >
           {fileName}
         </span>
+
+        <button
+          className="ml-1 shrink-0 text-content-faint hover:text-content"
+          title={
+            colorized
+              ? "Disable colorized toolpath"
+              : "Enable colorized toolpath"
+          }
+          aria-label={
+            colorized
+              ? "Disable colorized toolpath"
+              : "Enable colorized toolpath"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetColorized(!colorized);
+          }}
+        >
+          <Palette
+            size={11}
+            className={colorized ? "text-sky-400" : "text-content-faint"}
+          />
+        </button>
 
         <button
           className="ml-1 shrink-0 text-content-faint hover:text-content"

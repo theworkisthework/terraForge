@@ -675,7 +675,7 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X10.000 Y0.150");
   });
 
-  it("emits a weed border around the final job bounds when enabled", async () => {
+  it("emits a weed border around the final job bounds only with vinyl cutting", async () => {
     dispatch({
       type: "generate",
       taskId: "body-vinyl-weed-border",
@@ -683,6 +683,11 @@ describe("svgWorker — G-code body", () => {
       config: makeConfig(),
       options: createGcodeOptions({
         optimisePaths: false,
+        vinylCutting: {
+          bladeOffsetMM: 0.2,
+          cornerAngleThresholdDeg: 15,
+          microJogMagnitudeMM: 0.02,
+        },
         vinylWeedBorder: {
           marginMM: 1,
         },
@@ -697,6 +702,31 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("G1 X11.000 Y11.000");
     expect(gcode).toContain("G1 X-1.000 Y11.000");
     expect(gcode).toContain("G1 X-1.000 Y-1.000");
+  });
+
+  it("ignores weed border when vinyl cutting is disabled", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-vinyl-weed-border-ignored-without-vinyl",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        vinylWeedBorder: {
+          marginMM: 1,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    expect(gcode).toContain("; Weed bd  : yes (margin 1 mm)");
+    expect(gcode).not.toContain("G0 X-1.000 Y-1.000 ; Rapid travel");
+    expect(gcode).not.toContain("G1 X11.000 Y-1.000");
+    expect(gcode).not.toContain("G1 X11.000 Y11.000");
+    expect(gcode).not.toContain("G1 X-1.000 Y11.000");
+    expect(gcode).not.toContain("G1 X-1.000 Y-1.000");
   });
 
   it("inserts prime and wipe service moves when travel threshold is exceeded", async () => {
@@ -764,8 +794,8 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain("Service move: prime (Prime)");
     expect(gcode).toContain("Service move: wipe (Wipe)");
     expect(gcode).toContain("Prime action: 2 presses, depth 1.200 mm");
-    expect(gcode).toContain("G1 Z-1.200");
-    expect(gcode).toContain("G1 Z1.200");
+    expect(gcode).toContain("G0 Z-1.200");
+    expect(gcode).toContain("G0 Z1.200");
   });
 
   it("inserts brush dip and wash moves with wash cadence", async () => {
@@ -850,6 +880,12 @@ describe("svgWorker — G-code body", () => {
     expect(gcode).toContain(
       "Brush action: circular, reps 1, distance 0.800 mm, depth 1.000 mm",
     );
+    expect(gcode).toContain("; -- Final ink service: end wash --");
+
+    const finalWashIdx = gcode.lastIndexOf("Service move: wash (Wash)");
+    const endOfJobIdx = gcode.indexOf("; -- End of job");
+    expect(finalWashIdx).toBeGreaterThan(-1);
+    expect(finalWashIdx).toBeLessThan(endOfJobIdx);
   });
 
   it("performs ink service before the first draw rapid", async () => {
@@ -898,6 +934,63 @@ describe("svgWorker — G-code body", () => {
     expect(firstService).toBeGreaterThan(-1);
     expect(firstRapidTravel).toBeGreaterThan(-1);
     expect(firstService).toBeLessThan(firstRapidTravel);
+  });
+
+  it("splits long draw segments at the ink trigger boundary", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-ink-split-draw-segment",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 20 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        inkService: {
+          mode: "brush-dip",
+          triggerTravelMM: 10,
+          triggerJitterPct: 0,
+          randomizeDipStation: false,
+          includeWashMove: false,
+          stations: [
+            {
+              id: "dip-black",
+              name: "Dip Black",
+              type: "dip",
+              x: 15,
+              y: 10,
+              dwellMs: 250,
+              enabled: true,
+            },
+          ],
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    const firstSplitMove = gcode.indexOf("G1 X10.000 Y0.000");
+    const firstService = gcode.indexOf("Service move: dip (Dip Black)");
+    const secondService = gcode.indexOf(
+      "Service move: dip (Dip Black)",
+      firstService + 1,
+    );
+    const finalSegmentMove = gcode.indexOf("G1 X20.000 Y0.000");
+
+    expect(firstSplitMove).toBeGreaterThan(-1);
+    expect(firstService).toBeGreaterThan(-1);
+    expect(secondService).toBeGreaterThan(-1);
+    expect(finalSegmentMove).toBeGreaterThan(-1);
+    expect(firstSplitMove).toBeLessThan(secondService);
+    expect(secondService).toBeLessThan(finalSegmentMove);
   });
 
   it("washes before changing dip trays even when periodic wash is disabled", async () => {
@@ -1119,6 +1212,90 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("Service move: dip (Dip A)");
+  });
+
+  it("switches to mapped color dip stations even with large trigger distance", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "body-ink-color-map-large-trigger",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 8 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          sourceColor: "#00ff10",
+        }),
+        createVectorObject({
+          path: "M 50 0 L 58 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          sourceColor: "#ff0006",
+        }),
+      ],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        inkService: {
+          mode: "brush-dip",
+          triggerTravelMM: 1000,
+          triggerJitterPct: 0,
+          randomizeDipStation: false,
+          includeWashMove: false,
+          stations: [
+            {
+              id: "dip-green",
+              name: "Dip Green",
+              type: "dip",
+              x: 10,
+              y: 10,
+              dwellMs: 150,
+              enabled: true,
+            },
+            {
+              id: "dip-red",
+              name: "Dip Red",
+              type: "dip",
+              x: 20,
+              y: 10,
+              dwellMs: 150,
+              enabled: true,
+            },
+            {
+              id: "wash",
+              name: "Wash",
+              type: "wash",
+              x: 30,
+              y: 10,
+              dwellMs: 150,
+              enabled: true,
+            },
+          ],
+          layerDipStations: {
+            "color:#00ff10": "dip-green",
+            "color:#ff0006": "dip-red",
+          },
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+
+    const dipGreenIdx = gcode.indexOf("Service move: dip (Dip Green)");
+    const dipRedIdx = gcode.indexOf("Service move: dip (Dip Red)");
+    const redRapidIdx = gcode.indexOf("G0 X50.000 Y0.000 ; Rapid travel");
+
+    expect(dipGreenIdx).toBeGreaterThan(-1);
+    expect(dipRedIdx).toBeGreaterThan(-1);
+    expect(redRapidIdx).toBeGreaterThan(-1);
+    expect(dipGreenIdx).toBeLessThan(dipRedIdx);
+    expect(dipRedIdx).toBeLessThan(redRapidIdx);
   });
 });
 
