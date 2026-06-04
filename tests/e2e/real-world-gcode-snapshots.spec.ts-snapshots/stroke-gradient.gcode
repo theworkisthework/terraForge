@@ -18,6 +18,7 @@ M3S0 ; Pen up
 
 ; -- Color: url(#_linear1) (1 object) --
 ; -- Sequential path (1 subpaths) -----------
+;@tf v=1 color=url(%23_linear1)
 G0 X25.786 Y22.661 ; Rapid travel
 F3000
 M3S1 ; Pen down

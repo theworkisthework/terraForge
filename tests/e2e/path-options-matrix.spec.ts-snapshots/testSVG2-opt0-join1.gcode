@@ -19,6 +19,7 @@ M3S0 ; Pen up
 ; -- Color: #231f20 (4 objects) --
 ; -- Color: #ed2024 (42 objects) --
 ; -- Sequential path (46 subpaths) -----------
+;@tf v=1 color=%23231f20
 G0 X24.368 Y65.532 ; Rapid travel
 F3000
 M3S1 ; Pen down
@@ -179,6 +180,7 @@ G1 X19.632 Y31.560
 G1 X0.000 Y31.560
 M3S0 ; Pen up
 
+;@tf v=1 color=%23ed2024
 G0 X37.624 Y74.943 ; Rapid travel
 F3000
 M3S1 ; Pen down

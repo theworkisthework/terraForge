@@ -18,6 +18,7 @@ M3S0 ; Pen up
 
 ; -- Color: #010101 (2 objects) --
 ; -- Sequential path (14 subpaths) -----------
+;@tf v=1 color=%23010101
 G0 X6.429 Y0.220 ; Rapid travel
 F3000
 M3S1 ; Pen down
