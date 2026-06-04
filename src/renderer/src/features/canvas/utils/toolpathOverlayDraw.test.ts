@@ -86,7 +86,7 @@ describe("drawToolpathLayer", () => {
 
     // Rapid colors are lightened from cut colors (for 6-digit hex).
     expect(ctx.strokeHistory).toContain("#3b75b0");
-    expect(ctx.strokeHistory).toContain("#7540b0");
+    expect(ctx.strokeHistory).toContain("#753bb0");
 
     // Legacy defaults should not be necessary with full metadata present.
     expect(ctx.strokeHistory).not.toContain("#0ea5e9");
