@@ -775,22 +775,22 @@ async function generate(msg: GenerateMessage): Promise<void> {
     );
   }
 
-  if (options?.vinylCutting) {
-    orderedSubpaths = remapLayerMetadata(
-      orderedSubpaths,
-      applyVinylCompensation(
-        orderedSubpaths.map((sp) => sp.points),
-        options.vinylCutting,
-      ),
-    );
-  }
-
   if (options?.vinylCutting && options?.vinylWeedBorder) {
     orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
       applyVinylWeedBorder(
         orderedSubpaths.map((sp) => sp.points),
         options.vinylWeedBorder,
+      ),
+    );
+  }
+
+  if (options?.vinylCutting) {
+    orderedSubpaths = remapLayerMetadata(
+      orderedSubpaths,
+      applyVinylCompensation(
+        orderedSubpaths.map((sp) => sp.points),
+        options.vinylCutting,
       ),
     );
   }
