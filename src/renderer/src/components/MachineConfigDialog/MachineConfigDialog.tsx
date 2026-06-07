@@ -9,8 +9,10 @@ import React, { useState } from "react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { TabHeader } from "../TabHeader";
 import { PEN_DEFAULTS } from "./utils/machineConfigDefaults";
-import { MachineConfigurationsTab } from "./components/MachineConfigurationsTab";
-import { ApplicationConfigurationTab } from "./components/ApplicationConfigurationTab";
+import {
+  MachineConfigurationsTab,
+  ApplicationConfigurationTab,
+} from "./components";
 import { useMachineConfigDialogController } from "./hooks/useMachineConfigDialogController";
 import type { MachineConfigDialogController } from "./hooks/useMachineConfigDialogController";
 
