@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
-import { useMachineStore } from "../../store/machineStore";
-import { useTaskStore } from "../../store/taskStore";
-import { useCanvasStore } from "../../store/canvasStore";
-import { selectFileBrowserPaneCanvasState } from "../../store/canvasSelectors";
-import { parseGcode } from "../../utils/gcodeParser";
-import { useStableMachineState } from "../../hooks/useStableMachineState";
-import { isGcodeFile } from "./pathUtils";
-import type { RemoteFile } from "../../../../types";
+import { useMachineStore } from "../../../store/machineStore";
+import { useTaskStore } from "../../../store/taskStore";
+import { useCanvasStore } from "../../../store/canvasStore";
+import { selectFileBrowserPaneCanvasState } from "../../../store/canvasSelectors";
+import { parseGcode } from "../../../utils/gcodeParser";
+import { useStableMachineState } from "../../../hooks/useStableMachineState";
+import { isGcodeFile } from "../utils/pathUtils";
+import type { RemoteFile } from "../../../../../types";
 
 export interface FsPaneControllerProps {
   label: string;

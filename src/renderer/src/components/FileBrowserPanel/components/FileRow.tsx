@@ -1,5 +1,5 @@
-import { formatFileSize, isGcodeFile } from "./pathUtils";
-import type { RemoteFile } from "../../../../types";
+import { formatFileSize, isGcodeFile } from "../utils/pathUtils";
+import type { RemoteFile } from "../../../../../types";
 
 interface FileRowProps {
   file: RemoteFile;

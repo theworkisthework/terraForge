@@ -1,11 +1,11 @@
-import { ConfirmDialog } from "../ConfirmDialog";
+import { ConfirmDialog } from "../../ConfirmDialog";
 import { Breadcrumb } from "./Breadcrumb";
 import { FileRow } from "./FileRow";
-import { parentPath } from "./pathUtils";
+import { parentPath } from "../utils/pathUtils";
 import {
   useFsPaneController,
   type FsPaneControllerProps,
-} from "./useFsPaneController";
+} from "../hooks/useFsPaneController";
 
 interface FsPaneProps extends FsPaneControllerProps {
   accentColor: "blue" | "purple";
