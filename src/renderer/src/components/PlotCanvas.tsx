@@ -12,24 +12,9 @@
 // DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
 // ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import { useRef } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../store/canvasStore";
-import { useThemeStore } from "../store/themeStore";
-import { useAppConfigStore } from "../store/appConfigStore";
-import {
-  selectPlotCanvasCanvasState,
-  selectPlotCanvasToolpathState,
-} from "../store/canvasSelectors";
-import { useMachineStore } from "../store/machineStore";
 import { usePlotProgress } from "../utils/usePlotProgress";
-import { useStableMachineState } from "../hooks/useStableMachineState";
-import { DEFAULT_STROKE_WIDTH_MM } from "../../../types";
 import {
-  MM_TO_PX,
-  PAD,
-  RULER_W,
-  ZOOM_STEP,
-  ROTATE_CURSOR,
   BedLayer,
   GridLayer,
   RulerOverlay,
@@ -55,11 +40,28 @@ import {
   useCanvasGestureLifecycle,
   useCanvasInteractionHandlers,
 } from "../features/canvas";
+import { usePlotCanvasState } from "./plotCanvas/hooks/usePlotCanvasState";
+import { usePlotCanvasGeometry } from "./plotCanvas/hooks/usePlotCanvasGeometry";
+import { PlotCanvasControls } from "./plotCanvas/components/PlotCanvasControls";
 
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const {
+    canvas,
+    toolpath,
+    activeConfig,
+    theme,
+    selectedJobFile,
+    setSelectedJobFile,
+    machineStatus,
+    connected,
+    showInkServiceStationsOnCanvas,
+    respectSvgColorsOnCanvas,
+    inkServiceStations,
+    isJobActive,
+  } = usePlotCanvasState();
   const {
     imports,
     selectedImportId,
@@ -73,7 +75,7 @@ export function PlotCanvas() {
     layerGroups,
     pageTemplate,
     pageSizes,
-  } = useCanvasStore(useShallow(selectPlotCanvasCanvasState));
+  } = canvas;
   const {
     gcodeToolpath,
     setGcodeToolpath,
@@ -85,49 +87,30 @@ export function PlotCanvas() {
     toolpathOpacity,
     plotProgressCuts,
     plotProgressRapids,
-  } = useCanvasStore(useShallow(selectPlotCanvasToolpathState));
-  const activeConfig = useMachineStore((s) => s.activeConfig);
-  const theme = useThemeStore((s) => s.theme);
-  const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
-  const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
-  const machineStatus = useMachineStore((s) => s.status);
-  const connected = useMachineStore((s) => s.connected);
-  const showInkServiceStationsOnCanvas = useAppConfigStore(
-    (s) => s.showInkServiceStationsOnCanvas,
-  );
-  const respectSvgColorsOnCanvas = useAppConfigStore(
-    (s) => s.respectSvgColorsOnCanvas,
-  );
-  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
-  const displayMachineState = useStableMachineState(machineStatus?.state);
-  const isJobActive =
-    displayMachineState === "Run" || displayMachineState === "Hold";
+  } = toolpath;
 
   // Activate live plot-progress tracking whenever a toolpath is loaded
   // and the machine is running a job.
   usePlotProgress();
 
   const config = activeConfig();
-  const bedW = config?.bedWidth ?? 220;
-  const bedH = config?.bedHeight ?? 200;
-  const origin = config?.origin ?? "bottom-left";
-  const isBottom = origin === "bottom-left" || origin === "bottom-right";
-  const isRight = origin === "bottom-right" || origin === "top-right";
-  const isCenter = origin === "center";
-  // Bed coordinate bounds in machine mm (center origin uses ±half-dim)
-  const bedXMin = isCenter ? -bedW / 2 : 0;
-  const bedXMax = isCenter ? bedW / 2 : bedW;
-  const bedYMin = isCenter ? -bedH / 2 : 0;
-  const bedYMax = isCenter ? bedH / 2 : bedH;
-
-  const canvasW = bedW * MM_TO_PX + PAD * 2;
-  const canvasH = bedH * MM_TO_PX + PAD * 2;
-  const fitInsets = {
-    top: isBottom || isCenter ? 0 : RULER_W,
-    right: isRight ? RULER_W : 0,
-    bottom: isBottom || isCenter ? RULER_W : 0,
-    left: isRight ? 0 : RULER_W,
-  };
+  const {
+    bedW,
+    bedH,
+    origin,
+    isBottom,
+    isRight,
+    isCenter,
+    bedXMin,
+    bedXMax,
+    bedYMin,
+    bedYMax,
+    canvasW,
+    canvasH,
+    fitInsets,
+    getBedY,
+    getBedX,
+  } = usePlotCanvasGeometry(config);
 
   // ── Viewport (vp state, fit calculation, ResizeObserver) ────────────────────
   const {
@@ -136,7 +119,6 @@ export function PlotCanvas() {
     setVp,
     fitted,
     setFitted,
-    computeFit,
     fitToView,
     containerSize,
   } = useViewport(containerRef, canvasW, canvasH, fitInsets);
@@ -230,14 +212,6 @@ export function PlotCanvas() {
     toolpathSelected,
     setSelectedJobFile,
   });
-
-  // ── SVG coordinate helpers (map machine-mm → canvas SVG px) ─────────────────
-  // Y: bottom-origins flip so mm=0 is at the bottom of the bed rectangle.
-  const getBedY = (mmY: number) =>
-    isBottom ? canvasH - PAD - mmY * MM_TO_PX : PAD + mmY * MM_TO_PX;
-  // X: right-origins flip so mm=0 is at the right of the bed rectangle.
-  const getBedX = (mmX: number) =>
-    isRight ? PAD + (bedW - mmX) * MM_TO_PX : PAD + mmX * MM_TO_PX;
 
   useCanvasGestureLifecycle({
     dragging,
@@ -505,50 +479,14 @@ export function PlotCanvas() {
         bedH={bedH}
       />
 
-      {/* ── Zoom / pan overlay controls ───────────────────────────────────── */}
-      <div
-        className="absolute bottom-9 right-4 flex flex-col gap-1 z-10"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          title="Zoom in (Ctrl+Shift++)"
-          aria-label="Zoom in"
-          aria-keyshortcuts="Control+Shift++"
-          onClick={onZoomIn}
-          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
-                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          title="Zoom out (Ctrl+Shift+-)"
-          aria-label="Zoom out"
-          aria-keyshortcuts="Control+Shift+-"
-          onClick={onZoomOut}
-          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
-                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          title={`Fit to view (Ctrl+0)${fitted ? " — active" : ""}`}
-          aria-label="Fit to view"
-          aria-keyshortcuts="Control+0"
-          aria-pressed={fitted}
-          onClick={onFit}
-          className={`w-8 h-8 rounded border text-[11px] font-bold flex items-center justify-center leading-none
-            ${
-              fitted
-                ? "bg-accent border-accent text-white"
-                : "bg-panel border-border-ui text-content hover:bg-secondary"
-            }`}
-        >
-          ⊡
-        </button>
-      </div>
+      <PlotCanvasControls
+        fitted={fitted}
+        zoom={vp.zoom}
+        spaceDown={spaceDown}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
+        onFit={onFit}
+      />
 
       {/* ── Ruler overlay — screen-space, always crisp ──────────────────── */}
       {containerSize.w > 0 && (
@@ -556,24 +494,10 @@ export function PlotCanvas() {
           vp={vp}
           bedW={bedW}
           bedH={bedH}
-          origin={config?.origin ?? "bottom-left"}
+          origin={origin}
           containerW={containerSize.w}
           containerH={containerSize.h}
         />
-      )}
-
-      {/* ── Zoom-level badge ─────────────────────────────────────────────── */}
-      <div className="absolute bottom-4 left-4 z-10 text-[10px] text-content-faint font-mono pointer-events-none">
-        {Math.round(vp.zoom * 100)}%
-      </div>
-
-      {/* ── Space-pan hint ────────────────────────────────────────────────── */}
-      {spaceDown && (
-        <div className="absolute inset-0 z-20 pointer-events-none flex items-start justify-center pt-3">
-          <span className="text-[10px] text-content-muted bg-app/80 px-2 py-0.5 rounded">
-            Pan mode · drag to pan · release Space to exit
-          </span>
-        </div>
       )}
     </div>
   );
