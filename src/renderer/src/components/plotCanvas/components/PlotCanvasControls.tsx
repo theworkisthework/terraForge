@@ -45,7 +45,7 @@ export function PlotCanvasControls({
         </button>
         <button
           type="button"
-          title={`Fit to view (Ctrl+0)${fitted ? " — active" : ""}`}
+          title={`Fit to view (Ctrl+0)${fitted ? " - active" : ""}`}
           aria-label="Fit to view"
           aria-keyshortcuts="Control+0"
           aria-pressed={fitted}
@@ -68,7 +68,7 @@ export function PlotCanvasControls({
       {spaceDown && (
         <div className="absolute inset-0 z-20 pointer-events-none flex items-start justify-center pt-3">
           <span className="text-[10px] text-content-muted bg-app/80 px-2 py-0.5 rounded">
-            Pan mode · drag to pan · release Space to exit
+            Pan mode - drag to pan - release Space to exit
           </span>
         </div>
       )}

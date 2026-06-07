@@ -1,7 +1,12 @@
 import { useMemo } from "react";
 import { MM_TO_PX, PAD, RULER_W } from "../../../features/canvas";
 
-type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right" | "center";
+type Origin =
+  | "bottom-left"
+  | "bottom-right"
+  | "top-left"
+  | "top-right"
+  | "center";
 
 export function usePlotCanvasGeometry(config?: {
   bedWidth?: number;
