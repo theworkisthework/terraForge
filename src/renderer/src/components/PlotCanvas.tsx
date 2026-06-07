@@ -511,7 +511,10 @@ export function PlotCanvas() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           title="Zoom in (Ctrl+Shift++)"
+          aria-label="Zoom in"
+          aria-keyshortcuts="Control+Shift++"
           onClick={onZoomIn}
           className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
                      hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
@@ -519,7 +522,10 @@ export function PlotCanvas() {
           +
         </button>
         <button
+          type="button"
           title="Zoom out (Ctrl+Shift+-)"
+          aria-label="Zoom out"
+          aria-keyshortcuts="Control+Shift+-"
           onClick={onZoomOut}
           className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
                      hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
@@ -527,7 +533,11 @@ export function PlotCanvas() {
           −
         </button>
         <button
+          type="button"
           title={`Fit to view (Ctrl+0)${fitted ? " — active" : ""}`}
+          aria-label="Fit to view"
+          aria-keyshortcuts="Control+0"
+          aria-pressed={fitted}
           onClick={onFit}
           className={`w-8 h-8 rounded border text-[11px] font-bold flex items-center justify-center leading-none
             ${
