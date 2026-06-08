@@ -1,1 +1,1 @@
-export { PlotCanvasControls } from "./PlotCanvasControls";
+export { PlotCanvasControls } from "./PlotCanvasControls.tsx";
