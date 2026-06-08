@@ -40,8 +40,7 @@ import {
   useCanvasGestureLifecycle,
   useCanvasInteractionHandlers,
 } from "../../features/canvas";
-import { usePlotCanvasState } from "./hooks/usePlotCanvasState";
-import { usePlotCanvasGeometry } from "./hooks/usePlotCanvasGeometry";
+import { usePlotCanvasState, usePlotCanvasGeometry } from "./hooks";
 import { PlotCanvasControls } from "./components/PlotCanvasControls";
 
 export function PlotCanvas() {
