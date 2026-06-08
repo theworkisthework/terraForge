@@ -41,7 +41,7 @@ import {
   useCanvasInteractionHandlers,
 } from "../../features/canvas";
 import { usePlotCanvasState, usePlotCanvasGeometry } from "./hooks";
-import { PlotCanvasControls } from "./components/PlotCanvasControls";
+import { PlotCanvasControls } from "./components";
 
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
