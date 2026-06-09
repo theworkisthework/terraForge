@@ -9,6 +9,7 @@
 ; Ret home : no
 ; Pen delay: 50 ms
 ; Pen up delay: 0 ms
+; Dip svc  : no
 ; Generated: <normalized>
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
@@ -18,6 +19,7 @@ M3S0 ; Pen up
 ; -- Color: #9d4c97 (2 objects) --
 ; -- Color: #e6007e (20 objects) --
 ; -- Sequential path (23 subpaths) -----------
+;@tf v=1 color=%239d4c97
 G0 X46.646 Y0.000 ; Rapid travel
 F3000
 M3S1 ; Pen down
@@ -216,6 +218,7 @@ G1 X58.261 Y107.844
 G1 X58.261 Y107.818
 M3S0 ; Pen up
 
+;@tf v=1 color=%23e6007e
 G0 X87.471 Y140.996 ; Rapid travel
 F3000
 M3S1 ; Pen down

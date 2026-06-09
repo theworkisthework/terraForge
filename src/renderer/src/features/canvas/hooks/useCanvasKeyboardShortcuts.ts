@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useCanvasStore } from "../../../store/canvasStore";
 import { ZOOM_STEP } from "../constants";
+import type { GcodeToolpath } from "../../../../types";
 
 interface UseCanvasKeyboardShortcutsOptions {
   selectedImportId: string | null;
@@ -13,12 +14,7 @@ interface UseCanvasKeyboardShortcutsOptions {
   removeImport: (id: string) => void;
   clearImports: () => void;
   selectToolpath: (selected: boolean) => void;
-  setGcodeToolpath: (
-    gcode: {
-      segments: { type: "rapid" | "cut"; points: { x: number; y: number }[] }[];
-      bounds: { minX: number; minY: number; maxX: number; maxY: number };
-    } | null,
-  ) => void;
+  setGcodeToolpath: (gcode: GcodeToolpath | null) => void;
   zoomBy: (factor: number, clientX?: number, clientY?: number) => void;
   fitToView: () => void;
   setSpacePressed: (pressed: boolean) => void;

@@ -1,4 +1,11 @@
-import { ChevronDown, ChevronRight, FileText } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  FileText,
+  Palette,
+} from "lucide-react";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import { estimateDuration, formatBytes } from "../utils/toolpathMetrics";
 
@@ -6,9 +13,15 @@ interface ToolpathSectionProps {
   toolpath: GcodeToolpath;
   fileName: string;
   selected: boolean;
+  visible: boolean;
+  colorized: boolean;
+  opacity: number;
   isJobActive: boolean;
   fallbackFeedrate: number;
   onToggleSelected: () => void;
+  onSetVisible: (visible: boolean) => void;
+  onSetColorized: (colorized: boolean) => void;
+  onSetOpacity: (opacity: number) => void;
   onClear: () => void;
 }
 
@@ -16,9 +29,15 @@ export function ToolpathSection({
   toolpath,
   fileName,
   selected,
+  visible,
+  colorized,
+  opacity,
   isJobActive,
   fallbackFeedrate,
   onToggleSelected,
+  onSetVisible,
+  onSetColorized,
+  onSetOpacity,
   onClear,
 }: ToolpathSectionProps) {
   const duration = estimateDuration(toolpath, fallbackFeedrate);
@@ -51,6 +70,41 @@ export function ToolpathSection({
         >
           {fileName}
         </span>
+
+        <button
+          className="ml-1 shrink-0 text-content-faint hover:text-content"
+          title={
+            colorized
+              ? "Disable colorized toolpath"
+              : "Enable colorized toolpath"
+          }
+          aria-label={
+            colorized
+              ? "Disable colorized toolpath"
+              : "Enable colorized toolpath"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetColorized(!colorized);
+          }}
+        >
+          <Palette
+            size={11}
+            className={colorized ? "text-sky-400" : "text-content-faint"}
+          />
+        </button>
+
+        <button
+          className="ml-1 shrink-0 text-content-faint hover:text-content"
+          title={visible ? "Hide toolpath" : "Show toolpath"}
+          aria-label={visible ? "Hide toolpath" : "Show toolpath"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetVisible(!visible);
+          }}
+        >
+          {visible ? <Eye size={11} /> : <EyeOff size={11} />}
+        </button>
 
         <button
           className={`ml-1 shrink-0 ${
@@ -99,6 +153,25 @@ export function ToolpathSection({
               </span>
             </div>
           )}
+
+          <div className="flex items-center gap-2 text-[10px] pt-1">
+            <span className="text-content-faint whitespace-nowrap">
+              Opacity
+            </span>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={Math.round(opacity * 100)}
+              onChange={(e) => onSetOpacity(Number(e.target.value) / 100)}
+              className="flex-1 accent-accent"
+              aria-label="Toolpath opacity"
+            />
+            <span className="text-content font-mono w-8 text-right">
+              {Math.round(opacity * 100)}%
+            </span>
+          </div>
         </div>
       )}
     </div>

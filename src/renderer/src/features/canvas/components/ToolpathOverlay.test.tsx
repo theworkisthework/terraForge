@@ -30,8 +30,12 @@ function makeProps(
     layerGroups: [],
     gcodeToolpath: null,
     toolpathSelected: false,
+    toolpathVisible: true,
+    toolpathColorized: true,
+    toolpathOpacity: 1,
     plotProgressCuts: null,
     plotProgressRapids: null,
+    respectSvgColorsOnCanvas: false,
     theme: "dark",
     ...overrides,
   };

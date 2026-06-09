@@ -1,8 +1,8 @@
 // ── usePlotProgress ───────────────────────────────────────────────────────────
 //
 // Tracks live plot progress by comparing the machine's reported position to
-// the parsed G-code segment list, then paints completed segments red/orange
-// over the existing toolpath overlay.
+// the parsed G-code segment list, then adds a halo behind completed segments
+// without replacing the existing toolpath colours.
 //
 // Two tracking strategies (tried in order):
 //
@@ -194,6 +194,9 @@ export function usePlotProgress(): void {
   const frontierRef = useRef<{ idx: number; t: number }>({ idx: -1, t: 0 });
   const accRef = useRef<Acc>({ cuts: "", rapids: "", completedUpTo: -1 });
   const prevStateRef = useRef<string | null>(null);
+  // Debounce timeout for clearing progress glow to avoid flickering on brief
+  // state oscillations (e.g., Run → Idle → Run bouncing at the end of a job).
+  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Last known WCO (work-coordinate offset) parsed from FluidNC status.
   // WPos = MPos − WCO.  Initialised to (0,0,0) — correct when no offset
   // has been set (home position = work origin).
@@ -227,6 +230,7 @@ export function usePlotProgress(): void {
   // ── Reset on disconnect ────────────────────────────────────────────────────
   useEffect(() => {
     if (!connected) {
+      if (clearTimeoutRef.current) clearTimeout(clearTimeoutRef.current);
       frontierRef.current = { idx: -1, t: 0 };
       accRef.current = { cuts: "", rapids: "", completedUpTo: -1 };
       pendingRef.current = { idx: -1, hits: 0 };
@@ -275,7 +279,21 @@ export function usePlotProgress(): void {
       relocPendingRef.current = { idx: -1, t: 0, hits: 0 };
     }
 
+    // Cancel any pending clear timeout — job is running again
+    if ((state === "Run" || state === "Hold") && clearTimeoutRef.current) {
+      clearTimeout(clearTimeoutRef.current);
+      clearTimeoutRef.current = null;
+    }
+
     if (state !== "Run" && state !== "Hold") {
+      // Debounce the clear to avoid flickering on brief state oscillations.
+      // Only clear if we've been in a non-running state for 800ms.
+      if (!clearTimeoutRef.current) {
+        clearTimeoutRef.current = setTimeout(() => {
+          clearPlotProgress();
+          clearTimeoutRef.current = null;
+        }, 800);
+      }
       prevStateRef.current = state;
       return;
     }
@@ -488,5 +506,10 @@ export function usePlotProgress(): void {
 
     setPlotProgress(displayCuts.trimStart(), displayRapids.trimStart());
     prevStateRef.current = state;
+
+    // Cleanup: cancel any pending clear timeout on unmount
+    return () => {
+      if (clearTimeoutRef.current) clearTimeout(clearTimeoutRef.current);
+    };
   }, [status, gcodeToolpath, setPlotProgress]);
 }

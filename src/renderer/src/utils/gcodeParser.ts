@@ -16,7 +16,51 @@
 //   G20 / G21     — inch / mm units
 //   G90 / G91     — absolute / relative positioning
 //   N<number>     — line numbers (parsed and counted)
-//   ; ...  ( )    — comments stripped
+//   ; ...  ( )    — comments stripped (except terraForge `;@tf ...` markers)
+
+interface ToolpathMetadata {
+  color?: string;
+  layer?: string;
+  dip?: string;
+}
+
+function decodeMarkerValue(raw: string): string {
+  return decodeURIComponent(raw.replace(/\+/g, "%20"));
+}
+
+function parseTfMarker(comment: string): ToolpathMetadata | null {
+  const trimmed = comment.trim();
+  if (!trimmed.toLowerCase().startsWith("@tf")) return null;
+
+  const meta: ToolpathMetadata = {};
+  const tokens = trimmed
+    .slice(3)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  for (const token of tokens) {
+    const eqIndex = token.indexOf("=");
+    if (eqIndex <= 0) continue;
+    const key = token.slice(0, eqIndex).toLowerCase();
+    const rawValue = token.slice(eqIndex + 1);
+    if (!rawValue) continue;
+
+    let value: string;
+    try {
+      value = decodeMarkerValue(rawValue).trim();
+    } catch {
+      continue;
+    }
+    if (!value) continue;
+
+    if (key === "color") meta.color = value;
+    else if (key === "layer") meta.layer = value;
+    else if (key === "dip") meta.dip = value;
+  }
+
+  return meta;
+}
 
 /** A single linear motion segment extracted from G-code.
  *  Coordinates are in machine work-coordinate mm, matching the G-code values
@@ -25,6 +69,9 @@ export interface GcodeSegment {
   from: { x: number; y: number };
   to: { x: number; y: number };
   type: "cut" | "rapid";
+  color?: string;
+  layer?: string;
+  dip?: string;
   /** 1-indexed sequential line number of the source G-code line that produced
    *  this segment.  Matches the line counter FluidNC reports in Ln:N,Total
    *  status messages, enabling reliable progress tracking without coordinate
@@ -37,10 +84,14 @@ export interface GcodeToolpath {
    *  stroke: [x0,y0, x1,y1, x2,y2, ...].  A new array begins wherever the
    *  pen lifted between cuts (i.e. a G0 rapid or initial pen-up gap). */
   cutPaths: Float32Array[];
+  /** Optional per-cut-subpath color metadata (aligned by index with cutPaths). */
+  cutPathColors?: Array<string | null>;
   /** Rapid-move segments (pen up), packed as flat quads:
    *  [x_from, y_from, x_to, y_to,  x_from, y_from, x_to, y_to, ...].
    *  Stride = 4 (one segment per group of four values). */
   rapidPaths: Float32Array;
+  /** Optional per-rapid-segment color metadata (aligned with rapidPaths stride-4 segments). */
+  rapidColors?: Array<string | null>;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   lineCount: number;
   /** Individual motion segments used for live plot-progress tracking.
@@ -63,14 +114,19 @@ export function parseGcode(gcode: string): GcodeToolpath {
   let isAbsolute = true;
   let inMillimeters = true;
   let motionMode = 0; // 0=G0, 1=G1, 2=G2, 3=G3
+  let activeColor: string | null = null;
+  let activeLayer: string | null = null;
+  let activeDip: string | null = null;
 
   // Cut sub-paths: each number[] becomes one Float32Array in cutPaths.
   // currentCutPath is the active (open) sub-path being built.
   const cutSubPaths: number[][] = [];
+  const cutPathColors: Array<string | null> = [];
   let currentCutPath: number[] | null = null;
 
   // Rapid segments: flat [x_from, y_from, x_to, y_to, ...] buffer.
   const rapidData: number[] = [];
+  const rapidColors: Array<string | null> = [];
 
   const segments: GcodeSegment[] = [];
 
@@ -101,10 +157,21 @@ export function parseGcode(gcode: string): GcodeToolpath {
   for (const rawLine of gcode.split("\n")) {
     lineCount++;
 
+    const blockDeleteStripped = rawLine.replace(/^\//, "");
+    const noParen = blockDeleteStripped.replace(/\([^)]*\)/g, "");
+    const commentStart = noParen.indexOf(";");
+    if (commentStart >= 0) {
+      const commentText = noParen.slice(commentStart + 1);
+      const marker = parseTfMarker(commentText);
+      if (marker) {
+        if (marker.color !== undefined) activeColor = marker.color;
+        if (marker.layer !== undefined) activeLayer = marker.layer;
+        if (marker.dip !== undefined) activeDip = marker.dip;
+      }
+    }
+
     // Strip block-delete prefix, parenthesis comments, and semicolon comments
-    const line = rawLine
-      .replace(/^\//, "")
-      .replace(/\([^)]*\)/g, "")
+    const line = noParen
       .replace(/;.*$/, "")
       .trim()
       .toUpperCase();
@@ -159,6 +226,9 @@ export function parseGcode(gcode: string): GcodeToolpath {
       from: { x, y },
       to: { x: nx, y: ny },
       type: motionMode === 0 ? "rapid" : "cut",
+      color: activeColor ?? undefined,
+      layer: activeLayer ?? undefined,
+      dip: activeDip ?? undefined,
       lineNum: lineCount,
     });
 
@@ -166,6 +236,7 @@ export function parseGcode(gcode: string): GcodeToolpath {
       // Rapid — record as a flat quad [x_from, y_from, x_to, y_to]
       totalRapidDistance += segDist;
       rapidData.push(x, y, nx, ny);
+      rapidColors.push(activeColor);
       // A rapid lifts the pen, so the next cut must start a new sub-path.
       currentCutPath = null;
       lastWasCut = false;
@@ -176,6 +247,7 @@ export function parseGcode(gcode: string): GcodeToolpath {
         // Start a new cut sub-path beginning at the current position.
         currentCutPath = [x, y];
         cutSubPaths.push(currentCutPath);
+        cutPathColors.push(activeColor);
       }
       currentCutPath.push(nx, ny);
       lastWasCut = true;
@@ -187,7 +259,9 @@ export function parseGcode(gcode: string): GcodeToolpath {
 
   return {
     cutPaths: cutSubPaths.map((pts) => new Float32Array(pts)),
+    cutPathColors,
     rapidPaths: new Float32Array(rapidData),
+    rapidColors,
     bounds: { minX, maxX, minY, maxY },
     lineCount,
     segments,

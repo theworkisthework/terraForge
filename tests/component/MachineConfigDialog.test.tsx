@@ -29,6 +29,7 @@ beforeEach(() => {
     enablePerPathPasses: false,
     debugLoggingEnabled: false,
     showMachineCoordinates: false,
+    respectSvgColorsOnCanvas: false,
     vinylCuttingEnabled: false,
     vinylBladeOffsetMM: 0.25,
     vinylCornerAngleThresholdDeg: 10,
@@ -73,6 +74,17 @@ describe("MachineConfigDialog", () => {
     });
     await userEvent.click(checkbox);
     expect(useAppConfigStore.getState().enablePerPathPasses).toBe(true);
+  });
+
+  it("updates canvas imported-colour setting when toggled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Show imported SVG colours on canvas/i,
+    });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().respectSvgColorsOnCanvas).toBe(true);
   });
 
   it("shows vinyl cutting app settings when the experimental toggle is enabled", async () => {

@@ -38,6 +38,15 @@ export interface GcodePrefs {
   generateVinylCuttingGcode: boolean;
   generateVinylWeedBorderGcode: boolean;
   vinylWeedBorderMarginMM: number;
+  inkServiceEnabled: boolean;
+  inkServiceMode: "prime-wipe" | "brush-dip";
+  inkServiceTriggerTravelMM: number;
+  inkServiceTriggerJitterPct: number;
+  inkServiceRandomizeDipStation: boolean;
+  inkServiceIncludeWashMove: boolean;
+  inkServiceWashEveryNDips: number;
+  /** Map SVG layer id/name to an explicit dip station id. */
+  inkServiceLayerDipMap: Record<string, string>;
 }
 
 export const DEFAULT_GCODE_PREFS: GcodePrefs = {
@@ -65,6 +74,14 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   generateVinylCuttingGcode: false,
   generateVinylWeedBorderGcode: false,
   vinylWeedBorderMarginMM: 2,
+  inkServiceEnabled: false,
+  inkServiceMode: "prime-wipe",
+  inkServiceTriggerTravelMM: 900,
+  inkServiceTriggerJitterPct: 0,
+  inkServiceRandomizeDipStation: false,
+  inkServiceIncludeWashMove: false,
+  inkServiceWashEveryNDips: 3,
+  inkServiceLayerDipMap: {},
 };
 
 export function loadGcodePrefs(): GcodePrefs {

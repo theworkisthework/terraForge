@@ -21,6 +21,9 @@ export const selectPlotCanvasToolpathState = (state: CanvasState) => ({
   gcodeSource: state.gcodeSource,
   toolpathSelected: state.toolpathSelected,
   selectToolpath: state.selectToolpath,
+  toolpathVisible: state.toolpathVisible,
+  toolpathColorized: state.toolpathColorized,
+  toolpathOpacity: state.toolpathOpacity,
   plotProgressCuts: state.plotProgressCuts,
   plotProgressRapids: state.plotProgressRapids,
 });

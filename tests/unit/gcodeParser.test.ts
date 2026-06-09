@@ -333,4 +333,35 @@ describe("parseGcode", () => {
     const r = parse("G17\nG1 X10 Y10\n");
     expect(cutsContainPoint(r, 10, 10)).toBe(true);
   });
+
+  it("parses terraForge metadata markers and attaches colors to toolpaths", () => {
+    const r = parse(
+      [
+        ";@tf v=1 color=%23336699 layer=Layer+One dip=dip-blue",
+        "G0 X5 Y0",
+        "G1 X10 Y0",
+        ";@tf v=1 color=%23663399",
+        "G0 X15 Y0",
+        "G1 X20 Y0",
+      ].join("\n"),
+    );
+
+    expect(r.cutPathColors).toEqual(["#336699", "#663399"]);
+    expect(r.rapidColors?.slice(0, 2)).toEqual(["#336699", "#663399"]);
+
+    const cutSegments = r.segments?.filter((seg) => seg.type === "cut") ?? [];
+    expect(cutSegments[0]?.color).toBe("#336699");
+    expect(cutSegments[0]?.layer).toBe("Layer One");
+    expect(cutSegments[0]?.dip).toBe("dip-blue");
+    expect(cutSegments[1]?.color).toBe("#663399");
+  });
+
+  it("ignores malformed terraForge marker tokens and keeps parsing", () => {
+    const r = parse(";@tf v=1 color=%zz layer=Layer+Two\nG0 X1 Y1\nG1 X2 Y2\n");
+
+    expect(r.cutPaths.length).toBe(1);
+    expect(r.cutPathColors).toEqual([null]);
+    expect(r.rapidColors).toEqual([null]);
+    expect(r.segments?.length).toBe(2);
+  });
 });

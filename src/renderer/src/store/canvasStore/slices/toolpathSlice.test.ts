@@ -27,6 +27,9 @@ describe("toolpathSlice", () => {
     expect(state.gcodeToolpath).toBeNull();
     expect(state.gcodeSource).toBeNull();
     expect(state.showCentreMarker).toBe(true);
+    expect(state.toolpathVisible).toBe(true);
+    expect(state.toolpathColorized).toBe(true);
+    expect(state.toolpathOpacity).toBe(1);
     expect(state.plotProgressCuts).toBe("");
     expect(state.plotProgressRapids).toBe("");
     expect(state.gcodePreviewLoading).toBe(false);
@@ -121,5 +124,34 @@ describe("toolpathSlice", () => {
 
     store.getState().toggleCentreMarker();
     expect(store.getState().showCentreMarker).toBe(true);
+  });
+
+  it("setToolpathVisible toggles toolpath rendering visibility", () => {
+    const store = makeStore();
+    expect(store.getState().toolpathVisible).toBe(true);
+
+    store.getState().setToolpathVisible(false);
+    expect(store.getState().toolpathVisible).toBe(false);
+  });
+
+  it("setToolpathColorized toggles metadata color rendering", () => {
+    const store = makeStore();
+    expect(store.getState().toolpathColorized).toBe(true);
+
+    store.getState().setToolpathColorized(false);
+    expect(store.getState().toolpathColorized).toBe(false);
+  });
+
+  it("setToolpathOpacity clamps values to 0.1..1", () => {
+    const store = makeStore();
+
+    store.getState().setToolpathOpacity(0.6);
+    expect(store.getState().toolpathOpacity).toBe(0.6);
+
+    store.getState().setToolpathOpacity(0);
+    expect(store.getState().toolpathOpacity).toBe(0.1);
+
+    store.getState().setToolpathOpacity(2);
+    expect(store.getState().toolpathOpacity).toBe(1);
   });
 });

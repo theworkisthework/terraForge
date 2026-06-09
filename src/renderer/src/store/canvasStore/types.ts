@@ -77,6 +77,9 @@ export interface ToolpathSlice {
     source: "local" | "fs" | "sd";
   } | null;
   showCentreMarker: boolean;
+  toolpathVisible: boolean;
+  toolpathColorized: boolean;
+  toolpathOpacity: number;
   plotProgressCuts: string;
   plotProgressRapids: string;
   gcodePreviewLoading: boolean;
@@ -85,6 +88,9 @@ export interface ToolpathSlice {
     src: { path: string; name: string; source: "local" | "fs" | "sd" } | null,
   ) => void;
   toggleCentreMarker: () => void;
+  setToolpathVisible: (visible: boolean) => void;
+  setToolpathColorized: (colorized: boolean) => void;
+  setToolpathOpacity: (opacity: number) => void;
   setGcodePreviewLoading: (loading: boolean) => void;
   setPlotProgress: (cuts: string, rapids: string) => void;
   clearPlotProgress: () => void;

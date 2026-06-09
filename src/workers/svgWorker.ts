@@ -13,7 +13,13 @@
  *   OUT ← { type: 'error', taskId, error }
  */
 
-import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
+import type {
+  VectorObject,
+  MachineConfig,
+  GcodeOptions,
+  InkServiceSettings,
+  InkServiceStation,
+} from "../types";
 import { isSolenoidPenType } from "../types";
 import {
   flattenToSubpaths,
@@ -50,6 +56,368 @@ function fmtSeconds(n: number): string {
     .toFixed(3)
     .replace(/\.0+$/, "")
     .replace(/(\.\d*?)0+$/, "$1");
+}
+
+interface TravelSubpath {
+  points: Subpath;
+  layer?: string;
+  color?: string;
+}
+
+interface ToolpathMetadata {
+  color?: string;
+  layer?: string;
+  dip?: string;
+}
+
+function encodeMarkerValue(value: string): string {
+  return encodeURIComponent(value).replace(/%20/g, "+");
+}
+
+function metadataKey(meta: ToolpathMetadata): string {
+  return [meta.color ?? "", meta.layer ?? "", meta.dip ?? ""].join("|");
+}
+
+function emitTfMarker(lines: string[], meta: ToolpathMetadata): void {
+  const tokens = [";@tf", "v=1"];
+  if (meta.color) tokens.push(`color=${encodeMarkerValue(meta.color)}`);
+  if (meta.layer) tokens.push(`layer=${encodeMarkerValue(meta.layer)}`);
+  if (meta.dip) tokens.push(`dip=${encodeMarkerValue(meta.dip)}`);
+  lines.push(tokens.join(" "));
+}
+
+function clampNumber(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function distanceMM(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.hypot(dx, dy);
+}
+
+function isEnabledStation(station: InkServiceStation): boolean {
+  return station.enabled !== false;
+}
+
+function chooseTriggerDistance(baseMM: number, jitterPct: number): number {
+  if (jitterPct <= 0) return baseMM;
+  const ratio = jitterPct / 100;
+  const scalar = 1 + (Math.random() * 2 - 1) * ratio;
+  return Math.max(1, baseMM * scalar);
+}
+
+function normalizeDipMapKey(value: string | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized || null;
+}
+
+function colorDipMapKey(color: string | undefined): string | null {
+  const normalizedColor = normalizeDipMapKey(color);
+  if (!normalizedColor) return null;
+  return `color:${normalizedColor}`;
+}
+
+function resolvePreferredDipStation(
+  layerDipStations: Record<string, string>,
+  layer: string | undefined,
+  color: string | undefined,
+): string | undefined {
+  if (layer) {
+    const mappedByLayer = layerDipStations[layer];
+    if (mappedByLayer) return mappedByLayer;
+  }
+
+  const colorKey = colorDipMapKey(color);
+  if (colorKey) {
+    const mappedByColor = layerDipStations[colorKey];
+    if (mappedByColor) return mappedByColor;
+  }
+
+  return undefined;
+}
+
+function emitRelativeZMove(lines: string[], deltaMM: number): void {
+  lines.push("G91 ; Relative mode");
+  lines.push(`G0 Z${fmt(deltaMM)}`);
+  lines.push("G90 ; Absolute mode");
+}
+
+function emitPrimePressAction(
+  lines: string[],
+  station: InkServiceStation,
+  dwellMs: number,
+): void {
+  const action = station.action;
+  if (!action || action.kind !== "prime-press") return;
+
+  const zDepth = Math.max(0, action.zDepthMM);
+  const pressCount = Math.max(1, Math.round(action.pressCount));
+
+  lines.push(
+    `; Prime action: ${pressCount} press${pressCount === 1 ? "" : "es"}, depth ${fmt(zDepth)} mm`,
+  );
+  for (let i = 0; i < pressCount; i++) {
+    if (zDepth > 0) {
+      emitRelativeZMove(lines, -zDepth);
+      if (dwellMs > 0) {
+        lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Prime press dwell`);
+      }
+      emitRelativeZMove(lines, zDepth);
+    } else if (dwellMs > 0) {
+      lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Prime press dwell`);
+    }
+  }
+}
+
+function emitCircularBrushMotion(
+  lines: string[],
+  station: InkServiceStation,
+  repetitions: number,
+  radiusMM: number,
+): void {
+  const segments = 12;
+  for (let rep = 0; rep < repetitions; rep++) {
+    lines.push(`G1 X${fmt(station.x + radiusMM)} Y${fmt(station.y)}`);
+    for (let i = 1; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      lines.push(
+        `G1 X${fmt(station.x + radiusMM * Math.cos(theta))} Y${fmt(station.y + radiusMM * Math.sin(theta))}`,
+      );
+    }
+    lines.push(`G1 X${fmt(station.x)} Y${fmt(station.y)}`);
+  }
+}
+
+function emitBackForthBrushMotion(
+  lines: string[],
+  station: InkServiceStation,
+  repetitions: number,
+  distanceMM: number,
+): void {
+  for (let rep = 0; rep < repetitions; rep++) {
+    lines.push(`G1 X${fmt(station.x + distanceMM)} Y${fmt(station.y)}`);
+    lines.push(`G1 X${fmt(station.x - distanceMM)} Y${fmt(station.y)}`);
+    lines.push(`G1 X${fmt(station.x)} Y${fmt(station.y)}`);
+  }
+}
+
+function emitBrushMotionAction(
+  lines: string[],
+  config: MachineConfig,
+  station: InkServiceStation,
+  dwellMs: number,
+): void {
+  const action = station.action;
+  if (!action || action.kind !== "brush-motion") return;
+
+  const zDepth = Math.max(0, action.zDepthMM);
+  const repetitions = Math.max(1, Math.round(action.repetitions));
+  const distanceMM = Math.max(0, action.distanceMM);
+
+  lines.push(
+    `; Brush action: ${action.pattern}, reps ${repetitions}, distance ${fmt(distanceMM)} mm, depth ${fmt(zDepth)} mm`,
+  );
+
+  // Service brush patterns use G1 XY moves, so emit an explicit feedrate
+  // before those moves to avoid firmware errors when no F word has appeared yet.
+  const serviceFeed = Math.max(1, Number(config.drawSpeed) || 1000);
+  lines.push(`G1 F${fmt(serviceFeed)} ; Service feedrate`);
+
+  if (zDepth > 0) {
+    emitRelativeZMove(lines, -zDepth);
+  }
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Brush settle dwell`);
+  }
+
+  if (action.pattern === "circular") {
+    emitCircularBrushMotion(lines, station, repetitions, distanceMM);
+  } else {
+    emitBackForthBrushMotion(lines, station, repetitions, distanceMM);
+  }
+
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Brush release dwell`);
+  }
+  if (zDepth > 0) {
+    emitRelativeZMove(lines, zDepth);
+  }
+}
+
+function emitStationContact(
+  lines: string[],
+  config: MachineConfig,
+  station: InkServiceStation,
+): void {
+  const dwellMs = Number.isFinite(station.dwellMs)
+    ? Math.max(0, station.dwellMs)
+    : 0;
+
+  lines.push(
+    `G0 X${fmt(station.x)} Y${fmt(station.y)} ; Service move: ${station.type} (${station.name})`,
+  );
+
+  if (station.action?.kind === "prime-press") {
+    emitPrimePressAction(lines, station, dwellMs);
+    return;
+  }
+  if (station.action?.kind === "brush-motion") {
+    emitBrushMotionAction(lines, config, station, dwellMs);
+    return;
+  }
+
+  lines.push(config.penDownCommand + " ; Service contact");
+  if (dwellMs > 0) {
+    lines.push(`G4 P${fmtSeconds(dwellMs / 1000)} ; Service dwell`);
+  }
+  lines.push(config.penUpCommand + " ; Service pen up");
+}
+
+function emitPrimeAndWipe(
+  lines: string[],
+  config: MachineConfig,
+  stations: InkServiceStation[],
+): boolean {
+  const prime = stations.find((s) => s.type === "prime");
+  const wipe = stations.find((s) => s.type === "wipe");
+  if (!prime && !wipe) return false;
+  lines.push("; -- Ink service: prime and wipe --");
+  if (prime) emitStationContact(lines, config, prime);
+  if (wipe) emitStationContact(lines, config, wipe);
+  lines.push("; -- End ink service --");
+  lines.push("");
+  return true;
+}
+
+function emitBrushDip(
+  lines: string[],
+  config: MachineConfig,
+  settings: InkServiceSettings,
+  stations: InkServiceStation[],
+  dipCursorRef: { value: number },
+  dipsSinceWashRef: { value: number },
+  currentDipIdRef: { value: string | null },
+  preferredDipStationId?: string,
+): boolean {
+  const dips = stations.filter((s) => s.type === "dip");
+  if (dips.length === 0) return false;
+  const wash = stations.find((s) => s.type === "wash");
+
+  const mappedDip = preferredDipStationId
+    ? dips.find((dip) => dip.id === preferredDipStationId)
+    : undefined;
+  const selectedDip = mappedDip
+    ? mappedDip
+    : settings.randomizeDipStation
+      ? dips[Math.floor(Math.random() * dips.length)]
+      : dips[dipCursorRef.value++ % dips.length];
+  let dip = selectedDip;
+
+  const trayChangeRequired =
+    currentDipIdRef.value !== null && currentDipIdRef.value !== selectedDip.id;
+
+  lines.push("; -- Ink service: brush dip --");
+
+  // Never change dip trays without washing first. If no wash station exists,
+  // stick to the current tray to avoid cross-contamination.
+  if (trayChangeRequired) {
+    if (wash) {
+      lines.push(
+        `; Tray change: ${currentDipIdRef.value} -> ${selectedDip.id}, wash first`,
+      );
+      emitStationContact(lines, config, wash);
+      dipsSinceWashRef.value = 0;
+    } else {
+      const currentDip = dips.find((s) => s.id === currentDipIdRef.value);
+      if (currentDip) {
+        dip = currentDip;
+        lines.push(
+          `; Tray change blocked (no wash station), staying on ${currentDip.id}`,
+        );
+      }
+    }
+  }
+
+  const washEvery = Math.max(1, settings.washEveryNDips ?? 1);
+  const shouldWashBeforeDip =
+    settings.includeWashMove && !!wash && dipsSinceWashRef.value >= washEvery;
+  if (shouldWashBeforeDip) {
+    emitStationContact(lines, config, wash); // Wash first to clean brush
+    dipsSinceWashRef.value = 0;
+  }
+
+  emitStationContact(lines, config, dip); // Then dip to pick up fresh paint
+  currentDipIdRef.value = dip.id;
+  dipsSinceWashRef.value += 1;
+
+  lines.push("; -- End ink service --");
+  lines.push("");
+  return true;
+}
+
+function emitInkServiceMove(
+  lines: string[],
+  config: MachineConfig,
+  settings: InkServiceSettings,
+  dipCursorRef: { value: number },
+  dipsSinceWashRef: { value: number },
+  currentDipIdRef: { value: string | null },
+  preferredDipStationId?: string,
+): boolean {
+  const triggerTravelMM = Number.isFinite(settings.triggerTravelMM)
+    ? settings.triggerTravelMM
+    : 0;
+  if (triggerTravelMM <= 0) return false;
+
+  const enabledStations = settings.stations.filter(isEnabledStation);
+  if (enabledStations.length === 0) return false;
+
+  lines.push(config.penUpCommand + " ; Pen up for service move");
+
+  if (settings.mode === "prime-wipe") {
+    return emitPrimeAndWipe(lines, config, enabledStations);
+  }
+  return emitBrushDip(
+    lines,
+    config,
+    settings,
+    enabledStations,
+    dipCursorRef,
+    dipsSinceWashRef,
+    currentDipIdRef,
+    preferredDipStationId,
+  );
+}
+
+function remapLayerMetadata(
+  previous: TravelSubpath[],
+  nextPoints: Subpath[],
+): TravelSubpath[] {
+  if (previous.length === 0) {
+    return nextPoints.map((points) => ({ points }));
+  }
+  return nextPoints.map((points) => {
+    const first = points[0];
+    let best = previous[0];
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const candidate of previous) {
+      const start = candidate.points[0];
+      const end = candidate.points[candidate.points.length - 1];
+      const startScore = distanceMM(first, start);
+      const endScore = distanceMM(first, end);
+      const score = Math.min(startScore, endScore);
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return { points, layer: best.layer, color: best.color };
+  });
 }
 
 function approximateObjectSubpaths(
@@ -193,6 +561,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   const returnToHome = options?.returnToHome ?? false;
   const customStartGcode = (options?.customStartGcode ?? "").trim();
   const customEndGcode = (options?.customEndGcode ?? "").trim();
+  const inkService = options?.inkService;
   const hasDelayOverride = typeof options?.penDownDelayMsOverride === "number";
   const rawDelayMs = hasDelayOverride
     ? options.penDownDelayMsOverride
@@ -248,6 +617,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   } else {
     lines.push("; Weed bd  : no");
   }
+  if (inkService) {
+    lines.push(
+      `; Dip svc  : ${inkService.mode}, every ${inkService.triggerTravelMM} mm (jitter +/-${inkService.triggerJitterPct ?? 0}%)`,
+    );
+  } else {
+    lines.push("; Dip svc  : no");
+  }
   lines.push(`; Generated: ${new Date().toISOString()}`);
   lines.push(
     "; ---------------------------------------------------------------",
@@ -296,7 +672,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
   };
 
   // ── Phase 1: collect all subpaths from all visible objects ────────────────
-  const allSubpaths: Subpath[] = [];
+  const allSubpaths: TravelSubpath[] = [];
   const yieldPh1 = makeYielder();
   let lastPct1 = -1;
   let lastColor: string | undefined = undefined;
@@ -351,7 +727,11 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
     for (const sp of processedSubpaths) {
       if (sp.length >= 2) {
-        allSubpaths.push(sp);
+        allSubpaths.push({
+          points: sp,
+          layer: obj.layer,
+          color: obj.sourceColor,
+        });
       }
     }
     const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
@@ -371,27 +751,47 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
   let orderedSubpaths = optimise
-    ? nearestNeighbourSort(allSubpaths, { allowReverse: allowPathReversal })
+    ? remapLayerMetadata(
+        allSubpaths,
+        nearestNeighbourSort(
+          allSubpaths.map((sp) => sp.points),
+          {
+            allowReverse: allowPathReversal,
+          },
+        ),
+      )
     : allSubpaths;
 
   // ── Phase 3: optional path joining ────────────────────────────────────────
   // Joining is applied after NN sort so that already-adjacent subpaths
   // (which NN sort placed next to each other) get merged where possible.
   if (doJoin) {
-    orderedSubpaths = joinSubpaths(orderedSubpaths, joinTol);
-  }
-
-  if (options?.vinylCutting) {
-    orderedSubpaths = applyVinylCompensation(
+    orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
-      options.vinylCutting,
+      joinSubpaths(
+        orderedSubpaths.map((sp) => sp.points),
+        joinTol,
+      ),
     );
   }
 
-  if (options?.vinylWeedBorder) {
-    orderedSubpaths = applyVinylWeedBorder(
+  if (options?.vinylCutting && options?.vinylWeedBorder) {
+    orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
-      options.vinylWeedBorder,
+      applyVinylWeedBorder(
+        orderedSubpaths.map((sp) => sp.points),
+        options.vinylWeedBorder,
+      ),
+    );
+  }
+
+  if (options?.vinylCutting) {
+    orderedSubpaths = remapLayerMetadata(
+      orderedSubpaths,
+      applyVinylCompensation(
+        orderedSubpaths.map((sp) => sp.points),
+        options.vinylCutting,
+      ),
     );
   }
 
@@ -404,16 +804,111 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lines.push(`; NOTE: skipped ${skippedObjects} invalid path object(s)`);
   }
 
+  const inkTriggerBase = Math.max(0, inkService?.triggerTravelMM ?? 0);
+  const inkTriggerJitter = clampNumber(
+    inkService?.triggerJitterPct ?? 0,
+    0,
+    100,
+  );
+  const dipCursorRef = { value: 0 };
+  const dipsSinceWashRef = { value: 0 };
+  const currentDipIdRef = { value: null as string | null };
+  const layerDipStations = inkService?.layerDipStations ?? {};
+  let nextInkServiceAt = chooseTriggerDistance(
+    inkTriggerBase,
+    inkTriggerJitter,
+  );
+  let lastMarkerKey: string | null = null;
+  let accumulatedDrawTravel = 0;
+  const canEmitInkService =
+    !!inkService &&
+    inkTriggerBase > 0 &&
+    inkService.stations.some(isEnabledStation);
+
+  const emitTriggeredInkService = (preferredDipStationId?: string): void => {
+    if (!canEmitInkService || !inkService) return;
+    const inserted = emitInkServiceMove(
+      lines,
+      config,
+      inkService,
+      dipCursorRef,
+      dipsSinceWashRef,
+      currentDipIdRef,
+      preferredDipStationId,
+    );
+    if (inserted) {
+      accumulatedDrawTravel = 0;
+      nextInkServiceAt = chooseTriggerDistance(
+        inkTriggerBase,
+        inkTriggerJitter,
+      );
+    }
+  };
+
   const yieldPh4 = makeYielder();
   let lastPct4 = -1;
+
+  // Prime/dip before first stroke so paint/ink is loaded before drawing.
+  if (canEmitInkService && orderedSubpaths.length > 0) {
+    const firstColor = orderedSubpaths[0]?.color;
+    const firstLayer = orderedSubpaths[0]?.layer;
+    const preferredFirstDip = resolvePreferredDipStation(
+      layerDipStations,
+      firstLayer,
+      firstColor,
+    );
+    const firstMeta: ToolpathMetadata = {
+      color: firstColor,
+      layer: firstLayer,
+      dip: preferredFirstDip,
+    };
+    const firstMetaKey = metadataKey(firstMeta);
+    if (firstMetaKey !== lastMarkerKey) {
+      emitTfMarker(lines, firstMeta);
+      lastMarkerKey = firstMetaKey;
+    }
+    emitTriggeredInkService(preferredFirstDip);
+  }
+
   for (let i = 0; i < orderedSubpaths.length; i++) {
     if (cancelled.has(taskId)) {
       cancelled.delete(taskId);
       self.postMessage({ type: "cancelled", taskId });
       return;
     }
-    const subpath = orderedSubpaths[i];
+    const subpath = orderedSubpaths[i].points;
+    const currentColor = orderedSubpaths[i].color;
+    const currentLayer = orderedSubpaths[i].layer;
+    const preferredDipStationId = resolvePreferredDipStation(
+      layerDipStations,
+      currentLayer,
+      currentColor,
+    );
+    const currentMeta: ToolpathMetadata = {
+      color: currentColor,
+      layer: currentLayer,
+      dip: preferredDipStationId,
+    };
+    const currentMetaKey = metadataKey(currentMeta);
+    const markerChanged = currentMetaKey !== lastMarkerKey;
+    if (markerChanged) {
+      emitTfMarker(lines, currentMeta);
+      lastMarkerKey = currentMetaKey;
+    }
+
+    // Ensure mapped color/layer dip assignments are honored even when the
+    // travel trigger is large by forcing a service move on dip-target changes.
+    if (
+      markerChanged &&
+      canEmitInkService &&
+      preferredDipStationId &&
+      currentDipIdRef.value !== preferredDipStationId
+    ) {
+      emitTriggeredInkService(preferredDipStationId);
+    }
+
     const first = subpath[0];
+
     lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
     const drawSpeed =
       typeof options?.drawSpeedOverride === "number"
@@ -424,8 +919,47 @@ async function generate(msg: GenerateMessage): Promise<void> {
     if (penDownDelayMs > 0) {
       lines.push(`G4 P${fmtSeconds(penDownDelayMs / 1000)} ; Pen settle delay`);
     }
+    let currentPoint = first;
     for (let s = 1; s < subpath.length; s++) {
-      lines.push(`G1 X${fmt(subpath[s].x)} Y${fmt(subpath[s].y)}`);
+      const targetPoint = subpath[s];
+      if (!canEmitInkService || !inkService) {
+        lines.push(`G1 X${fmt(targetPoint.x)} Y${fmt(targetPoint.y)}`);
+        currentPoint = targetPoint;
+        continue;
+      }
+
+      let segmentStart = currentPoint;
+      while (true) {
+        const remainingDistance = distanceMM(segmentStart, targetPoint);
+        if (remainingDistance <= 1e-9) {
+          currentPoint = targetPoint;
+          break;
+        }
+
+        const distanceToTrigger = nextInkServiceAt - accumulatedDrawTravel;
+        if (distanceToTrigger <= 1e-9) {
+          emitTriggeredInkService(preferredDipStationId);
+          continue;
+        }
+
+        if (remainingDistance + 1e-9 < distanceToTrigger) {
+          lines.push(`G1 X${fmt(targetPoint.x)} Y${fmt(targetPoint.y)}`);
+          accumulatedDrawTravel += remainingDistance;
+          currentPoint = targetPoint;
+          break;
+        }
+
+        const splitRatio = distanceToTrigger / remainingDistance;
+        const splitPoint = {
+          x: segmentStart.x + (targetPoint.x - segmentStart.x) * splitRatio,
+          y: segmentStart.y + (targetPoint.y - segmentStart.y) * splitRatio,
+        };
+        lines.push(`G1 X${fmt(splitPoint.x)} Y${fmt(splitPoint.y)}`);
+        accumulatedDrawTravel += distanceToTrigger;
+        segmentStart = splitPoint;
+        currentPoint = splitPoint;
+        emitTriggeredInkService(preferredDipStationId);
+      }
     }
     if (penUpDelayMs > 0) {
       lines.push(`G4 P${fmtSeconds(penUpDelayMs / 1000)} ; Pen lift delay`);
@@ -438,6 +972,20 @@ async function generate(msg: GenerateMessage): Promise<void> {
       self.postMessage({ type: "progress", taskId, percent: pct });
     }
     await yieldPh4();
+  }
+
+  const finalWashStation =
+    inkService?.mode === "brush-dip"
+      ? inkService.stations
+          .filter(isEnabledStation)
+          .find((station) => station.type === "wash")
+      : undefined;
+  if (finalWashStation && orderedSubpaths.length > 0) {
+    lines.push("; -- Final ink service: end wash --");
+    lines.push(config.penUpCommand + " ; Pen up for final wash");
+    emitStationContact(lines, config, finalWashStation);
+    lines.push("; -- End final ink service --");
+    lines.push("");
   }
 
   lines.push("; -- End of job -----------------------------------------------");
