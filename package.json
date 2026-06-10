@@ -124,6 +124,7 @@
   "build": {
     "appId": "com.terraforge.app",
     "productName": "terraForge",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
