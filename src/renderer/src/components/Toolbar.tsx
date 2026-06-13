@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
-import { useMachineStore } from "../store/machineStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { selectToolbarCanvasState } from "../store/canvasSelectors";
 import { useThemeStore } from "../store/themeStore";
@@ -13,6 +12,7 @@ import { useEditKeyboardShortcuts } from "../hooks/useEditKeyboardShortcuts";
 import { MachineSelector } from "./Toolbar/MachineSelector";
 import { ImportActions } from "./Toolbar/ImportActions";
 import { PageTemplateControls } from "./Toolbar/PageTemplateControls";
+import { ConnectionStatus } from "./Toolbar/ConnectionStatus";
 import { ToolbarDialogs } from "./Toolbar/ToolbarDialogs";
 import { useCanvasStore as useCanvasStoreUntyped } from "../store/canvasStore";
 
@@ -79,7 +79,15 @@ export function Toolbar({
   // ── Edit keyboard shortcuts ──────────────────────────────────────────────
   useEditKeyboardShortcuts(
     { selectedImportId, clipboardImport, allImportsSelected },
-    { copyImport, cutImport, pasteImport, selectAllImports, clearImports, undo, redo },
+    {
+      copyImport,
+      cutImport,
+      pasteImport,
+      selectAllImports,
+      clearImports,
+      undo,
+      redo,
+    },
   );
 
   // ── Menu IPC subscriptions (layout actions + import + about) ─────────────
@@ -113,7 +121,9 @@ export function Toolbar({
       .then((sizes) => {
         if (sizes.length > 0) setPageSizes(sizes);
       })
-      .catch(() => { /* keep built-in defaults */ });
+      .catch(() => {
+        /* keep built-in defaults */
+      });
   }, []);
 
   // ── Layout menu state ────────────────────────────────────────────────────
@@ -134,7 +144,7 @@ export function Toolbar({
         className="text-accent h-[22px] w-auto mr-2 shrink-0"
       />
 
-      {/* Machine selector + connect/disconnect + home + jog + status */}
+      {/* Machine selector + connect/disconnect + home + jog */}
       <MachineSelector
         showJog={showJog}
         onToggleJog={onToggleJog}
@@ -163,13 +173,20 @@ export function Toolbar({
         setPageSizes={setPageSizes}
       />
 
-      {/* Right side: theme + settings */}
+      {/* Right side: status + firmware info + theme + settings */}
       <div className="ml-auto flex items-center gap-3">
+        {/* Connection status indicator */}
+        <ConnectionStatus />
+
         <button
           onClick={toggleTheme}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
           aria-pressed={theme === "light"}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
           className="p-1.5 rounded bg-secondary hover:bg-secondary-hover transition-colors text-content-muted"
         >
           {theme === "dark" ? (
