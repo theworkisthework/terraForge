@@ -7,6 +7,7 @@
 
 import React, { useState } from "react";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { Button } from "../ui";
 import { TabHeader } from "../TabHeader";
 import { PEN_DEFAULTS } from "./utils/machineConfigDefaults";
 import {
@@ -53,13 +54,14 @@ export function MachineConfigDialog({ onClose }: Props) {
                 className="border-b-0"
               />
             </div>
-            <button
+            <Button
               onClick={onClose}
               aria-label="Dismiss"
-              className="text-content-muted hover:text-content transition-colors text-xl leading-none"
+              variant="ghost"
+              className="text-xl leading-none"
             >
               ×
-            </button>
+            </Button>
           </div>
 
           {activeTab === "machines" ? (
@@ -70,7 +72,7 @@ export function MachineConfigDialog({ onClose }: Props) {
 
           {activeTab === "machines" ? (
             <div className="flex items-center justify-between px-6 py-4 border-t border-border-ui">
-              <button
+              <Button
                 onClick={controller.handleActivate}
                 disabled={!selectedId || isNew || connected}
                 title={
@@ -78,34 +80,29 @@ export function MachineConfigDialog({ onClose }: Props) {
                     ? "Disconnect before switching the active machine"
                     : undefined
                 }
-                className="px-4 py-2 text-sm bg-green-700 hover:bg-green-600 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm bg-green-700 hover:bg-green-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Set as Active
-              </button>
+              </Button>
               <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm bg-secondary hover:bg-secondary-hover text-content rounded-lg transition-colors"
-                >
+                <Button variant="secondary" size="lg" onClick={onClose}>
                   Close
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
                   onClick={controller.handleSave}
                   disabled={!controller.isDirty || controller.isLocked}
-                  className="px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {controller.isDirty ? "Save Changes" : "Saved"}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-end px-6 py-4 border-t border-border-ui">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm bg-secondary hover:bg-secondary-hover text-content rounded-lg transition-colors"
-              >
+              <Button variant="secondary" size="lg" onClick={onClose}>
                 Close
-              </button>
+              </Button>
             </div>
           )}
         </div>

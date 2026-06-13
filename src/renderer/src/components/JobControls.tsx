@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
+import { Button } from "./ui";
+import type { ButtonVariant } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useMachineStore } from "../store/machineStore";
 import { useTaskStore } from "../store/taskStore";
@@ -70,24 +72,19 @@ export function JobControls() {
   const btn = (
     label: string,
     onClick: () => void,
-    variant: "primary" | "secondary" | "danger" = "secondary",
+    variant: ButtonVariant = "secondary",
     disabled = false,
     title?: string,
   ) => (
-    <button
-      onClick={onClick}
+    <Button
+      variant={variant}
+      className="w-full"
       disabled={disabled || !connected}
       title={title}
-      className={`w-full py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40 ${
-        variant === "primary"
-          ? "bg-accent hover:bg-accent-hover text-white"
-          : variant === "danger"
-            ? "bg-red-900/60 hover:bg-red-700/60 text-red-200"
-            : "bg-secondary hover:bg-secondary-hover text-content"
-      }`}
+      onClick={onClick}
     >
       {label}
-    </button>
+    </Button>
   );
 
   return (

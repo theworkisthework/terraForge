@@ -1,4 +1,5 @@
 import { Eye, EyeOff, Repeat } from "lucide-react";
+import { Button } from "../../../components/ui";
 
 interface PathRowProps {
   label: string;
@@ -36,8 +37,8 @@ export function PathRow({
         {visible ? <Eye size={9} /> : <EyeOff size={9} />}
       </span>
       {onTogglePassSettings && (
-        <button
-          className="text-content-faint hover:text-content"
+        <Button
+          variant="ghost"
           title="Open path pass settings"
           aria-label="Open path pass settings"
           onMouseDown={(event) => event.stopPropagation()}
@@ -47,13 +48,14 @@ export function PathRow({
           }}
         >
           <Repeat size={9} />
-        </button>
+        </Button>
       )}
-      <button
+      <Button
+        variant="ghost"
         className={`text-[9px] ${
           strokeAvailable
-            ? "text-content-faint hover:text-content cursor-pointer"
-            : "text-content-faint/40 cursor-not-allowed"
+            ? "hover:text-content"
+            : "opacity-40 cursor-not-allowed"
         }`}
         aria-label={
           strokeEnabled ? "Disable path stroke" : "Enable path stroke"
@@ -67,17 +69,18 @@ export function PathRow({
         disabled={!strokeAvailable}
       >
         S
-      </button>
+      </Button>
       <span className="flex-1 min-w-0 text-content-faint truncate">
         {label}
       </span>
-      <button
-        className="text-content-faint hover:text-accent"
+      <Button
+        variant="ghost"
+        className="hover:text-accent"
         title="Remove path"
         onClick={onRemove}
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
 import { useAppConfigStore } from "../store/appConfigStore";
+import { Button } from "./ui";
 import { JobControls } from "./JobControls";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useStableMachineState } from "../hooks/useStableMachineState";
@@ -85,14 +86,14 @@ export function ConsolePanel() {
             </span>
             {status &&
               (isAlarm ? (
-                <button
+                <Button
                   onClick={() => window.terraForge.fluidnc.sendCommand("$X")}
                   disabled={!connected}
                   title="Clear alarm ($X)"
-                  className="text-xs px-2 py-0.5 rounded bg-red-900 text-red-300 hover:bg-red-700 hover:text-white disabled:opacity-50 transition-colors animate-pulse"
+                  className="text-xs px-2 py-0.5 rounded bg-red-900 text-red-300 hover:bg-red-700 hover:text-white disabled:opacity-50 animate-pulse"
                 >
                   ⚠ ALARM — click to unlock
-                </button>
+                </Button>
               ) : (
                 <span
                   className={`text-xs px-2 py-0.5 rounded ${
@@ -121,21 +122,19 @@ export function ConsolePanel() {
           </div>
           <div className="flex items-center gap-2">
             {connected && (
-              <button
+              <Button
+                variant="secondary"
+                size="xs"
                 onClick={handleFirmwareReset}
                 disabled={resetting || showRestartConfirm}
                 title="Restart firmware (ESP32 reboot) — use when controller is stuck"
-                className="text-xs px-2 py-0.5 rounded bg-secondary hover:bg-secondary-hover text-content-muted disabled:opacity-50 transition-colors"
               >
                 {resetting ? "Restarting…" : "Restart FW"}
-              </button>
+              </Button>
             )}
-            <button
-              onClick={clear}
-              className="text-xs text-content-faint hover:text-content"
-            >
+            <Button variant="ghost" size="xs" onClick={clear}>
               Clear
-            </button>
+            </Button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-terminal text-green-400">
@@ -164,13 +163,15 @@ export function ConsolePanel() {
             placeholder={connected ? "Send command…" : "Not connected"}
             className="flex-1 bg-transparent font-mono text-xs text-green-400 placeholder-gray-700 outline-none disabled:opacity-40"
           />
-          <button
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={handleSend}
             disabled={!connected || !cmd.trim()}
-            className="text-[10px] px-2 py-0.5 rounded bg-secondary hover:bg-secondary-hover disabled:opacity-40 text-content-muted shrink-0 ml-1"
+            className="shrink-0 ml-1"
           >
             Send
-          </button>
+          </Button>
         </div>
       </div>
 

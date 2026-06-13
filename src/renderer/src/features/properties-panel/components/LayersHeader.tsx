@@ -1,3 +1,5 @@
+import { Button } from "../../../components/ui";
+
 interface LayersHeaderProps {
   show: boolean;
   onAddGroup: () => void;
@@ -11,13 +13,14 @@ export function LayersHeader({ show, onAddGroup }: LayersHeaderProps) {
       <span className="text-[10px] text-content-faint uppercase tracking-wider flex-1">
         Layers
       </span>
-      <button
-        className="text-content-faint hover:text-accent text-xs leading-none px-1"
+      <Button
+        variant="ghost"
+        className="text-xs leading-none px-1 hover:text-accent"
         title="Add layer group"
         onClick={onAddGroup}
       >
         +
-      </button>
+      </Button>
     </div>
   );
 }

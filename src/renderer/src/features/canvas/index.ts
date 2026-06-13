@@ -13,4 +13,6 @@ export * from "./components/ToolpathOverlay";
 export * from "./components/DeleteActionBadge";
 export * from "./components/CanvasOverlays";
 export * from "./components/CanvasSceneOverlays";
+export * from "./components/CanvasSvgContent";
+export * from "./components/CanvasHandleOverlays";
 export * from "./hooks";

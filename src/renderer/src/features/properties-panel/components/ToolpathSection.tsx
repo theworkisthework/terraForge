@@ -6,6 +6,7 @@ import {
   FileText,
   Palette,
 } from "lucide-react";
+import { Button } from "../../../components/ui";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import { estimateDuration, formatBytes } from "../utils/toolpathMetrics";
 
@@ -48,19 +49,20 @@ export function ToolpathSection({
         className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-secondary/20 ${selected ? "bg-secondary/20" : ""}`}
         onClick={onToggleSelected}
       >
-        <button
+        <Button
           aria-expanded={selected}
           aria-label={
             selected ? "Collapse toolpath details" : "Expand toolpath details"
           }
-          className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
+          variant="ghost"
+          className="w-4 shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onToggleSelected();
           }}
         >
           {selected ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-        </button>
+        </Button>
 
         <FileText className="shrink-0 text-sky-400" size={11} strokeWidth={2} />
 
@@ -71,8 +73,9 @@ export function ToolpathSection({
           {fileName}
         </span>
 
-        <button
-          className="ml-1 shrink-0 text-content-faint hover:text-content"
+        <Button
+          variant="ghost"
+          className="ml-1 shrink-0"
           title={
             colorized
               ? "Disable colorized toolpath"
@@ -92,10 +95,11 @@ export function ToolpathSection({
             size={11}
             className={colorized ? "text-sky-400" : "text-content-faint"}
           />
-        </button>
+        </Button>
 
-        <button
-          className="ml-1 shrink-0 text-content-faint hover:text-content"
+        <Button
+          variant="ghost"
+          className="ml-1 shrink-0"
           title={visible ? "Hide toolpath" : "Show toolpath"}
           aria-label={visible ? "Hide toolpath" : "Show toolpath"}
           onClick={(e) => {
@@ -104,13 +108,12 @@ export function ToolpathSection({
           }}
         >
           {visible ? <Eye size={11} /> : <EyeOff size={11} />}
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="ghost"
           className={`ml-1 shrink-0 ${
-            isJobActive
-              ? "text-content-faint opacity-30 cursor-not-allowed"
-              : "text-content-faint hover:text-accent"
+            isJobActive ? "opacity-30 cursor-not-allowed" : "hover:text-accent"
           }`}
           title={
             isJobActive
@@ -124,7 +127,7 @@ export function ToolpathSection({
           }}
         >
           ✕
-        </button>
+        </Button>
       </div>
 
       {selected && (
