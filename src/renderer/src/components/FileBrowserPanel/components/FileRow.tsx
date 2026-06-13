@@ -1,5 +1,6 @@
 import { formatFileSize, isGcodeFile } from "../utils/pathUtils";
 import type { RemoteFile } from "../../../../../types";
+import { Button } from "../../ui";
 
 interface FileRowProps {
   file: RemoteFile;
@@ -74,44 +75,49 @@ export function FileRow({
           className={`gap-0.5 shrink-0 ${isActiveJob || isLoadingThis ? "flex" : "hidden group-hover:flex"}`}
         >
           {isGcode && (
-            <button
-              onClick={(e) => {
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 onPreview(file);
               }}
               title="Preview toolpath"
               disabled={previewing === file.path || anyJobActive}
-              className="text-[9px] px-1 py-0.5 rounded bg-secondary/50 hover:bg-secondary disabled:opacity-50"
             >
               {previewing === file.path ? "…" : "👁"}
-            </button>
+            </Button>
           )}
 
           {isGcode && isThisRunning ? (
-            <button
-              onClick={(e) => {
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 window.terraForge.fluidnc.pauseJob();
               }}
               title="Pause job"
-              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover text-white"
             >
               ⏸
-            </button>
+            </Button>
           ) : isGcode && isThisHeld ? (
-            <button
-              onClick={(e) => {
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 window.terraForge.fluidnc.resumeJob();
               }}
               title="Resume job"
-              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover text-white"
             >
               ▶
-            </button>
+            </Button>
           ) : isGcode ? (
-            <button
-              onClick={(e) => {
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 onRun(file);
               }}
@@ -123,14 +129,15 @@ export function FileRow({
                     : "Run job now"
               }
               disabled={isLoadingThis || anyJobActive || hasRunningTransfer}
-              className="text-[9px] px-1 py-0.5 rounded bg-accent hover:bg-accent-hover disabled:opacity-50 text-white"
             >
               ▶
-            </button>
+            </Button>
           ) : null}
 
-          <button
-            onClick={(e) => {
+          <Button
+            variant="secondary"
+            size="xs"
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onDownload(file);
             }}
@@ -144,13 +151,14 @@ export function FileRow({
                     ? "File download not available over serial"
                     : "Download"
             }
-            className="text-[9px] px-1 py-0.5 rounded bg-secondary hover:bg-secondary-hover disabled:opacity-40"
           >
             ↓
-          </button>
+          </Button>
 
-          <button
-            onClick={(e) => {
+          <Button
+            variant="danger"
+            size="xs"
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onDelete(file);
             }}
@@ -158,10 +166,9 @@ export function FileRow({
             title={
               anyJobActive ? "Unavailable while a job is running" : "Delete"
             }
-            className="text-[9px] px-1 py-0.5 rounded bg-red-900/50 hover:bg-red-700/60 disabled:opacity-40"
           >
             ✕
-          </button>
+          </Button>
         </div>
       )}
     </div>

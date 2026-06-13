@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import TerraForgeLogo from "../assets/terraForgeAnimated.svg?react";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
+import { Button } from "./ui";
 
 interface Props {
   onClose: () => void;
@@ -80,13 +81,14 @@ export function AboutDialog({ onClose }: Props) {
         </div>
 
         {/* Close */}
-        <button
+        <Button
+          variant="secondary"
           onClick={onClose}
           autoFocus
-          className="mt-1 px-5 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
+          className="mt-1 px-5"
         >
           Close
-        </button>
+        </Button>
       </div>
     </div>
   );

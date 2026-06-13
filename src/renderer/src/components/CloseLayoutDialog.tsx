@@ -11,6 +11,7 @@
  */
 
 import React from "react";
+import { Button } from "./ui";
 
 interface Props {
   /** Number of imported objects, used to build the message. */
@@ -59,30 +60,15 @@ export function CloseLayoutDialog({
         </p>
 
         <div className="flex gap-2 justify-end mt-1">
-          {/* Cancel — neutral, left-most */}
-          <button
-            onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
-          >
+          <Button variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
-
-          {/* Exit without Saving — neutral-destructive */}
-          <button
-            onClick={onDiscard}
-            className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
-          >
+          </Button>
+          <Button variant="secondary" onClick={onDiscard}>
             Exit without Saving
-          </button>
-
-          {/* Save and Exit — primary accent */}
-          <button
-            onClick={onSave}
-            autoFocus
-            className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hover transition-colors text-white"
-          >
+          </Button>
+          <Button variant="primary" onClick={onSave} autoFocus>
             Save and Exit
-          </button>
+          </Button>
         </div>
       </div>
     </div>

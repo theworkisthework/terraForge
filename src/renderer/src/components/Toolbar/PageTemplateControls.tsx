@@ -1,5 +1,6 @@
 import { PenLine } from "lucide-react";
 import type { PageSize, PageTemplate } from "../../../../types";
+import { Button } from "../ui";
 
 interface PageTemplateControlsProps {
   pageTemplate: PageTemplate | null;
@@ -43,7 +44,9 @@ export function PageTemplateControls({
 
       {/* Portrait / landscape toggle — only shown when a page is selected */}
       {pageTemplate && (
-        <button
+        <Button
+          variant="secondary"
+          size="icon-sm"
           onClick={() =>
             setPageTemplate({
               ...pageTemplate,
@@ -51,7 +54,6 @@ export function PageTemplateControls({
               marginMM: pageTemplate.marginMM ?? 20,
             })
           }
-          className="w-7 h-7 rounded bg-secondary hover:bg-secondary-hover transition-colors flex items-center justify-center text-content-muted"
           title={
             pageTemplate.landscape
               ? "Landscape — click to switch to portrait"
@@ -87,7 +89,7 @@ export function PageTemplateControls({
               <rect x="0.75" y="0.75" width="9.5" height="13.5" rx="1" />
             </svg>
           )}
-        </button>
+        </Button>
       )}
 
       {/* Margin input — only shown when a page is selected */}
@@ -116,13 +118,14 @@ export function PageTemplateControls({
       )}
 
       {/* Edit custom page sizes file */}
-      <button
+      <Button
+        variant="secondary"
+        size="icon-sm"
         onClick={() => window.terraForge.config.openPageSizesFile()}
-        className="w-7 h-7 rounded bg-secondary hover:bg-secondary-hover transition-colors flex items-center justify-center text-content-faint"
         title="Edit custom page sizes (opens page-sizes.json in your default editor)"
       >
         <PenLine size={12} />
-      </button>
+      </Button>
     </div>
   );
 }

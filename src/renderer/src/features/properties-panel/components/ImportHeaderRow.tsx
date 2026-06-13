@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Button } from "../../../components/ui";
 import { useImportHeaderRowModel } from "../hooks/useImportHeaderRowModel";
 import { ImportNameField } from "./ImportNameField";
 import type { ImportHeaderRowProps } from "./ImportHeaderRow.types";
@@ -57,14 +58,15 @@ export function ImportHeaderRow({
         ⠿
       </span>
 
-      <button
+      <Button
         aria-expanded={isExpanded}
         aria-label={isExpanded ? "Collapse paths" : "Expand paths"}
-        className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
+        variant="ghost"
+        className="w-4 shrink-0"
         onClick={onExpandClick}
       >
         {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-      </button>
+      </Button>
 
       <span
         className="text-content-faint hover:text-content text-[10px] cursor-pointer shrink-0"
@@ -87,13 +89,14 @@ export function ImportHeaderRow({
       <span className="text-[9px] text-content-faint shrink-0 ml-1">
         {imp.paths.length}p
       </span>
-      <button
-        className="ml-1 text-content-faint hover:text-accent shrink-0"
+      <Button
+        variant="ghost"
+        className="ml-1 hover:text-accent shrink-0"
         title="Delete import"
         onClick={onDeleteClick}
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

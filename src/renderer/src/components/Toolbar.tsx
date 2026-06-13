@@ -9,6 +9,7 @@ import { useImportActions } from "../features/imports/hooks/useImportActions";
 import { useLayoutActions } from "../features/layout/hooks/useLayoutActions";
 import { useJobActions } from "../features/machine/hooks/useJobActions";
 import { useEditKeyboardShortcuts } from "../hooks/useEditKeyboardShortcuts";
+import { Button } from "./ui";
 import { MachineSelector } from "./Toolbar/MachineSelector";
 import { ImportActions } from "./Toolbar/ImportActions";
 import { PageTemplateControls } from "./Toolbar/PageTemplateControls";
@@ -178,7 +179,9 @@ export function Toolbar({
         {/* Connection status indicator */}
         <ConnectionStatus />
 
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={toggleTheme}
           aria-label={
             theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
@@ -187,23 +190,23 @@ export function Toolbar({
           title={
             theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
           }
-          className="p-1.5 rounded bg-secondary hover:bg-secondary-hover transition-colors text-content-muted"
         >
           {theme === "dark" ? (
             <Sun size={14} aria-hidden="true" />
           ) : (
             <Moon size={14} aria-hidden="true" />
           )}
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setShowSettings(true)}
           aria-label="Machine settings"
           title="Machine settings"
-          className="px-2 py-1 rounded text-sm bg-secondary hover:bg-secondary-hover transition-colors"
         >
           ⚙
-        </button>
+        </Button>
       </div>
 
       {/* Dialogs rendered at header level */}

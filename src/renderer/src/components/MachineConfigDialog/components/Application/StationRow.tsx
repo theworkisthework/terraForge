@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "../../../ui";
 import type {
   InkServiceStation,
   InkServiceStationAction,
@@ -111,21 +112,21 @@ export function StationRow({
       </div>
 
       <div className="col-span-2 flex gap-1 justify-end">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => void handleTestStationLocation(station)}
-          className="px-2 py-1 text-xs rounded bg-secondary hover:bg-secondary-hover text-content"
         >
           Test
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
           onClick={() => removeInkServiceStation(station.id)}
           disabled={!canRemove}
-          className="px-2 py-1 text-xs rounded bg-red-700/80 hover:bg-red-700 text-white disabled:opacity-40"
         >
           Remove
-        </button>
+        </Button>
       </div>
 
       {(station.type === "prime" ||
@@ -264,7 +265,9 @@ export function StationRow({
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-content-faint">Z Depth (mm)</label>
+                <label className="text-xs text-content-faint">
+                  Z Depth (mm)
+                </label>
                 <input
                   type="number"
                   min={0}

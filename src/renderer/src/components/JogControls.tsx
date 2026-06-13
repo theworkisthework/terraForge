@@ -14,6 +14,7 @@ import {
 import { isSolenoidPenType, type JogStep } from "../../../types";
 import { useMachineStore } from "../store/machineStore";
 import { Tooltip } from "./Tooltip";
+import { Button } from "./ui";
 
 const STEPS: JogStep[] = [0.1, 1, 10, 100];
 
@@ -79,12 +80,9 @@ export function JogControls({ onClose }: Props) {
           Jog Controls
         </span>
         {onClose && (
-          <button
-            onClick={onClose}
-            className="text-content-faint hover:text-content text-xs"
-          >
+          <Button variant="ghost" size="xs" onClick={onClose}>
             ✕
-          </button>
+          </Button>
         )}
       </div>
 
@@ -96,12 +94,14 @@ export function JogControls({ onClose }: Props) {
             text="Selected increment to move X, Y & Z by"
             className="flex-1"
           >
-            <button
+            <Button
+              variant="toggle"
+              selected={step === s}
               onClick={() => setStep(s)}
-              className={`w-full py-1 rounded text-xs transition-colors ${step === s ? "bg-accent text-white" : "bg-secondary hover:bg-secondary-hover text-content-muted"}`}
+              className="w-full"
             >
               {s}
-            </button>
+            </Button>
           </Tooltip>
         ))}
       </div>
@@ -156,26 +156,28 @@ export function JogControls({ onClose }: Props) {
       {/* Pen down / up / zero-Z */}
       <div className="flex gap-1 justify-center mb-4">
         <Tooltip text={penDownTitle}>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             aria-label="Pen down"
             onClick={() => movePen(-1)}
             disabled={!connected || (isSolenoidPenType(penType) && !penDown)}
-            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <PenLine size={15} />
             <ArrowDown size={11} />
-          </button>
+          </Button>
         </Tooltip>
         <Tooltip text={penUpTitle}>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             aria-label="Pen up"
             onClick={() => movePen(1)}
             disabled={!connected || (isSolenoidPenType(penType) && !penUp)}
-            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-0.5"
           >
             <Pen size={15} />
             <ArrowUp size={11} />
-          </button>
+          </Button>
         </Tooltip>
         <Tooltip
           text={
@@ -184,16 +186,17 @@ export function JogControls({ onClose }: Props) {
               : "Zero Z axis (set current Z position as Z0)"
           }
         >
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             aria-label="Zero Z"
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 Z0");
             }}
             disabled={!connected || isSolenoidPenType(penType)}
-            className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors disabled:opacity-40 flex items-center justify-center"
           >
             <CircleSlash2 size={14} />
-          </button>
+          </Button>
         </Tooltip>
       </div>
 
@@ -221,28 +224,30 @@ export function JogControls({ onClose }: Props) {
           Positioning
         </span>
         <Tooltip text="Run the machine homing cycle ($H)">
-          <button
+          <Button
+            variant="secondary"
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("$H");
             }}
             disabled={!connected}
-            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+            className="w-full"
+            icon={<House size={13} />}
           >
-            <House size={13} />
             Run Homing
-          </button>
+          </Button>
         </Tooltip>
         <Tooltip text="Set the current position as X0, Y0 (Z is unaffected)">
-          <button
+          <Button
+            variant="secondary"
             onClick={async () => {
               await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
             }}
             disabled={!connected}
-            className="w-full py-1.5 rounded text-xs bg-secondary hover:bg-secondary-hover text-content transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+            className="w-full"
+            icon={<CircleSlash2 size={13} />}
           >
-            <CircleSlash2 size={13} />
             Set Zero
-          </button>
+          </Button>
         </Tooltip>
       </div>
     </div>
@@ -263,14 +268,16 @@ function JogBtn({
   disabled?: boolean;
 }) {
   const btn = (
-    <button
-      onClick={onClick}
+    <Button
+      variant="secondary"
+      size="sm"
       aria-label={ariaLabel}
       disabled={disabled}
-      className="py-1.5 px-2 rounded text-xs bg-secondary hover:bg-secondary-hover active:bg-accent text-content transition-colors font-mono flex items-center justify-center w-full disabled:opacity-40"
+      onClick={onClick}
+      className="w-full font-mono"
     >
       {label}
-    </button>
+    </Button>
   );
   return title ? <Tooltip text={title}>{btn}</Tooltip> : btn;
 }

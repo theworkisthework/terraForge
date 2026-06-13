@@ -1,3 +1,6 @@
+import { Button } from "../../ui";
+import type { ButtonProps } from "../../ui";
+
 interface GcodeOptionsDialogActionsProps {
   disabled: boolean;
   onCancel: () => void;
@@ -19,19 +22,12 @@ export function GcodeOptionsDialogActions({
       )}
 
       <div className="flex gap-2 justify-end mt-1">
-        <button
-          onClick={onCancel}
-          className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
-        >
+        <Button variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={disabled}
-          className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white"
-        >
+        </Button>
+        <Button variant="primary" onClick={onConfirm} disabled={disabled}>
           Generate
-        </button>
+        </Button>
       </div>
     </>
   );

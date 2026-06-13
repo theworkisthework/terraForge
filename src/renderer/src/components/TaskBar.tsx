@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTaskStore } from "../store/taskStore";
 import type { BackgroundTask } from "../../../../types";
+import { Button } from "./ui";
 
 /** Completed / cancelled toasts auto-dismiss after this delay. */
 const DISMISS_MS = 8000;
@@ -111,23 +112,25 @@ function Toast({ task }: { task: BackgroundTask }) {
 
       {/* Cancel (running) or dismiss (finished) */}
       {isRunning ? (
-        <button
+        <Button
+          variant="ghost"
           onClick={() => cancelTask(task.id)}
-          className="text-content-faint hover:text-accent text-xs shrink-0 leading-none ml-1"
           aria-label="Cancel task"
           title="Cancel task"
+          className="text-xs shrink-0 leading-none ml-1 hover:text-accent"
         >
           ✕
-        </button>
+        </Button>
       ) : (
-        <button
+        <Button
+          variant="ghost"
           onClick={() => removeTask(task.id)}
-          className="text-content-faint hover:text-content-muted text-xs shrink-0 leading-none ml-1"
           aria-label="Dismiss"
           title="Dismiss"
+          className="text-xs shrink-0 leading-none ml-1 hover:text-content-muted"
         >
           ✕
-        </button>
+        </Button>
       )}
     </div>
   );

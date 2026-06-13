@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "../../../ui";
 import { Field } from "../Field";
 import { Section } from "../Section";
 import { PEN_DEFAULTS } from "../../utils/machineConfigDefaults";
@@ -75,16 +76,18 @@ export function MachinePenCommandsSection({
         </Field>
       </div>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleSwapCommands}
-          className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors font-mono"
           title="Swap pen-up and pen-down commands (useful for reversed solenoid wiring)"
+          className="font-mono"
         >
           ⇕ Swap up / down
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => {
             const d = PEN_DEFAULTS[form.penType];
             change({
@@ -94,11 +97,10 @@ export function MachinePenCommandsSection({
               penUpDelayMs: d.penUpDelayMs,
             });
           }}
-          className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content-muted rounded transition-colors"
           title="Reset to default commands for the selected pen type"
         >
           ↺ Reset to defaults
-        </button>
+        </Button>
         <span className="text-xs text-content-faint">
           {form.penType === "solenoid-hardware"
             ? "Solenoid (Hardware): M3S0/M3S1 drive the DRV120 output"
@@ -112,7 +114,9 @@ export function MachinePenCommandsSection({
           <input
             type="checkbox"
             checked={softwareSolenoidUsesMachineCoordinates}
-            onChange={(e) => handleMachineCoordinateToggle(e.currentTarget.checked)}
+            onChange={(e) =>
+              handleMachineCoordinateToggle(e.currentTarget.checked)
+            }
             className="accent-accent"
           />
           <span>Use machine coordinates for pen commands (prefix G53)</span>

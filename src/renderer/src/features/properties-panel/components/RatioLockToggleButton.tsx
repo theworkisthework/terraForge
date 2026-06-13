@@ -1,4 +1,5 @@
 import { Lock, Unlock } from "lucide-react";
+import { Button } from "../../../components/ui";
 
 interface RatioLockToggleButtonProps {
   ratioLocked: boolean;
@@ -14,12 +15,12 @@ export function RatioLockToggleButton({
   onClick,
 }: RatioLockToggleButtonProps) {
   return (
-    <button className={className} title={title} onClick={onClick}>
+    <Button className={className} title={title} onClick={onClick}>
       {ratioLocked ? (
         <Lock size={12} strokeWidth={2} />
       ) : (
         <Unlock size={12} strokeWidth={2} />
       )}
-    </button>
+    </Button>
   );
 }

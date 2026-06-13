@@ -1,4 +1,5 @@
 import { useMachineStore } from "../../store/machineStore";
+import { Button } from "../ui";
 
 interface MachineSelectorProps {
   showJog: boolean;
@@ -41,67 +42,40 @@ export function MachineSelector({
 
       {/* Connect / disconnect */}
       {connected ? (
-        <button
+        <Button
+          variant="secondary"
           onClick={handleDisconnect}
-          className="px-3 py-1 rounded text-sm bg-secondary hover:bg-accent transition-colors"
+          className="hover:bg-accent"
         >
           Disconnect
-        </button>
+        </Button>
       ) : (
-        <button
+        <Button
+          variant="primary"
           onClick={handleConnect}
           disabled={!activeConfigId || isConnecting}
-          className="px-3 py-1 rounded text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 transition-colors text-white flex items-center gap-1.5"
+          loading={isConnecting}
         >
-          {isConnecting ? (
-            <>
-              <svg
-                className="animate-spin h-3 w-3 shrink-0"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                />
-              </svg>
-              Connecting…
-            </>
-          ) : (
-            "Connect"
-          )}
-        </button>
+          {isConnecting ? "Connecting…" : "Connect"}
+        </Button>
       )}
 
       <div className="h-4 w-px bg-border-ui" />
 
       {/* Home */}
-      <button
+      <Button
+        variant="secondary"
         onClick={() => window.terraForge.fluidnc.sendCommand("$H")}
         disabled={!connected}
         title="Run homing cycle ($H)"
-        className="px-3 py-1 rounded text-sm bg-secondary hover:bg-secondary-hover disabled:opacity-40 transition-colors"
       >
         Home
-      </button>
+      </Button>
 
       {/* Jog toggle */}
-      <button
-        onClick={onToggleJog}
-        className={`px-3 py-1 rounded text-sm transition-colors ${showJog ? "bg-accent text-white" : "bg-secondary hover:bg-secondary-hover text-content"}`}
-      >
+      <Button variant="toggle" selected={showJog} onClick={onToggleJog}>
         Jog
-      </button>
+      </Button>
     </>
   );
 }
