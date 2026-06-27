@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { Moon, Sun } from "lucide-react";
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { useCanvasStore } from "../store/canvasStore";
@@ -9,12 +8,12 @@ import { useImportActions } from "../features/imports/hooks/useImportActions";
 import { useLayoutActions } from "../features/layout/hooks/useLayoutActions";
 import { useJobActions } from "../features/machine/hooks/useJobActions";
 import { useEditKeyboardShortcuts } from "../hooks/useEditKeyboardShortcuts";
-import { Button } from "./ui";
 import { MachineSelector } from "./Toolbar/MachineSelector";
 import { ImportActions } from "./Toolbar/ImportActions";
 import { PageTemplateControls } from "./Toolbar/PageTemplateControls";
-import { ConnectionStatus } from "./Toolbar/ConnectionStatus";
 import { ToolbarDialogs } from "./Toolbar/ToolbarDialogs";
+import { ToolbarRightSection } from "./Toolbar/ToolbarRightSection";
+import { useToolbarEffects } from "./Toolbar/useToolbarEffects";
 import { useCanvasStore as useCanvasStoreUntyped } from "../store/canvasStore";
 
 interface ToolbarProps {
@@ -26,7 +25,7 @@ export function Toolbar({
   showJog = false,
   onToggleJog = () => {},
 }: ToolbarProps = {}) {
-  // ── Machine store ─────────────────────────────────────────────────────────
+  // ── Theme ────────────────────────────────────────────────────────────────
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
 
@@ -77,6 +76,18 @@ export function Toolbar({
     generating,
   } = useJobActions();
 
+  // ── Side effects ─────────────────────────────────────────────────────────
+  useToolbarEffects({
+    handleImport,
+    loadLayoutRef,
+    saveLayoutRef,
+    closeLayoutRef,
+    setShowAbout,
+    setPageSizes,
+    importsLength: imports.length,
+    selectedImportId,
+  });
+
   // ── Edit keyboard shortcuts ──────────────────────────────────────────────
   useEditKeyboardShortcuts(
     { selectedImportId, clipboardImport, allImportsSelected },
@@ -90,52 +101,6 @@ export function Toolbar({
       redo,
     },
   );
-
-  // ── Menu IPC subscriptions (layout actions + import + about) ─────────────
-  useEffect(() => {
-    const unsubImport = window.terraForge.fs.onMenuImport(() => handleImport());
-    const unsubOpen = window.terraForge.fs.onMenuOpenLayout(() =>
-      loadLayoutRef.current(),
-    );
-    const unsubSave = window.terraForge.fs.onMenuSaveLayout(() =>
-      saveLayoutRef.current(),
-    );
-    const unsubClose = window.terraForge.fs.onMenuCloseLayout(() =>
-      closeLayoutRef.current(),
-    );
-    const unsubAbout = window.terraForge.app.onMenuAbout(() =>
-      setShowAbout(true),
-    );
-    return () => {
-      unsubImport();
-      unsubOpen();
-      unsubSave();
-      unsubClose();
-      unsubAbout();
-    };
-  }, []);
-
-  // ── Load custom page sizes on mount ──────────────────────────────────────
-  useEffect(() => {
-    window.terraForge.config
-      .loadPageSizes()
-      .then((sizes) => {
-        if (sizes.length > 0) setPageSizes(sizes);
-      })
-      .catch(() => {
-        /* keep built-in defaults */
-      });
-  }, []);
-
-  // ── Layout menu state ────────────────────────────────────────────────────
-  useEffect(() => {
-    window.terraForge.fs.setLayoutMenuState(imports.length > 0);
-  }, [imports.length]);
-
-  // ── Edit menu state ──────────────────────────────────────────────────────
-  useEffect(() => {
-    window.terraForge.edit.setHasSelection(selectedImportId !== null);
-  }, [selectedImportId]);
 
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-border-ui shrink-0">
@@ -174,40 +139,12 @@ export function Toolbar({
         setPageSizes={setPageSizes}
       />
 
-      {/* Right side: status + firmware info + theme + settings */}
-      <div className="ml-auto flex items-center gap-3">
-        {/* Connection status indicator */}
-        <ConnectionStatus />
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={toggleTheme}
-          aria-label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-          aria-pressed={theme === "light"}
-          title={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-        >
-          {theme === "dark" ? (
-            <Sun size={14} aria-hidden="true" />
-          ) : (
-            <Moon size={14} aria-hidden="true" />
-          )}
-        </Button>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setShowSettings(true)}
-          aria-label="Machine settings"
-          title="Machine settings"
-        >
-          ⚙
-        </Button>
-      </div>
+      {/* Right side: status + theme + settings */}
+      <ToolbarRightSection
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenSettings={() => setShowSettings(true)}
+      />
 
       {/* Dialogs rendered at header level */}
       <ToolbarDialogs
