@@ -75,9 +75,7 @@ export function ConsolePanel() {
           showRestartConfirm={showRestartConfirm}
           onFirmwareReset={() => setShowRestartConfirm(true)}
           onClear={clear}
-          onAlarmClear={() =>
-            window.terraForge.fluidnc.sendCommand("$X")
-          }
+          onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}
         />
 
         <ConsoleLog lines={lines} />
