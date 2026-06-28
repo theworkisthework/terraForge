@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Eye, EyeOff, Repeat } from "lucide-react";
+import { Button } from "../../../components/ui";
 
 interface LayerRowProps {
   name: string;
@@ -21,13 +22,14 @@ export function LayerRow({
 }: LayerRowProps) {
   return (
     <div className="flex items-center gap-1 py-0.5 text-[9px]">
-      <button
-        className="text-content-faint hover:text-content text-[9px] w-3 shrink-0"
+      <Button
+        variant="ghost"
+        className="w-3 shrink-0"
         title={expanded ? "Collapse layer" : "Expand layer"}
         onClick={onToggleExpanded}
       >
         {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-      </button>
+      </Button>
       <span
         className="text-content-faint hover:text-content cursor-pointer"
         onClick={onToggleVisible}
@@ -35,8 +37,8 @@ export function LayerRow({
       >
         {visible ? <Eye size={9} /> : <EyeOff size={9} />}
       </span>
-      <button
-        className="text-content-faint hover:text-content"
+      <Button
+        variant="ghost"
         title="Open layer pass settings"
         aria-label="Open layer pass settings"
         onMouseDown={(event) => event.stopPropagation()}
@@ -46,7 +48,7 @@ export function LayerRow({
         }}
       >
         <Repeat size={9} />
-      </button>
+      </Button>
       <span
         className="flex-1 min-w-0 text-[9px] font-medium text-content-muted truncate cursor-pointer"
         onClick={onToggleExpanded}

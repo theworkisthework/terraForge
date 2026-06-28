@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import { Button } from "../../../components/ui";
 import type { RotStep } from "../utils/rotation";
 
 interface RotationStepFlyoutProps {
@@ -20,14 +21,16 @@ export function RotationStepFlyout({
 }: RotationStepFlyoutProps) {
   return (
     <div className="relative">
-      <button
-        className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-content-muted hover:text-content rounded hover:bg-secondary/40 transition-colors"
+      <Button
+        variant="ghost-hover"
+        size="sm"
         title="Change rotation step"
         onClick={onToggleStepFlyout}
+        className="text-[10px]"
       >
         {rotStep}°
         <ChevronDown size={10} strokeWidth={2.5} />
-      </button>
+      </Button>
       {stepFlyoutOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={onCloseStepFlyout} />

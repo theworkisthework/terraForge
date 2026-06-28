@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "../../../ui";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -11,7 +12,9 @@ interface MachineConfigsSidebarProps {
   controller: MachineConfigDialogController;
 }
 
-export function MachineConfigsSidebar({ controller }: MachineConfigsSidebarProps) {
+export function MachineConfigsSidebar({
+  controller,
+}: MachineConfigsSidebarProps) {
   const {
     machineStore,
     selectedId,
@@ -63,22 +66,29 @@ export function MachineConfigsSidebar({ controller }: MachineConfigsSidebarProps
         )}
       </div>
       <div className="p-2 border-t border-border-ui flex gap-1">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
           onClick={handleNew}
           title="New config"
-          className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
         >
           + New
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
           onClick={handleDuplicate}
           disabled={!selectedId || isNew}
           title="Duplicate selected config"
-          className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Copy
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          className="flex-1"
           onClick={handleDelete}
           disabled={!selectedId || configs.length <= 1 || isLocked}
           title={
@@ -86,26 +96,29 @@ export function MachineConfigsSidebar({ controller }: MachineConfigsSidebarProps
               ? "Disconnect before deleting the active config"
               : "Delete selected config"
           }
-          className="flex-1 px-2 py-1.5 text-xs bg-red-800 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Del
-        </button>
+        </Button>
       </div>
       <div className="px-2 pb-2 flex gap-1">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
           onClick={handleExport}
           title="Export all configs to a JSON file"
-          className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
         >
           ↑ Export
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
           onClick={handleImport}
           title="Import configs from a JSON file"
-          className="flex-1 px-2 py-1.5 text-xs bg-secondary hover:bg-secondary-hover text-content rounded transition-colors"
         >
           ↓ Import
-        </button>
+        </Button>
       </div>
     </div>
   );

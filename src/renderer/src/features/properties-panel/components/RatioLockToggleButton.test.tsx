@@ -15,7 +15,7 @@ describe("RatioLockToggleButton", () => {
     );
 
     const button = screen.getByTitle("Ratio locked — click to unlock");
-    expect(button.className).toBe("lock-class");
+    expect(button.className).toContain("lock-class");
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });

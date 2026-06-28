@@ -1,5 +1,6 @@
 import type { DragEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "../../../components/ui";
 import type { LayerGroup } from "../../../../types";
 
 interface GroupHeaderRowProps {
@@ -60,14 +61,15 @@ export function GroupHeaderRow({
       onDragLeave={onDragLeaveGroup}
       onDrop={(e) => onDropGroup(e, group.id)}
     >
-      <button
+      <Button
         aria-expanded={!isCollapsed}
         aria-label={isCollapsed ? "Expand group" : "Collapse group"}
-        className="text-content-faint hover:text-content text-[10px] w-4 shrink-0"
+        variant="ghost"
+        className="w-4 shrink-0"
         onClick={() => onToggleCollapse(group.id)}
       >
         {isCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
-      </button>
+      </Button>
 
       <input
         type="color"
@@ -106,13 +108,14 @@ export function GroupHeaderRow({
         {membersCount}
       </span>
 
-      <button
-        className="text-content-faint hover:text-accent shrink-0"
+      <Button
+        variant="ghost"
+        className="hover:text-accent shrink-0"
         title="Delete group (layers become ungrouped)"
         onClick={() => onRemoveGroup(group.id)}
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

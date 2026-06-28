@@ -16,6 +16,7 @@
  */
 
 import React from "react";
+import { Button } from "./ui";
 
 interface Props {
   title?: string;
@@ -82,19 +83,13 @@ export function ConfirmDialog({
 
           <div className="flex gap-2 justify-end mt-1">
             {onCancel && (
-              <button
-                onClick={onCancel}
-                className="px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary-hover transition-colors text-content"
-              >
+              <Button variant="secondary" onClick={onCancel}>
                 {cancelLabel}
-              </button>
+              </Button>
             )}
-            <button
-              onClick={onConfirm}
-              className="px-3 py-1.5 text-sm rounded transition-colors text-white bg-accent hover:bg-accent-hover"
-            >
+            <Button variant="primary" onClick={onConfirm}>
               {confirmLabel}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

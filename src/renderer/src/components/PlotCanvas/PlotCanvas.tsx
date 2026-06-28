@@ -12,21 +12,14 @@
 // DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
 // ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import { useRef } from "react";
-import { useCanvasStore } from "../../store/canvasStore";
 import { usePlotProgress } from "../../utils/usePlotProgress";
 import {
-  BedLayer,
-  GridLayer,
   RulerOverlay,
-  ImportLayer,
-  GroupHandleOverlay,
-  HandleOverlay,
-  PageTemplateOverlay,
-  ToolpathHitAreaOverlay,
   ToolpathSelectionOverlay,
   PenCrosshairOverlay,
-  InkServiceStationsOverlay,
   ToolpathOverlay,
+  CanvasSvgContent,
+  CanvasHandleOverlays,
   useViewport,
   useCanvasPanZoom,
 } from "../../features/canvas";
@@ -248,7 +241,6 @@ export function PlotCanvas() {
 
   // ── Toolpath canvas overlay — see ToolpathOverlay component below ────────────
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
@@ -257,9 +249,8 @@ export function PlotCanvas() {
       onMouseDown={onContainerMouseDown}
       onContextMenu={onContextMenu}
     >
-      {/* ── Toolpath canvas — renders G-code paths with per-frame LOD.
-           Positioned below the main SVG so SVG imports appear on top.
-           pointerEvents:none keeps all click/drag handling on the SVG layer. ── */}
+      {/* Toolpath canvas — renders G-code paths with per-frame LOD.
+          Positioned below the main SVG so SVG imports appear on top. */}
       <ToolpathOverlay
         vp={vp}
         containerSize={containerSize}
@@ -289,157 +280,64 @@ export function PlotCanvas() {
         theme={theme}
       />
 
-      {/* ── Canvas SVG — fills the container; viewBox drives pan/zoom so the
-           browser renders all paths at native screen resolution instead of
-           rasterising a CSS-scaled compositing layer (which causes blurriness). ── */}
-      <svg
-        ref={svgRef}
-        style={{ position: "absolute", top: 0, left: 0, display: "block" }}
-        width={containerSize.w || canvasW}
-        height={containerSize.h || canvasH}
-        viewBox={
-          containerSize.w > 0
-            ? `${-vp.panX / vp.zoom} ${-vp.panY / vp.zoom} ${containerSize.w / vp.zoom} ${containerSize.h / vp.zoom}`
-            : `0 0 ${canvasW} ${canvasH}`
-        }
-        className="cursor-default"
-        onClick={() => {
-          // Suppress deselect if a drag/scale/rotate/pan gesture just ended;
-          // the browser synthesises a click on mouseup even after a drag.
-          if (justDraggedRef.current) {
-            justDraggedRef.current = false;
-            return;
-          }
-          selectImport(null);
-          selectToolpath(false);
-        }}
-      >
-        {/* Bed background — filled by the canvas layer behind this SVG.
-             fill="none" here so the canvas #0d1117 rect shows through. */}
-        <BedLayer bedW={bedW} bedH={bedH} />
+      {/* SVG scene — bed, grid, imports */}
 
-        {/* Grid — 10 mm intervals, major every 50 mm */}
-        <GridLayer bedW={bedW} bedH={bedH} getBedY={getBedY} />
+      <CanvasSvgContent
+        bedW={bedW}
+        bedH={bedH}
+        getBedY={getBedY}
+        getBedX={getBedX}
+        vp={vp}
+        containerSize={containerSize}
+        canvasW={canvasW}
+        canvasH={canvasH}
+        pageTemplate={pageTemplate}
+        pageSizes={pageSizes}
+        inkServiceStations={inkServiceStations}
+        showInkServiceStationsOnCanvas={showInkServiceStationsOnCanvas}
+        gcodeToolpathBounds={gcodeToolpath?.bounds ?? null}
+        isCenter={isCenter}
+        isRight={isRight}
+        isBottom={isBottom}
+        imports={imports}
+        selectedImportId={selectedImportId}
+        allImportsSelected={allImportsSelected}
+        selectedGroupId={selectedGroupId}
+        layerGroups={layerGroups}
+        selectImport={selectImport}
+        selectToolpath={selectToolpath}
+        onImportMouseDown={onImportMouseDown}
+        toolpathSelected={toolpathSelected}
+        justDraggedRef={justDraggedRef}
+        svgRef={svgRef}
+      />
 
-        {/* Rulers are rendered as a screen-space overlay — see below */}
+      {/* Handle overlay — bounding box + handles in screen-pixel space */}
 
-        <PageTemplateOverlay
-          pageTemplate={pageTemplate}
-          pageSizes={pageSizes}
-          vp={vp}
-          getBedX={getBedX}
-          getBedY={getBedY}
-        />
-
-        <InkServiceStationsOverlay
-          stations={inkServiceStations}
-          visible={showInkServiceStationsOnCanvas}
-          getBedX={getBedX}
-          getBedY={getBedY}
-        />
-
-        <ToolpathHitAreaOverlay
-          bounds={gcodeToolpath?.bounds ?? null}
-          isCenter={isCenter}
-          isRight={isRight}
-          isBottom={isBottom}
-          bedW={bedW}
-          bedH={bedH}
-          selectImport={selectImport}
-          selectToolpath={selectToolpath}
-          toolpathSelected={toolpathSelected}
-        />
-
-        {/* SVG imports — paths only; handles rendered in HandleOverlay */}
-        {imports
-          .filter((imp) => imp.visible)
-          .map((imp) => (
-            <ImportLayer
-              key={imp.id}
-              imp={imp}
-              selected={
-                allImportsSelected ||
-                selectedImportId === imp.id ||
-                (!!selectedGroupId &&
-                  !!layerGroups
-                    .find((g) => g.id === selectedGroupId)
-                    ?.importIds.includes(imp.id))
-              }
-              onImportMouseDown={onImportMouseDown}
-              getBedY={getBedY}
-            />
-          ))}
-      </svg>
-
-      {/* ── Handle overlay — bounding box + handles in pure screen-pixel space */}
-      {(allImportsSelected || !!selectedGroupId) && containerSize.w > 0 ? (
-        <GroupHandleOverlay
-          imports={(allImportsSelected
-            ? imports
-            : imports.filter(
-                (i) =>
-                  !!layerGroups
-                    .find((g) => g.id === selectedGroupId)
-                    ?.importIds.includes(i.id),
-              )
-          ).filter((i) => i.visible)}
-          zoom={vp.zoom}
-          panX={vp.panX}
-          panY={vp.panY}
-          containerW={containerSize.w}
-          containerH={containerSize.h}
-          getBedY={getBedY}
-          onGroupMouseDown={onGroupMouseDown}
-          onGroupHandleMouseDown={onGroupHandleMouseDown}
-          onGroupRotateHandleMouseDown={onGroupRotateHandleMouseDown}
-          onDelete={
-            allImportsSelected
-              ? clearImports
-              : () => {
-                  const st = useCanvasStore.getState();
-                  const gids = new Set(
-                    st.layerGroups.find((g) => g.id === selectedGroupId)
-                      ?.importIds ?? [],
-                  );
-                  st.imports
-                    .filter((i) => gids.has(i.id))
-                    .forEach((i) => st.removeImport(i.id));
-                  selectGroup(null);
-                }
-          }
-          activeOBB={
-            groupRotating
-              ? {
-                  gCx: groupRotating.gCx,
-                  gCy: groupRotating.gCy,
-                  gHW: groupRotating.gHW,
-                  gHH: groupRotating.gHH,
-                  angle: groupOBBAngle,
-                }
-              : (persistentGroupOBB ?? undefined)
-          }
-        />
-      ) : (
-        selectedImportId &&
-        containerSize.w > 0 &&
-        (() => {
-          const imp = imports.find((i) => i.id === selectedImportId);
-          return imp ? (
-            <HandleOverlay
-              imp={imp}
-              zoom={vp.zoom}
-              panX={vp.panX}
-              panY={vp.panY}
-              containerW={containerSize.w}
-              containerH={containerSize.h}
-              getBedY={getBedY}
-              onHandleMouseDown={onHandleMouseDown}
-              onRotateHandleMouseDown={onRotateHandleMouseDown}
-              onDelete={() => removeImport(imp.id)}
-            />
-          ) : null;
-        })()
-      )}
+      <CanvasHandleOverlays
+        imports={imports}
+        selectedImportId={selectedImportId}
+        allImportsSelected={allImportsSelected}
+        selectedGroupId={selectedGroupId}
+        layerGroups={layerGroups}
+        zoom={vp.zoom}
+        panX={vp.panX}
+        panY={vp.panY}
+        containerW={containerSize.w}
+        containerH={containerSize.h}
+        getBedY={getBedY}
+        groupObbAngle={groupOBBAngle}
+        groupRotating={groupRotating}
+        persistentGroupOBB={persistentGroupOBB}
+        onGroupMouseDown={onGroupMouseDown}
+        onHandleMouseDown={onHandleMouseDown}
+        onRotateHandleMouseDown={onRotateHandleMouseDown}
+        onGroupHandleMouseDown={onGroupHandleMouseDown}
+        onGroupRotateHandleMouseDown={onGroupRotateHandleMouseDown}
+        clearImports={clearImports}
+        removeImport={removeImport}
+        selectGroup={selectGroup}
+      />
 
       <ToolpathSelectionOverlay
         bounds={gcodeToolpath?.bounds ?? null}
@@ -480,7 +378,7 @@ export function PlotCanvas() {
         onFit={onFit}
       />
 
-      {/* ── Ruler overlay — screen-space, always crisp ──────────────────── */}
+      {/* Ruler overlay — screen-space, always crisp */}
       {containerSize.w > 0 && (
         <RulerOverlay
           vp={vp}

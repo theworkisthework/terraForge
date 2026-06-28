@@ -1,3 +1,5 @@
+import { Button } from "../../ui";
+
 type PlotCanvasControlsProps = {
   fitted: boolean;
   zoom: number;
@@ -21,44 +23,41 @@ export function PlotCanvasControls({
         className="absolute bottom-9 right-4 flex flex-col gap-1 z-10"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
+        <Button
+          variant="ghost-hover"
+          size="icon-md"
           title="Zoom in (Ctrl+Shift++)"
           aria-label="Zoom in"
           aria-keyshortcuts="Control+Shift++"
           onClick={onZoomIn}
-          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
-                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
+          className="bg-panel border border-border-ui text-base font-bold"
         >
           +
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost-hover"
+          size="icon-md"
           title="Zoom out (Ctrl+Shift+-)"
           aria-label="Zoom out"
           aria-keyshortcuts="Control+Shift+-"
           onClick={onZoomOut}
-          className="w-8 h-8 rounded bg-panel border border-border-ui text-content text-base font-bold
-                     hover:bg-secondary active:bg-secondary-active flex items-center justify-center leading-none"
+          className="bg-panel border border-border-ui text-base font-bold"
         >
           −
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="toggle"
+          size="icon-md"
+          selected={fitted}
           title={`Fit to view (Ctrl+0)${fitted ? " - active" : ""}`}
           aria-label="Fit to view"
           aria-keyshortcuts="Control+0"
           aria-pressed={fitted}
           onClick={onFit}
-          className={`w-8 h-8 rounded border text-[11px] font-bold flex items-center justify-center leading-none
-            ${
-              fitted
-                ? "bg-accent border-accent text-white"
-                : "bg-panel border-border-ui text-content hover:bg-secondary"
-            }`}
+          className="text-[11px] font-bold leading-none"
         >
           ⊡
-        </button>
+        </Button>
       </div>
 
       <div className="absolute bottom-4 left-4 z-10 text-[10px] text-content-faint font-mono pointer-events-none">

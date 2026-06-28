@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { Badge } from "../../../Badge";
+import { Button } from "../../../ui";
 import { Section } from "../Section";
 import type { MachineConfigDialogController } from "../../hooks/useMachineConfigDialogController";
 import { StationRow } from "./StationRow";
@@ -57,17 +58,17 @@ export function InkServiceStationsSection({
         </label>
 
         <div className="pl-6 pt-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost-hover"
             onClick={() => setShowStationList((open) => !open)}
-            className="flex items-center gap-1.5 text-xs text-content-muted hover:text-content transition-colors select-none"
+            className="text-xs"
           >
             <ChevronDown
               size={14}
               className={`transition-transform duration-150 ${showStationList ? "rotate-0" : "-rotate-90"}`}
             />
             Dip Station List
-          </button>
+          </Button>
         </div>
 
         {showStationList && (
@@ -76,15 +77,16 @@ export function InkServiceStationsSection({
               <p className="text-xs text-content-faint">
                 Edit coordinates in mm. Use Test to jog to a station.
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={addInkServiceStation}
                 title="Add Dip Station"
                 aria-label="Add Dip Station"
-                className="inline-flex items-center justify-center px-2 py-1 text-xs rounded bg-secondary hover:bg-secondary-hover text-content"
+                icon={<Plus size={12} />}
               >
-                <Plus size={12} />
-              </button>
+                Add
+              </Button>
             </div>
 
             {inkServiceStations.map((station) => (

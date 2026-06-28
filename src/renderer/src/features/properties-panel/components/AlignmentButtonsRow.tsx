@@ -6,6 +6,7 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
 } from "lucide-react";
+import { Button } from "../../../components/ui";
 
 interface AlignmentButtonsRowProps {
   leftTitle: string;
@@ -36,30 +37,35 @@ export function AlignmentButtonsRow({
   onAlignCenterY,
   onAlignBottom,
 }: AlignmentButtonsRowProps) {
-  const btnCls =
-    "p-1 text-content-faint hover:text-content rounded hover:bg-secondary/40 transition-colors";
-
   return (
     <div className="flex items-center gap-0.5">
-      <button className={btnCls} title={leftTitle} onClick={onAlignLeft}>
+      <Button variant="ghost-hover" title={leftTitle} onClick={onAlignLeft}>
         <AlignHorizontalJustifyStart size={13} />
-      </button>
-      <button className={btnCls} title={centerHTitle} onClick={onAlignCenterX}>
+      </Button>
+      <Button
+        variant="ghost-hover"
+        title={centerHTitle}
+        onClick={onAlignCenterX}
+      >
         <AlignHorizontalJustifyCenter size={13} />
-      </button>
-      <button className={btnCls} title={rightTitle} onClick={onAlignRight}>
+      </Button>
+      <Button variant="ghost-hover" title={rightTitle} onClick={onAlignRight}>
         <AlignHorizontalJustifyEnd size={13} />
-      </button>
+      </Button>
       <div className="w-px h-3 bg-border-ui mx-0.5" />
-      <button className={btnCls} title={topTitle} onClick={onAlignTop}>
+      <Button variant="ghost-hover" title={topTitle} onClick={onAlignTop}>
         <AlignVerticalJustifyStart size={13} />
-      </button>
-      <button className={btnCls} title={centerVTitle} onClick={onAlignCenterY}>
+      </Button>
+      <Button
+        variant="ghost-hover"
+        title={centerVTitle}
+        onClick={onAlignCenterY}
+      >
         <AlignVerticalJustifyCenter size={13} />
-      </button>
-      <button className={btnCls} title={bottomTitle} onClick={onAlignBottom}>
+      </Button>
+      <Button variant="ghost-hover" title={bottomTitle} onClick={onAlignBottom}>
         <AlignVerticalJustifyEnd size={13} />
-      </button>
+      </Button>
     </div>
   );
 }
