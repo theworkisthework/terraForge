@@ -186,7 +186,7 @@ describe("svgWorker — G-code body", () => {
 
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
-    expect(gcode).toContain("; Point taps (1 points)");
+    expect(gcode).toContain("; -- Point taps (1 points)");
     expect(gcode).toContain("; Point rapid");
     expect(gcode).toContain("; Point tap");
     expect(gcode).toContain("M3S0 ; Pen up");
