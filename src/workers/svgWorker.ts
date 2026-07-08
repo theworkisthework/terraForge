@@ -64,6 +64,13 @@ interface TravelSubpath {
   color?: string;
 }
 
+interface TravelPoint {
+  point: { x: number; y: number };
+  layer?: string;
+  color?: string;
+  repeats: number;
+}
+
 interface ToolpathMetadata {
   color?: string;
   layer?: string;
@@ -97,6 +104,37 @@ function distanceMM(
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   return Math.hypot(dx, dy);
+}
+
+function isPointWithinBounds(
+  point: { x: number; y: number },
+  config: MachineConfig,
+  pageClip?: { widthMM: number; heightMM: number; marginMM: number },
+): boolean {
+  const xMin = pageClip
+    ? pageClip.marginMM
+    : config.origin === "center"
+      ? -config.bedWidth / 2
+      : 0;
+  const xMax = pageClip
+    ? pageClip.widthMM - pageClip.marginMM
+    : config.origin === "center"
+      ? config.bedWidth / 2
+      : config.bedWidth;
+  const yMin = pageClip
+    ? pageClip.marginMM
+    : config.origin === "center"
+      ? -config.bedHeight / 2
+      : 0;
+  const yMax = pageClip
+    ? pageClip.heightMM - pageClip.marginMM
+    : config.origin === "center"
+      ? config.bedHeight / 2
+      : config.bedHeight;
+
+  return (
+    point.x >= xMin && point.x <= xMax && point.y >= yMin && point.y <= yMax
+  );
 }
 
 function isEnabledStation(station: InkServiceStation): boolean {
@@ -673,6 +711,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
   // ── Phase 1: collect all subpaths from all visible objects ────────────────
   const allSubpaths: TravelSubpath[] = [];
+  const allPoints: TravelPoint[] = [];
   const yieldPh1 = makeYielder();
   let lastPct1 = -1;
   let lastColor: string | undefined = undefined;
@@ -685,6 +724,23 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const obj = colorSortedObjects[i];
+
+    if (obj.pointTap) {
+      const transformedPoint = transformPt(
+        obj,
+        config,
+        obj.pointTap.x,
+        obj.pointTap.y,
+      );
+      if (isPointWithinBounds(transformedPoint, config, options?.pageClip)) {
+        allPoints.push({
+          point: transformedPoint,
+          layer: obj.layer,
+          color: obj.sourceColor,
+          repeats: Math.max(1, obj.passCount ?? 1),
+        });
+      }
+    }
 
     // Emit color batch comment when color changes
     if (obj.sourceColor !== lastColor && i > 0) {
@@ -800,6 +856,11 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(
     `; -- ${modeLabel} path (${orderedSubpaths.length} subpaths) -----------`,
   );
+  if (allPoints.length > 0) {
+    lines.push(
+      `; -- Point taps (${allPoints.length} points) ---------------------`,
+    );
+  }
   if (skippedObjects > 0) {
     lines.push(`; NOTE: skipped ${skippedObjects} invalid path object(s)`);
   }
@@ -824,6 +885,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     !!inkService &&
     inkTriggerBase > 0 &&
     inkService.stations.some(isEnabledStation);
+  const totalOperations = orderedSubpaths.length + allPoints.length;
 
   const emitTriggeredInkService = (preferredDipStationId?: string): void => {
     if (!canEmitInkService || !inkService) return;
@@ -849,9 +911,13 @@ async function generate(msg: GenerateMessage): Promise<void> {
   let lastPct4 = -1;
 
   // Prime/dip before first stroke so paint/ink is loaded before drawing.
-  if (canEmitInkService && orderedSubpaths.length > 0) {
-    const firstColor = orderedSubpaths[0]?.color;
-    const firstLayer = orderedSubpaths[0]?.layer;
+  if (canEmitInkService && totalOperations > 0) {
+    const firstColor =
+      orderedSubpaths[0]?.color ??
+      (orderedSubpaths.length === 0 ? allPoints[0]?.color : undefined);
+    const firstLayer =
+      orderedSubpaths[0]?.layer ??
+      (orderedSubpaths.length === 0 ? allPoints[0]?.layer : undefined);
     const preferredFirstDip = resolvePreferredDipStation(
       layerDipStations,
       firstLayer,
@@ -966,7 +1032,78 @@ async function generate(msg: GenerateMessage): Promise<void> {
     }
     lines.push(config.penUpCommand + " ; Pen up");
     lines.push("");
-    const pct = 40 + Math.round(((i + 1) / orderedSubpaths.length) * 60);
+    const completedOperations = i + 1;
+    const pct =
+      totalOperations > 0
+        ? 40 + Math.round((completedOperations / totalOperations) * 60)
+        : 100;
+    if (pct !== lastPct4) {
+      lastPct4 = pct;
+      self.postMessage({ type: "progress", taskId, percent: pct });
+    }
+    await yieldPh4();
+  }
+
+  for (let i = 0; i < allPoints.length; i++) {
+    if (cancelled.has(taskId)) {
+      cancelled.delete(taskId);
+      self.postMessage({ type: "cancelled", taskId });
+      return;
+    }
+
+    const tap = allPoints[i];
+    const preferredDipStationId = resolvePreferredDipStation(
+      layerDipStations,
+      tap.layer,
+      tap.color,
+    );
+    const currentMeta: ToolpathMetadata = {
+      color: tap.color,
+      layer: tap.layer,
+      dip: preferredDipStationId,
+    };
+    const currentMetaKey = metadataKey(currentMeta);
+    const markerChanged = currentMetaKey !== lastMarkerKey;
+    if (markerChanged) {
+      emitTfMarker(lines, currentMeta);
+      lastMarkerKey = currentMetaKey;
+    }
+
+    if (
+      markerChanged &&
+      canEmitInkService &&
+      preferredDipStationId &&
+      currentDipIdRef.value !== preferredDipStationId
+    ) {
+      emitTriggeredInkService(preferredDipStationId);
+    }
+
+    const drawSpeed =
+      typeof options?.drawSpeedOverride === "number"
+        ? options.drawSpeedOverride
+        : config.drawSpeed;
+
+    for (let rep = 0; rep < tap.repeats; rep++) {
+      lines.push(`G0 X${fmt(tap.point.x)} Y${fmt(tap.point.y)} ; Point rapid`);
+      lines.push(`F${drawSpeed}`);
+      lines.push(config.penDownCommand + " ; Point tap");
+      if (penDownDelayMs > 0) {
+        lines.push(
+          `G4 P${fmtSeconds(penDownDelayMs / 1000)} ; Pen settle delay`,
+        );
+      }
+      if (penUpDelayMs > 0) {
+        lines.push(`G4 P${fmtSeconds(penUpDelayMs / 1000)} ; Pen lift delay`);
+      }
+      lines.push(config.penUpCommand + " ; Pen up");
+      lines.push("");
+    }
+
+    const completedOperations = orderedSubpaths.length + i + 1;
+    const pct =
+      totalOperations > 0
+        ? 40 + Math.round((completedOperations / totalOperations) * 60)
+        : 100;
     if (pct !== lastPct4) {
       lastPct4 = pct;
       self.postMessage({ type: "progress", taskId, percent: pct });
@@ -980,7 +1117,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
           .filter(isEnabledStation)
           .find((station) => station.type === "wash")
       : undefined;
-  if (finalWashStation && orderedSubpaths.length > 0) {
+  if (finalWashStation && totalOperations > 0) {
     lines.push("; -- Final ink service: end wash --");
     lines.push(config.penUpCommand + " ; Pen up for final wash");
     emitStationContact(lines, config, finalWashStation);

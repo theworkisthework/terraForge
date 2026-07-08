@@ -78,7 +78,22 @@ function projectPathToVectorObjects(
         : undefined,
     }),
   );
-  return [...outlineVOs, ...hatchVOs];
+  const pointVOs: VectorObject[] =
+    imp.plotPointsEnabled && path.pointTap
+      ? [
+          {
+            ...base,
+            id: `${path.id}-pt`,
+            path: "",
+            pointTap: path.pointTap,
+            sourceColor: path.sourceColor
+              ? normalizeSvgColor(path.sourceColor)
+              : undefined,
+          },
+        ]
+      : [];
+
+  return [...outlineVOs, ...hatchVOs, ...pointVOs];
 }
 
 export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {

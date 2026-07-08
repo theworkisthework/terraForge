@@ -161,6 +161,37 @@ describe("svgWorker — G-code header", () => {
 // ── G-code body structure ─────────────────────────────────────────────────────
 
 describe("svgWorker — G-code body", () => {
+  it("emits pen taps for point-only vector objects", async () => {
+    const pointObj = createVectorObject({
+      id: "point-1",
+      svgSource: '<circle cx="5" cy="7" />',
+      path: "",
+      pointTap: { x: 5, y: 7 },
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      originalWidth: 20,
+      originalHeight: 20,
+    });
+
+    dispatch({
+      type: "generate",
+      taskId: "body-point-tap",
+      objects: [pointObj],
+      config: makeConfig(),
+      options: createGcodeOptions({ optimisePaths: false }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("; Point taps (1 points)");
+    expect(gcode).toContain("; Point rapid");
+    expect(gcode).toContain("; Point tap");
+    expect(gcode).toContain("M3S0 ; Pen up");
+  });
+
   it("emits G0 rapid (pen up) before drawing and G1 feed (pen down) for cuts", async () => {
     dispatch({
       type: "generate",

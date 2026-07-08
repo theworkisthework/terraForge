@@ -128,6 +128,30 @@ describe("canvasStore vectorObjects service", () => {
     expect(vectorObjectsForImport(pathStrokeOff)).toHaveLength(0);
   });
 
+  it("projects point taps when plot-points is enabled", () => {
+    const imp = makeImport({
+      plotPointsEnabled: true,
+      paths: [
+        {
+          id: "p1",
+          d: "M0,0 L10,10",
+          svgSource: "<circle/>",
+          visible: true,
+          pointTap: { x: 5, y: 6 },
+          sourceOutlineVisible: false,
+          outlineVisible: false,
+          sourceColor: "#00aa00",
+        },
+      ],
+    });
+
+    const result = vectorObjectsForImport(imp);
+    const pointObject = result.find((vo) => vo.id === "p1-pt");
+    expect(pointObject).toBeDefined();
+    expect(pointObject?.pointTap).toEqual({ x: 5, y: 6 });
+    expect(pointObject?.sourceColor).toBe("#00aa00");
+  });
+
   it("vectorObjectsForImports aggregates all visible imports", () => {
     const impA = makeImport({ id: "a" });
     const impB = makeImport({ id: "b", visible: false });
