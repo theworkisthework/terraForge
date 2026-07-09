@@ -22,6 +22,30 @@ function buildImport(patch: Partial<SvgImport> = {}): SvgImport {
 }
 
 describe("PlotPointsSection", () => {
+  it("adds a tooltip describing point plotting behavior", () => {
+    render(
+      <PlotPointsSection
+        imp={buildImport({
+          paths: [
+            {
+              id: "p1",
+              d: "M0 0",
+              svgSource: "<circle />",
+              visible: true,
+              pointTap: { x: 2, y: 3 },
+            },
+          ],
+          plotPointsEnabled: false,
+        })}
+        onUpdate={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Plot points").getAttribute("title")).toBe(
+      "Plot the center point of a circle. Applies only to SVG circle elements and does not affect stroke or fill options.",
+    );
+  });
+
   it("does not render when no point candidates exist", () => {
     render(<PlotPointsSection imp={buildImport()} onUpdate={() => {}} />);
     expect(screen.queryByText("Plot points")).toBeNull();

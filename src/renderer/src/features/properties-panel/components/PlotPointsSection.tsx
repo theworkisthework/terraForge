@@ -10,6 +10,8 @@ export function PlotPointsSection({ imp, onUpdate }: PlotPointsSectionProps) {
   if (!hasPointCandidates) return null;
 
   const plotPointsEnabled = imp.plotPointsEnabled ?? false;
+  const tooltipText =
+    "Plot the center point of a circle. Applies only to SVG circle elements and does not affect stroke or fill options.";
 
   return (
     <div className="mt-2 pt-2 border-t border-border-ui/30">
@@ -17,6 +19,7 @@ export function PlotPointsSection({ imp, onUpdate }: PlotPointsSectionProps) {
         <span
           id={`plot-points-label-${imp.id}`}
           className="text-[10px] text-content-muted uppercase tracking-wider flex-1"
+          title={tooltipText}
         >
           Plot points
         </span>
@@ -27,6 +30,7 @@ export function PlotPointsSection({ imp, onUpdate }: PlotPointsSectionProps) {
           role="switch"
           aria-checked={plotPointsEnabled}
           aria-labelledby={`plot-points-label-${imp.id}`}
+          title={tooltipText}
           onClick={() => onUpdate({ plotPointsEnabled: !plotPointsEnabled })}
         >
           <span
