@@ -198,6 +198,17 @@ export function useImportActions() {
         const sourceOutlineVisible = hasVisibleStroke(el, stylesheet);
         const tag = el.tagName.toLowerCase();
         const pathIndex = fillFlags.length;
+        const pointTap =
+          tag === "circle"
+            ? (() => {
+                const cx = Number.parseFloat(el.getAttribute("cx") ?? "");
+                const cy = Number.parseFloat(el.getAttribute("cy") ?? "");
+                if (!Number.isFinite(cx) || !Number.isFinite(cy))
+                  return undefined;
+                const pt = matrix.transformPoint({ x: cx, y: cy, z: 0, w: 1 });
+                return { x: pt.x, y: pt.y };
+              })()
+            : undefined;
 
         const inkLabel =
           el.getAttribute("inkscape:label") ??
@@ -226,6 +237,7 @@ export function useImportActions() {
             sourceOutlineVisible,
             outlineVisible: sourceOutlineVisible,
             strokeEnabled: true,
+            pointTap,
             label,
             layer: findContainingLayerId(el, layerGroupIds),
           },
@@ -286,6 +298,7 @@ export function useImportActions() {
         hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
         hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
         strokeEnabled: true,
+        plotPointsEnabled: false,
         generatedStrokeForNoStroke: false,
         layers: layers.length > 0 ? layers : undefined,
       };

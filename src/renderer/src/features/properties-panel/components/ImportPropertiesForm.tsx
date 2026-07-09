@@ -7,6 +7,7 @@ import { useImportPropertiesFormModel } from "../hooks/useImportPropertiesFormMo
 import type { ImportPropertiesFormProps } from "./ImportPropertiesForm.types";
 import { AlignmentDimensionsSection } from "./AlignmentDimensionsSection";
 import { HatchFillSection } from "./HatchFillSection";
+import { PlotPointsSection } from "./PlotPointsSection";
 import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeOptionsSection } from "./StrokeOptionsSection";
 import { StrokeWidthSection } from "./StrokeWidthSection";
@@ -131,6 +132,8 @@ export function ImportPropertiesForm({
         defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG}
         onApplyHatch={onApplyHatch}
       />
+
+      <PlotPointsSection imp={imp} onUpdate={onUpdate} />
     </>
   );
 }

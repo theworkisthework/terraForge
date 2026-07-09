@@ -39,6 +39,7 @@ function withDefaultHatchSettings(imp: SvgImport): SvgImport {
     hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
     hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
     strokeEnabled: true,
+    plotPointsEnabled: false,
     generatedStrokeForNoStroke: false,
     ...imp,
     paths: normalizedPaths,

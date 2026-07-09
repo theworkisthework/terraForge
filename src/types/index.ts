@@ -210,6 +210,8 @@ export interface VectorObject {
   svgSource: string;
   /** Flattened absolute path data (d attribute) */
   path: string;
+  /** Optional point-tap source coordinate in SVG user units. */
+  pointTap?: { x: number; y: number };
   /** Position on the bed in mm from the configured origin */
   x: number;
   y: number;
@@ -281,6 +283,8 @@ export interface SvgPath {
    *  Rendered and emitted for G-code alongside the outline.  Toggled as a unit
    *  with the parent path's `visible` flag. */
   hatchLines?: string[];
+  /** Optional point-tap coordinate in SVG user units (after source transforms). */
+  pointTap?: { x: number; y: number };
   /** Number of times to repeat this path (default 1). */
   passCount?: number;
   /** How to handle multiple passes: repeat, backtrack, or penLift (default 'repeat'). */
@@ -339,6 +343,8 @@ export interface SvgImport {
   hatchAngleDeg?: number;
   /** Import-level default toggle for stroke outlines. Defaults to true. */
   strokeEnabled?: boolean;
+  /** Import-level toggle to emit point taps for paths carrying `pointTap` metadata. */
+  plotPointsEnabled?: boolean;
   /** Import-level toggle to generate outlines for source paths with no stroke. */
   generatedStrokeForNoStroke?: boolean;
   /** Preview stroke width in mm — controls how thick paths appear on the canvas.
