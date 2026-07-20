@@ -466,7 +466,7 @@ export function ImportPathsList({
 
           {imp.paths
             .filter(
-              (p) => !p.layer || !imp.layers!.some((l) => l.id === p.layer),
+              (p) => !p.layer || !layerViews.some((l) => l.id === p.layer),
             )
             .map((p) => {
               const label = p.label ?? p.layer ?? `path ${p.id.slice(0, 6)}`;

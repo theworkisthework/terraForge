@@ -124,6 +124,7 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Expand first
     await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
+    await userEvent.click(screen.getByTitle("Expand layer"));
     // Toggle path visibility
     await userEvent.click(screen.getByTitle("Toggle path visibility"));
     expect(useCanvasStore.getState().imports[0].paths[0].visible).toBe(false);
@@ -139,6 +140,10 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     // Expand
     await userEvent.click(screen.getByRole("button", { name: "Expand paths" }));
+    const layerExpandButtons = screen.getAllByTitle("Expand layer");
+    for (const button of layerExpandButtons) {
+      await userEvent.click(button);
+    }
     expect(screen.getByText("remove")).toBeInTheDocument();
     // Click the Remove path button for "remove" path
     const removeBtns = screen.getAllByTitle("Remove path");
