@@ -132,7 +132,7 @@ export function PlotCanvas() {
     onGroupMouseDown,
     updateDragMove,
     endDrag,
-  } = useObjectDrag(vpRef, spaceRef, selectImport, updateImport);
+  } = useObjectDrag(vpRef, spaceRef, selectImport, updateImport, origin);
 
   // ── useObjectScaleRotate ─── scale / rotate handle state machines ────────────
   const {
