@@ -11,8 +11,9 @@
 // OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
 // DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
 // ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePlotProgress } from "../../utils/usePlotProgress";
+import { useMachineStore } from "../../store/machineStore";
 import {
   RulerOverlay,
   ToolpathSelectionOverlay,
@@ -39,6 +40,8 @@ import { PlotCanvasControls } from "./components";
 export function PlotCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeConfigId = useMachineStore((s) => s.activeConfigId);
+  const prevConfigIdRef = useRef<string | null>(activeConfigId);
 
   const {
     canvas,
@@ -238,6 +241,15 @@ export function PlotCanvas() {
     isPanning,
     rotating,
   });
+
+  // Switching machine configs can change bed geometry; refit immediately so
+  // the new bed size/origin is visible without requiring a manual fit action.
+  useEffect(() => {
+    if (prevConfigIdRef.current !== activeConfigId) {
+      prevConfigIdRef.current = activeConfigId;
+      fitToView();
+    }
+  }, [activeConfigId, fitToView]);
 
   // ── Toolpath canvas overlay — see ToolpathOverlay component below ────────────
 
