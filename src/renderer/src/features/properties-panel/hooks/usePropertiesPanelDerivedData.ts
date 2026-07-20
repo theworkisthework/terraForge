@@ -37,6 +37,7 @@ export function usePropertiesPanelDerivedData({
   const fallbackFeedrate = cfg?.drawSpeed ?? 3000;
   const bedW = cfg?.bedWidth ?? 220;
   const bedH = cfg?.bedHeight ?? 200;
+  const origin = cfg?.origin ?? "bottom-left";
   const toolpathFileName = gcodeSource?.name ?? "G-code toolpath";
 
   return {
@@ -45,6 +46,7 @@ export function usePropertiesPanelDerivedData({
     fallbackFeedrate,
     bedW,
     bedH,
+    origin,
     toolpathFileName,
   };
 }

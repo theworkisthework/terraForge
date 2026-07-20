@@ -29,6 +29,7 @@ describe("ImportRowCardDetails", () => {
         imp={mockImport}
         bedW={220}
         bedH={200}
+        origin="bottom-left"
         pageW={210}
         pageH={297}
         marginMM={20}

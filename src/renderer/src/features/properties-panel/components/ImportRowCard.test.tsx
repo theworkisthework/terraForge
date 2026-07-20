@@ -42,6 +42,7 @@ const baseProps = {
   editingNameValue: mockImport.name,
   bedW: 220,
   bedH: 200,
+  origin: "bottom-left" as const,
   pageW: 210,
   pageH: 297,
   marginMM: 20,

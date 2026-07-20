@@ -1,10 +1,12 @@
 import type { SvgImport } from "../../../../../types";
+import type { OriginType } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
 
 export interface ImportPropertiesFormProps {
   imp: SvgImport;
   bedW: number;
   bedH: number;
+  origin: OriginType;
   pageW: number;
   pageH: number;
   marginMM: number;
