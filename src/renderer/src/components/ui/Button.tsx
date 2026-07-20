@@ -15,6 +15,7 @@ export type ButtonSize =
   | "sm" // text-xs px-2 py-1 rounded
   | "md" // text-sm px-3 py-1.5 rounded (default)
   | "lg" // text-sm px-4 py-2 rounded-lg
+  | "icon-xs" // w-4 h-4 rounded (compact icon-only square)
   | "icon-sm" // w-7 h-7 rounded (icon-only square)
   | "icon-md"; // w-8 h-8 rounded (icon-only square, larger)
 
@@ -46,6 +47,7 @@ const sizeClasses: Record<ButtonSize, string> = {
   sm: "text-xs px-2 py-1 rounded",
   md: "text-sm px-3 py-1.5 rounded",
   lg: "text-sm px-4 py-2 rounded-lg",
+  "icon-xs": "w-4 h-4 rounded inline-flex items-center justify-center",
   "icon-sm": "w-7 h-7 rounded inline-flex items-center justify-center",
   "icon-md": "w-8 h-8 rounded inline-flex items-center justify-center",
 };
