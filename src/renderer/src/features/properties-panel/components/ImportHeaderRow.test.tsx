@@ -70,6 +70,36 @@ describe("ImportHeaderRow", () => {
     expect(onDeleteImport).toHaveBeenCalledWith("imp-1");
   });
 
+  it("selects import when row is clicked without expanding", () => {
+    const onSelectImport = vi.fn();
+    const onToggleExpand = vi.fn();
+
+    render(
+      <ImportHeaderRow
+        imp={buildImport()}
+        indented={false}
+        isExpanded={false}
+        isEditingName={false}
+        editingNameValue="sample"
+        onSelectImport={onSelectImport}
+        onToggleExpand={onToggleExpand}
+        onToggleVisibility={() => {}}
+        onStartRename={() => {}}
+        onEditingNameChange={() => {}}
+        onCommitName={() => {}}
+        onCancelName={() => {}}
+        onDeleteImport={() => {}}
+        onDragStart={() => {}}
+        onDragEnd={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("sample"));
+
+    expect(onSelectImport).toHaveBeenCalledWith("imp-1");
+    expect(onToggleExpand).not.toHaveBeenCalled();
+  });
+
   it("commits and cancels rename in edit mode", () => {
     const onCommitName = vi.fn();
     const onCancelName = vi.fn();
