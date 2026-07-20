@@ -109,6 +109,53 @@ describe("ImportPathsList", () => {
     expect(screen.getByText("path p3")).toBeDefined();
   });
 
+  it("falls back to path-derived layer rows when SVG layer metadata is missing", () => {
+    const onToggleLayerCollapse = vi.fn();
+    const onUpdatePathVisibility = vi.fn();
+    const imp = buildImport({
+      paths: [
+        {
+          id: "p1",
+          d: "M0 0",
+          svgSource: "<path />",
+          visible: true,
+          layer: "layer-a",
+        },
+        {
+          id: "p2",
+          d: "M1 1",
+          svgSource: "<path />",
+          visible: false,
+          layer: "layer-a",
+        },
+      ],
+    });
+
+    render(
+      <ImportPathsList
+        imp={imp}
+        expandedLayerKeys={new Set(["imp-1:layer-a"])}
+        onSelectImport={() => {}}
+        onToggleLayerCollapse={onToggleLayerCollapse}
+        onUpdateLayerVisibility={() => {}}
+        onUpdatePathVisibility={onUpdatePathVisibility}
+        onUpdatePathFillEnabled={() => {}}
+        onUpdatePathStroke={() => {}}
+        onUpdatePath={() => {}}
+        onRemovePath={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("layer-a")).toBeDefined();
+
+    fireEvent.click(screen.getByTitle("Collapse layer"));
+    expect(onToggleLayerCollapse).toHaveBeenCalledWith("imp-1", "layer-a");
+
+    fireEvent.click(screen.getByTitle("Toggle layer visibility"));
+    expect(onUpdatePathVisibility).toHaveBeenCalledWith("imp-1", "p1", false);
+    expect(onUpdatePathVisibility).toHaveBeenCalledWith("imp-1", "p2", false);
+  });
+
   it("toggles color-group expansion using color-scoped key format", () => {
     const onToggleLayerCollapse = vi.fn();
     const imp = buildImport({

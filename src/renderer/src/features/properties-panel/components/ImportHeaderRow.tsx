@@ -62,7 +62,8 @@ export function ImportHeaderRow({
         aria-expanded={isExpanded}
         aria-label={isExpanded ? "Collapse paths" : "Expand paths"}
         variant="ghost"
-        className="w-4 shrink-0"
+        size="icon-xs"
+        className="shrink-0"
         onClick={onExpandClick}
       >
         {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
@@ -91,6 +92,7 @@ export function ImportHeaderRow({
       </span>
       <Button
         variant="ghost"
+        size="icon-xs"
         className="ml-1 hover:text-accent shrink-0"
         title="Delete import"
         onClick={onDeleteClick}
