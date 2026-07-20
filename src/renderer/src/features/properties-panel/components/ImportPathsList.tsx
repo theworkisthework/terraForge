@@ -8,6 +8,13 @@ import { GroupPassSettings } from "./GroupPassSettings";
 import { PathPassSettings } from "./PathPassSettings";
 import { useColorGroups } from "../hooks/useColorGroupsModel";
 
+type LayerView = {
+  id: string;
+  name: string;
+  visible: boolean;
+  synthetic: boolean;
+};
+
 function hasVisibleStroke(imp: SvgImport, path: SvgImport["paths"][number]) {
   const sourceOutlineVisible =
     typeof path.sourceOutlineVisible === "boolean"
@@ -29,6 +36,31 @@ function deriveGroupPass(paths: SvgImport["paths"]): {
     passCount: paths[0].passCount ?? 1,
     passMode: paths[0].passMode ?? "repeat",
   };
+}
+
+function deriveLayerViews(imp: SvgImport): LayerView[] {
+  if (imp.layers && imp.layers.length > 0) {
+    return imp.layers.map((layer) => ({
+      ...layer,
+      synthetic: false,
+    }));
+  }
+
+  const fallbackLayers = new Map<string, Array<SvgImport["paths"][number]>>();
+
+  for (const path of imp.paths) {
+    if (!path.layer) continue;
+    const paths = fallbackLayers.get(path.layer) ?? [];
+    paths.push(path);
+    fallbackLayers.set(path.layer, paths);
+  }
+
+  return Array.from(fallbackLayers.entries()).map(([layerId, paths]) => ({
+    id: layerId,
+    name: layerId,
+    visible: paths.some((path) => path.visible),
+    synthetic: true,
+  }));
 }
 
 interface ImportPathsListProps {
@@ -81,6 +113,7 @@ export function ImportPathsList({
   onRemovePath,
 }: ImportPathsListProps) {
   const colorGroups = useColorGroups(imp);
+  const layerViews = deriveLayerViews(imp);
   const [openPassFlyoutKey, setOpenPassFlyoutKey] = useState<string | null>(
     null,
   );
@@ -317,9 +350,9 @@ export function ImportPathsList({
             );
           })
         )
-      ) : imp.layers && imp.layers.length > 0 ? (
+      ) : layerViews.length > 0 ? (
         <>
-          {imp.layers.map((layer) => {
+          {layerViews.map((layer) => {
             const layerPaths = imp.paths.filter((p) => p.layer === layer.id);
             const layerKey = `${imp.id}:${layer.id}`;
             const isLayerExpanded = expandedLayerKeys.has(layerKey);
@@ -339,7 +372,19 @@ export function ImportPathsList({
                     onToggleLayerCollapse(imp.id, layer.id)
                   }
                   onToggleVisible={() =>
-                    onUpdateLayerVisibility(imp.id, layer.id, !layer.visible)
+                    layer.synthetic
+                      ? layerPaths.forEach((path) =>
+                          onUpdatePathVisibility(
+                            imp.id,
+                            path.id,
+                            !layer.visible,
+                          ),
+                        )
+                      : onUpdateLayerVisibility(
+                          imp.id,
+                          layer.id,
+                          !layer.visible,
+                        )
                   }
                 />
 
