@@ -57,6 +57,7 @@ export function ImportPropertiesForm({
     imp,
     bedW,
     bedH,
+    origin,
     pageW,
     pageH,
     marginMM,

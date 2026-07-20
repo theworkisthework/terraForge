@@ -5,6 +5,7 @@ interface UseImportPropertiesFormModelArgs {
   imp: SvgImport;
   bedW: number;
   bedH: number;
+  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center";
   pageW: number;
   pageH: number;
   marginMM: number;
@@ -29,6 +30,7 @@ export function useImportPropertiesFormModel({
   imp,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -67,6 +69,8 @@ export function useImportPropertiesFormModel({
     fitMarginH / (imp.svgHeight || 1),
   );
   const useTemplateBounds = templateScaleEnabled && canScaleToTemplate;
+  const isRightOrigin = origin === "bottom-right" || origin === "top-right";
+  const isTopOrigin = origin === "top-left" || origin === "top-right";
   const fitTargetW = useTemplateBounds
     ? templateScaleTarget === "margin"
       ? fitMarginW
@@ -86,6 +90,17 @@ export function useImportPropertiesFormModel({
   const fitScaleY = fitTargetH / (imp.svgHeight || 1);
   const snapPresetTitle = `Snap to next preset (${ROT_PRESETS.join("° · ")}°)`;
 
+  const computeOriginAnchoredPosition = (
+    nextObjW: number,
+    nextObjH: number,
+  ) => {
+    if (useTemplateBounds) return {};
+    return {
+      x: isRightOrigin ? bedW - nextObjW : 0,
+      y: isTopOrigin ? -nextObjH : 0,
+    };
+  };
+
   const sharedTransformProps = {
     fitScale,
     fitScaleX,
@@ -103,12 +118,13 @@ export function useImportPropertiesFormModel({
     onTemplateScaleTargetChange,
     onFitToBed: () => {
       if (ratioLocked) {
-        const keepPosition = useTemplateBounds;
+        const nextObjW = (imp.svgWidth || 0) * fitScale;
+        const nextObjH = (imp.svgHeight || 0) * fitScale;
         onUpdate({
           scale: fitScale,
           scaleX: undefined,
           scaleY: undefined,
-          ...(keepPosition ? {} : { x: 0, y: 0 }),
+          ...computeOriginAnchoredPosition(nextObjW, nextObjH),
         });
         return;
       }
@@ -118,19 +134,36 @@ export function useImportPropertiesFormModel({
         fitTargetH / ((imp.svgHeight || 1) * currentScaleY),
       );
 
+      const nextScaleX = Math.max(0.001, currentScaleX * fitFactor);
+      const nextScaleY = Math.max(0.001, currentScaleY * fitFactor);
+      const nextObjW = (imp.svgWidth || 0) * nextScaleX;
+      const nextObjH = (imp.svgHeight || 0) * nextScaleY;
+
       onUpdate({
-        scaleX: Math.max(0.001, currentScaleX * fitFactor),
-        scaleY: Math.max(0.001, currentScaleY * fitFactor),
-        ...(useTemplateBounds ? {} : { x: 0, y: 0 }),
+        scaleX: nextScaleX,
+        scaleY: nextScaleY,
+        ...computeOriginAnchoredPosition(nextObjW, nextObjH),
       });
     },
     onFitHorizontal: () => {
       if (ratioLocked) return;
-      onUpdate({ scaleX: Math.max(0.001, fitScaleX) });
+      const nextScaleX = Math.max(0.001, fitScaleX);
+      const nextObjW = (imp.svgWidth || 0) * nextScaleX;
+      onUpdate({
+        scaleX: nextScaleX,
+        ...(useTemplateBounds
+          ? {}
+          : { x: isRightOrigin ? bedW - nextObjW : 0 }),
+      });
     },
     onFitVertical: () => {
       if (ratioLocked) return;
-      onUpdate({ scaleY: Math.max(0.001, fitScaleY) });
+      const nextScaleY = Math.max(0.001, fitScaleY);
+      const nextObjH = (imp.svgHeight || 0) * nextScaleY;
+      onUpdate({
+        scaleY: nextScaleY,
+        ...(useTemplateBounds ? {} : { y: isTopOrigin ? -nextObjH : 0 }),
+      });
     },
     onResetScale: () => {
       onRatioLockedChange(true);
