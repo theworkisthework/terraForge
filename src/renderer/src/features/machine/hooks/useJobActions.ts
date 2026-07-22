@@ -11,6 +11,33 @@ import { type GcodeOptions, type VectorObject } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
 import { normalizeSvgColor } from "../../imports/services/svgImportHelpers";
 
+type GcodeProgressStage =
+  | "preparing"
+  | "optimizing"
+  | "joining"
+  | "postprocessing"
+  | "emitting";
+
+function formatGcodeProgressLabel(
+  target: string,
+  stage?: GcodeProgressStage,
+): string {
+  const action =
+    stage === "preparing"
+      ? "Preparing"
+      : stage === "optimizing"
+        ? "Optimizing"
+        : stage === "joining"
+          ? "Joining"
+          : stage === "postprocessing"
+            ? "Post-processing"
+            : stage === "emitting"
+              ? "Emitting"
+              : "Generating";
+
+  return target ? `${action} ${target}…` : `${action} G-code`;
+}
+
 /** Orchestrates machine connection, disconnection, and G-code generation. */
 export function useJobActions() {
   const activeConfig = useMachineStore((s) => s.activeConfig);
@@ -223,7 +250,7 @@ export function useJobActions() {
     upsertTask({
       id: taskId,
       type: "gcode-generate",
-      label: "Generating G-code",
+      label: formatGcodeProgressLabel("", "preparing"),
       progress: 0,
       status: "running",
     });
@@ -234,7 +261,7 @@ export function useJobActions() {
         upsertTask({
           id: taskId,
           type: "gcode-generate",
-          label: "Generating G-code",
+          label: formatGcodeProgressLabel("", msg.stage),
           progress: msg.percent,
           status: "running",
         });
@@ -397,7 +424,7 @@ export function useJobActions() {
       upsertTask({
         id: taskId,
         type: "gcode-generate",
-        label: `Generating ${group.name}…`,
+        label: formatGcodeProgressLabel(group.name, "preparing"),
         progress: 0,
         status: "running",
       });
@@ -413,7 +440,7 @@ export function useJobActions() {
             upsertTask({
               id: taskId,
               type: "gcode-generate",
-              label: `Generating ${group.name}…`,
+              label: formatGcodeProgressLabel(group.name, msg.stage),
               progress: msg.percent,
               status: "running",
             });
@@ -542,7 +569,7 @@ export function useJobActions() {
       upsertTask({
         id: taskId,
         type: "gcode-generate",
-        label: `Generating ${entry.color}…`,
+        label: formatGcodeProgressLabel(entry.color, "preparing"),
         progress: 0,
         status: "running",
       });
@@ -558,7 +585,7 @@ export function useJobActions() {
             upsertTask({
               id: taskId,
               type: "gcode-generate",
-              label: `Generating ${entry.color}…`,
+              label: formatGcodeProgressLabel(entry.color, msg.stage),
               progress: msg.percent,
               status: "running",
             });
@@ -675,7 +702,7 @@ export function useJobActions() {
       upsertTask({
         id: taskId,
         type: "gcode-generate",
-        label: `Generating hatch ${color}…`,
+        label: formatGcodeProgressLabel(`hatch ${color}`, "preparing"),
         progress: 0,
         status: "running",
       });
@@ -691,7 +718,7 @@ export function useJobActions() {
             upsertTask({
               id: taskId,
               type: "gcode-generate",
-              label: `Generating hatch ${color}…`,
+              label: formatGcodeProgressLabel(`hatch ${color}`, msg.stage),
               progress: msg.percent,
               status: "running",
             });

@@ -8,7 +8,7 @@
  * Message protocol:
  *   IN  → { type: 'generate', taskId, objects, config, options }
  *   IN  → { type: 'cancel', taskId }
- *   OUT ← { type: 'progress', taskId, percent }
+ *   OUT ← { type: 'progress', taskId, percent, stage }
  *   OUT ← { type: 'complete', taskId, gcode }
  *   OUT ← { type: 'error', taskId, error }
  */
@@ -26,14 +26,17 @@ import {
   clipSubpathsToBed,
   clipSubpathsToRect,
   resolvePageClipRect,
-  nearestNeighbourSort,
-  joinSubpaths,
   fmtCoord as fmt,
   tokenizePath,
   toAbsolute,
   transformPt,
   type Subpath,
 } from "./gcodeEngine";
+import {
+  joinSubpathsCooperative,
+  nearestNeighbourSortCooperative,
+  OperationCancelledError,
+} from "./gcodeEngine/stages/pathOptimization";
 import { applyVinylCompensation } from "./gcodeEngine/stages/vinylCompensation";
 import { applyVinylWeedBorder } from "./gcodeEngine/stages/vinylWeedBorder";
 
@@ -51,6 +54,13 @@ interface CancelMessage {
 type InMessage = GenerateMessage | CancelMessage;
 
 const cancelled = new Set<string>();
+
+type GcodeGenerationStage =
+  | "preparing"
+  | "optimizing"
+  | "joining"
+  | "postprocessing"
+  | "emitting";
 
 function fmtSeconds(n: number): string {
   return n
@@ -601,6 +611,28 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
 async function generate(msg: GenerateMessage): Promise<void> {
   const { taskId, objects, config, options } = msg;
   const lines: string[] = [];
+  let lastProgressPercent = -1;
+  let lastProgressStage: GcodeGenerationStage | null = null;
+
+  const postProgress = (
+    percent: number,
+    stage: GcodeGenerationStage,
+    force: boolean = false,
+  ): void => {
+    const normalized = Number(Math.max(0, Math.min(100, percent)).toFixed(1));
+    const stageChanged = lastProgressStage !== stage;
+    if (!force && !stageChanged && normalized === lastProgressPercent) {
+      return;
+    }
+    lastProgressPercent = normalized;
+    lastProgressStage = stage;
+    self.postMessage({
+      type: "progress",
+      taskId,
+      percent: normalized,
+      stage,
+    });
+  };
 
   const optimise = options?.optimisePaths ?? false;
   const pathDirectionMode = options?.pathDirectionMode ?? "minimize-travel";
@@ -811,7 +843,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     const pct = Math.round(((i + 1) / colorSortedObjects.length) * 40);
     if (pct !== lastPct1) {
       lastPct1 = pct;
-      self.postMessage({ type: "progress", taskId, percent: pct });
+      postProgress(pct, "preparing");
     }
     await yieldPh1();
   }
@@ -824,32 +856,77 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
 
   // ── Phase 2: optional nearest-neighbour reorder ────────────────────────────
-  let orderedSubpaths = optimise
-    ? remapLayerMetadata(
-        allSubpaths,
-        nearestNeighbourSort(
-          allSubpaths.map((sp) => sp.points),
-          {
-            allowReverse: allowPathReversal,
-          },
-        ),
-      )
-    : allSubpaths;
+  let orderedSubpaths = allSubpaths;
+  let phase3Progress = 40;
+  let phase3Stage: GcodeGenerationStage = "optimizing";
+  const hasPreEmitProcessing =
+    optimise || doJoin || !!options?.vinylCutting || !!options?.vinylWeedBorder;
 
-  // ── Phase 3: optional path joining ────────────────────────────────────────
-  // Joining is applied after NN sort so that already-adjacent subpaths
-  // (which NN sort placed next to each other) get merged where possible.
-  if (doJoin) {
-    orderedSubpaths = remapLayerMetadata(
-      orderedSubpaths,
-      joinSubpaths(
+  const emitPhase3Progress = (pct: number, force: boolean = false): void => {
+    const clamped = Math.max(40, Math.min(95, pct));
+    if (force || clamped - phase3Progress >= 0.1) {
+      phase3Progress = clamped;
+      postProgress(clamped, phase3Stage, force);
+    }
+  };
+
+  try {
+    if (optimise) {
+      phase3Stage = "optimizing";
+      emitPhase3Progress(phase3Progress, true);
+      const sorted = await nearestNeighbourSortCooperative(
+        allSubpaths.map((sp) => sp.points),
+        {
+          allowReverse: allowPathReversal,
+          shouldCancel: () => cancelled.has(taskId),
+          onProgress: (completed, total) => {
+            if (total <= 0) return;
+            // Ease-out mapping gives earlier visible movement for very large
+            // path counts where linear integer percentages stay flat too long.
+            const ratio = Math.max(0, Math.min(1, completed / total));
+            const eased = Math.sqrt(ratio);
+            const pct = 40 + eased * 50;
+            emitPhase3Progress(pct);
+          },
+        },
+      );
+      orderedSubpaths = remapLayerMetadata(allSubpaths, sorted);
+      emitPhase3Progress(90);
+    }
+
+    // ── Phase 3: optional path joining ──────────────────────────────────────
+    // Joining is applied after NN sort so that already-adjacent subpaths
+    // (which NN sort placed next to each other) get merged where possible.
+    if (doJoin) {
+      phase3Stage = "joining";
+      emitPhase3Progress(phase3Progress, true);
+      const joined = await joinSubpathsCooperative(
         orderedSubpaths.map((sp) => sp.points),
         joinTol,
-      ),
-    );
+        {
+          shouldCancel: () => cancelled.has(taskId),
+          onProgress: (completed, total) => {
+            if (total <= 0) return;
+            const pct = 90 + (completed / total) * 3;
+            emitPhase3Progress(pct);
+          },
+        },
+      );
+      orderedSubpaths = remapLayerMetadata(orderedSubpaths, joined);
+      emitPhase3Progress(93);
+    }
+  } catch (err: unknown) {
+    if (err instanceof OperationCancelledError || cancelled.has(taskId)) {
+      cancelled.delete(taskId);
+      self.postMessage({ type: "cancelled", taskId });
+      return;
+    }
+    throw err;
   }
 
   if (options?.vinylCutting && options?.vinylWeedBorder) {
+    phase3Stage = "postprocessing";
+    emitPhase3Progress(phase3Progress, true);
     orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
       applyVinylWeedBorder(
@@ -857,9 +934,12 @@ async function generate(msg: GenerateMessage): Promise<void> {
         options.vinylWeedBorder,
       ),
     );
+    emitPhase3Progress(94);
   }
 
   if (options?.vinylCutting) {
+    phase3Stage = "postprocessing";
+    emitPhase3Progress(phase3Progress, true);
     orderedSubpaths = remapLayerMetadata(
       orderedSubpaths,
       applyVinylCompensation(
@@ -867,6 +947,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
         options.vinylCutting,
       ),
     );
+    emitPhase3Progress(95);
   }
 
   // ── Phase 4: emit G-code ─────────────────────────────────────────────────
@@ -904,6 +985,7 @@ async function generate(msg: GenerateMessage): Promise<void> {
     inkTriggerBase > 0 &&
     inkService.stations.some(isEnabledStation);
   const totalOperations = orderedSubpaths.length + allPoints.length;
+  const phase4StartProgress = hasPreEmitProcessing ? 95 : 40;
 
   const emitTriggeredInkService = (preferredDipStationId?: string): void => {
     if (!canEmitInkService || !inkService) return;
@@ -1053,11 +1135,15 @@ async function generate(msg: GenerateMessage): Promise<void> {
     const completedOperations = i + 1;
     const pct =
       totalOperations > 0
-        ? 40 + Math.round((completedOperations / totalOperations) * 60)
+        ? phase4StartProgress +
+          Math.round(
+            (completedOperations / totalOperations) *
+              (100 - phase4StartProgress),
+          )
         : 100;
     if (pct !== lastPct4) {
       lastPct4 = pct;
-      self.postMessage({ type: "progress", taskId, percent: pct });
+      postProgress(pct, "emitting");
     }
     await yieldPh4();
   }
@@ -1120,11 +1206,15 @@ async function generate(msg: GenerateMessage): Promise<void> {
     const completedOperations = orderedSubpaths.length + i + 1;
     const pct =
       totalOperations > 0
-        ? 40 + Math.round((completedOperations / totalOperations) * 60)
+        ? phase4StartProgress +
+          Math.round(
+            (completedOperations / totalOperations) *
+              (100 - phase4StartProgress),
+          )
         : 100;
     if (pct !== lastPct4) {
       lastPct4 = pct;
-      self.postMessage({ type: "progress", taskId, percent: pct });
+      postProgress(pct, "emitting");
     }
     await yieldPh4();
   }
