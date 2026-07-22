@@ -463,7 +463,9 @@ describe("svgWorker — G-code body", () => {
       taskId: "page-clip-top-left-anchor",
       objects: [
         createVectorObject({
-          path: "M 0 0 L 200 0 L 200 200 L 0 200 Z",
+          // Use a diagonal that must cross the inner margin clip window
+          // (10..90 on both axes) after top-edge-anchor normalization.
+          path: "M 0 0 L 200 200",
           x: 0,
           y: -200,
           scale: 1,

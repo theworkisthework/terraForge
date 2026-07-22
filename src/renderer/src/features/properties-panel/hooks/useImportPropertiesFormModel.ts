@@ -50,6 +50,11 @@ export function useImportPropertiesFormModel({
   onSelectRotStep,
   onToggleCentreMarker,
 }: UseImportPropertiesFormModelArgs) {
+  const normalizeCoord = (value: number): number => {
+    const rounded = Math.round(value * 1e9) / 1e9;
+    return Math.abs(rounded) < 1e-9 ? 0 : rounded;
+  };
+
   const objW = imp.svgWidth * (imp.scaleX ?? imp.scale);
   const objH = imp.svgHeight * (imp.scaleY ?? imp.scale);
   const currentScaleX = imp.scaleX ?? imp.scale;
@@ -96,8 +101,8 @@ export function useImportPropertiesFormModel({
   ) => {
     if (useTemplateBounds) return {};
     return {
-      x: isRightOrigin ? bedW - nextObjW : 0,
-      y: isTopOrigin ? -nextObjH : 0,
+      x: normalizeCoord(isRightOrigin ? bedW - nextObjW : 0),
+      y: normalizeCoord(isTopOrigin ? -nextObjH : 0),
     };
   };
 
@@ -153,7 +158,9 @@ export function useImportPropertiesFormModel({
         scaleX: nextScaleX,
         ...(useTemplateBounds
           ? {}
-          : { x: isRightOrigin ? bedW - nextObjW : 0 }),
+          : isRightOrigin
+            ? { x: normalizeCoord(bedW - nextObjW) }
+            : {}),
       });
     },
     onFitVertical: () => {
@@ -162,7 +169,11 @@ export function useImportPropertiesFormModel({
       const nextObjH = (imp.svgHeight || 0) * nextScaleY;
       onUpdate({
         scaleY: nextScaleY,
-        ...(useTemplateBounds ? {} : { y: isTopOrigin ? -nextObjH : 0 }),
+        ...(useTemplateBounds
+          ? {}
+          : isTopOrigin
+            ? { y: normalizeCoord(-nextObjH) }
+            : {}),
       });
     },
     onResetScale: () => {

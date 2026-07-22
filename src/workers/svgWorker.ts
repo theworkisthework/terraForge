@@ -117,21 +117,26 @@ function distanceMM(
   return Math.hypot(dx, dy);
 }
 
-function normalizeObjectForPageClip(
+function legacyTopOriginAnchorObject(
   obj: VectorObject,
   config: MachineConfig,
-): VectorObject {
+): VectorObject | null {
   if (config.origin !== "top-left" && config.origin !== "top-right") {
-    return obj;
+    return null;
   }
 
   const sY = obj.scaleY ?? obj.scale;
+  const objHeight = obj.originalHeight * sY;
+  if (!Number.isFinite(objHeight) || objHeight === 0) {
+    return null;
+  }
+
   // Canvas top-origin placement stores import Y one object-height above the
   // visual top edge. Shift to the actual machine-space top-edge anchor before
   // flattening so page-clip bounds align with what the user sees.
   return {
     ...obj,
-    y: obj.y + obj.originalHeight * sY,
+    y: obj.y + objHeight,
   };
 }
 
@@ -771,24 +776,30 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const obj = colorSortedObjects[i];
-    const renderAlignedObj = pageClipBounds
-      ? normalizeObjectForPageClip(obj, config)
-      : obj;
+    const legacyTopOriginObj = pageClipBounds
+      ? legacyTopOriginAnchorObject(obj, config)
+      : null;
 
-    if (renderAlignedObj.pointTap) {
+    const pointTapCandidates = legacyTopOriginObj
+      ? [obj, legacyTopOriginObj]
+      : [obj];
+
+    for (const pointTapObj of pointTapCandidates) {
+      if (!pointTapObj.pointTap) continue;
       const transformedPoint = transformPt(
-        renderAlignedObj,
+        pointTapObj,
         config,
-        renderAlignedObj.pointTap.x,
-        renderAlignedObj.pointTap.y,
+        pointTapObj.pointTap.x,
+        pointTapObj.pointTap.y,
       );
       if (isPointWithinBounds(transformedPoint, config, options?.pageClip)) {
         allPoints.push({
           point: transformedPoint,
-          layer: renderAlignedObj.layer,
-          color: renderAlignedObj.sourceColor,
-          repeats: Math.max(1, renderAlignedObj.passCount ?? 1),
+          layer: pointTapObj.layer,
+          color: pointTapObj.sourceColor,
+          repeats: Math.max(1, pointTapObj.passCount ?? 1),
         });
+        break;
       }
     }
 
@@ -802,25 +813,51 @@ async function generate(msg: GenerateMessage): Promise<void> {
     lastColor = obj.sourceColor;
     colorObjectCount++;
 
-    let raw: Subpath[];
-    try {
-      raw = flattenToSubpaths(renderAlignedObj, config);
-    } catch {
-      // Fallback to coarse endpoint-only approximation for malformed paths.
-      raw = approximateObjectSubpaths(renderAlignedObj, config);
-      if (raw.length === 0) {
-        skippedObjects++;
+    const clipCandidate = (
+      candidate: VectorObject,
+    ): { clipped: Subpath[]; validGeometry: boolean } => {
+      let raw: Subpath[];
+      try {
+        raw = flattenToSubpaths(candidate, config);
+      } catch {
+        // Fallback to coarse endpoint-only approximation for malformed paths.
+        raw = approximateObjectSubpaths(candidate, config);
+        if (raw.length === 0) {
+          return { clipped: [], validGeometry: false };
+        }
       }
+
+      const clipped = pageClipBounds
+        ? clipSubpathsToRect(
+            raw,
+            pageClipBounds.xMin,
+            pageClipBounds.xMax,
+            pageClipBounds.yMin,
+            pageClipBounds.yMax,
+          )
+        : clipSubpathsToBed(raw, config);
+
+      return { clipped, validGeometry: true };
+    };
+
+    const primaryResult = clipCandidate(obj);
+    let clipped = primaryResult.clipped;
+    let validGeometry = primaryResult.validGeometry;
+
+    // Some older top-origin imports persist Y one object-height above the
+    // visual top edge. If clipping the modern anchor produces no visible
+    // geometry, retry once with the legacy anchor representation.
+    if (pageClipBounds && clipped.length === 0 && legacyTopOriginObj) {
+      const legacyResult = clipCandidate(legacyTopOriginObj);
+      if (legacyResult.clipped.length > 0) {
+        clipped = legacyResult.clipped;
+      }
+      validGeometry = validGeometry || legacyResult.validGeometry;
     }
-    const clipped = pageClipBounds
-      ? clipSubpathsToRect(
-          raw,
-          pageClipBounds.xMin,
-          pageClipBounds.xMax,
-          pageClipBounds.yMin,
-          pageClipBounds.yMax,
-        )
-      : clipSubpathsToBed(raw, config);
+
+    if (!validGeometry) {
+      skippedObjects++;
+    }
 
     // Apply passes: if passCount > 1, duplicate subpaths according to passMode
     const passCount = obj.passCount ?? 1;
