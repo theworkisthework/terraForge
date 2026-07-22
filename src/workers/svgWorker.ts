@@ -25,6 +25,7 @@ import {
   flattenToSubpaths,
   clipSubpathsToBed,
   clipSubpathsToRect,
+  resolvePageClipRect,
   nearestNeighbourSort,
   joinSubpaths,
   fmtCoord as fmt,
@@ -106,34 +107,45 @@ function distanceMM(
   return Math.hypot(dx, dy);
 }
 
+function normalizeObjectForPageClip(
+  obj: VectorObject,
+  config: MachineConfig,
+): VectorObject {
+  if (config.origin !== "top-left" && config.origin !== "top-right") {
+    return obj;
+  }
+
+  const sY = obj.scaleY ?? obj.scale;
+  // Canvas top-origin placement stores import Y one object-height above the
+  // visual top edge. Shift to the actual machine-space top-edge anchor before
+  // flattening so page-clip bounds align with what the user sees.
+  return {
+    ...obj,
+    y: obj.y + obj.originalHeight * sY,
+  };
+}
+
 function isPointWithinBounds(
   point: { x: number; y: number },
   config: MachineConfig,
   pageClip?: { widthMM: number; heightMM: number; marginMM: number },
 ): boolean {
-  const xMin = pageClip
-    ? pageClip.marginMM
-    : config.origin === "center"
-      ? -config.bedWidth / 2
-      : 0;
-  const xMax = pageClip
-    ? pageClip.widthMM - pageClip.marginMM
-    : config.origin === "center"
-      ? config.bedWidth / 2
-      : config.bedWidth;
-  const yMin = pageClip
-    ? pageClip.marginMM
-    : config.origin === "center"
-      ? -config.bedHeight / 2
-      : 0;
-  const yMax = pageClip
-    ? pageClip.heightMM - pageClip.marginMM
-    : config.origin === "center"
-      ? config.bedHeight / 2
-      : config.bedHeight;
+  const bounds = pageClip
+    ? resolvePageClipRect(config, pageClip)
+    : {
+        xMin: config.origin === "center" ? -config.bedWidth / 2 : 0,
+        xMax:
+          config.origin === "center" ? config.bedWidth / 2 : config.bedWidth,
+        yMin: config.origin === "center" ? -config.bedHeight / 2 : 0,
+        yMax:
+          config.origin === "center" ? config.bedHeight / 2 : config.bedHeight,
+      };
 
   return (
-    point.x >= xMin && point.x <= xMax && point.y >= yMin && point.y <= yMax
+    point.x >= bounds.xMin &&
+    point.x <= bounds.xMax &&
+    point.y >= bounds.yMin &&
+    point.y <= bounds.yMax
   );
 }
 
@@ -684,6 +696,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
   }
 
   const visibleObjects = objects.filter((o) => o.visible);
+  const pageClipBounds = options?.pageClip
+    ? resolvePageClipRect(config, options.pageClip)
+    : null;
 
   // Sort objects by sourceColor to batch by color for pen-swapping workflow
   const colorSortedObjects = visibleObjects.sort((a, b) => {
@@ -724,20 +739,23 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const obj = colorSortedObjects[i];
+    const renderAlignedObj = pageClipBounds
+      ? normalizeObjectForPageClip(obj, config)
+      : obj;
 
-    if (obj.pointTap) {
+    if (renderAlignedObj.pointTap) {
       const transformedPoint = transformPt(
-        obj,
+        renderAlignedObj,
         config,
-        obj.pointTap.x,
-        obj.pointTap.y,
+        renderAlignedObj.pointTap.x,
+        renderAlignedObj.pointTap.y,
       );
       if (isPointWithinBounds(transformedPoint, config, options?.pageClip)) {
         allPoints.push({
           point: transformedPoint,
-          layer: obj.layer,
-          color: obj.sourceColor,
-          repeats: Math.max(1, obj.passCount ?? 1),
+          layer: renderAlignedObj.layer,
+          color: renderAlignedObj.sourceColor,
+          repeats: Math.max(1, renderAlignedObj.passCount ?? 1),
         });
       }
     }
@@ -754,21 +772,21 @@ async function generate(msg: GenerateMessage): Promise<void> {
 
     let raw: Subpath[];
     try {
-      raw = flattenToSubpaths(obj, config);
+      raw = flattenToSubpaths(renderAlignedObj, config);
     } catch {
       // Fallback to coarse endpoint-only approximation for malformed paths.
-      raw = approximateObjectSubpaths(obj, config);
+      raw = approximateObjectSubpaths(renderAlignedObj, config);
       if (raw.length === 0) {
         skippedObjects++;
       }
     }
-    const clipped = options?.pageClip
+    const clipped = pageClipBounds
       ? clipSubpathsToRect(
           raw,
-          options.pageClip.marginMM,
-          options.pageClip.widthMM - options.pageClip.marginMM,
-          options.pageClip.marginMM,
-          options.pageClip.heightMM - options.pageClip.marginMM,
+          pageClipBounds.xMin,
+          pageClipBounds.xMax,
+          pageClipBounds.yMin,
+          pageClipBounds.yMax,
         )
       : clipSubpathsToBed(raw, config);
 

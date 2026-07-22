@@ -89,6 +89,16 @@ async function waitForMsgById(
   throw new Error(`Timeout waiting for type="${type}" taskId="${taskId}"`);
 }
 
+function extractMotionPoints(gcode: string): Array<{ x: number; y: number }> {
+  const points: Array<{ x: number; y: number }> = [];
+  const motionRe = /^G(?:0|1)\s+X(-?\d+(?:\.\d+)?)\s+Y(-?\d+(?:\.\d+)?)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = motionRe.exec(gcode)) !== null) {
+    points.push({ x: Number(m[1]), y: Number(m[2]) });
+  }
+  return points;
+}
+
 function makeSimpleObj() {
   return createVectorObject({
     path: "M 0 0 L 10 0 L 10 10 Z",
@@ -400,6 +410,96 @@ describe("svgWorker — G-code body", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).not.toContain("G1");
+  });
+
+  it("clips motions to page margin bounds for top-right origin", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "page-clip-top-right-bounds",
+      objects: [
+        createVectorObject({
+          path: "M 0 200 L 200 0",
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          originalWidth: 200,
+          originalHeight: 200,
+        }),
+      ],
+      config: makeConfig({
+        origin: "top-right",
+        bedWidth: 200,
+        bedHeight: 200,
+      }),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        returnToHome: false,
+        pageClip: {
+          widthMM: 100,
+          heightMM: 100,
+          marginMM: 10,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    const pts = extractMotionPoints(gcode);
+    expect(pts.length).toBeGreaterThan(0);
+
+    for (const p of pts) {
+      expect(p.x).toBeGreaterThanOrEqual(10);
+      expect(p.x).toBeLessThanOrEqual(90);
+      expect(p.y).toBeGreaterThanOrEqual(10);
+      expect(p.y).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it("clips motions to page margin bounds for top-left origin when import uses top-edge anchor", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "page-clip-top-left-anchor",
+      objects: [
+        createVectorObject({
+          path: "M 0 0 L 200 0 L 200 200 L 0 200 Z",
+          x: 0,
+          y: -200,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          originalWidth: 200,
+          originalHeight: 200,
+        }),
+      ],
+      config: makeConfig({
+        origin: "top-left",
+        bedWidth: 200,
+        bedHeight: 200,
+      }),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        returnToHome: false,
+        pageClip: {
+          widthMM: 100,
+          heightMM: 100,
+          marginMM: 10,
+        },
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    const pts = extractMotionPoints(gcode);
+    expect(pts.length).toBeGreaterThan(0);
+
+    for (const p of pts) {
+      expect(p.x).toBeGreaterThanOrEqual(10);
+      expect(p.x).toBeLessThanOrEqual(90);
+      expect(p.y).toBeGreaterThanOrEqual(10);
+      expect(p.y).toBeLessThanOrEqual(90);
+    }
   });
 
   it("emits compensated drag-knife moves when vinyl cutting mode is enabled", async () => {
