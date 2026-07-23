@@ -122,6 +122,19 @@ export function MachinePenCommandsSection({
           <span>Use machine coordinates for pen commands (prefix G53)</span>
         </label>
       )}
+      {!form.penType.startsWith("solenoid") && (
+        <label className="flex items-center gap-2 text-xs text-content-faint cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!form.invertZJogControls}
+            onChange={(e) =>
+              change({ invertZJogControls: e.currentTarget.checked })
+            }
+            className="accent-accent"
+          />
+          <span>Invert jog pen up/down Z direction</span>
+        </label>
+      )}
       <p className="text-xs text-content-faint">
         Pen-down delay is inserted after pen-down before XY motion starts.
         Pen-up delay is inserted after pen-up before rapid travel begins. Both

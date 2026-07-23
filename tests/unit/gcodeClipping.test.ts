@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   clipSubpathsToRect,
   clipSubpathsToBed,
+  resolvePageClipRect,
   type Subpath,
 } from "../../src/workers/gcodeEngine/stages/clipping";
 import { createMachineConfig } from "../helpers/factories";
@@ -46,5 +47,47 @@ describe("gcode clipping stage", () => {
     expect(result).toHaveLength(1);
     expect(result[0][0].x).toBeCloseTo(-30);
     expect(result[0][result[0].length - 1].x).toBeCloseTo(30);
+  });
+
+  it("resolves page clip bounds for top-left origin", () => {
+    const cfg = createMachineConfig({
+      origin: "top-left",
+      bedWidth: 300,
+      bedHeight: 200,
+    });
+
+    const bounds = resolvePageClipRect(cfg, {
+      widthMM: 210,
+      heightMM: 297,
+      marginMM: 20,
+    });
+
+    expect(bounds).toEqual({
+      xMin: 20,
+      xMax: 190,
+      yMin: 20,
+      yMax: 277,
+    });
+  });
+
+  it("resolves centered page clip bounds for center origin", () => {
+    const cfg = createMachineConfig({
+      origin: "center",
+      bedWidth: 300,
+      bedHeight: 200,
+    });
+
+    const bounds = resolvePageClipRect(cfg, {
+      widthMM: 100,
+      heightMM: 80,
+      marginMM: 10,
+    });
+
+    expect(bounds).toEqual({
+      xMin: -40,
+      xMax: 40,
+      yMin: -30,
+      yMax: 30,
+    });
   });
 });

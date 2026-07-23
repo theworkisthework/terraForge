@@ -3,6 +3,55 @@ import type { Pt } from "./geometryFlattening";
 
 export type Subpath = Pt[];
 
+export interface ClipRectBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+function clampMargin(
+  widthMM: number,
+  heightMM: number,
+  marginMM: number,
+): number {
+  return Math.min(Math.max(marginMM, 0), widthMM / 2, heightMM / 2);
+}
+
+/**
+ * Resolve the page clip rectangle in machine coordinates for the current origin.
+ *
+ * For corner origins, page clip remains anchored at machine (0,0) in that
+ * origin's coordinate space. For center origin, page clip is centered around
+ * machine (0,0).
+ */
+export function resolvePageClipRect(
+  config: MachineConfig,
+  pageClip: { widthMM: number; heightMM: number; marginMM: number },
+): ClipRectBounds {
+  const margin = clampMargin(
+    pageClip.widthMM,
+    pageClip.heightMM,
+    pageClip.marginMM,
+  );
+
+  if (config.origin === "center") {
+    return {
+      xMin: -pageClip.widthMM / 2 + margin,
+      xMax: pageClip.widthMM / 2 - margin,
+      yMin: -pageClip.heightMM / 2 + margin,
+      yMax: pageClip.heightMM / 2 - margin,
+    };
+  }
+
+  return {
+    xMin: margin,
+    xMax: pageClip.widthMM - margin,
+    yMin: margin,
+    yMax: pageClip.heightMM - margin,
+  };
+}
+
 /**
  * Liang-Barsky line-segment clipper.
  * Clips segment (x0,y0)→(x1,y1) against axis-aligned rectangle.

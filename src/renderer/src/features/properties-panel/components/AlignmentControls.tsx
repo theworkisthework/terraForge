@@ -6,6 +6,7 @@ interface AlignmentControlsProps {
   objH: number;
   bedW: number;
   bedH: number;
+  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center";
   pageW: number;
   pageH: number;
   marginMM: number;
@@ -23,6 +24,7 @@ export function AlignmentControls({
   objH,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -54,6 +56,7 @@ export function AlignmentControls({
     objH,
     bedW,
     bedH,
+    origin,
     pageW,
     pageH,
     marginMM,

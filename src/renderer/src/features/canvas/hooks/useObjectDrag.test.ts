@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useObjectDrag } from "./useObjectDrag";
 import { useCanvasStore } from "../../../store/canvasStore";
 import { createSvgImport } from "../../../../../../tests/helpers/factories";
-import type { Vp } from "../types";
+import type { CanvasOrigin, Vp } from "../types";
 
 // ── Store reset ───────────────────────────────────────────────────────────────
 
@@ -31,6 +31,22 @@ function makeVpRef(zoom = 1): { current: Vp } {
 
 function makeSpaceRef(held = false) {
   return { current: held };
+}
+
+function mountHook(
+  updateImport: ReturnType<typeof vi.fn>,
+  origin: CanvasOrigin = "bottom-left",
+  zoom = 1,
+) {
+  return renderHook(() =>
+    useObjectDrag(
+      makeVpRef(zoom),
+      makeSpaceRef(),
+      vi.fn(),
+      updateImport,
+      origin,
+    ),
+  );
 }
 
 function fakeMouseEvent(ox: number, oy: number): React.MouseEvent {
@@ -135,14 +151,11 @@ describe("useObjectDrag", () => {
       expect(updateImport).not.toHaveBeenCalled();
     });
 
-    it("calls updateImport with correct mm delta for single import", () => {
+    it("keeps existing bottom-left drag behavior", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
       const updateImport = vi.fn();
-      const vpRef = makeVpRef(1); // zoom=1
-      const { result } = renderHook(() =>
-        useObjectDrag(vpRef, makeSpaceRef(), vi.fn(), updateImport),
-      );
+      const { result } = mountHook(updateImport, "bottom-left", 1);
       // Start drag at (100, 100)
       act(() =>
         result.current.onImportMouseDown(fakeMouseEvent(100, 100), "imp1"),
@@ -156,6 +169,69 @@ describe("useObjectDrag", () => {
       // MM_TO_PX = 3, zoom = 1: dx = 30/3 = 10mm, dy = -15/3 = -5mm (Y inverted)
       expect(updateImport).toHaveBeenCalledWith("imp1", {
         x: 10,
+        y: -5,
+      });
+    });
+
+    it("uses top-left y-axis direction for drag deltas", () => {
+      const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
+      useCanvasStore.setState({ imports: [imp] });
+      const updateImport = vi.fn();
+      const { result } = mountHook(updateImport, "top-left", 1);
+
+      act(() =>
+        result.current.onImportMouseDown(fakeMouseEvent(100, 100), "imp1"),
+      );
+      act(() =>
+        result.current.updateDragMove(
+          new MouseEvent("mousemove", { clientX: 100, clientY: 115 }),
+        ),
+      );
+
+      expect(updateImport).toHaveBeenCalledWith("imp1", {
+        x: 0,
+        y: 5,
+      });
+    });
+
+    it("uses top-right axis directions for drag deltas", () => {
+      const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
+      useCanvasStore.setState({ imports: [imp] });
+      const updateImport = vi.fn();
+      const { result } = mountHook(updateImport, "top-right", 1);
+
+      act(() =>
+        result.current.onImportMouseDown(fakeMouseEvent(100, 100), "imp1"),
+      );
+      act(() =>
+        result.current.updateDragMove(
+          new MouseEvent("mousemove", { clientX: 130, clientY: 115 }),
+        ),
+      );
+
+      expect(updateImport).toHaveBeenCalledWith("imp1", {
+        x: -10,
+        y: 5,
+      });
+    });
+
+    it("uses bottom-right axis directions for drag deltas", () => {
+      const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
+      useCanvasStore.setState({ imports: [imp] });
+      const updateImport = vi.fn();
+      const { result } = mountHook(updateImport, "bottom-right", 1);
+
+      act(() =>
+        result.current.onImportMouseDown(fakeMouseEvent(100, 100), "imp1"),
+      );
+      act(() =>
+        result.current.updateDragMove(
+          new MouseEvent("mousemove", { clientX: 130, clientY: 115 }),
+        ),
+      );
+
+      expect(updateImport).toHaveBeenCalledWith("imp1", {
+        x: -10,
         y: -5,
       });
     });

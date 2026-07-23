@@ -52,6 +52,7 @@ describe("usePropertiesPanelDerivedData", () => {
     expect(result.current.fallbackFeedrate).toBe(1800);
     expect(result.current.bedW).toBe(420);
     expect(result.current.bedH).toBe(297);
+    expect(result.current.origin).toBe("bottom-left");
     expect(result.current.toolpathFileName).toBe("job.gcode");
     expect(result.current.importGroupId("imp-a")).toBe("g-1");
     expect(result.current.importGroupId("missing")).toBeNull();
@@ -76,6 +77,7 @@ describe("usePropertiesPanelDerivedData", () => {
     expect(result.current.fallbackFeedrate).toBe(3000);
     expect(result.current.bedW).toBe(220);
     expect(result.current.bedH).toBe(200);
+    expect(result.current.origin).toBe("bottom-left");
     expect(result.current.toolpathFileName).toBe("G-code toolpath");
   });
 });

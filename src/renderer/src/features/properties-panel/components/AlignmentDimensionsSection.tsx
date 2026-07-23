@@ -6,6 +6,7 @@ interface AlignmentDimensionsSectionProps {
   objH: number;
   bedW: number;
   bedH: number;
+  origin: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center";
   pageW: number;
   pageH: number;
   marginMM: number;
@@ -34,6 +35,7 @@ export function AlignmentDimensionsSection({
   objH,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -59,6 +61,7 @@ export function AlignmentDimensionsSection({
         objH={objH}
         bedW={bedW}
         bedH={bedH}
+        origin={origin}
         pageW={pageW}
         pageH={pageH}
         marginMM={marginMM}

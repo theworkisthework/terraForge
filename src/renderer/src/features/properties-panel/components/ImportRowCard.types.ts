@@ -1,5 +1,6 @@
 import type { DragEvent } from "react";
 import type { SvgImport, SvgPath } from "../../../../../types";
+import type { OriginType } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
 
 export interface ImportRowCardProps {
@@ -14,6 +15,7 @@ export interface ImportRowCardProps {
   editingNameValue: string;
   bedW: number;
   bedH: number;
+  origin: OriginType;
   pageW: number;
   pageH: number;
   marginMM: number;

@@ -11,7 +11,7 @@
  */
 import { useState, useRef, useCallback, type RefObject } from "react";
 import { MM_TO_PX } from "../constants";
-import type { DraggingState, Vp } from "../types";
+import type { CanvasOrigin, DraggingState, Vp } from "../types";
 import type { SvgImport } from "../../../../../types";
 import { useCanvasStore } from "../../../store/canvasStore";
 
@@ -20,6 +20,7 @@ export function useObjectDrag(
   spaceRef: RefObject<boolean>,
   selectImport: (id: string | null) => void,
   updateImport: (id: string, patch: Partial<SvgImport>) => void,
+  origin: CanvasOrigin = "bottom-left",
 ) {
   const [dragging, setDragging] = useState<DraggingState | null>(null);
   const justDraggedRef = useRef(false);
@@ -121,8 +122,17 @@ export function useObjectDrag(
     (e: MouseEvent) => {
       if (!dragging) return;
       const zoom = vpRef.current.zoom;
-      const dx = (e.clientX - dragging.startMouseX) / (MM_TO_PX * zoom);
-      const dy = -(e.clientY - dragging.startMouseY) / (MM_TO_PX * zoom);
+      const isRight = origin === "bottom-right" || origin === "top-right";
+      const isBottom = origin === "bottom-left" || origin === "bottom-right";
+      const isCenter = origin === "center";
+
+      const xSign = isRight ? -1 : 1;
+      const ySign = isBottom || isCenter ? -1 : 1;
+
+      const dx =
+        (xSign * (e.clientX - dragging.startMouseX)) / (MM_TO_PX * zoom);
+      const dy =
+        (ySign * (e.clientY - dragging.startMouseY)) / (MM_TO_PX * zoom);
       if (dragging.group) {
         for (const item of dragging.group) {
           updateImport(item.id, { x: item.startX + dx, y: item.startY + dy });
@@ -134,7 +144,7 @@ export function useObjectDrag(
         });
       }
     },
-    [dragging, vpRef, updateImport],
+    [dragging, origin, vpRef, updateImport],
   );
 
   /** Returns true when the ending drag was a group drag (caller may need to clear OBB). */

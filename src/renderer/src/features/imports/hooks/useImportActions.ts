@@ -83,6 +83,7 @@ export function useImportActions() {
     useCanvasStore(useShallow(selectImportActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
+  const activeMachineConfig = useMachineStore((s) => s.activeConfig());
 
   /**
    * Imports a single SVG file — parses layers, shapes, fills, hatch lines, and
@@ -266,6 +267,14 @@ export function useImportActions() {
       const normY = bounds?.minY ?? viewBoxY;
       const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
       const effH = bounds ? bounds.maxY - bounds.minY : svgHeight;
+      const objW = effW * initScale;
+      const objH = effH * initScale;
+      const origin = activeMachineConfig?.origin ?? "bottom-left";
+      const bedW = activeMachineConfig?.bedWidth ?? 220;
+      const isRightOrigin = origin === "bottom-right" || origin === "top-right";
+      const isTopOrigin = origin === "top-left" || origin === "top-right";
+      const initialX = isRightOrigin ? bedW - objW : 0;
+      const initialY = isTopOrigin ? -objH : 0;
 
       let finalPaths = paths;
       if (initScale > 0) {
@@ -285,8 +294,8 @@ export function useImportActions() {
         id: uuid(),
         name,
         paths: finalPaths,
-        x: 0,
-        y: 0,
+        x: initialX,
+        y: initialY,
         scale: initScale,
         rotation: 0,
         visible: true,

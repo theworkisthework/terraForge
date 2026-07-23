@@ -3,6 +3,7 @@ interface UseAlignmentControlsModelArgs {
   objH: number;
   bedW: number;
   bedH: number;
+  origin?: "bottom-left" | "top-left" | "bottom-right" | "top-right" | "center";
   pageW: number;
   pageH: number;
   marginMM: number;
@@ -20,6 +21,7 @@ export function useAlignmentControlsModel({
   objH,
   bedW,
   bedH,
+  origin = "bottom-left",
   pageW,
   pageH,
   marginMM,
@@ -39,6 +41,7 @@ export function useAlignmentControlsModel({
   const maxX = useTemplateBounds ? pageW - inset : bedW;
   const minY = useTemplateBounds ? inset : 0;
   const maxY = useTemplateBounds ? pageH - inset : bedH;
+  const isTopOrigin = origin === "top-left" || origin === "top-right";
 
   const frameName = useTemplateBounds
     ? templateAlignTarget === "margin"
@@ -48,8 +51,11 @@ export function useAlignmentControlsModel({
 
   const centerX = minX + (maxX - minX - objW) / 2;
   const rightX = maxX - objW;
-  const topY = maxY - objH;
-  const centerY = minY + (maxY - minY - objH) / 2;
+  // Top-origin modes render import Y with the top edge at (y + objH), so
+  // top/bottom/centre alignment targets must account for that offset.
+  const topY = isTopOrigin ? minY - objH : maxY - objH;
+  const bottomY = isTopOrigin ? maxY - objH * 2 : minY;
+  const centerY = (topY + bottomY) / 2;
 
   return {
     leftTitle: useTemplateBounds
@@ -68,7 +74,7 @@ export function useAlignmentControlsModel({
       ? `Centre vertically (${frameName}) (Y = ${roundToTenth(centerY)} mm)`
       : `Centre vertically (Y = ${roundToTenth((bedH - objH) / 2)} mm)`,
     bottomTitle: useTemplateBounds
-      ? `Align bottom edge to ${frameName} bottom (Y = ${roundToTenth(minY)} mm)`
+      ? `Align bottom edge to ${frameName} bottom (Y = ${roundToTenth(bottomY)} mm)`
       : "Align bottom edge to bed bottom (Y = 0)",
     targetControlDisabled: !templateAlignEnabled || !canAlignToTemplate,
     targetControlToneClass:
@@ -80,6 +86,6 @@ export function useAlignmentControlsModel({
     onAlignRight: () => onAlignX(rightX),
     onAlignTop: () => onAlignY(topY),
     onAlignCenterY: () => onAlignY(centerY),
-    onAlignBottom: () => onAlignY(minY),
+    onAlignBottom: () => onAlignY(bottomY),
   };
 }

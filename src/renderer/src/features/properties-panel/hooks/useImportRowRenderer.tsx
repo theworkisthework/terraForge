@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { SvgImport, SvgPath } from "../../../../../types";
+import type { OriginType } from "../../../../../types";
 import type { RotStep } from "../utils/rotation";
 import { ImportRowCard } from "../components/ImportRowCard";
 
@@ -17,6 +18,7 @@ interface UseImportRowRendererArgs {
   editingName: NameEditState | null;
   bedW: number;
   bedH: number;
+  origin: OriginType;
   pageW: number;
   pageH: number;
   marginMM: number;
@@ -87,6 +89,7 @@ export function useImportRowRenderer({
   editingName,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -150,6 +153,7 @@ export function useImportRowRenderer({
           }
           bedW={bedW}
           bedH={bedH}
+          origin={origin}
           pageW={pageW}
           pageH={pageH}
           marginMM={marginMM}
@@ -214,6 +218,7 @@ export function useImportRowRenderer({
       editingName,
       bedW,
       bedH,
+      origin,
       pageW,
       pageH,
       marginMM,

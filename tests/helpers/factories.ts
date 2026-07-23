@@ -36,6 +36,7 @@ export function createMachineConfig(
     penType: "solenoid-hardware",
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
+    invertZJogControls: false,
     penDownDelayMs: 50,
     penUpDelayMs: 0,
     jogSpeed: 3000,
