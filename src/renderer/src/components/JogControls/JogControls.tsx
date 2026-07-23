@@ -40,9 +40,7 @@ export function JogControls({ onClose }: Props) {
     }
 
     const standardDir: 1 | -1 = action === "down" ? -1 : 1;
-    const dir = invertZJogControls
-      ? ((-standardDir) as 1 | -1)
-      : standardDir;
+    const dir = invertZJogControls ? (-standardDir as 1 | -1) : standardDir;
     const dist = (step * dir).toFixed(3);
     await window.terraForge.fluidnc.sendCommand(
       `$J=G91 G21 Z${dist} F${feedrate}`,
