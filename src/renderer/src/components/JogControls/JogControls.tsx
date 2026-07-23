@@ -30,17 +30,23 @@ export function JogControls({ onClose }: Props) {
   const penUp = activeConfig?.penUpCommand ?? "";
   const penDown = activeConfig?.penDownCommand ?? "";
   const penType = activeConfig?.penType ?? "solenoid-hardware";
+  const invertZJogControls = !!activeConfig?.invertZJogControls;
 
-  const movePen = async (dir: 1 | -1) => {
-    if (!isSolenoidPenType(penType)) {
-      const dist = (step * dir).toFixed(3);
-      await window.terraForge.fluidnc.sendCommand(
-        `$J=G91 G21 Z${dist} F${feedrate}`,
-      );
-    } else {
-      const cmd = dir === -1 ? penDown : penUp;
+  const movePen = async (action: "up" | "down") => {
+    if (isSolenoidPenType(penType)) {
+      const cmd = action === "down" ? penDown : penUp;
       if (cmd) await window.terraForge.fluidnc.sendCommand(cmd);
+      return;
     }
+
+    const standardDir: 1 | -1 = action === "down" ? -1 : 1;
+    const dir = invertZJogControls
+      ? ((-standardDir) as 1 | -1)
+      : standardDir;
+    const dist = (step * dir).toFixed(3);
+    await window.terraForge.fluidnc.sendCommand(
+      `$J=G91 G21 Z${dist} F${feedrate}`,
+    );
   };
 
   const jog = async (axis: string, dir: 1 | -1) => {

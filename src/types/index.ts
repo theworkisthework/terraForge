@@ -42,6 +42,8 @@ export interface MachineConfig {
   penType: PenType;
   penUpCommand: string;
   penDownCommand: string;
+  /** Invert relative Z jog direction for jog panel pen up/down buttons. */
+  invertZJogControls?: boolean;
   /** Delay after pen-down before XY motion begins (milliseconds). */
   penDownDelayMs: number;
   /** Delay after pen-up before rapid travel begins (milliseconds). */

@@ -171,7 +171,7 @@ describe("JogControls", () => {
   });
 });
 
-// ── Z axis jog (servo / stepper) ─────────────────────────────────────────────
+// ── Z axis jog (servo / stepper) with explicit invert setting ───────────────
 
 describe("JogControls — Z jog with servo/stepper pen type", () => {
   beforeEach(() => {
@@ -191,25 +191,47 @@ describe("JogControls — Z jog with servo/stepper pen type", () => {
     vi.clearAllMocks();
   });
 
-  it("pen-down sends $J incremental Z- jog (not G0)", async () => {
+  it("pen-down sends relative Z- jog with default mapping", async () => {
     render(<JogControls />);
     await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringMatching(/^\$J=G91 G21 Z-[\d.]+/),
     );
-    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
-      expect.stringContaining("G0 Z"),
-    );
   });
 
-  it("pen-up sends $J incremental Z+ jog (not G0)", async () => {
+  it("pen-up sends relative Z+ jog with default mapping", async () => {
     render(<JogControls />);
     await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringMatching(/^\$J=G91 G21 Z\+?[\d.]+/),
     );
-    expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalledWith(
-      expect.stringContaining("G0 Z"),
+  });
+
+  it("inverts relative jog direction when invertZJogControls is enabled", async () => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      invertZJogControls: true,
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 Z10.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Z-10.000 F3000",
     );
   });
 
@@ -230,6 +252,102 @@ describe("JogControls — Z jog with servo/stepper pen type", () => {
     await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       expect.stringContaining("F1500"),
+    );
+  });
+});
+
+describe("JogControls — Z jog fallback when pen commands missing", () => {
+  beforeEach(() => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "",
+      penDownCommand: "",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  it("falls back to $J incremental Z jog for pen-down", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringMatching(/^\$J=G91 G21 Z-[\d.]+/),
+    );
+  });
+
+  it("falls back to $J incremental Z jog for pen-up", async () => {
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
+      expect.stringMatching(/^\$J=G91 G21 Z\+?[\d.]+/),
+    );
+  });
+
+  it("uses default direction mapping when commands cannot be parsed", async () => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "M900",
+      penDownCommand: "M901",
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 Z-1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Z1.000 F3000",
+    );
+  });
+
+  it("still respects invertZJogControls when commands are non-parseable", async () => {
+    const cfg = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "M900",
+      penDownCommand: "M901",
+      invertZJogControls: true,
+    });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+    vi.clearAllMocks();
+
+    render(<JogControls />);
+    await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pen up" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 Z1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Z-1.000 F3000",
     );
   });
 });

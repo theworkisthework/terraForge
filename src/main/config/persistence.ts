@@ -38,6 +38,7 @@ export const DEFAULT_MACHINE_CONFIGS: MachineConfig[] = [
     penType: "solenoid-hardware",
     penUpCommand: "M3S0",
     penDownCommand: "M3S1",
+    invertZJogControls: false,
     penDownDelayMs: 50,
     penUpDelayMs: 0,
     jogSpeed: 3000,
@@ -115,6 +116,10 @@ function normalizeConfig(config: MachineConfig): MachineConfig {
       typeof config.drawSpeed === "number" && config.drawSpeed >= 1
         ? config.drawSpeed
         : legacySpeed,
+    invertZJogControls:
+      typeof config.invertZJogControls === "boolean"
+        ? config.invertZJogControls
+        : false,
   };
 }
 
