@@ -23,7 +23,9 @@ export function createMainWindow(): BrowserWindow {
     show: false,
     backgroundColor: "#1a1a2e",
     icon: resolveWindowIconPath(),
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    // Use a standard framed title bar on macOS so traffic lights stay in
+    // native chrome instead of overlapping renderer content.
+    titleBarStyle: "default",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
