@@ -77,7 +77,9 @@ describe("registerConfigIpcHandlers", () => {
 
     await mocks.handlers.get("config:saveMachineConfig")?.({}, updated);
 
-    expect(saveConfigs).toHaveBeenCalledWith([updated]);
+    expect(saveConfigs).toHaveBeenCalledWith([
+      { ...updated, invertZJogControls: false },
+    ]);
   });
 
   it("appends a new machine config when the id does not exist", async () => {
@@ -97,7 +99,10 @@ describe("registerConfigIpcHandlers", () => {
 
     await mocks.handlers.get("config:saveMachineConfig")?.({}, created);
 
-    expect(saveConfigs).toHaveBeenCalledWith([existing, created]);
+    expect(saveConfigs).toHaveBeenCalledWith([
+      existing,
+      { ...created, invertZJogControls: false },
+    ]);
   });
 
   it("deletes a machine config by id", async () => {

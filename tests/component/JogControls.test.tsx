@@ -227,11 +227,11 @@ describe("JogControls — Z jog with servo/stepper pen type", () => {
 
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
       1,
-      "$J=G91 G21 Z10.000 F3000",
+      "$J=G91 G21 Z1.000 F3000",
     );
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
       2,
-      "$J=G91 G21 Z-10.000 F3000",
+      "$J=G91 G21 Z-1.000 F3000",
     );
   });
 
