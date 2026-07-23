@@ -59,6 +59,10 @@ function normalizeConfig(config: MachineConfig): MachineConfig {
       typeof config.drawSpeed === "number" && config.drawSpeed >= 1
         ? config.drawSpeed
         : legacySpeed,
+    invertZJogControls:
+      typeof config.invertZJogControls === "boolean"
+        ? config.invertZJogControls
+        : false,
   };
 }
 

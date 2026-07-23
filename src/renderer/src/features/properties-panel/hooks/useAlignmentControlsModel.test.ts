@@ -63,4 +63,31 @@ describe("useAlignmentControlsModel", () => {
     expect(onAlignX).toHaveBeenCalledWith(90);
     expect(onAlignY).toHaveBeenCalledWith(141);
   });
+
+  it("aligns top-origin vertical edges correctly", () => {
+    const onAlignX = vi.fn();
+    const onAlignY = vi.fn();
+
+    const model = useAlignmentControlsModel({
+      objW: 30,
+      objH: 15,
+      bedW: 220,
+      bedH: 200,
+      origin: "top-left",
+      pageW: 210,
+      pageH: 297,
+      marginMM: 20,
+      canAlignToTemplate: true,
+      templateAlignEnabled: true,
+      templateAlignTarget: "page",
+      onAlignX,
+      onAlignY,
+    });
+
+    model.onAlignTop();
+    model.onAlignBottom();
+
+    expect(onAlignY).toHaveBeenNthCalledWith(1, -15);
+    expect(onAlignY).toHaveBeenNthCalledWith(2, 267);
+  });
 });

@@ -17,6 +17,7 @@ export function ImportPropertiesForm({
   imp,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -56,6 +57,7 @@ export function ImportPropertiesForm({
     imp,
     bedW,
     bedH,
+    origin,
     pageW,
     pageH,
     marginMM,
@@ -91,6 +93,7 @@ export function ImportPropertiesForm({
         objH={objH}
         bedW={bedW}
         bedH={bedH}
+        origin={origin}
         pageW={pageW}
         pageH={pageH}
         marginMM={marginMM}

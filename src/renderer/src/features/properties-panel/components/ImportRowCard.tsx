@@ -18,6 +18,7 @@ export function ImportRowCard({
   editingNameValue,
   bedW,
   bedH,
+  origin,
   pageW,
   pageH,
   marginMM,
@@ -128,6 +129,7 @@ export function ImportRowCard({
           imp={imp}
           bedW={bedW}
           bedH={bedH}
+          origin={origin}
           pageW={pageW}
           pageH={pageH}
           marginMM={marginMM}

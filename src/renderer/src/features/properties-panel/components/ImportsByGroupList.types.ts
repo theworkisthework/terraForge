@@ -1,6 +1,7 @@
 import type { DragEvent } from "react";
 import type {
   LayerGroup,
+  OriginType,
   PageSize,
   PageTemplate,
   SvgPath,
@@ -26,6 +27,7 @@ export interface ImportsByGroupListProps {
   showUngroupedHint: boolean;
   bedW: number;
   bedH: number;
+  origin: OriginType;
   pageTemplate: PageTemplate | null;
   pageSizes: PageSize[];
   templateAlignEnabled: boolean;

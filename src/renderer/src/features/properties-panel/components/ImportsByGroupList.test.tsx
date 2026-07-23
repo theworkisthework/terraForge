@@ -76,6 +76,7 @@ const baseProps = {
   showUngroupedHint: false,
   bedW: 220,
   bedH: 200,
+  origin: "bottom-left" as const,
   pageTemplate: null,
   pageSizes: [],
   templateAlignEnabled: false,

@@ -66,6 +66,7 @@ export function LayersPanelContent() {
     fallbackFeedrate,
     bedW,
     bedH,
+    origin,
     toolpathFileName,
   } = usePropertiesPanelDerivedData({
     layerGroups,
@@ -200,6 +201,7 @@ export function LayersPanelContent() {
               showUngroupedHint={showUngroupedHint}
               bedW={bedW}
               bedH={bedH}
+              origin={origin}
               pageTemplate={pageTemplate}
               pageSizes={pageSizes}
               templateAlignEnabled={templateAlignEnabled}

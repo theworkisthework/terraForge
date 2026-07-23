@@ -419,6 +419,50 @@ describe("PlotCanvas", () => {
     fireEvent.click(zoomOutBtn!);
   });
 
+  it("auto-fits when active machine config changes", () => {
+    const restoreRO = setupRO();
+
+    const cfgSmall = createMachineConfig({
+      id: "cfg-small",
+      name: "Small Bed",
+      bedWidth: 100,
+      bedHeight: 100,
+    });
+    const cfgLarge = createMachineConfig({
+      id: "cfg-large",
+      name: "Large Bed",
+      bedWidth: 420,
+      bedHeight: 297,
+    });
+
+    useMachineStore.setState({
+      configs: [cfgSmall, cfgLarge],
+      activeConfigId: cfgSmall.id,
+    });
+
+    const { container } = render(<PlotCanvas />);
+    const svg = container.querySelector("svg");
+    expect(svg).toBeTruthy();
+
+    const initialViewBox = svg!.getAttribute("viewBox");
+    expect(initialViewBox).toBeTruthy();
+
+    act(() => {
+      useMachineStore.getState().setActiveConfigId(cfgLarge.id);
+    });
+
+    const switchedViewBox = svg!.getAttribute("viewBox");
+    expect(switchedViewBox).toBeTruthy();
+
+    const initialWidth = Number(initialViewBox!.split(" ")[2]);
+    const switchedWidth = Number(switchedViewBox!.split(" ")[2]);
+
+    // Larger bed should reduce zoom, so the visible SVG width increases.
+    expect(switchedWidth).toBeGreaterThan(initialWidth);
+
+    restoreRO();
+  });
+
   it("fit-to-view button renders and can be clicked without crashing", () => {
     const { container } = render(<PlotCanvas />);
     const fitBtn = container.querySelector('button[title^="Fit to view"]');

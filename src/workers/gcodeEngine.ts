@@ -25,6 +25,7 @@ import {
 import {
   clipSubpathsToRect,
   clipSubpathsToBed,
+  resolvePageClipRect,
 } from "./gcodeEngine/stages/clipping";
 import { flattenToSubpaths } from "./gcodeEngine/stages/flatteningFlow";
 
@@ -73,7 +74,7 @@ export { flattenToSubpaths };
 
 // ── Bed clipping ─────────────────────────────────────────────────────────────
 
-export { clipSubpathsToRect, clipSubpathsToBed };
+export { clipSubpathsToRect, clipSubpathsToBed, resolvePageClipRect };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

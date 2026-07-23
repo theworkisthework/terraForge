@@ -35,6 +35,7 @@ describe("useImportsByGroupListModel", () => {
       editingName: null,
       bedW: 220,
       bedH: 200,
+      origin: "bottom-left" as const,
       pageTemplate: null,
       pageSizes: [],
       templateAlignEnabled: false,
@@ -87,6 +88,7 @@ describe("useImportsByGroupListModel", () => {
       canAlignToTemplate: true,
       marginMM: 20,
       selectedImportId: "imp-1",
+      origin: "bottom-left",
     });
     expect(result.current.groupedSectionProps.renderImport).toBe(renderImport);
     expect(result.current.ungroupedSectionProps.renderImport).toBe(

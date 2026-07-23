@@ -43,6 +43,7 @@ export const EMPTY_CONFIG: Omit<MachineConfig, "id"> = {
   penType: "solenoid-hardware",
   penUpCommand: PEN_DEFAULTS["solenoid-hardware"].penUpCommand,
   penDownCommand: PEN_DEFAULTS["solenoid-hardware"].penDownCommand,
+  invertZJogControls: false,
   penDownDelayMs: PEN_DEFAULTS["solenoid-hardware"].penDownDelayMs,
   penUpDelayMs: PEN_DEFAULTS["solenoid-hardware"].penUpDelayMs,
   jogSpeed: 3000,

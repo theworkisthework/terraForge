@@ -9,7 +9,7 @@ interface PenControlsProps {
   penDown: string;
   penUp: string;
   step: number;
-  onMovePen: (dir: 1 | -1) => Promise<void>;
+  onMovePen: (action: "up" | "down") => Promise<void>;
   onZeroZ: () => Promise<void>;
 }
 
@@ -26,17 +26,17 @@ export function PenControls({
   onMovePen,
   onZeroZ,
 }: PenControlsProps) {
-  const penDownTitle = !isSolenoidPenType(penType)
-    ? `Pen Down: jog Z by -${step} mm`
-    : penDown
+  const penDownTitle = isSolenoidPenType(penType)
+    ? penDown
       ? `Pen Down: ${penDown}`
-      : "No pen-down command configured";
+      : "No pen-down command configured"
+    : "Pen Down: relative Z jog (direction follows machine config invert setting)";
 
-  const penUpTitle = !isSolenoidPenType(penType)
-    ? `Pen Up: jog Z by +${step} mm`
-    : penUp
+  const penUpTitle = isSolenoidPenType(penType)
+    ? penUp
       ? `Pen Up: ${penUp}`
-      : "No pen-up command configured";
+      : "No pen-up command configured"
+    : "Pen Up: relative Z jog (direction follows machine config invert setting)";
 
   return (
     <div className="flex gap-1 justify-center mb-4">
@@ -45,7 +45,7 @@ export function PenControls({
           variant="secondary"
           size="sm"
           aria-label="Pen down"
-          onClick={() => onMovePen(-1)}
+          onClick={() => onMovePen("down")}
           disabled={!connected || (isSolenoidPenType(penType) && !penDown)}
         >
           <PenLine size={15} />
@@ -57,7 +57,7 @@ export function PenControls({
           variant="secondary"
           size="sm"
           aria-label="Pen up"
-          onClick={() => onMovePen(1)}
+          onClick={() => onMovePen("up")}
           disabled={!connected || (isSolenoidPenType(penType) && !penUp)}
         >
           <Pen size={15} />
