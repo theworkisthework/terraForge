@@ -187,7 +187,10 @@ if (typeof window !== "undefined") {
       getMachineConfigs: vi.fn().mockResolvedValue([]),
       saveMachineConfig: vi.fn().mockResolvedValue(undefined),
       deleteMachineConfig: vi.fn().mockResolvedValue(undefined),
-      getAppConfig: vi.fn().mockResolvedValue({ debugLoggingEnabled: false }),
+      getAppConfig: vi.fn().mockResolvedValue({
+        debugLoggingEnabled: false,
+        showConsoleTimestamps: true,
+      }),
       saveAppConfig: vi.fn().mockResolvedValue(undefined),
       exportConfigs: vi.fn().mockResolvedValue(null),
       importConfigs: vi.fn().mockResolvedValue({ added: 0, skipped: 0 }),

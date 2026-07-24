@@ -64,6 +64,7 @@ export const BUILT_IN_PAGE_SIZES: PageSize[] = [
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   debugLoggingEnabled: false,
+  showConsoleTimestamps: true,
 };
 
 function cloneMachineConfigs(configs: MachineConfig[]): MachineConfig[] {
@@ -184,6 +185,10 @@ export function createPersistence(userDataPath: string): MainPersistence {
           typeof parsed.debugLoggingEnabled === "boolean"
             ? parsed.debugLoggingEnabled
             : DEFAULT_APP_CONFIG.debugLoggingEnabled,
+        showConsoleTimestamps:
+          typeof parsed.showConsoleTimestamps === "boolean"
+            ? parsed.showConsoleTimestamps
+            : DEFAULT_APP_CONFIG.showConsoleTimestamps,
       };
     } catch {
       return { ...DEFAULT_APP_CONFIG };

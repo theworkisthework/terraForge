@@ -1,5 +1,16 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { useAppConfigStore } from "./appConfigStore";
+
+function formatConsoleTimestamp(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds(),
+  )}`;
+}
 
 interface ConsoleState {
   lines: string[];
@@ -15,7 +26,13 @@ export const useConsoleStore = create<ConsoleState>()(
 
     appendLine: (line) =>
       set((state) => {
-        state.lines.push(line);
+        const showConsoleTimestamps =
+          useAppConfigStore.getState().showConsoleTimestamps;
+        state.lines.push(
+          showConsoleTimestamps
+            ? `[${formatConsoleTimestamp(new Date())}] ${line}`
+            : line,
+        );
         if (state.lines.length > state.maxLines) {
           state.lines.splice(0, state.lines.length - state.maxLines);
         }

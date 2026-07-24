@@ -70,6 +70,7 @@ function normalizeStation(station: InkServiceStation): InkServiceStation {
 interface AppConfigState {
   enablePerPathPasses: boolean;
   debugLoggingEnabled: boolean;
+  showConsoleTimestamps: boolean;
   showMachineCoordinates: boolean;
   respectSvgColorsOnCanvas: boolean;
   vinylCuttingEnabled: boolean;
@@ -80,6 +81,7 @@ interface AppConfigState {
   inkServiceStations: InkServiceStation[];
   setEnablePerPathPasses: (enabled: boolean) => void;
   setDebugLoggingEnabled: (enabled: boolean) => void;
+  setShowConsoleTimestamps: (enabled: boolean) => void;
   setShowMachineCoordinates: (enabled: boolean) => void;
   setRespectSvgColorsOnCanvas: (enabled: boolean) => void;
   setVinylCuttingEnabled: (enabled: boolean) => void;
@@ -101,6 +103,7 @@ export const useAppConfigStore = create<AppConfigState>()(
     (set) => ({
       enablePerPathPasses: false,
       debugLoggingEnabled: false,
+      showConsoleTimestamps: true,
       showMachineCoordinates: false,
       respectSvgColorsOnCanvas: false,
       vinylCuttingEnabled: false,
@@ -113,6 +116,8 @@ export const useAppConfigStore = create<AppConfigState>()(
         set({ enablePerPathPasses: enabled }),
       setDebugLoggingEnabled: (enabled) =>
         set({ debugLoggingEnabled: enabled }),
+      setShowConsoleTimestamps: (enabled) =>
+        set({ showConsoleTimestamps: enabled }),
       setShowMachineCoordinates: (enabled) =>
         set({ showMachineCoordinates: enabled }),
       setRespectSvgColorsOnCanvas: (enabled) =>

@@ -58,6 +58,8 @@ export interface MachineConfig {
 export interface AppConfig {
   /** Enables verbose debug command transport logs in the console panel. */
   debugLoggingEnabled: boolean;
+  /** Shows a local date/time prefix for each console line. */
+  showConsoleTimestamps: boolean;
 }
 
 export interface VinylCuttingSettings {

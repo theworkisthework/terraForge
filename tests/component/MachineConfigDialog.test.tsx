@@ -28,6 +28,7 @@ beforeEach(() => {
   useAppConfigStore.setState({
     enablePerPathPasses: false,
     debugLoggingEnabled: false,
+    showConsoleTimestamps: true,
     showMachineCoordinates: false,
     respectSvgColorsOnCanvas: false,
     vinylCuttingEnabled: false,
@@ -124,6 +125,22 @@ describe("MachineConfigDialog", () => {
     expect(useAppConfigStore.getState().debugLoggingEnabled).toBe(true);
     expect(window.terraForge.config.saveAppConfig).toHaveBeenCalledWith({
       debugLoggingEnabled: true,
+      showConsoleTimestamps: true,
+    });
+  });
+
+  it("saves console timestamp setting when toggled", async () => {
+    render(<MachineConfigDialog onClose={onClose} />);
+    await userEvent.click(screen.getByText("Application Configuration"));
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Show date and time on console lines/i,
+    });
+    expect(checkbox).toBeChecked();
+    await userEvent.click(checkbox);
+    expect(useAppConfigStore.getState().showConsoleTimestamps).toBe(false);
+    expect(window.terraForge.config.saveAppConfig).toHaveBeenCalledWith({
+      debugLoggingEnabled: false,
+      showConsoleTimestamps: false,
     });
   });
 
