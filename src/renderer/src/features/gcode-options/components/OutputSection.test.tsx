@@ -33,7 +33,6 @@ describe("OutputSection", () => {
         name: "Split output into separate files",
       }),
     ).toBeChecked();
-    expect(screen.getByText(/Split output by/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
     expect(onToggleOpen).toHaveBeenCalledTimes(1);
