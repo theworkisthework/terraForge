@@ -23,6 +23,7 @@ const defaultPrefs: GcodePrefs = {
   pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
+  exportPerLayer: false,
   joinPaths: false,
   joinTolerance: 0.2,
   liftPenAtEnd: true,
@@ -164,6 +165,7 @@ describe("GcodeOptionsDialog", () => {
         pathDirectionMode: "respect",
         uploadToSd: true,
         saveLocally: false,
+        exportPerLayer: false,
         joinPaths: false,
         joinTolerance: 0.2,
         liftPenAtEnd: true,
@@ -362,6 +364,33 @@ describe("GcodeOptionsDialog", () => {
     expect(cb).not.toBeChecked(); // default false
     await userEvent.click(cb);
     expect(cb).toBeChecked();
+  });
+
+  it("clears hatch export when switching away from colour-group split mode", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+
+    const splitOutputCb = screen.getByRole("checkbox", {
+      name: "Split output into separate files",
+    });
+    await userEvent.click(splitOutputCb);
+
+    const colourGroupRadio = screen.getByRole("radio", {
+      name: "Export one file per colour group",
+    });
+    await userEvent.click(colourGroupRadio);
+
+    const hatchCb = screen.getByRole("checkbox", {
+      name: "Export separate hatch files per colour",
+    });
+    expect(hatchCb).not.toBeDisabled();
+    await userEvent.click(hatchCb);
+    expect(hatchCb).toBeChecked();
+
+    await userEvent.click(
+      screen.getByRole("radio", { name: "Export one file per group" }),
+    );
+
+    expect(hatchCb).not.toBeChecked();
   });
 
   it("enables pen-down delay override and includes override value on confirm", async () => {
@@ -566,6 +595,7 @@ describe("GcodeOptionsDialog", () => {
       pathDirectionMode: "minimize-travel",
       uploadToSd: true,
       saveLocally: false,
+      exportPerLayer: false,
       exportPerColor: false,
       exportPerHatch: false,
       joinPaths: false,

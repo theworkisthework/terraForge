@@ -33,21 +33,40 @@ export function useGcodeOptionsState({
 
   const toggle = (key: keyof GcodePrefs) =>
     setPrefs((currentPrefs) => {
-      if (key === "exportPerGroup") {
-        const next = !currentPrefs.exportPerGroup;
-        return {
-          ...currentPrefs,
-          exportPerGroup: next,
-          exportPerColor: next ? false : currentPrefs.exportPerColor,
+      if (
+        key === "exportPerLayer" ||
+        key === "exportPerGroup" ||
+        key === "exportPerColor"
+      ) {
+        const next = !currentPrefs[key];
+        const nextSplitPrefs = {
+          exportPerLayer:
+            key === "exportPerLayer"
+              ? next
+              : next
+                ? false
+                : currentPrefs.exportPerLayer,
+          exportPerGroup:
+            key === "exportPerGroup"
+              ? next
+              : next
+                ? false
+                : currentPrefs.exportPerGroup,
+          exportPerColor:
+            key === "exportPerColor"
+              ? next
+              : next
+                ? false
+                : currentPrefs.exportPerColor,
         };
-      }
 
-      if (key === "exportPerColor") {
-        const next = !currentPrefs.exportPerColor;
         return {
           ...currentPrefs,
-          exportPerColor: next,
-          exportPerGroup: next ? false : currentPrefs.exportPerGroup,
+          ...nextSplitPrefs,
+          exportPerHatch:
+            key === "exportPerColor" && next
+              ? currentPrefs.exportPerHatch
+              : false,
         };
       }
 

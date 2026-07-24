@@ -26,9 +26,8 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const inkServiceStations = useAppConfigStore(
     (state) => state.inkServiceStations,
   );
-  const { layerGroupCount, colorGroupCount, pageTemplate } = useCanvasStore(
-    useShallow(selectGcodeOptionsDialogCanvasState),
-  );
+  const { layerGroupCount, sourceLayerCount, colorGroupCount, pageTemplate } =
+    useCanvasStore(useShallow(selectGcodeOptionsDialogCanvasState));
   const {
     activeTab,
     customGcodeOpen,
@@ -107,6 +106,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
             hasPageTemplate={!!pageTemplate}
             layerDipOptions={layerDipOptions}
             layerGroupCount={layerGroupCount}
+            sourceLayerCount={sourceLayerCount}
             machineDrawSpeed={activeConfig?.drawSpeed ?? 3000}
             machinePenDownDelayMs={activeConfig?.penDownDelayMs ?? 0}
             machinePenUpDelayMs={activeConfig?.penUpDelayMs ?? 0}

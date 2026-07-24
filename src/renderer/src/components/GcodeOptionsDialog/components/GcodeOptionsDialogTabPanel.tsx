@@ -15,6 +15,7 @@ interface DipStationOption {
 interface GcodeOptionsDialogTabPanelProps {
   activeTab: GcodeOptionsTab;
   connected: boolean;
+  sourceLayerCount: number;
   colorGroupCount: number;
   customGcodeOpen: boolean;
   dipStations: DipStationOption[];
@@ -51,6 +52,7 @@ interface GcodeOptionsDialogTabPanelProps {
 export function GcodeOptionsDialogTabPanel({
   activeTab,
   connected,
+  sourceLayerCount,
   colorGroupCount,
   customGcodeOpen,
   dipStations,
@@ -160,6 +162,7 @@ export function GcodeOptionsDialogTabPanel({
           open={true}
           showHeader={false}
           connected={connected}
+          sourceLayerCount={sourceLayerCount}
           layerGroupCount={layerGroupCount}
           colorGroupCount={colorGroupCount}
           prefs={prefs}

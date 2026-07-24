@@ -21,6 +21,13 @@ export const selectToolbarCanvasState = (state: CanvasState) => ({
 
 export const selectGcodeOptionsDialogCanvasState = (state: CanvasState) => ({
   layerGroupCount: state.layerGroups.length,
+  sourceLayerCount: new Set(
+    state.imports.flatMap((imp) =>
+      imp.paths
+        .map((path) => path.layer)
+        .filter((layer): layer is string => !!layer),
+    ),
+  ).size,
   colorGroupCount: new Set(
     state.imports.flatMap((imp) =>
       imp.paths

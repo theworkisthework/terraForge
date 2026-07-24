@@ -39,7 +39,7 @@ terraForge is a desktop application for controlling FluidNC-based pen plotters �
 - Start, pause, resume, and abort jobs
 - Jog the machine and send raw commands via the console
 - Organise imports into **layer groups** for multi-pen plotting
-- Export separate G-code files by **layer group** or detected **source colour**
+- Export separate G-code files by **SVG layer**, **layer group**, or detected **source colour**
 - Override draw speed and pen timing per generated job when needed
 - **Undo/redo** and **copy/paste** canvas objects
 - **Save and reopen layouts** (.tforge files)
@@ -468,8 +468,11 @@ The Properties panel also includes two outline-related toggles for each import:
 
 - **Stroke outlines** — master enable/disable for plotting outlines from that import.
 - **Generate stroke for no-stroke paths** — when enabled, terraForge will also plot an outline for source shapes that only had a fill and no visible stroke.
+- **Plot points (circles)** — when enabled, terraForge adds a single pen tap at the geometric centre of each circle in that import.
 
 This is useful for artwork imported from design tools that use fills heavily. Fill-only geometry can still contribute hatch lines or colour-group exports even if outline generation stays off.
+
+**Plot points (circles)** is intended for stippling workflows where SVG source files use small circles to represent dots (SVG has no native point primitive). Enabling this option does **not** replace normal circle output: circle stroke outlines and/or fill-derived hatch lines are still generated when their respective options are enabled.
 
 ### Centre Marker
 
@@ -601,6 +604,8 @@ Click a group header row to select the entire group. Drag, scale, and rotate ope
 
 When layer groups are defined, you can generate a separate G-code file for each group from the G-code options dialog. Each file is named after the group (e.g. `red_layer.gcode`, `blue_layer.gcode`). Imports not assigned to any group are collected into a single additional file.
 
+When source SVG layers are present, you can also export one file per SVG layer. In that mode, each file is named from the source import name plus the layer name so that identically named layers from different imports do not collide.
+
 ---
 
 ## 9. Generating G-code
@@ -646,7 +651,9 @@ When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.
 
 When a delay or draw-speed override is enabled, the dialog shows both the override value and the current machine default for reference.
 
-#### Vinyl section
+#### Vinyl section (EXPERIMENTAL)
+
+> **Note:** The vinyl cutting feature is experimental and subject to change.
 
 | Option                                      | Description                                                                           |
 | ------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -656,26 +663,83 @@ When a delay or draw-speed override is enabled, the dialog shows both the overri
 
 The Vinyl tab appears only when **Enable vinyl cutting features** is enabled in **Application Configuration**.
 
+#### Ink/Brush Service section (EXPERIMENTAL)
+
+> **Note:** The ink/brush service feature is experimental and subject to change.
+
+The Ink/Brush Service tab enables automated pen/brush maintenance moves during G-code generation. This is useful for brush painting, ink dipping, and similar workflows that require periodic priming, wiping, or ink replenishment.
+
+![G-code Options dialog — Ink/Brush Service section expanded](../docs/resources/14d-gcode-ink-service.png)
+
+| Option                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| **Ink service mode**              | Choose between two operation modes                                               |
+| **Prime-wipe**                    | Prime (press) station followed by wipe station; triggered after travel threshold |
+| **Brush-dip**                     | Cyclic dip stations with optional wash cadence; triggered after travel threshold |
+| **Service trigger distance (mm)** | Travel distance threshold before visiting a service station                      |
+| **Add service station**           | Create a new station (prime, wipe, dip, or wash)                                 |
+
+**Station configuration (available in both modes):**
+
+| Option              | Description                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Type**            | Station function: `prime` (press for ink priming), `wipe` (brush wipe/clean), `dip` (brush ink dip), `wash` (brush rinse) |
+| **Position (X, Y)** | Machine coordinates in mm for the station location                                                                        |
+| **Dwell (ms)**      | Contact time at the station after pen-down                                                                                |
+| **Action**          | Optional motion recipe performed at this station                                                                          |
+| **Enabled**         | Checkbox to include/exclude this station                                                                                  |
+
+**Prime action (prime-wipe mode):**
+
+- **Depth (mm)** — relative plunge depth per press cycle
+- **Press count** — number of press repetitions at the station
+
+**Brush motion action (brush-dip and dip stations):**
+
+- **Depth (mm)** — relative plunge depth for the motion
+- **Pattern** — motion type: `back-forth` (reciprocal) or `circular` (spiral/loop)
+- **Repetitions** — number of pattern cycles
+- **Distance (mm)** — pattern amplitude (radius for circular, half-stroke for back-forth)
+
+**Brush-dip mode additional options:**
+
+- **Randomise dip station** — cycle through dip stations in random order instead of sequentially
+- **Include wash moves** — visit the wash station periodically during dipping
+- **Wash every N dips** — interval (e.g., wash after every 3rd dip)
+
+**Example workflow:**
+
+1. Set mode to **Brush-dip**
+2. Create a **Dip** station at X=50, Y=10 with back-forth brush motion (depth 2 mm, 2 repetitions, 1 mm distance)
+3. Create a **Wash** station at X=60, Y=10 with circular brush motion (depth 1 mm, 1 repetition, 0.8 mm radius)
+4. Set **Service trigger distance** to 15 mm
+5. Enable **Include wash moves** and set **Wash every N dips** to 2
+
+During G-code generation, whenever the plotter travels more than 15 mm (rapid), a service move is inserted: the pen descends to the dip station, performs the brush motion, ascends, and continues. After every 2nd dip, the wash station is visited.
+
 #### Output section
 
 ![G-code Options dialog — Output section expanded](../docs/resources/14c-gcode-output.png)
 
-| Option                                     | Description                                                                   |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| **Upload to SD card**                      | Upload the generated file to the machine SD card root after generation        |
-| **Save to computer**                       | Open a native save dialog after generation                                    |
-| **Export one file per group**              | Generate a separate G-code file for each layer group (multi-colour pen plots) |
-| **Export one file per colour group**       | Generate a separate file for each detected source colour                      |
-| **Export separate hatch files per colour** | Generate hatch-only files per colour; requires colour export                  |
+| Option                                     | Description                                                                               |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| **Upload to SD card**                      | Upload the generated file to the machine SD card root after generation                    |
+| **Save to computer**                       | Open a native save dialog after generation                                                |
+| **Split output into separate files**       | Master enable/disable for the split-output radio choices below                            |
+| **Export one file per SVG layer**          | Generate a separate G-code file for each detected source SVG layer                        |
+| **Export one file per group**              | Generate a separate G-code file for each layer group (multi-colour pen plots)             |
+| **Export one file per colour group**       | Generate a separate file for each detected source colour                                  |
+| **Export separate hatch files per colour** | Generate hatch-only files per colour; available only when colour-group export is selected |
 
 - At least one output (**Upload** or **Save**) must be selected; the **Generate** button is disabled otherwise.
 - When **Upload to SD card** is selected and a machine is connected, the uploaded file is automatically selected as the queued job — **Start job** is immediately ready.
 - When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
-- **Export one file per group** and **Export one file per colour group** are mutually exclusive.
+- The split-output modes are mutually exclusive radio choices under the **Split output into separate files** master checkbox.
+- **Export separate hatch files per colour** is only available when **Export one file per colour group** is selected.
 
 ### Persisted Preferences
 
-The dialog remembers your last-used settings in `localStorage`, including join tolerance, per-job overrides, and output choices. Defaults include: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
+The dialog remembers your last-used settings in `localStorage`, including join tolerance, per-job overrides, split-output mode, hatch export choice, and output choices. Defaults include: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
 
 ### Path Optimisation
 
@@ -696,6 +760,8 @@ The default filename in the save dialog is derived from the import name(s):
 - Optimised: `logo_opt.gcode` / `logo+2_opt.gcode`
 
 When exporting by colour, filenames use a colour-based prefix such as `color_hex-ff0000.gcode`. Hatch-only colour exports use `hatch_<colour>.gcode`.
+
+When exporting by SVG layer, filenames are based on the source import name plus the layer name so layers from different imports remain distinct.
 
 ### G-code Header
 

@@ -70,6 +70,21 @@ async function shotElement(
   console.log(`  ✓ ${filename}`);
 }
 
+async function ensureSampleSvgImported(
+  electronApp: ElectronApplication,
+  window: Page,
+): Promise<void> {
+  const alreadyImported = await window.locator("text=sample").count();
+  if (alreadyImported > 0) {
+    return;
+  }
+
+  await mockOpenDialog(electronApp, fixturePath("sample.svg"));
+  await window.locator("button:has-text('Import')").click();
+  await window.locator("text=sample").first().waitFor({ timeout: 15_000 });
+  await window.waitForTimeout(500);
+}
+
 // ─── App setup ───────────────────────────────────────────────────────────────
 
 let electronApp: ElectronApplication;
@@ -472,6 +487,26 @@ test("14c-gcode-output — G-code options dialog with Output section open (defau
   await window.waitForTimeout(200);
 });
 
+// ─── 14d: G-code Options dialog — Ink/Brush Service section ────────────────
+
+test("14d-gcode-ink-service — G-code options dialog with Ink/Brush Service section open", async () => {
+  await ensureSampleSvgImported(electronApp, window);
+
+  const btn = window.locator("button:has-text('Generate G-code')");
+  await btn.click();
+  await window
+    .locator("h2:has-text('Generate G-code')")
+    .waitFor({ timeout: 5_000 });
+  await window.waitForTimeout(200);
+  const inkServiceBtn = window.getByRole("tab", { name: /^Paint\/Ink$/i });
+  await inkServiceBtn.click();
+  await window.waitForTimeout(200);
+  await shot(window, "14d-gcode-ink-service.png");
+  // Close dialog
+  await window.locator("button:has-text('Cancel')").click();
+  await window.waitForTimeout(200);
+});
+
 // ─── 15: File Browser panel ──────────────────────────────────────────────────
 
 test("15-file-browser — file browser panel with both sections", async () => {
@@ -735,6 +770,8 @@ test("21-console-alarm — console panel alarm state (pulsing red button)", asyn
 // ─── 22: Toast stack during G-code generation ─────────────────────────────────
 
 test("22-toast-stack — toast notification during G-code generation", async () => {
+  await ensureSampleSvgImported(electronApp, window);
+
   // Click Generate G-code to open the options dialog
   const genBtn = window.locator("button:has-text('Generate G-code')");
   await genBtn.click();

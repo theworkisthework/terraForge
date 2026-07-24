@@ -266,12 +266,12 @@ All methods must be explicitly typed.
    penUpDelayMsOverride?: number // optional per-job pen-up delay override (ms)
    drawSpeedOverride?: number // optional per-job draw speed override (mm/min)
    vinylCutting?: { // optional drag-knife compensation for this job
-      bladeOffsetMM: number
-      cornerAngleThresholdDeg: number
-      microJogMagnitudeMM: number
+   bladeOffsetMM: number
+   cornerAngleThresholdDeg: number
+   microJogMagnitudeMM: number
    }
    vinylWeedBorder?: { // optional weed-border rectangle around final job bounds
-      marginMM: number
+   marginMM: number
    }
    pageClip?: { // when a page template is active — clips output to printable area
    widthMM: number
@@ -346,11 +346,17 @@ Optimise paths — nearest-neighbour reorder to minimise rapid travel
 Join nearby paths — (experimental) merge path endpoints within configurable tolerance (default 0.2 mm)
 Upload to SD card — direct upload to machine after generation
 Save to computer — native save dialog
+Split output into separate files — master enable/disable for split-output radio choices
+Export one file per SVG layer — separate file per detected source SVG layer
+Export one file per group — separate file per layer group
+Export one file per colour group — separate file per detected source colour
+Export separate hatch files per colour — hatch-only files, available only with colour-group export
 Generate drag-knife/vinyl-cutter G-code — enables drag-knife compensation stage
 Generate weed border G-code — adds a weed-border rectangle around final job bounds
 Weed border margin (mm) — per-job margin used when weed border is enabled
 At least one output must be selected; a pre-generation validation enforces this.
-Dialog settings are persisted in localStorage under `terraforge.gcodePrefs`, including join tolerance and vinyl weed-border margin.
+The split-output modes are mutually exclusive radio choices, and hatch export is only valid when colour-group export is selected.
+Dialog settings are persisted in localStorage under `terraforge.gcodePrefs`, including join tolerance, split-output mode, hatch export choice, and vinyl weed-border margin.
 
 Pass Rules
 Each visible path supports pass settings:
