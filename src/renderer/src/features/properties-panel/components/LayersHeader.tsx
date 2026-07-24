@@ -11,7 +11,7 @@ export function LayersHeader({ show, onAddGroup }: LayersHeaderProps) {
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border-ui/50">
       <span className="text-[10px] text-content-faint uppercase tracking-wider flex-1">
-        Layers
+        Groups
       </span>
       <Button
         variant="ghost"

@@ -9,10 +9,10 @@ describe("LayersHeader", () => {
       <LayersHeader show={false} onAddGroup={onAddGroup} />,
     );
 
-    expect(screen.queryByText("Layers")).toBeNull();
+    expect(screen.queryByText("Groups")).toBeNull();
 
     rerender(<LayersHeader show onAddGroup={onAddGroup} />);
-    expect(screen.getByText("Layers")).toBeDefined();
+    expect(screen.getByText("Groups")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "+" }));
     expect(onAddGroup).toHaveBeenCalledTimes(1);
