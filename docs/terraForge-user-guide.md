@@ -39,7 +39,7 @@ terraForge is a desktop application for controlling FluidNC-based pen plotters �
 - Start, pause, resume, and abort jobs
 - Jog the machine and send raw commands via the console
 - Organise imports into **layer groups** for multi-pen plotting
-- Export separate G-code files by **layer group** or detected **source colour**
+- Export separate G-code files by **SVG layer**, **layer group**, or detected **source colour**
 - Override draw speed and pen timing per generated job when needed
 - **Undo/redo** and **copy/paste** canvas objects
 - **Save and reopen layouts** (.tforge files)
@@ -601,6 +601,8 @@ Click a group header row to select the entire group. Drag, scale, and rotate ope
 
 When layer groups are defined, you can generate a separate G-code file for each group from the G-code options dialog. Each file is named after the group (e.g. `red_layer.gcode`, `blue_layer.gcode`). Imports not assigned to any group are collected into a single additional file.
 
+When source SVG layers are present, you can also export one file per SVG layer. In that mode, each file is named from the source import name plus the layer name so that identically named layers from different imports do not collide.
+
 ---
 
 ## 9. Generating G-code
@@ -660,22 +662,25 @@ The Vinyl tab appears only when **Enable vinyl cutting features** is enabled in 
 
 ![G-code Options dialog — Output section expanded](../docs/resources/14c-gcode-output.png)
 
-| Option                                     | Description                                                                   |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| **Upload to SD card**                      | Upload the generated file to the machine SD card root after generation        |
-| **Save to computer**                       | Open a native save dialog after generation                                    |
-| **Export one file per group**              | Generate a separate G-code file for each layer group (multi-colour pen plots) |
-| **Export one file per colour group**       | Generate a separate file for each detected source colour                      |
-| **Export separate hatch files per colour** | Generate hatch-only files per colour; requires colour export                  |
+| Option                                     | Description                                                                               |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| **Upload to SD card**                      | Upload the generated file to the machine SD card root after generation                    |
+| **Save to computer**                       | Open a native save dialog after generation                                                |
+| **Split output into separate files**       | Master enable/disable for the split-output radio choices below                            |
+| **Export one file per SVG layer**          | Generate a separate G-code file for each detected source SVG layer                        |
+| **Export one file per group**              | Generate a separate G-code file for each layer group (multi-colour pen plots)             |
+| **Export one file per colour group**       | Generate a separate file for each detected source colour                                  |
+| **Export separate hatch files per colour** | Generate hatch-only files per colour; available only when colour-group export is selected |
 
 - At least one output (**Upload** or **Save**) must be selected; the **Generate** button is disabled otherwise.
 - When **Upload to SD card** is selected and a machine is connected, the uploaded file is automatically selected as the queued job — **Start job** is immediately ready.
 - When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
-- **Export one file per group** and **Export one file per colour group** are mutually exclusive.
+- The split-output modes are mutually exclusive radio choices under the **Split output into separate files** master checkbox.
+- **Export separate hatch files per colour** is only available when **Export one file per colour group** is selected.
 
 ### Persisted Preferences
 
-The dialog remembers your last-used settings in `localStorage`, including join tolerance, per-job overrides, and output choices. Defaults include: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
+The dialog remembers your last-used settings in `localStorage`, including join tolerance, per-job overrides, split-output mode, hatch export choice, and output choices. Defaults include: Optimise = on, Join paths = off (tolerance 0.2 mm), Upload to SD = on, Save to computer = off.
 
 ### Path Optimisation
 
@@ -696,6 +701,8 @@ The default filename in the save dialog is derived from the import name(s):
 - Optimised: `logo_opt.gcode` / `logo+2_opt.gcode`
 
 When exporting by colour, filenames use a colour-based prefix such as `color_hex-ff0000.gcode`. Hatch-only colour exports use `hatch_<colour>.gcode`.
+
+When exporting by SVG layer, filenames are based on the source import name plus the layer name so layers from different imports remain distinct.
 
 ### G-code Header
 
