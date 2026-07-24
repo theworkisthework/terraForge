@@ -6,6 +6,8 @@ export interface GcodePrefs {
   pathDirectionMode: "respect" | "minimize-travel";
   uploadToSd: boolean;
   saveLocally: boolean;
+  /** When true, generate a separate G-code file per source SVG layer. */
+  exportPerLayer: boolean;
   /** When true, generate a separate G-code file per layer group (multi-pen plots). */
   exportPerGroup: boolean;
   /** When true, generate separate G-code files per source stroke and/or fill color group. */
@@ -54,6 +56,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
+  exportPerLayer: false,
   exportPerGroup: false,
   exportPerColor: false,
   exportPerHatch: false,

@@ -109,6 +109,27 @@ export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {
     .flatMap((path) => projectPathToVectorObjects(imp, path));
 }
 
+export function vectorObjectsForImportLayer(
+  imp: SvgImport,
+  layerId: string,
+): VectorObject[] {
+  if (!imp.visible) return [];
+  const hiddenLayerIds = imp.layers
+    ? new Set(
+        imp.layers.filter((layer) => !layer.visible).map((layer) => layer.id),
+      )
+    : null;
+
+  return imp.paths
+    .filter(
+      (path) =>
+        path.visible &&
+        path.layer === layerId &&
+        isLayerVisible(path, hiddenLayerIds),
+    )
+    .flatMap((path) => projectPathToVectorObjects(imp, path));
+}
+
 export function vectorObjectsForImports(imports: SvgImport[]): VectorObject[] {
   return imports.flatMap((imp) => vectorObjectsForImport(imp));
 }
