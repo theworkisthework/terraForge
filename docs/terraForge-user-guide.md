@@ -468,8 +468,11 @@ The Properties panel also includes two outline-related toggles for each import:
 
 - **Stroke outlines** — master enable/disable for plotting outlines from that import.
 - **Generate stroke for no-stroke paths** — when enabled, terraForge will also plot an outline for source shapes that only had a fill and no visible stroke.
+- **Plot points (circles)** — when enabled, terraForge adds a single pen tap at the geometric centre of each circle in that import.
 
 This is useful for artwork imported from design tools that use fills heavily. Fill-only geometry can still contribute hatch lines or colour-group exports even if outline generation stays off.
+
+**Plot points (circles)** is intended for stippling workflows where SVG source files use small circles to represent dots (SVG has no native point primitive). Enabling this option does **not** replace normal circle output: circle stroke outlines and/or fill-derived hatch lines are still generated when their respective options are enabled.
 
 ### Centre Marker
 
@@ -648,7 +651,9 @@ When **Join nearby paths** is enabled, a **Tolerance** field appears (default 0.
 
 When a delay or draw-speed override is enabled, the dialog shows both the override value and the current machine default for reference.
 
-#### Vinyl section
+#### Vinyl section (EXPERIMENTAL)
+
+> **Note:** The vinyl cutting feature is experimental and subject to change.
 
 | Option                                      | Description                                                                           |
 | ------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -657,6 +662,60 @@ When a delay or draw-speed override is enabled, the dialog shows both the overri
 | **Weed border margin (mm)**                 | Border offset from the job bounds; shown when weed border is enabled; applied per job |
 
 The Vinyl tab appears only when **Enable vinyl cutting features** is enabled in **Application Configuration**.
+
+#### Ink/Brush Service section (EXPERIMENTAL)
+
+> **Note:** The ink/brush service feature is experimental and subject to change.
+
+The Ink/Brush Service tab enables automated pen/brush maintenance moves during G-code generation. This is useful for brush painting, ink dipping, and similar workflows that require periodic priming, wiping, or ink replenishment.
+
+![G-code Options dialog — Ink/Brush Service section expanded](../docs/resources/14d-gcode-ink-service.png)
+
+| Option                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| **Ink service mode**              | Choose between two operation modes                                               |
+| **Prime-wipe**                    | Prime (press) station followed by wipe station; triggered after travel threshold |
+| **Brush-dip**                     | Cyclic dip stations with optional wash cadence; triggered after travel threshold |
+| **Service trigger distance (mm)** | Travel distance threshold before visiting a service station                      |
+| **Add service station**           | Create a new station (prime, wipe, dip, or wash)                                 |
+
+**Station configuration (available in both modes):**
+
+| Option              | Description                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Type**            | Station function: `prime` (press for ink priming), `wipe` (brush wipe/clean), `dip` (brush ink dip), `wash` (brush rinse) |
+| **Position (X, Y)** | Machine coordinates in mm for the station location                                                                        |
+| **Dwell (ms)**      | Contact time at the station after pen-down                                                                                |
+| **Action**          | Optional motion recipe performed at this station                                                                          |
+| **Enabled**         | Checkbox to include/exclude this station                                                                                  |
+
+**Prime action (prime-wipe mode):**
+
+- **Depth (mm)** — relative plunge depth per press cycle
+- **Press count** — number of press repetitions at the station
+
+**Brush motion action (brush-dip and dip stations):**
+
+- **Depth (mm)** — relative plunge depth for the motion
+- **Pattern** — motion type: `back-forth` (reciprocal) or `circular` (spiral/loop)
+- **Repetitions** — number of pattern cycles
+- **Distance (mm)** — pattern amplitude (radius for circular, half-stroke for back-forth)
+
+**Brush-dip mode additional options:**
+
+- **Randomise dip station** — cycle through dip stations in random order instead of sequentially
+- **Include wash moves** — visit the wash station periodically during dipping
+- **Wash every N dips** — interval (e.g., wash after every 3rd dip)
+
+**Example workflow:**
+
+1. Set mode to **Brush-dip**
+2. Create a **Dip** station at X=50, Y=10 with back-forth brush motion (depth 2 mm, 2 repetitions, 1 mm distance)
+3. Create a **Wash** station at X=60, Y=10 with circular brush motion (depth 1 mm, 1 repetition, 0.8 mm radius)
+4. Set **Service trigger distance** to 15 mm
+5. Enable **Include wash moves** and set **Wash every N dips** to 2
+
+During G-code generation, whenever the plotter travels more than 15 mm (rapid), a service move is inserted: the pen descends to the dip station, performs the brush motion, ascends, and continues. After every 2nd dip, the wash station is visited.
 
 #### Output section
 
