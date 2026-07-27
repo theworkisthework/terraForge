@@ -504,6 +504,49 @@ describe("svgWorker — G-code body", () => {
     }
   });
 
+  it("matches top-left canvas placement for legacy top-origin Y anchor without page clipping", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "top-left-legacy-anchor-no-pageclip",
+      objects: [
+        createVectorObject({
+          // Legacy top-origin import placement stores y one object-height above
+          // the visual top edge. This should still generate in-bounds geometry.
+          path: "M 0 0 L 20 0",
+          x: 0,
+          y: -20,
+          scale: 1,
+          rotation: 0,
+          visible: true,
+          originalWidth: 20,
+          originalHeight: 20,
+        }),
+      ],
+      config: makeConfig({
+        origin: "top-left",
+        bedWidth: 200,
+        bedHeight: 200,
+      }),
+      options: createGcodeOptions({
+        optimisePaths: false,
+        returnToHome: false,
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    const pts = extractMotionPoints(gcode);
+    expect(pts.length).toBeGreaterThan(0);
+
+    // Geometry should be aligned to the top edge (y = 0), not shifted negative.
+    const minY = Math.min(...pts.map((p) => p.y));
+    expect(minY).toBeGreaterThanOrEqual(0);
+
+    // The first drawing move should start at the expected normalized location.
+    const firstDraw = pts.find((p) => p.x === 0 && p.y === 0);
+    expect(firstDraw).toBeDefined();
+  });
+
   it("emits compensated drag-knife moves when vinyl cutting mode is enabled", async () => {
     dispatch({
       type: "generate",
