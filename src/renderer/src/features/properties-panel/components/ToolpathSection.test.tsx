@@ -45,7 +45,7 @@ describe("ToolpathSection", () => {
     );
     expect(onToggleSelected).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear toolpath" }));
     expect(onClear).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText("sample.gcode")).toBeDefined();
