@@ -168,7 +168,7 @@ export function OutputSection({
               Export one file per colour group
             </div>
             <div className="text-[11px] text-content-muted">
-              Generate a separate G-code file for each detected path fill color
+              Generate a separate G-code file for each detected source color
               - ideal for pen-swap workflows.
             </div>
             {prefs.exportPerColor && colorGroupCount === 0 && (
