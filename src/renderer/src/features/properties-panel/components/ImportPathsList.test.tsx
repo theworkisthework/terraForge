@@ -79,7 +79,7 @@ describe("ImportPathsList", () => {
     fireEvent.click(screen.getAllByLabelText("Disable path stroke")[0]);
     expect(onUpdatePathStroke).toHaveBeenCalledWith("imp-1", "p1", false);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "✕" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove path" })[0]);
     expect(onRemovePath).toHaveBeenCalledWith("imp-1", "p1");
 
     fireEvent.click(screen.getByText("loose"));

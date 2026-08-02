@@ -50,9 +50,11 @@ test("Generate G-code button is disabled with no imports", async () => {
 });
 
 test("no split-button dropdown — single Generate G-code button only", async () => {
-  // UI uses a single button that opens an options dialog; the old ▾ dropdown is gone
-  const dropdown = window.locator("button:has-text('▾')");
-  await expect(dropdown).toHaveCount(0);
+  const generateButtons = window.locator("button:has-text('Generate G-code')");
+  await expect(generateButtons).toHaveCount(1);
+
+  const menuTriggers = window.locator("button[aria-haspopup='menu']");
+  await expect(menuTriggers).toHaveCount(0);
 });
 
 // ─── Import an SVG to enable generation ──────────────────────────────────────

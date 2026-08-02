@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, X } from "lucide-react";
 import { Button } from "../../../components/ui";
 import { useImportHeaderRowModel } from "../hooks/useImportHeaderRowModel";
 import { ImportNameField } from "./ImportNameField";
@@ -55,7 +55,7 @@ export function ImportHeaderRow({
         onDragStart={onDragHandleStart}
         onDragEnd={onDragHandleEnd}
       >
-        ⠿
+        <GripVertical size={10} />
       </span>
 
       <Button
@@ -95,9 +95,10 @@ export function ImportHeaderRow({
         size="icon-xs"
         className="ml-1 hover:text-accent shrink-0"
         title="Delete import"
+        aria-label="Delete import"
         onClick={onDeleteClick}
       >
-        ✕
+        <X size={12} strokeWidth={2.25} />
       </Button>
     </div>
   );

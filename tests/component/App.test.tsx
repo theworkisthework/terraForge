@@ -249,7 +249,7 @@ describe("App", () => {
   it("closing jog panel hides the drag handle", async () => {
     render(<App />);
     await act(async () => {});
-    const closeBtn = screen.getByText("✕");
+    const closeBtn = screen.getByLabelText("Close jog controls");
     await userEvent.click(closeBtn);
     expect(screen.queryByTitle("Drag to move")).not.toBeInTheDocument();
   });

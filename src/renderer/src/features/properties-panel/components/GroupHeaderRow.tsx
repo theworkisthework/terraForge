@@ -1,5 +1,5 @@
 import type { DragEvent } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "../../../components/ui";
 import type { LayerGroup } from "../../../../types";
 
@@ -112,9 +112,10 @@ export function GroupHeaderRow({
         variant="ghost"
         className="hover:text-accent shrink-0"
         title="Delete group (layers become ungrouped)"
+        aria-label="Delete group"
         onClick={() => onRemoveGroup(group.id)}
       >
-        ✕
+        <X size={12} strokeWidth={2.25} />
       </Button>
     </div>
   );

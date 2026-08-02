@@ -132,12 +132,12 @@ describe("JogControls", () => {
   it("renders close button when onClose prop provided", () => {
     const onClose = vi.fn();
     render(<JogControls onClose={onClose} />);
-    expect(screen.getByText("✕")).toBeInTheDocument();
+    expect(screen.getByLabelText("Close jog controls")).toBeInTheDocument();
   });
 
   it("does not render close button when onClose not provided", () => {
     render(<JogControls />);
-    expect(screen.queryByText("✕")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Close jog controls")).not.toBeInTheDocument();
   });
 
   // ── Step selector ───────────────────────────────────────────────────────

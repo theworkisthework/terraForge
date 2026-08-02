@@ -51,7 +51,7 @@ test("file browser shows 'Not connected' when offline", async () => {
 
 test("upload buttons are disabled when offline", async () => {
   // Both internal and sdcard panes have upload buttons
-  const uploadButtons = window.locator("button:has-text('Upload')");
+  const uploadButtons = window.locator("button[aria-label='Upload file']");
   const count = await uploadButtons.count();
   for (let i = 0; i < count; i++) {
     await expect(uploadButtons.nth(i)).toBeDisabled();
@@ -60,7 +60,7 @@ test("upload buttons are disabled when offline", async () => {
 
 test("refresh buttons are disabled when offline", async () => {
   // The ↻ refresh buttons should be disabled or not present
-  const refreshButtons = window.locator("button:has-text('↻')");
+  const refreshButtons = window.locator("button[aria-label='Refresh']");
   const count = await refreshButtons.count();
   for (let i = 0; i < count; i++) {
     await expect(refreshButtons.nth(i)).toBeDisabled();

@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
+import { Check, CircleX, X } from "lucide-react";
 import { useTaskStore } from "../store/taskStore";
 import type { BackgroundTask } from "../../../../types";
 import { Button } from "./ui";
 
 /** Completed / cancelled toasts auto-dismiss after this delay. */
 const DISMISS_MS = 8000;
-/** Errors and warnings are never auto-dismissed — user must click ✕. */
+/** Errors and warnings are never auto-dismissed — user must click the close button. */
 const AUTO_DISMISS_STATUSES: ReadonlySet<string> = new Set([
   "completed",
   "cancelled",
@@ -70,10 +71,10 @@ function Toast({ task }: { task: BackgroundTask }) {
         </div>
       )}
       {isDone && (
-        <span className="text-green-400 text-sm shrink-0 leading-none">✓</span>
+        <Check className="text-green-400 shrink-0" size={14} strokeWidth={2.5} />
       )}
       {isCancelled && (
-        <span className="text-accent text-sm shrink-0 leading-none">✕</span>
+        <CircleX className="text-accent shrink-0" size={14} strokeWidth={2} />
       )}
       {isWarning && (
         <span className="text-yellow-400 text-xs shrink-0 leading-none font-bold">
@@ -119,7 +120,7 @@ function Toast({ task }: { task: BackgroundTask }) {
           title="Cancel task"
           className="text-xs shrink-0 leading-none ml-1 hover:text-accent"
         >
-          ✕
+          <X size={12} strokeWidth={2.25} />
         </Button>
       ) : (
         <Button
@@ -129,7 +130,7 @@ function Toast({ task }: { task: BackgroundTask }) {
           title="Dismiss"
           className="text-xs shrink-0 leading-none ml-1 hover:text-content-muted"
         >
-          ✕
+          <X size={12} strokeWidth={2.25} />
         </Button>
       )}
     </div>

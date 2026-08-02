@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { isSolenoidPenType, type JogStep } from "../../../../types";
 import { useMachineStore } from "../../store/machineStore";
 import { Button } from "../ui";
@@ -76,8 +77,8 @@ export function JogControls({ onClose }: Props) {
           Jog Controls
         </span>
         {onClose && (
-          <Button variant="ghost" size="xs" onClick={onClose}>
-            ✕
+          <Button variant="ghost" size="xs" onClick={onClose} aria-label="Close jog controls" title="Close jog controls">
+            <X size={12} strokeWidth={2.25} />
           </Button>
         )}
       </div>

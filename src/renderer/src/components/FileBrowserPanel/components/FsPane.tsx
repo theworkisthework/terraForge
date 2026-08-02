@@ -3,6 +3,14 @@ import { Breadcrumb } from "./Breadcrumb";
 import { FileRow } from "./FileRow";
 import { parentPath } from "../utils/pathUtils";
 import {
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  RefreshCw,
+  Upload,
+} from "lucide-react";
+import {
   useFsPaneController,
   type FsPaneControllerProps,
 } from "../hooks/useFsPaneController";
@@ -121,7 +129,12 @@ export function FsPane({
         <span
           className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}
         >
-          {open ? "▾" : "▸"} {label}
+          {open ? (
+            <ChevronDown size={10} className="inline-block align-middle" />
+          ) : (
+            <ChevronRight size={10} className="inline-block align-middle" />
+          )}{" "}
+          {label}
         </span>
         {open && (
           <button
@@ -138,7 +151,7 @@ export function FsPane({
             }
             className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
           >
-            {loading ? "…" : "↻"}
+              {loading ? "…" : <RefreshCw size={12} />}
           </button>
         )}
       </div>
@@ -152,9 +165,10 @@ export function FsPane({
               onClick={() => void navigate(parentPath(path))}
               disabled={atRoot || !connected}
               title="Up"
+              aria-label="Up one level"
               className="text-content-muted hover:text-content disabled:opacity-30 mr-0.5 transition-colors leading-none"
             >
-              ↑
+              <ArrowUp size={12} />
             </button>
             <Breadcrumb
               path={path}
@@ -186,7 +200,7 @@ export function FsPane({
                 className="flex items-center px-3 py-1 hover:bg-app cursor-pointer border-b border-border-ui/20 text-content-faint"
                 onClick={() => void navigate(parentPath(path))}
               >
-                <span className="mr-2 text-[11px]">📁</span>
+                <span className="mr-2 text-[11px]"><Folder size={12} /></span>
                 <span className="text-[10px]">..</span>
               </div>
             )}
@@ -223,13 +237,14 @@ export function FsPane({
                     ? "File upload not available over serial"
                     : undefined
               }
+              aria-label="Upload file"
               className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${
                 accentColor === "blue"
                   ? "bg-[var(--tf-fs-blue-border)] hover:bg-[var(--tf-fs-blue-bg)]"
                   : "bg-[var(--tf-fs-purple-border)] hover:bg-[var(--tf-fs-purple-bg)]"
               } text-content`}
             >
-              ↑ Upload to {path}
+              <Upload size={12} className="inline-block mr-1 align-text-bottom" /> Upload to {path}
             </button>
           </div>
         </div>

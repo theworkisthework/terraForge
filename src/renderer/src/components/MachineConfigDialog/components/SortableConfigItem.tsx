@@ -1,4 +1,5 @@
 import React from "react";
+import { Check, GripVertical } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -45,7 +46,7 @@ export function SortableConfigItem({
         className="px-2 py-2 cursor-grab active:cursor-grabbing text-content-faint group-hover:text-content-muted flex-shrink-0 select-none"
         title="Drag to reorder"
       >
-        ⠿
+        <GripVertical size={14} />
       </span>
       <button
         onClick={onSelect}
@@ -54,7 +55,7 @@ export function SortableConfigItem({
         }`}
       >
         {config.name}
-        {isActive && <span className="ml-1 text-xs text-green-400">✓</span>}
+        {isActive && <Check className="ml-1 inline-block text-green-400" size={12} strokeWidth={2.5} />}
       </button>
     </div>
   );

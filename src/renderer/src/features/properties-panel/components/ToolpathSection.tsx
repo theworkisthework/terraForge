@@ -5,6 +5,7 @@ import {
   EyeOff,
   FileText,
   Palette,
+  X,
 } from "lucide-react";
 import { Button } from "../../../components/ui";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
@@ -137,7 +138,7 @@ export function ToolpathSection({
             onClear();
           }}
         >
-          ✕
+          <X size={12} strokeWidth={2.25} />
         </Button>
       </div>
 

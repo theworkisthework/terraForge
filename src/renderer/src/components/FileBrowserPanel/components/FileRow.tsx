@@ -1,5 +1,15 @@
 import { formatFileSize, isGcodeFile } from "../utils/pathUtils";
 import type { RemoteFile } from "../../../../../types";
+import {
+  ArrowDownToLine,
+  ChevronRight,
+  Eye,
+  FileText,
+  Folder,
+  Pause,
+  Play,
+  Trash2,
+} from "lucide-react";
 import { Button } from "../../ui";
 
 interface FileRowProps {
@@ -54,7 +64,7 @@ export function FileRow({
       onClick={() => onRowClick(file)}
     >
       <span className="mr-1.5 text-[11px]">
-        {file.isDirectory ? "📁" : "📄"}
+        {file.isDirectory ? <Folder size={12} /> : <FileText size={12} />}
       </span>
       <span className="flex-1 text-[10px] truncate" title={file.name}>
         {file.name}
@@ -67,7 +77,7 @@ export function FileRow({
 
       {file.isDirectory ? (
         <span className="text-content-faint text-[9px] hidden group-hover:block shrink-0">
-          ›
+          <ChevronRight size={10} />
         </span>
       ) : (
         <div
@@ -82,10 +92,11 @@ export function FileRow({
                 e.stopPropagation();
                 onPreview(file);
               }}
+                aria-label="Preview toolpath"
               title="Preview toolpath"
               disabled={previewing === file.path || anyJobActive}
             >
-              {previewing === file.path ? "…" : "👁"}
+                {previewing === file.path ? "…" : <Eye size={12} />}
             </Button>
           )}
 
@@ -97,9 +108,10 @@ export function FileRow({
                 e.stopPropagation();
                 window.terraForge.fluidnc.pauseJob();
               }}
+                aria-label="Pause job"
               title="Pause job"
             >
-              ⏸
+                <Pause size={12} />
             </Button>
           ) : isGcode && isThisHeld ? (
             <Button
@@ -109,9 +121,10 @@ export function FileRow({
                 e.stopPropagation();
                 window.terraForge.fluidnc.resumeJob();
               }}
+                aria-label="Resume job"
               title="Resume job"
             >
-              ▶
+                <Play size={12} />
             </Button>
           ) : isGcode ? (
             <Button
@@ -121,6 +134,7 @@ export function FileRow({
                 e.stopPropagation();
                 onRun(file);
               }}
+                aria-label="Run job now"
               title={
                 hasRunningTransfer
                   ? "Unavailable while a file transfer is running"
@@ -130,7 +144,7 @@ export function FileRow({
               }
               disabled={isLoadingThis || anyJobActive || hasRunningTransfer}
             >
-              ▶
+              <Play size={12} />
             </Button>
           ) : null}
 
@@ -141,6 +155,7 @@ export function FileRow({
               e.stopPropagation();
               onDownload(file);
             }}
+            aria-label="Download file"
             disabled={serialMode || anyJobActive || hasRunningTransfer}
             title={
               hasRunningTransfer
@@ -152,7 +167,7 @@ export function FileRow({
                     : "Download"
             }
           >
-            ↓
+                  <ArrowDownToLine size={12} />
           </Button>
 
           <Button
@@ -162,12 +177,13 @@ export function FileRow({
               e.stopPropagation();
               onDelete(file);
             }}
+            aria-label="Delete file"
             disabled={anyJobActive}
             title={
               anyJobActive ? "Unavailable while a job is running" : "Delete"
             }
           >
-            ✕
+            <Trash2 size={12} />
           </Button>
         </div>
       )}

@@ -157,7 +157,7 @@ test("file browser shows gcode files after connecting", async () => {
 test("file browser shows directories with a folder icon", async () => {
   const subdirRow = window.locator("[data-testid='file-row-subdir']");
   await expect(subdirRow).toBeVisible();
-  await expect(subdirRow.locator("text=📁")).toBeVisible();
+  await expect(subdirRow.locator("svg").first()).toBeVisible();
 });
 
 test("file browser shows file size labels for gcode files", async () => {
@@ -230,7 +230,7 @@ test("the '↑ Up' button navigates to the parent directory", async () => {
   });
 
   // Click the Up (↑) button in the breadcrumb bar.
-  await window.locator("button[title='Up']").first().click();
+  await window.locator("button[aria-label='Up one level']").first().click();
 
   await expect(window.locator("text=plot.gcode").first()).toBeVisible({
     timeout: 5_000,
@@ -257,8 +257,7 @@ test("clicking Refresh re-fetches the file listing", async () => {
 // ─── Group 5: Upload ────────────────────────────────────────────────────────
 
 test("Upload footer button is visible and enabled when connected", async () => {
-  // Upload button text includes "↑ Upload to"
-  const uploadBtn = window.locator("button:has-text('↑ Upload to')").first();
+  const uploadBtn = window.locator("button[aria-label='Upload file']").first();
   await expect(uploadBtn).toBeEnabled({ timeout: 3000 });
 });
 
@@ -266,7 +265,7 @@ test("clicking Upload triggers a file open dialog", async () => {
   // Mock the dialog to return sample.gcode.
   await mockOpenDialog(electronApp, fixturePath("sample.gcode"));
 
-  const uploadBtn = window.locator("button:has-text('↑ Upload to')").first();
+  const uploadBtn = window.locator("button[aria-label='Upload file']").first();
   await uploadBtn.click();
 
   // The mocked uploadFile IPC should be called.
