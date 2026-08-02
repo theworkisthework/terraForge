@@ -66,6 +66,28 @@ describe("App", () => {
     expect(screen.getByText("Properties")).toBeInTheDocument();
   });
 
+  it("collapses and re-expands the file browser panel", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    await userEvent.click(screen.getByLabelText("Hide file browser panel"));
+    expect(screen.queryByText("File Browser")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Show file browser panel"));
+    expect(screen.getByText("File Browser")).toBeInTheDocument();
+  });
+
+  it("collapses and re-expands the properties panel", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    await userEvent.click(screen.getByLabelText("Hide properties panel"));
+    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Show properties panel"));
+    expect(screen.getByText("Properties")).toBeInTheDocument();
+  });
+
   it("subscribes to IPC channels on mount", async () => {
     render(<App />);
     await act(async () => {});
