@@ -31,8 +31,8 @@ export const selectGcodeOptionsDialogCanvasState = (state: CanvasState) => ({
   colorGroupCount: new Set(
     state.imports.flatMap((imp) =>
       imp.paths
-        .filter((p) => p.hasFill && !!p.fillColor)
-        .map((p) => normalizeSvgColor(p.fillColor ?? "")),
+        .map((p) => normalizeSvgColor(p.sourceColor ?? ""))
+        .filter((color): color is string => !!color),
     ),
   ).size,
   pageTemplate: state.pageTemplate,

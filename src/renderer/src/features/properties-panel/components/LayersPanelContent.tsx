@@ -161,23 +161,30 @@ export function LayersPanelContent() {
         <EmptyState message="No objects. Import an SVG." />
       ) : (
         <>
-          {/* G-code toolpath row — shown when a .gcode file has been loaded */}
+          {/* G-code section heading + row — shown when a .gcode file has been loaded */}
           {gcodeToolpath && (
-            <ToolpathSection
-              toolpath={gcodeToolpath}
-              fileName={toolpathFileName}
-              selected={toolpathSelected}
-              visible={toolpathVisible}
-              colorized={toolpathColorized}
-              opacity={toolpathOpacity}
-              isJobActive={isJobActive}
-              fallbackFeedrate={fallbackFeedrate}
-              onToggleSelected={() => selectToolpath(!toolpathSelected)}
-              onSetVisible={setToolpathVisible}
-              onSetColorized={setToolpathColorized}
-              onSetOpacity={setToolpathOpacity}
-              onClear={() => setGcodeToolpath(null)}
-            />
+            <>
+              <div className="flex items-center gap-1 px-2 py-1 border-b border-border-ui/50">
+                <span className="text-[10px] text-content-faint uppercase tracking-wider flex-1">
+                  GCODE
+                </span>
+              </div>
+              <ToolpathSection
+                toolpath={gcodeToolpath}
+                fileName={toolpathFileName}
+                selected={toolpathSelected}
+                visible={toolpathVisible}
+                colorized={toolpathColorized}
+                opacity={toolpathOpacity}
+                isJobActive={isJobActive}
+                fallbackFeedrate={fallbackFeedrate}
+                onToggleSelected={() => selectToolpath(!toolpathSelected)}
+                onSetVisible={setToolpathVisible}
+                onSetColorized={setToolpathColorized}
+                onSetOpacity={setToolpathOpacity}
+                onClear={() => setGcodeToolpath(null)}
+              />
+            </>
           )}
 
           {/* "Layers" section heading + add-group button */}
