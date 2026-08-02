@@ -3,6 +3,7 @@ import { PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type {
+  AppConfig,
   InkServiceStation,
   InkServiceStationAction,
   MachineConfig,
@@ -230,11 +231,22 @@ export function useMachineConfigDialogController() {
     if (selectedId) setActiveConfig(selectedId);
   };
 
+  const saveAppConfig = (overrides: Partial<AppConfig>) => {
+    void window.terraForge.config.saveAppConfig({
+      debugLoggingEnabled: appConfig.debugLoggingEnabled,
+      showConsoleTimestamps: appConfig.showConsoleTimestamps,
+      ...overrides,
+    });
+  };
+
   const handleDebugLoggingChange = (enabled: boolean) => {
     appConfig.setDebugLoggingEnabled(enabled);
-    void window.terraForge.config.saveAppConfig({
-      debugLoggingEnabled: enabled,
-    });
+    saveAppConfig({ debugLoggingEnabled: enabled });
+  };
+
+  const handleShowConsoleTimestampsChange = (enabled: boolean) => {
+    appConfig.setShowConsoleTimestamps(enabled);
+    saveAppConfig({ showConsoleTimestamps: enabled });
   };
 
   const updateStationField = <K extends keyof InkServiceStation>(
@@ -342,6 +354,7 @@ export function useMachineConfigDialogController() {
     handleDragEnd,
     handleActivate,
     handleDebugLoggingChange,
+    handleShowConsoleTimestampsChange,
     updateStationField,
     updateStationActionField,
     handleTestStationLocation,

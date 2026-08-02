@@ -22,6 +22,9 @@ export default function App() {
   const setDebugLoggingEnabled = useAppConfigStore(
     (s) => s.setDebugLoggingEnabled,
   );
+  const setShowConsoleTimestamps = useAppConfigStore(
+    (s) => s.setShowConsoleTimestamps,
+  );
   const theme = useThemeStore((s) => s.theme);
 
   // Keep <html> class in sync with theme store
@@ -81,7 +84,10 @@ export default function App() {
     window.terraForge.config.getMachineConfigs().then(setConfigs);
     window.terraForge.config
       .getAppConfig()
-      .then((cfg) => setDebugLoggingEnabled(cfg.debugLoggingEnabled))
+      .then((cfg) => {
+        setDebugLoggingEnabled(cfg.debugLoggingEnabled);
+        setShowConsoleTimestamps(cfg.showConsoleTimestamps);
+      })
       .catch(() => {});
 
     // Subscribe to status updates pushed from main process
@@ -121,6 +127,7 @@ export default function App() {
     upsertTask,
     appendLine,
     setDebugLoggingEnabled,
+    setShowConsoleTimestamps,
   ]);
 
   return (

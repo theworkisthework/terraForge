@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useConsoleStore } from "../../../src/renderer/src/store/consoleStore";
+import { useAppConfigStore } from "../../../src/renderer/src/store/appConfigStore";
 
 beforeEach(() => {
   useConsoleStore.setState({ lines: [], maxLines: 500 });
+  useAppConfigStore.setState({ showConsoleTimestamps: false });
 });
 
 describe("consoleStore", () => {
