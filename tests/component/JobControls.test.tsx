@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
@@ -69,7 +69,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    const btn = screen.getByText("▶ Start job");
+    const btn = screen.getByText("Start job");
     expect(btn).toBeDisabled();
   });
 
@@ -101,7 +101,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+    expect(screen.getByText("Pause")).toBeInTheDocument();
   });
 
   it("shows Resume button when held", () => {
@@ -115,7 +115,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("▶ Resume")).toBeInTheDocument();
+    expect(screen.getByText("Resume")).toBeInTheDocument();
     expect(screen.getByText(/Paused/)).toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("✕ Abort")).toBeInTheDocument();
+    expect(screen.getByText("Abort")).toBeInTheDocument();
   });
 
   it("keeps active controls visible through a brief Idle blip", async () => {
@@ -146,7 +146,7 @@ describe("JobControls", () => {
     });
 
     render(<JobControls />);
-    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+    expect(screen.getByText("Pause")).toBeInTheDocument();
 
     act(() => {
       useMachineStore.setState({
@@ -159,18 +159,18 @@ describe("JobControls", () => {
       });
     });
 
-    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
-    expect(screen.queryByText("▶ Start job")).not.toBeInTheDocument();
+    expect(screen.getByText("Pause")).toBeInTheDocument();
+    expect(screen.queryByText("Start job")).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(300);
     });
-    expect(screen.getByText("⏸ Pause")).toBeInTheDocument();
+    expect(screen.getByText("Pause")).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(250);
     });
-    expect(screen.getByText("▶ Start job")).toBeInTheDocument();
+    expect(screen.getByText("Start job")).toBeInTheDocument();
   });
 
   it("calls pauseJob when Pause clicked", async () => {
@@ -184,7 +184,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    await userEvent.click(screen.getByText("⏸ Pause"));
+    await userEvent.click(screen.getByText("Pause"));
     expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
   });
 
@@ -199,7 +199,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    await userEvent.click(screen.getByText("▶ Resume"));
+    await userEvent.click(screen.getByText("Resume"));
     expect(window.terraForge.fluidnc.resumeJob).toHaveBeenCalled();
   });
 
@@ -229,7 +229,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    await userEvent.click(screen.getByText("▶ Start job"));
+    await userEvent.click(screen.getByText("Start job"));
     // fetchFileText + 600ms cosmetic pause precede runFile — wait for it
     await waitFor(
       () =>
@@ -256,7 +256,7 @@ describe("JobControls", () => {
       window.terraForge.fluidnc.uploadFile as ReturnType<typeof vi.fn>
     ).mockResolvedValue(undefined);
     render(<JobControls />);
-    await userEvent.click(screen.getByText("▶ Start job"));
+    await userEvent.click(screen.getByText("Start job"));
     expect(window.terraForge.fluidnc.uploadFile).toHaveBeenCalled();
     expect(window.terraForge.fluidnc.runFile).toHaveBeenCalledWith(
       "/art.gcode",
@@ -277,10 +277,10 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    await userEvent.click(screen.getByText("✕ Abort"));
+    await userEvent.click(screen.getByText("Abort"));
     // Themed confirm dialog should appear
-    await screen.findByRole("dialog");
-    await userEvent.click(screen.getByRole("button", { name: "Abort" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Abort" }));
     expect(window.terraForge.fluidnc.abortJob).toHaveBeenCalled();
   });
 
@@ -295,10 +295,10 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    await userEvent.click(screen.getByText("✕ Abort"));
+    await userEvent.click(screen.getByText("Abort"));
     // Themed confirm dialog should appear
-    await screen.findByRole("dialog");
-    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(window.terraForge.fluidnc.abortJob).not.toHaveBeenCalled();
   });
 
@@ -330,7 +330,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("▶ Start job")).toBeDisabled();
+    expect(screen.getByText("Start job")).toBeDisabled();
   });
 
   // ── Canvas toolpath selection ───────────────────────────────────────────
@@ -346,7 +346,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("▶ Start job")).not.toBeDisabled();
+    expect(screen.getByText("Start job")).not.toBeDisabled();
   });
 
   it("shows canvas toolpath file name in indicator when toolpath selected with no explicit job file", () => {
@@ -375,7 +375,7 @@ describe("JobControls", () => {
       },
     });
     render(<JobControls />);
-    expect(screen.getByText("▶ Start job")).toBeDisabled();
+    expect(screen.getByText("Start job")).toBeDisabled();
   });
 
   it("uploads then runs canvas-selected local toolpath when Start clicked", async () => {
@@ -392,7 +392,7 @@ describe("JobControls", () => {
       window.terraForge.fluidnc.uploadFile as ReturnType<typeof vi.fn>
     ).mockResolvedValue(undefined);
     render(<JobControls />);
-    await userEvent.click(screen.getByText("▶ Start job"));
+    await userEvent.click(screen.getByText("Start job"));
     expect(window.terraForge.fluidnc.uploadFile).toHaveBeenCalled();
     expect(window.terraForge.fluidnc.runFile).toHaveBeenCalledWith(
       "/art.gcode",

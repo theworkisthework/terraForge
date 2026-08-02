@@ -1,4 +1,5 @@
 import React from "react";
+import { Download, Upload } from "lucide-react";
 import { Button } from "../../../ui";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
@@ -108,7 +109,7 @@ export function MachineConfigsSidebar({
           onClick={handleExport}
           title="Export all configs to a JSON file"
         >
-          ↑ Export
+          <Upload className="mr-1 inline-block" size={12} /> Export
         </Button>
         <Button
           variant="secondary"
@@ -117,7 +118,7 @@ export function MachineConfigsSidebar({
           onClick={handleImport}
           title="Import configs from a JSON file"
         >
-          ↓ Import
+          <Download className="mr-1 inline-block" size={12} /> Import
         </Button>
       </div>
     </div>

@@ -194,8 +194,8 @@ describe("MachineConfigDialog", () => {
   it("shows Export and Import buttons", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
-    expect(screen.getByText("↑ Export")).toBeInTheDocument();
-    expect(screen.getByText("↓ Import")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Export/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Import/ })).toBeInTheDocument();
   });
 
   it("shows Set as Active button", async () => {
@@ -328,23 +328,21 @@ describe("MachineConfigDialog", () => {
       window.terraForge.config.exportConfigs as ReturnType<typeof vi.fn>
     ).mockResolvedValue(null);
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("↑ Export"));
+    await userEvent.click(screen.getByRole("button", { name: /Export/ }));
     expect(window.terraForge.config.exportConfigs).toHaveBeenCalled();
   });
 
   // ── Import ──────────────────────────────────────────────────────────────
-
   it("calls importConfigs when Import clicked", async () => {
     (
       window.terraForge.config.importConfigs as ReturnType<typeof vi.fn>
     ).mockResolvedValue({ added: 0, skipped: 0 });
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("↓ Import"));
+    await userEvent.click(screen.getByRole("button", { name: /Import/ }));
     expect(window.terraForge.config.importConfigs).toHaveBeenCalled();
   });
 
   // ── Set as Active ───────────────────────────────────────────────────────
-
   it("sets selected config as active", async () => {
     const c1 = createMachineConfig({ name: "First" });
     const c2 = createMachineConfig({ name: "Second" });
@@ -566,7 +564,7 @@ describe("MachineConfigDialog", () => {
         window.terraForge.config.exportConfigs as ReturnType<typeof vi.fn>
       ).mockResolvedValue("/home/user/configs.json");
       render(<MachineConfigDialog onClose={onClose} />);
-      await userEvent.click(screen.getByText("↑ Export"));
+      await userEvent.click(screen.getByRole("button", { name: /Export/ }));
       await screen.findByText("Configs Exported");
       expect(screen.getByText("Configs Exported")).toBeInTheDocument();
       expect(
@@ -586,7 +584,7 @@ describe("MachineConfigDialog", () => {
         window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
       ).mockResolvedValue([newCfg]);
       render(<MachineConfigDialog onClose={onClose} />);
-      await userEvent.click(screen.getByText("↓ Import"));
+      await userEvent.click(screen.getByRole("button", { name: /Import/ }));
       await screen.findByText("Import Complete");
       expect(screen.getByText("Import Complete")).toBeInTheDocument();
       expect(screen.getByText(/2 configs imported/)).toBeInTheDocument();
@@ -598,7 +596,7 @@ describe("MachineConfigDialog", () => {
         window.terraForge.config.importConfigs as ReturnType<typeof vi.fn>
       ).mockRejectedValue(new Error("disk full"));
       render(<MachineConfigDialog onClose={onClose} />);
-      await userEvent.click(screen.getByText("↓ Import"));
+      await userEvent.click(screen.getByRole("button", { name: /Import/ }));
       await screen.findByText("Import Failed");
       expect(screen.getByText("Import Failed")).toBeInTheDocument();
     });
@@ -608,7 +606,7 @@ describe("MachineConfigDialog", () => {
         window.terraForge.config.exportConfigs as ReturnType<typeof vi.fn>
       ).mockRejectedValue(new Error("permission denied"));
       render(<MachineConfigDialog onClose={onClose} />);
-      await userEvent.click(screen.getByText("↑ Export"));
+      await userEvent.click(screen.getByRole("button", { name: /Export/ }));
       await screen.findByText("Export Failed");
       expect(screen.getByText("Export Failed")).toBeInTheDocument();
     });
@@ -645,7 +643,7 @@ describe("MachineConfigDialog", () => {
       window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
     ).mockResolvedValue([existing, newCfg]);
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("↓ Import"));
+    await userEvent.click(screen.getByRole("button", { name: /Import/ }));
     // After import, the newly imported config should appear in the list
     await screen.findByText("Newly Imported");
     expect(screen.getByText("Newly Imported")).toBeInTheDocument();

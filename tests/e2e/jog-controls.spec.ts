@@ -286,9 +286,9 @@ test("'Zero Z' button is disabled for solenoid pen type", async () => {
 // ─── Close button ─────────────────────────────────────────────────────────────
 
 test("closing Jog Controls via ✕ hides the panel", async () => {
-  // The close button has a small ✕ inside the panel header.
+  // The close button is the icon-only control in the panel header.
   await window
-    .locator("div:has(> span:text('Jog Controls')) button:has-text('✕')")
+    .locator("div:has(> span:text('Jog Controls')) button[aria-label='Close jog controls']")
     .click();
   await expect(window.locator("text=Jog Controls")).not.toBeVisible({
     timeout: 3000,

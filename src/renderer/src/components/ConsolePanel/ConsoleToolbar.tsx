@@ -1,5 +1,6 @@
 import { Button } from "../ui";
 import type { MachineStatus } from "../../../../types";
+import { AlertTriangle } from "lucide-react";
 
 interface ConsoleToolbarProps {
   status: MachineStatus | null;
@@ -44,7 +45,10 @@ export function ConsoleToolbar({
               title="Clear alarm ($X)"
               className="text-xs px-2 py-0.5 rounded bg-red-900 text-red-300 hover:bg-red-700 hover:text-white disabled:opacity-50 animate-pulse"
             >
-              ⚠ ALARM — click to unlock
+              <span className="inline-flex items-center gap-1">
+                <AlertTriangle size={12} strokeWidth={2.25} />
+                <span>ALARM — click to unlock</span>
+              </span>
             </Button>
           ) : (
             <span

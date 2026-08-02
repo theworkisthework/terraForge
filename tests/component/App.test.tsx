@@ -77,6 +77,59 @@ describe("App", () => {
     expect(screen.getByText("File Browser")).toBeInTheDocument();
   });
 
+  it("shows collapsed mini job controls when file browser is hidden and a job is active", async () => {
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "/demo.gcode",
+        source: "sd",
+        name: "demo.gcode",
+      },
+      status: {
+        raw: "<Run|MPos:0,0,0|Ln:25/100>",
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        lineNum: 25,
+        lineTotal: 100,
+      },
+    });
+
+    render(<App />);
+    await act(async () => {});
+
+    await userEvent.click(screen.getByLabelText("Hide file browser panel"));
+    expect(screen.getByLabelText("Collapsed job progress")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pause job")).toBeInTheDocument();
+    expect(screen.getByLabelText("Abort job")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Pause job"));
+    expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
+  });
+
+  it("hides collapsed abort button when job is not active", async () => {
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "/demo.gcode",
+        source: "sd",
+        name: "demo.gcode",
+      },
+      status: {
+        raw: "<Idle|MPos:0,0,0>",
+        state: "Idle",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+      },
+    });
+
+    render(<App />);
+    await act(async () => {});
+
+    await userEvent.click(screen.getByLabelText("Hide file browser panel"));
+    expect(screen.queryByLabelText("Abort job")).not.toBeInTheDocument();
+  });
+
   it("collapses and re-expands the properties panel", async () => {
     render(<App />);
     await act(async () => {});
@@ -196,7 +249,7 @@ describe("App", () => {
   it("closing jog panel hides the drag handle", async () => {
     render(<App />);
     await act(async () => {});
-    const closeBtn = screen.getByText("✕");
+    const closeBtn = screen.getByLabelText("Close jog controls");
     await userEvent.click(closeBtn);
     expect(screen.queryByTitle("Drag to move")).not.toBeInTheDocument();
   });

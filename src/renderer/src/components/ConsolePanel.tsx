@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useConsoleStore } from "../store/consoleStore";
 import { useMachineStore } from "../store/machineStore";
 import { useAppConfigStore } from "../store/appConfigStore";
-import { JobControls } from "./JobControls";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useStableMachineState } from "../hooks/useStableMachineState";
 import { ConsoleToolbar } from "./ConsolePanel/ConsoleToolbar";
@@ -51,7 +50,7 @@ export function ConsolePanel() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="h-full flex flex-col overflow-hidden">
       {showRestartConfirm && (
         <ConfirmDialog
           title="Restart Firmware?"
@@ -63,30 +62,22 @@ export function ConsolePanel() {
         />
       )}
 
-      {/* Console log + toolbar + input */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <ConsoleToolbar
-          status={status}
-          connected={connected}
-          isAlarm={isAlarm}
-          displayState={displayState}
-          showMachineCoordinates={showMachineCoordinates}
-          resetting={resetting}
-          showRestartConfirm={showRestartConfirm}
-          onFirmwareReset={() => setShowRestartConfirm(true)}
-          onClear={clear}
-          onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}
-        />
+      <ConsoleToolbar
+        status={status}
+        connected={connected}
+        isAlarm={isAlarm}
+        displayState={displayState}
+        showMachineCoordinates={showMachineCoordinates}
+        resetting={resetting}
+        showRestartConfirm={showRestartConfirm}
+        onFirmwareReset={() => setShowRestartConfirm(true)}
+        onClear={clear}
+        onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}
+      />
 
-        <ConsoleLog lines={lines} />
+      <ConsoleLog lines={lines} />
 
-        <ConsoleInput connected={connected} onSend={handleSend} />
-      </div>
-
-      {/* Job controls sidebar */}
-      <div className="w-48 border-l border-border-ui shrink-0">
-        <JobControls />
-      </div>
+      <ConsoleInput connected={connected} onSend={handleSend} />
     </div>
   );
 }

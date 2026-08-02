@@ -384,12 +384,12 @@ test("Abort button is visible while a job is running", async () => {
   });
   await window.waitForTimeout(200);
 
-  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  const abortBtn = window.locator("button:has-text('Abort')");
   await expect(abortBtn).toBeVisible({ timeout: 3_000 });
 });
 
 test("clicking Abort shows a confirmation dialog", async () => {
-  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  const abortBtn = window.locator("button:has-text('Abort')");
   await expect(abortBtn).toBeVisible({ timeout: 3_000 });
   await abortBtn.click();
 
@@ -411,11 +411,11 @@ test("confirming Abort calls abortJob and machine returns to Idle", async () => 
   await window.waitForTimeout(300);
 
   // Abort button should be gone; Start job button should be visible.
-  await expect(window.locator("button:has-text('✕ Abort')")).not.toBeVisible({
+  await expect(window.locator("button:has-text('Abort')")).not.toBeVisible({
     timeout: 3_000,
   });
 
-  await expect(window.locator("button:has-text('▶ Start job')")).toBeVisible({
+  await expect(window.locator("button:has-text('Start job')")).toBeVisible({
     timeout: 3_000,
   });
 });
@@ -428,7 +428,7 @@ test("cancelling the Abort dialog keeps the job running", async () => {
   });
   await window.waitForTimeout(200);
 
-  const abortBtn = window.locator("button:has-text('✕ Abort')");
+  const abortBtn = window.locator("button:has-text('Abort')");
   await expect(abortBtn).toBeVisible({ timeout: 3_000 });
   await abortBtn.click();
 

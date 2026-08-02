@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { Moon, Settings, Sun } from "lucide-react";
 import { Button } from "../ui";
 import { ConnectionStatus } from "./ConnectionStatus";
 
@@ -47,7 +47,7 @@ export function ToolbarRightSection({
         aria-label="Machine settings"
         title="Machine settings"
       >
-        ⚙
+        <Settings size={14} aria-hidden="true" />
       </Button>
     </div>
   );

@@ -274,7 +274,7 @@ test("Set as Active changes which config is active", async () => {
   // The active indicator (✓) should appear for this config in the sidebar
   const checkmark = sidebarEntry(window, "Test Machine E2E");
   await expect(checkmark).toBeVisible({ timeout: 3000 });
-  await expect(checkmark).toContainText("✓");
+  await expect(checkmark.locator("svg")).toBeVisible({ timeout: 3000 });
 });
 
 // ─── Export configs ─────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ test("Export button triggers save dialog and writes JSON", async () => {
   const exportPath = path.join(tempDir, "exported-configs.json");
   await mockSaveDialog(electronApp, exportPath);
 
-  const exportBtn = dialog(window).locator("button:has-text('↑ Export')");
+  const exportBtn = dialog(window).locator("button:has-text('Export')").first();
   await exportBtn.click();
 
   // Allow time for the IPC round-trip + file write
@@ -319,10 +319,13 @@ test("clicking Close dismisses the dialog", async () => {
 });
 
 test("machine selector in toolbar now shows the new active config", async () => {
-  const options = await window
-    .locator("select[aria-label='Machine selector'] option")
-    .allTextContents();
-  expect(options.some((t) => t.includes("Test Machine E2E"))).toBe(true);
+  const selectedName = await window
+    .locator("select[aria-label='Machine selector']")
+    .evaluate((select) => {
+      const option = select.selectedOptions[0];
+      return option?.textContent?.trim() ?? "";
+    });
+  expect(selectedName).toContain("Test Machine E2E");
 });
 
 // ─── Re-open and confirm persistence ────────────────────────────────────────

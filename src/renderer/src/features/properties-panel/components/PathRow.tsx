@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Repeat } from "lucide-react";
+import { Eye, EyeOff, Repeat, X } from "lucide-react";
 import { Button } from "../../../components/ui";
 
 interface PathRowProps {
@@ -77,9 +77,10 @@ export function PathRow({
         variant="ghost"
         className="hover:text-accent"
         title="Remove path"
+        aria-label="Remove path"
         onClick={onRemove}
       >
-        ✕
+        <X size={12} strokeWidth={2.25} />
       </Button>
     </div>
   );

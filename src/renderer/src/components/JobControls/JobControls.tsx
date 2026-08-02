@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Pause, Play, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui";
 import type { ButtonVariant } from "../ui";
@@ -69,6 +70,7 @@ export function JobControls() {
     variant: ButtonVariant = "secondary",
     disabled = false,
     title?: string,
+    icon?: ReactNode,
   ) => (
     <Button
       variant={variant}
@@ -76,6 +78,7 @@ export function JobControls() {
       disabled={disabled || !connected}
       title={title}
       onClick={onClick}
+      icon={icon}
     >
       {label}
     </Button>
@@ -105,7 +108,7 @@ export function JobControls() {
       {/* Start — only when idle */}
       {!isActive &&
         btn(
-          "▶ Start job",
+          "Start job",
           () => {
             if (effectiveJobFile) startJob(effectiveJobFile);
           },
@@ -116,40 +119,44 @@ export function JobControls() {
               ? `Upload ${effectiveJobFile!.name} to SD card then run`
               : `Run ${effectiveJobFile!.name} on the machine`
             : "Select a G-code file in the File Browser first",
+          <Play className="h-3.5 w-3.5" strokeWidth={2.25} />,
         )}
 
       {/* Pause — only while running */}
       {isRunning &&
         btn(
-          "⏸ Pause",
+          "Pause",
           async () => {
             await window.terraForge.fluidnc.pauseJob();
           },
           "secondary",
           false,
-          "Pause the running job (resume with ▶ Resume)",
+          "Pause the running job (resume with Resume)",
+          <Pause className="h-3.5 w-3.5" strokeWidth={2.25} />,
         )}
 
       {/* Resume — only while held */}
       {isHeld &&
         btn(
-          "▶ Resume",
+          "Resume",
           async () => {
             await window.terraForge.fluidnc.resumeJob();
           },
           "primary",
           false,
           "Resume the paused job",
+          <Play className="h-3.5 w-3.5" strokeWidth={2.25} />,
         )}
 
       {/* Abort — while running or held */}
       {isActive &&
         btn(
-          "✕ Abort",
+          "Abort",
           () => setShowAbortConfirm(true),
           "danger",
           false,
           "Immediately stop the job and cancel remaining moves",
+          <X className="h-3.5 w-3.5" strokeWidth={2.25} />,
         )}
 
       {showAbortConfirm && (
