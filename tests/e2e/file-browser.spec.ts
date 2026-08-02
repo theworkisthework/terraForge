@@ -107,7 +107,7 @@ test("breadcrumb shows root path when offline", async () => {
 
 // ─── Job controls integration ───────────────────────────────────────────────
 
-test("Job controls section is visible in console area", async () => {
+test("Job controls section is visible in the left panel", async () => {
   const jobLabel = window.locator("text=Job").first();
   await expect(jobLabel).toBeVisible();
 });

@@ -137,7 +137,7 @@ describe("Toolbar", () => {
 
   it("renders settings button", () => {
     render(<Toolbar />);
-    expect(screen.getByText("⚙")).toBeInTheDocument();
+    expect(screen.getByTitle("Machine settings")).toBeInTheDocument();
   });
 
   it("disables machine selector while connected", () => {
@@ -285,11 +285,11 @@ describe("Toolbar", () => {
 
   // ── Settings dialog toggle ────────────────────────────────────────────
 
-  it("⚙ button opens Machine Config dialog", async () => {
+  it("Machine settings button opens Machine Config dialog", async () => {
     const cfg = createMachineConfig({ name: "My Plotter" });
     useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
     render(<Toolbar />);
-    await userEvent.click(screen.getByText("⚙"));
+    await userEvent.click(screen.getByTitle("Machine settings"));
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
   });
 
