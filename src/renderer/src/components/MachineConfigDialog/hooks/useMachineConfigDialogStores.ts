@@ -8,6 +8,9 @@ export function useMachineConfigDialogStores() {
   const debugLoggingEnabled = useAppConfigStore(
     (state) => state.debugLoggingEnabled,
   );
+  const showConsoleTimestamps = useAppConfigStore(
+    (state) => state.showConsoleTimestamps,
+  );
   const showMachineCoordinates = useAppConfigStore(
     (state) => state.showMachineCoordinates,
   );
@@ -37,6 +40,9 @@ export function useMachineConfigDialogStores() {
   );
   const setDebugLoggingEnabled = useAppConfigStore(
     (state) => state.setDebugLoggingEnabled,
+  );
+  const setShowConsoleTimestamps = useAppConfigStore(
+    (state) => state.setShowConsoleTimestamps,
   );
   const setShowMachineCoordinates = useAppConfigStore(
     (state) => state.setShowMachineCoordinates,
@@ -75,6 +81,7 @@ export function useMachineConfigDialogStores() {
     appConfig: {
       enablePerPathPasses,
       debugLoggingEnabled,
+      showConsoleTimestamps,
       showMachineCoordinates,
       respectSvgColorsOnCanvas,
       vinylCuttingEnabled,
@@ -85,6 +92,7 @@ export function useMachineConfigDialogStores() {
       inkServiceStations,
       setEnablePerPathPasses,
       setDebugLoggingEnabled,
+      setShowConsoleTimestamps,
       setShowMachineCoordinates,
       setRespectSvgColorsOnCanvas,
       setVinylCuttingEnabled,

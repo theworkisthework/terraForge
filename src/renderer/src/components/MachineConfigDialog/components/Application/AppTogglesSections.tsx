@@ -10,11 +10,13 @@ export function AppTogglesSections({ controller }: AppTogglesSectionsProps) {
   const {
     appConfig,
     handleDebugLoggingChange,
+    handleShowConsoleTimestampsChange,
   } = controller;
 
   const {
     enablePerPathPasses,
     debugLoggingEnabled,
+    showConsoleTimestamps,
     showMachineCoordinates,
     respectSvgColorsOnCanvas,
     setEnablePerPathPasses,
@@ -65,6 +67,25 @@ export function AppTogglesSections({ controller }: AppTogglesSectionsProps) {
       </Section>
 
       <Section title="Console Display">
+        <label className="flex items-start gap-3 cursor-pointer mb-4">
+          <input
+            type="checkbox"
+            checked={showConsoleTimestamps}
+            onChange={(e) =>
+              handleShowConsoleTimestampsChange(e.currentTarget.checked)
+            }
+            className="mt-0.5 accent-accent"
+          />
+          <div className="space-y-1">
+            <div className="text-sm text-content">
+              Show date and time on console lines
+            </div>
+            <p className="text-xs text-content-faint">
+              Prefixes each console entry with the local date and time.
+            </p>
+          </div>
+        </label>
+
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
