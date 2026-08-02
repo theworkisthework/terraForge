@@ -30,6 +30,8 @@ export default function App() {
   }, [theme]);
 
   const [showJog, setShowJog] = useState(true);
+  const [showFileBrowser, setShowFileBrowser] = useState(true);
+  const [showProperties, setShowProperties] = useState(true);
   // null = use CSS default (aligned with right panel + 16px gap); set when user first drags
   const [jogPos, setJogPos] = useState<{ x: number; y: number } | null>(null);
   const jogPanelRef = useRef<HTMLDivElement>(null);
@@ -129,8 +131,27 @@ export default function App() {
       {/* Main work area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel — SD card file browser */}
-        <aside className="w-60 bg-panel border-r border-border-ui overflow-y-auto shrink-0">
-          <FileBrowserPanel />
+        <aside
+          className={`${showFileBrowser ? "w-60" : "w-8"} bg-panel border-r border-border-ui overflow-hidden shrink-0 transition-[width] duration-200 ease-in-out`}
+        >
+          {showFileBrowser ? (
+            <FileBrowserPanel onHide={() => setShowFileBrowser(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowFileBrowser(true)}
+              aria-label="Show file browser panel"
+              title="Show file browser"
+              className="h-full w-full flex flex-col items-stretch text-content-muted hover:text-content transition-colors"
+            >
+              <span className="h-8 w-full flex items-center justify-center hover:bg-secondary border-b border-border-ui">
+                <span aria-hidden="true" className="text-xs font-semibold">
+                  &gt;
+                </span>
+              </span>
+              <span className="flex-1" />
+            </button>
+          )}
         </aside>
 
         {/* Centre — plot canvas */}
@@ -141,8 +162,27 @@ export default function App() {
         </main>
 
         {/* Right panel — object properties */}
-        <aside className="w-64 bg-panel border-l border-border-ui overflow-y-auto shrink-0">
-          <PropertiesPanel />
+        <aside
+          className={`${showProperties ? "w-64" : "w-8"} bg-panel border-l border-border-ui overflow-hidden shrink-0 transition-[width] duration-200 ease-in-out`}
+        >
+          {showProperties ? (
+            <PropertiesPanel onHide={() => setShowProperties(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowProperties(true)}
+              aria-label="Show properties panel"
+              title="Show properties"
+              className="h-full w-full flex flex-col items-stretch text-content-muted hover:text-content transition-colors"
+            >
+              <span className="h-8 w-full flex items-center justify-center hover:bg-secondary border-b border-border-ui">
+                <span aria-hidden="true" className="text-xs font-semibold">
+                  &lt;
+                </span>
+              </span>
+              <span className="flex-1" />
+            </button>
+          )}
         </aside>
       </div>
 
