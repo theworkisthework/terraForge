@@ -159,6 +159,84 @@ describe("JogControls", () => {
     );
   });
 
+  it("swaps Y jog button mapping for top-origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "top-left" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y+" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 Y-1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Y1.000 F3000",
+    );
+  });
+
+  it("swaps X jog button mapping for right-origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "bottom-right" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog X-" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 X1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 X-1.000 F3000",
+    );
+  });
+
+  it("swaps both axes for top-right origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "top-right" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog X-" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 X-1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Y-1.000 F3000",
+    );
+  });
+
   it("updates feedrate when input changes", async () => {
     render(<JogControls />);
     const input = screen.getByRole("spinbutton");
