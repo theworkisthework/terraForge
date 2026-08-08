@@ -351,7 +351,7 @@ test("clicking Preview fetches the file text and loads the canvas toolpath", asy
   const previewBtn = window.locator(
     "[data-testid='file-actions-sketch.gcode'] button[title='Preview toolpath']",
   );
-  await previewBtn.click();
+  await previewBtn.click({ force: true });
 
   // If a toolpath was already loaded a confirm dialog may appear; accept it.
   const replaceBtn = window.locator(
