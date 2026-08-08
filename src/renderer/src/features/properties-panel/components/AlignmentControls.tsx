@@ -84,19 +84,19 @@ export function AlignmentControls({
         onAlignBottom={onAlignBottom}
       />
 
-      <div className="flex items-center gap-2 mt-1">
-        <label className="inline-flex items-center gap-1 text-[10px] text-content-muted">
+      <div className="mt-1 flex items-center justify-between gap-1">
+        <label className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] text-content-muted">
           <input
             type="checkbox"
             checked={templateAlignEnabled}
             disabled={!canAlignToTemplate}
             onChange={(e) => onTemplateAlignEnabledChange(e.target.checked)}
-            className="accent-accent"
+            className="h-3.5 w-3.5 shrink-0 accent-accent"
           />
           Align to template
         </label>
         <label
-          className={`inline-flex items-center gap-1 text-[10px] ${targetControlToneClass}`}
+          className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${targetControlToneClass}`}
         >
           <input
             type="radio"
@@ -105,12 +105,12 @@ export function AlignmentControls({
             checked={templateAlignTarget === "page"}
             disabled={targetControlDisabled}
             onChange={() => onTemplateAlignTargetChange("page")}
-            className="accent-accent"
+            className="h-3.5 w-3.5 shrink-0 accent-accent"
           />
           Page
         </label>
         <label
-          className={`inline-flex items-center gap-1 text-[10px] ${targetControlToneClass}`}
+          className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${targetControlToneClass}`}
         >
           <input
             type="radio"
@@ -119,7 +119,7 @@ export function AlignmentControls({
             checked={templateAlignTarget === "margin"}
             disabled={targetControlDisabled}
             onChange={() => onTemplateAlignTargetChange("margin")}
-            className="accent-accent"
+            className="h-3.5 w-3.5 shrink-0 accent-accent"
           />
           Margin
         </label>

@@ -95,19 +95,19 @@ export function TransformShortcuts({
               <ScaleVerticalIcon className="h-3.5 w-3.5" />
             </TransformIconButton>
           </div>
-          <div className="flex items-center gap-2 mb-2">
-            <label className="inline-flex items-center gap-1 text-[10px] text-content-muted">
+          <div className="mb-2 flex items-center justify-between gap-1">
+            <label className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] text-content-muted">
               <input
                 type="checkbox"
                 checked={templateScaleEnabled}
                 disabled={!canScaleToTemplate}
                 onChange={(e) => onTemplateScaleEnabledChange(e.target.checked)}
-                className="accent-accent"
+                className="h-3.5 w-3.5 shrink-0 accent-accent"
               />
               Scale to template
             </label>
             <label
-              className={`inline-flex items-center gap-1 text-[10px] ${
+              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${
                 templateScaleEnabled && canScaleToTemplate
                   ? "text-content-default"
                   : "text-content-muted"
@@ -121,12 +121,12 @@ export function TransformShortcuts({
                 checked={templateScaleTarget === "page"}
                 disabled={!templateScaleEnabled || !canScaleToTemplate}
                 onChange={() => onTemplateScaleTargetChange("page")}
-                className="accent-accent"
+                className="h-3.5 w-3.5 shrink-0 accent-accent"
               />
               Page
             </label>
             <label
-              className={`inline-flex items-center gap-1 text-[10px] ${
+              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${
                 templateScaleEnabled && canScaleToTemplate
                   ? "text-content-default"
                   : "text-content-muted"
@@ -140,7 +140,7 @@ export function TransformShortcuts({
                 checked={templateScaleTarget === "margin"}
                 disabled={!templateScaleEnabled || !canScaleToTemplate}
                 onChange={() => onTemplateScaleTargetChange("margin")}
-                className="accent-accent"
+                className="h-3.5 w-3.5 shrink-0 accent-accent"
               />
               Margin
             </label>
