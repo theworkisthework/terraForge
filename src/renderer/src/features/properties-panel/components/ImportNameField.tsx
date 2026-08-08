@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, useRef } from "react";
 
 interface ImportNameFieldProps {
   isEditingName: boolean;
@@ -19,9 +19,14 @@ export function ImportNameField({
   onCancelName,
   onStartRename,
 }: ImportNameFieldProps) {
+  const cancelledRef = useRef(false);
+
   const onNameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") onCommitName();
-    if (event.key === "Escape") onCancelName();
+    if (event.key === "Escape") {
+      cancelledRef.current = true;
+      onCancelName();
+    }
   };
 
   if (isEditingName) {
@@ -32,7 +37,13 @@ export function ImportNameField({
         className="flex-1 min-w-0 bg-app border border-accent rounded px-1 text-[10px] outline-none"
         onClick={(event) => event.stopPropagation()}
         onChange={(event) => onEditingNameChange(event.target.value)}
-        onBlur={onCommitName}
+        onBlur={() => {
+          if (cancelledRef.current) {
+            cancelledRef.current = false;
+            return;
+          }
+          onCommitName();
+        }}
         onKeyDown={onNameKeyDown}
       />
     );

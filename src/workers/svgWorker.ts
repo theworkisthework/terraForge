@@ -117,7 +117,7 @@ function distanceMM(
   return Math.hypot(dx, dy);
 }
 
-function legacyTopOriginAnchorObject(
+function normalizeTopOriginAnchorObject(
   obj: VectorObject,
   config: MachineConfig,
 ): VectorObject | null {
@@ -133,7 +133,7 @@ function legacyTopOriginAnchorObject(
 
   // Canvas top-origin placement stores import Y one object-height above the
   // visual top edge. Shift to the actual machine-space top-edge anchor before
-  // flattening so page-clip bounds align with what the user sees.
+  // flattening so generated toolpaths align with canvas placement.
   return {
     ...obj,
     y: obj.y + objHeight,
@@ -776,12 +776,16 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return;
     }
     const obj = colorSortedObjects[i];
-    const legacyTopOriginObj = pageClipBounds
-      ? legacyTopOriginAnchorObject(obj, config)
-      : null;
+    const normalizedTopOriginObj = normalizeTopOriginAnchorObject(obj, config);
 
-    const pointTapCandidates = legacyTopOriginObj
-      ? [obj, legacyTopOriginObj]
+    // Always flatten using normalized top-origin placement first so G-code
+    // matches the import position shown on canvas.
+    const flattenCandidate = normalizedTopOriginObj ?? obj;
+
+    // Keep a compatibility fallback for pre-normalized object data by trying
+    // both candidates and accepting the first in-bounds point.
+    const pointTapCandidates = normalizedTopOriginObj
+      ? [flattenCandidate, obj]
       : [obj];
 
     for (const pointTapObj of pointTapCandidates) {
@@ -840,19 +844,19 @@ async function generate(msg: GenerateMessage): Promise<void> {
       return { clipped, validGeometry: true };
     };
 
-    const primaryResult = clipCandidate(obj);
+    const primaryResult = clipCandidate(flattenCandidate);
     let clipped = primaryResult.clipped;
     let validGeometry = primaryResult.validGeometry;
 
-    // Some older top-origin imports persist Y one object-height above the
-    // visual top edge. If clipping the modern anchor produces no visible
-    // geometry, retry once with the legacy anchor representation.
-    if (pageClipBounds && clipped.length === 0 && legacyTopOriginObj) {
-      const legacyResult = clipCandidate(legacyTopOriginObj);
-      if (legacyResult.clipped.length > 0) {
-        clipped = legacyResult.clipped;
+    // Compatibility fallback: if the normalized anchor produces no visible
+    // geometry, retry with the raw object coordinates for data that is already
+    // stored in top-edge-anchor form.
+    if (clipped.length === 0 && normalizedTopOriginObj) {
+      const fallbackResult = clipCandidate(obj);
+      if (fallbackResult.clipped.length > 0) {
+        clipped = fallbackResult.clipped;
       }
-      validGeometry = validGeometry || legacyResult.validGeometry;
+      validGeometry = validGeometry || fallbackResult.validGeometry;
     }
 
     if (!validGeometry) {

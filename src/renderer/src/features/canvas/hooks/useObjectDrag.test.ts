@@ -210,7 +210,7 @@ describe("useObjectDrag", () => {
       );
 
       expect(updateImport).toHaveBeenCalledWith("imp1", {
-        x: -10,
+        x: 10,
         y: 5,
       });
     });
@@ -231,7 +231,7 @@ describe("useObjectDrag", () => {
       );
 
       expect(updateImport).toHaveBeenCalledWith("imp1", {
-        x: -10,
+        x: 10,
         y: -5,
       });
     });
