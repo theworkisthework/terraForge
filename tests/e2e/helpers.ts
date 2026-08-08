@@ -61,6 +61,8 @@ export async function launchApp(): Promise<AppHandle> {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--disable-software-rasterizer",
+          "--ozone-platform=x11",
         ]
       : [];
 

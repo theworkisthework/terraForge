@@ -343,7 +343,9 @@ describe("PropertiesPanel", () => {
       },
     });
     render(<PropertiesPanel />);
+    expect(screen.getByText("GCODE")).toBeInTheDocument();
     expect(screen.getByText("test.gcode")).toBeInTheDocument();
+    expect(screen.getByText("test.gcode")).toHaveClass("font-semibold");
   });
 
   it("shows gcode properties expanded by default", () => {

@@ -54,7 +54,7 @@ export function PlotCanvasControls({
           aria-keyshortcuts="Control+0"
           aria-pressed={fitted}
           onClick={onFit}
-          className="text-[11px] font-bold leading-none"
+          className="text-base font-bold leading-none"
         >
           ⊡
         </Button>

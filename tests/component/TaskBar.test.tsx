@@ -39,7 +39,7 @@ describe("TaskBar", () => {
     expect(screen.getByText("75%")).toBeInTheDocument();
   });
 
-  it("shows checkmark for completed task", () => {
+  it("shows completed task controls", () => {
     const task = createBackgroundTask({
       id: "t1",
       label: "Done",
@@ -48,7 +48,8 @@ describe("TaskBar", () => {
     });
     useTaskStore.setState({ tasks: { t1: task } });
     render(<TaskBar />);
-    expect(screen.getByText("✓")).toBeInTheDocument();
+    expect(screen.getByText("Done")).toBeInTheDocument();
+    expect(screen.getByTitle("Dismiss")).toBeInTheDocument();
   });
 
   it("shows error indicator and error message", () => {
@@ -199,9 +200,9 @@ describe("TaskBar", () => {
     vi.useRealTimers();
   });
 
-  // ── Cancelled task shows ✕ icon ────────────────────────────────────────
+  // ── Cancelled task remains visible in the task bar ──────────────────────
 
-  it("shows ✕ icon for cancelled task", () => {
+  it("shows cancelled task entry", () => {
     const task = createBackgroundTask({
       id: "t1",
       label: "Cancelled thing",
@@ -210,7 +211,6 @@ describe("TaskBar", () => {
     });
     useTaskStore.setState({ tasks: { t1: task } });
     render(<TaskBar />);
-    // The cancelled status icon is ✕ (different from dismiss button)
     expect(screen.getByText("Cancelled thing")).toBeInTheDocument();
   });
 });

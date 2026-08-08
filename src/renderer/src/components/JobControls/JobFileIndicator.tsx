@@ -1,3 +1,5 @@
+import { AlertTriangle, FileText, Monitor } from "lucide-react";
+
 interface JobFileIndicatorProps {
   /** The effective job file (may come from file browser or canvas toolpath). */
   effectiveJobFile: {
@@ -33,7 +35,11 @@ export function JobFileIndicator({
         </span>
       ) : jobFileValid ? (
         <span className="text-content">
-          {effectiveJobFile.source === "local" ? "🖥" : "📄"}{" "}
+          {effectiveJobFile.source === "local" ? (
+            <Monitor className="inline-block align-text-bottom" size={12} />
+          ) : (
+            <FileText className="inline-block align-text-bottom" size={12} />
+          )}{" "}
           {effectiveJobFile.name}
           {effectiveJobFile.source === "local" && (
             <span className="text-content-faint ml-1">
@@ -43,7 +49,7 @@ export function JobFileIndicator({
         </span>
       ) : (
         <span className="text-amber-400">
-          ⚠ {effectiveJobFile.name} — not a G-code file
+          <AlertTriangle className="inline-block align-text-bottom" size={12} /> {effectiveJobFile.name} — not a G-code file
         </span>
       )}
     </div>

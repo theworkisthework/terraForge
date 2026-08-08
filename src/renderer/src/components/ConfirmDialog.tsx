@@ -16,6 +16,7 @@
  */
 
 import React from "react";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "./ui";
 
 interface Props {
@@ -63,7 +64,7 @@ export function ConfirmDialog({
       >
         {variant === "warning" && (
           <div className="flex items-center gap-2 px-5 py-3 bg-orange-500/10 border-b border-orange-500/30">
-            <span className="text-orange-400 text-base leading-none">⚠</span>
+            <AlertTriangle className="text-orange-400 shrink-0" size={16} strokeWidth={2.25} />
             <span className="text-xs font-semibold uppercase tracking-wider text-orange-400">
               Warning
             </span>

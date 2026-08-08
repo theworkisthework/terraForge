@@ -8,7 +8,10 @@ import { ConsolePanel } from "@renderer/components/ConsolePanel";
 
 beforeEach(() => {
   useConsoleStore.setState({ lines: [], maxLines: 500 });
-  useAppConfigStore.setState({ showMachineCoordinates: false });
+  useAppConfigStore.setState({
+    showMachineCoordinates: false,
+    showConsoleTimestamps: false,
+  });
   useMachineStore.setState({
     configs: [],
     activeConfigId: null,
@@ -196,7 +199,7 @@ describe("ConsolePanel", () => {
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       "G0 X10",
     );
-    expect(useConsoleStore.getState().lines).toContain("> G0 X10");
+    expect(useConsoleStore.getState().lines.some((l) => l.endsWith("> G0 X10"))).toBe(true);
   });
 
   it("sends command when Send button clicked", async () => {
@@ -248,10 +251,5 @@ describe("ConsolePanel", () => {
     expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
   });
 
-  // ── JobControls rendered ────────────────────────────────────────────────
-
-  it("renders JobControls sidebar inside ConsolePanel", () => {
-    render(<ConsolePanel />);
-    expect(screen.getByText("Job")).toBeInTheDocument();
-  });
+  // Job controls are rendered in the left panel by App layout.
 });

@@ -33,7 +33,7 @@ describe("PathRow", () => {
     fireEvent.click(screen.getByLabelText("Disable path stroke"));
     expect(onToggleStroke).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove path" }));
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 

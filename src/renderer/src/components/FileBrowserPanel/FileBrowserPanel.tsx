@@ -7,7 +7,11 @@ import { useVerticalSplit } from "./hooks/useVerticalSplit";
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
 
-export function FileBrowserPanel() {
+interface FileBrowserPanelProps {
+  onHide?: () => void;
+}
+
+export function FileBrowserPanel({ onHide }: FileBrowserPanelProps = {}) {
   const connected = useMachineStore((s) => s.connected);
   const activeConfig = useMachineStore((s) => s.activeConfig);
   const serialMode = connected && activeConfig()?.connection.type === "usb";
@@ -32,10 +36,21 @@ export function FileBrowserPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Title */}
-      <div className="flex items-center px-3 py-2 border-b border-border-ui shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border-ui shrink-0">
         <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           File Browser
         </span>
+        {onHide && (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Hide file browser panel"
+            title="Hide file browser"
+            className="text-xs text-content-muted hover:text-content transition-colors"
+          >
+            &lt;
+          </button>
+        )}
       </div>
 
       {/* Pane container */}

@@ -5,6 +5,7 @@ import {
   EyeOff,
   FileText,
   Palette,
+  X,
 } from "lucide-react";
 import { Button } from "../../../components/ui";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
@@ -49,25 +50,67 @@ export function ToolpathSection({
         className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-secondary/20 ${selected ? "bg-secondary/20" : ""}`}
         onClick={onToggleSelected}
       >
-        <Button
-          aria-expanded={selected}
-          aria-label={
-            selected ? "Collapse toolpath details" : "Expand toolpath details"
-          }
-          variant="ghost"
-          className="w-4 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleSelected();
-          }}
-        >
-          {selected ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-        </Button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button
+            aria-expanded={selected}
+            aria-label={
+              selected ? "Collapse toolpath details" : "Expand toolpath details"
+            }
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelected();
+            }}
+          >
+            {selected ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          </Button>
 
-        <FileText className="shrink-0 text-sky-400" size={11} strokeWidth={2} />
+          <FileText className="shrink-0 text-sky-400" size={11} strokeWidth={2} />
+
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0"
+            title={
+              colorized
+                ? "Disable colorized toolpath"
+                : "Enable colorized toolpath"
+            }
+            aria-label={
+              colorized
+                ? "Disable colorized toolpath"
+                : "Enable colorized toolpath"
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetColorized(!colorized);
+            }}
+          >
+            <Palette
+              size={11}
+              className={colorized ? "text-sky-400" : "text-content-faint"}
+            />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0"
+            title={visible ? "Hide toolpath" : "Show toolpath"}
+            aria-label={visible ? "Hide toolpath" : "Show toolpath"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetVisible(!visible);
+            }}
+          >
+            {visible ? <Eye size={11} /> : <EyeOff size={11} />}
+          </Button>
+        </div>
 
         <span
-          className="flex-1 min-w-0 text-[10px] truncate text-content"
+          className="flex-1 min-w-0 text-[10px] truncate font-semibold text-content ml-1"
           title={fileName}
         >
           {fileName}
@@ -75,47 +118,16 @@ export function ToolpathSection({
 
         <Button
           variant="ghost"
-          className="ml-1 shrink-0"
-          title={
-            colorized
-              ? "Disable colorized toolpath"
-              : "Enable colorized toolpath"
-          }
-          aria-label={
-            colorized
-              ? "Disable colorized toolpath"
-              : "Enable colorized toolpath"
-          }
-          onClick={(e) => {
-            e.stopPropagation();
-            onSetColorized(!colorized);
-          }}
-        >
-          <Palette
-            size={11}
-            className={colorized ? "text-sky-400" : "text-content-faint"}
-          />
-        </Button>
-
-        <Button
-          variant="ghost"
-          className="ml-1 shrink-0"
-          title={visible ? "Hide toolpath" : "Show toolpath"}
-          aria-label={visible ? "Hide toolpath" : "Show toolpath"}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSetVisible(!visible);
-          }}
-        >
-          {visible ? <Eye size={11} /> : <EyeOff size={11} />}
-        </Button>
-
-        <Button
-          variant="ghost"
-          className={`ml-1 shrink-0 ${
+          size="icon-xs"
+          className={`shrink-0 ml-1 ${
             isJobActive ? "opacity-30 cursor-not-allowed" : "hover:text-accent"
           }`}
           title={
+            isJobActive
+              ? "Cannot clear toolpath while job is running"
+              : "Clear toolpath"
+          }
+          aria-label={
             isJobActive
               ? "Cannot clear toolpath while job is running"
               : "Clear toolpath"
@@ -126,7 +138,7 @@ export function ToolpathSection({
             onClear();
           }}
         >
-          ✕
+          <X size={12} strokeWidth={2.25} />
         </Button>
       </div>
 
