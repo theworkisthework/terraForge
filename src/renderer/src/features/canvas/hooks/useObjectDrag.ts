@@ -122,11 +122,10 @@ export function useObjectDrag(
     (e: MouseEvent) => {
       if (!dragging) return;
       const zoom = vpRef.current.zoom;
-      const isRight = origin === "bottom-right" || origin === "top-right";
       const isBottom = origin === "bottom-left" || origin === "bottom-right";
       const isCenter = origin === "center";
 
-      const xSign = isRight ? -1 : 1;
+      const xSign = 1;
       const ySign = isBottom || isCenter ? -1 : 1;
 
       const dx =
