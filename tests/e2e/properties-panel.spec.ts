@@ -238,7 +238,7 @@ test("pressing Escape during rename cancels without changing the name", async ()
   await renameInput.waitFor({ timeout: 3000 });
   const originalName = await nameSpan.textContent().catch(() => "renamed");
   await renameInput.fill("should-not-save");
-  await renameInput.press("Escape");
+  await window.keyboard.press("Escape");
 
   // Input should be gone and name unchanged
   await expect(renameInput).not.toBeVisible({ timeout: 2000 });
