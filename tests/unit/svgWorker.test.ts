@@ -103,7 +103,7 @@ function makeSimpleObj() {
   return createVectorObject({
     path: "M 0 0 L 10 0 L 10 10 Z",
     x: 0,
-    y: 0,
+    y: -20,
     scale: 1,
     rotation: 0,
     visible: true,
@@ -555,7 +555,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 10 0 L 10 10",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -592,7 +592,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 0.1 0 L 10 0",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -623,7 +623,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 0.1 0.03 L 0.2 0.08 L 0.3 0.15 L 0.45 0.24",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -656,7 +656,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 0.8 0.2 L 1.4 0.7 L 1.8 1.4 L 2.0 2.2",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -689,7 +689,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 4 0 L 8 0 L 8.02 0.02",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -723,7 +723,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 0.5 0.2 L 0.9 0.6 L 1.0 1.2 L 1.0 2.5 L 2.0 2.5",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -756,7 +756,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 10 0 L 10 20 L 0 20 Z",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -791,7 +791,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 5 L 15 0 L 30 5",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -826,7 +826,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 10 0 L 10 0.15 L 16 0.15",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -1072,7 +1072,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 20 0",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -1120,7 +1120,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 20 0",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -1398,7 +1398,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 0 0 L 8 0",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
@@ -1407,7 +1407,7 @@ describe("svgWorker — G-code body", () => {
         createVectorObject({
           path: "M 50 0 L 58 0",
           x: 0,
-          y: 0,
+          y: -10,
           scale: 1,
           rotation: 0,
           visible: true,
