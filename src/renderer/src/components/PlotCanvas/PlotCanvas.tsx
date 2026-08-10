@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import { usePlotProgress } from "../../utils/usePlotProgress";
 import { useMachineStore } from "../../store/machineStore";
 import {
+  RULER_W,
   RulerOverlay,
   ToolpathSelectionOverlay,
   PenCrosshairOverlay,
@@ -385,6 +386,7 @@ export function PlotCanvas() {
         fitted={fitted}
         zoom={vp.zoom}
         spaceDown={spaceDown}
+        rightInsetPx={16 + (isRight ? RULER_W : 0)}
         onZoomIn={onZoomIn}
         onZoomOut={onZoomOut}
         onFit={onFit}
