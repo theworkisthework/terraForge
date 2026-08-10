@@ -108,4 +108,43 @@ describe("TransformShortcuts", () => {
     fireEvent.click(backdrop);
     expect(onCloseStepFlyout).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps template scale labels on one line", () => {
+    render(
+      <TransformShortcuts
+        fitScale={2}
+        fitScaleX={2}
+        fitScaleY={2}
+        rotStep={45}
+        rotSteps={[1, 5, 15, 45, 90]}
+        stepFlyoutOpen={false}
+        showCentreMarker={false}
+        ratioLocked={true}
+        snapPresetTitle="snap"
+        canScaleToTemplate={true}
+        templateScaleEnabled={true}
+        templateScaleTarget="page"
+        onFitToBed={() => {}}
+        onFitHorizontal={() => {}}
+        onFitVertical={() => {}}
+        onResetScale={() => {}}
+        onTemplateScaleEnabledChange={() => {}}
+        onTemplateScaleTargetChange={() => {}}
+        onRotateCcw={() => {}}
+        onRotateCw={() => {}}
+        onToggleStepFlyout={() => {}}
+        onCloseStepFlyout={() => {}}
+        onSelectRotStep={() => {}}
+        onToggleCentreMarker={() => {}}
+        onSnapToNextPreset={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText("Scale to template").closest("label")?.className)
+      .toContain("whitespace-nowrap");
+    expect(
+      screen.getByRole("radio", { name: "Scale to template page" }).closest("label")
+        ?.className,
+    ).toContain("whitespace-nowrap");
+  });
 });
