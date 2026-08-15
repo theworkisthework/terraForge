@@ -4,6 +4,7 @@ type PlotCanvasControlsProps = {
   fitted: boolean;
   zoom: number;
   spaceDown: boolean;
+  rightInsetPx?: number;
   onZoomIn: (e: React.MouseEvent) => void;
   onZoomOut: (e: React.MouseEvent) => void;
   onFit: (e: React.MouseEvent) => void;
@@ -13,6 +14,7 @@ export function PlotCanvasControls({
   fitted,
   zoom,
   spaceDown,
+  rightInsetPx = 16,
   onZoomIn,
   onZoomOut,
   onFit,
@@ -20,7 +22,8 @@ export function PlotCanvasControls({
   return (
     <>
       <div
-        className="absolute bottom-9 right-4 flex flex-col gap-1 z-10"
+        className="absolute bottom-9 flex flex-col gap-1 z-10"
+        style={{ right: `${rightInsetPx}px` }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <Button

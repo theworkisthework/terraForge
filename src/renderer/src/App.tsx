@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Pause, Play, X } from "lucide-react";
 import { Toolbar } from "./components/Toolbar";
@@ -18,6 +18,8 @@ import { useTaskStore } from "./store/taskStore";
 import { useConsoleStore } from "./store/consoleStore";
 import { useAppConfigStore } from "./store/appConfigStore";
 import { useThemeStore, applyTheme } from "./store/themeStore";
+import { RULER_W } from "./features/canvas";
+import type { OriginType } from "@types/index";
 
 const GCODE_EXTS = [
   ".gcode",
@@ -41,6 +43,8 @@ export default function App() {
   const setFwInfo = useMachineStore((s) => s.setFwInfo);
   const connected = useMachineStore((s) => s.connected);
   const status = useMachineStore((s) => s.status);
+  const activeConfigId = useMachineStore((s) => s.activeConfigId);
+  const machineConfigs = useMachineStore((s) => s.configs);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
   const { toolpathSelected, gcodeSource, gcodePreviewLoading } = useCanvasStore(
     useShallow(selectJobControlsCanvasState),
@@ -75,6 +79,30 @@ export default function App() {
     startY: number;
   } | null>(null);
 
+  const origin = useMemo<OriginType>(() => {
+    const active = machineConfigs.find((cfg) => cfg.id === activeConfigId);
+    return active?.origin ?? "bottom-left";
+  }, [activeConfigId, machineConfigs]);
+  const isRightOrigin = origin === "bottom-right" || origin === "top-right";
+  const rightPanelWidth = showProperties ? 256 : 36;
+  // Keep jog panel offset to the left of the properties edge by 16px,
+  // and add ruler width when the ruler is on the right side.
+  const jogMinRightInset =
+    Math.max(12, rightPanelWidth - 16) + (isRightOrigin ? RULER_W : 0);
+
+  // Keep dragged jog panel clear of the right-side reserved UI area when
+  // panel widths or machine origin change (which moves the ruler side).
+  useEffect(() => {
+    if (!jogPos || !jogPanelRef.current) return;
+    const width =
+      jogPanelRef.current.offsetWidth ||
+      jogPanelRef.current.getBoundingClientRect().width;
+    const maxX = Math.max(0, window.innerWidth - width - jogMinRightInset);
+    if (jogPos.x > maxX) {
+      setJogPos((prev) => (prev ? { ...prev, x: maxX } : prev));
+    }
+  }, [jogMinRightInset, jogPos]);
+
   const startJogDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     // Resolve current pixel position from either state or the element's bounding rect
@@ -99,7 +127,7 @@ export default function App() {
     const newY =
       jogDragRef.current.startY + e.clientY - jogDragRef.current.mouseY;
     setJogPos({
-      x: Math.max(0, Math.min(window.innerWidth - w, newX)),
+      x: Math.max(0, Math.min(window.innerWidth - w - jogMinRightInset, newX)),
       y: Math.max(0, Math.min(window.innerHeight - h, newY)),
     });
   };
@@ -402,7 +430,7 @@ export default function App() {
           style={
             jogPos
               ? { left: jogPos.x, top: jogPos.y }
-              : { right: 240, top: 124 }
+              : { right: jogMinRightInset, top: 124 }
           }
           onPointerMove={onJogDragMove}
           onPointerUp={onJogDragEnd}

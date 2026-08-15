@@ -283,4 +283,40 @@ describe("App", () => {
     // After drag, the panel should have explicit position style set (left/top from setJogPos)
     expect(jogPanel.getAttribute("style")).toMatch(/left/);
   });
+
+  it("updates jog panel right inset when active profile origin switches", async () => {
+    const leftOrigin = createMachineConfig({
+      id: "cfg-left",
+      name: "Left Origin",
+      origin: "bottom-left",
+    });
+    const rightOrigin = createMachineConfig({
+      id: "cfg-right",
+      name: "Right Origin",
+      origin: "bottom-right",
+    });
+
+    (
+      window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([leftOrigin, rightOrigin]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(useMachineStore.getState().activeConfigId).toBe(leftOrigin.id);
+    });
+
+    const dragHandle = screen.getByTitle("Drag to move");
+    const jogPanel = dragHandle.parentElement!;
+
+    // Properties panel visible by default: 256 - 16 = 240.
+    expect(jogPanel).toHaveStyle({ right: "240px" });
+
+    act(() => {
+      useMachineStore.getState().setActiveConfigId(rightOrigin.id);
+    });
+
+    // Right-origin adds ruler spacing: (256 - 16) + 20 = 260.
+    expect(jogPanel).toHaveStyle({ right: "260px" });
+  });
 });
