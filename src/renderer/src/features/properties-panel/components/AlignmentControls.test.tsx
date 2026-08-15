@@ -68,4 +68,31 @@ describe("AlignmentControls", () => {
     );
     expect(onTemplateAlignEnabledChange).toHaveBeenCalledWith(false);
   });
+
+  it("keeps template alignment labels on one line", () => {
+    render(
+      <AlignmentControls
+        objW={20}
+        objH={10}
+        bedW={200}
+        bedH={100}
+        origin="bottom-left"
+        pageW={210}
+        pageH={297}
+        marginMM={20}
+        canAlignToTemplate={true}
+        templateAlignEnabled={true}
+        templateAlignTarget="page"
+        onTemplateAlignEnabledChange={() => {}}
+        onTemplateAlignTargetChange={() => {}}
+        onAlignX={() => {}}
+        onAlignY={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText("Align to template").closest("label")?.className)
+      .toContain("whitespace-nowrap");
+    expect(screen.getByRole("radio", { name: "Page" }).closest("label")?.className)
+      .toContain("whitespace-nowrap");
+  });
 });
