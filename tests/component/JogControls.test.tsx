@@ -5,6 +5,34 @@ import { JogControls } from "@renderer/components/JogControls";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { createMachineConfig } from "../helpers/factories";
 
+function setupOrigin(origin: "bottom-left" | "top-left" | "bottom-right" | "top-right") {
+  const cfg = createMachineConfig({ origin });
+  useMachineStore.setState({
+    configs: [cfg],
+    activeConfigId: cfg.id,
+    status: null,
+    connected: true,
+    wsLive: false,
+    selectedJobFile: null,
+  });
+}
+
+function getVisualJogButtons(container: HTMLElement) {
+  const jogPad = container.querySelector(".w-36.mx-auto") as HTMLElement | null;
+  if (!jogPad) throw new Error("Jog pad not found");
+
+  const buttons = jogPad.querySelectorAll("button");
+  if (buttons.length < 5) throw new Error("Expected jog pad to have 5 buttons");
+
+  return {
+    up: buttons[0] as HTMLButtonElement,
+    left: buttons[1] as HTMLButtonElement,
+    origin: buttons[2] as HTMLButtonElement,
+    right: buttons[3] as HTMLButtonElement,
+    down: buttons[4] as HTMLButtonElement,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   // Reset store to a clean state with no active config between tests
@@ -159,6 +187,84 @@ describe("JogControls", () => {
     );
   });
 
+  it("swaps Y jog button mapping for top-origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "top-left" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y+" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 Y-1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Y1.000 F3000",
+    );
+  });
+
+  it("swaps X jog button mapping for right-origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "bottom-right" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog X+" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog X-" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 X1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 X-1.000 F3000",
+    );
+  });
+
+  it("swaps both axes for top-right origin machines", async () => {
+    const cfg = createMachineConfig({ origin: "top-right" });
+    useMachineStore.setState({
+      configs: [cfg],
+      activeConfigId: cfg.id,
+      status: null,
+      connected: true,
+      wsLive: false,
+      selectedJobFile: null,
+    });
+
+    render(<JogControls />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Jog X-" }));
+    await userEvent.click(screen.getByRole("button", { name: "Jog Y-" }));
+
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      "$J=G91 G21 X-1.000 F3000",
+    );
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      "$J=G91 G21 Y-1.000 F3000",
+    );
+  });
+
   it("updates feedrate when input changes", async () => {
     render(<JogControls />);
     const input = screen.getByRole("spinbutton");
@@ -169,6 +275,77 @@ describe("JogControls", () => {
       expect.stringContaining("F6000"),
     );
   });
+});
+
+describe("JogControls — origin mapping proof", () => {
+  type VisualDir = "up" | "down" | "left" | "right";
+
+  const cases = [
+    {
+      origin: "bottom-left",
+      positiveY: "up",
+      negativeY: "down",
+      positiveX: "right",
+      negativeX: "left",
+    },
+    {
+      origin: "top-left",
+      positiveY: "down",
+      negativeY: "up",
+      positiveX: "right",
+      negativeX: "left",
+    },
+    {
+      origin: "bottom-right",
+      positiveY: "up",
+      negativeY: "down",
+      positiveX: "left",
+      negativeX: "right",
+    },
+    {
+      origin: "top-right",
+      positiveY: "down",
+      negativeY: "up",
+      positiveX: "left",
+      negativeX: "right",
+    },
+  ] as const satisfies ReadonlyArray<{
+    origin: "bottom-left" | "top-left" | "bottom-right" | "top-right";
+    positiveY: VisualDir;
+    negativeY: VisualDir;
+    positiveX: VisualDir;
+    negativeX: VisualDir;
+  }>;
+
+  for (const testCase of cases) {
+    it(`${testCase.origin}: +Y/+X buttons emit positive jogs, opposite buttons emit negative jogs`, async () => {
+      setupOrigin(testCase.origin);
+      const { container } = render(<JogControls />);
+      const pad = getVisualJogButtons(container);
+
+      await userEvent.click(pad[testCase.positiveY]);
+      await userEvent.click(pad[testCase.positiveX]);
+      await userEvent.click(pad[testCase.negativeY]);
+      await userEvent.click(pad[testCase.negativeX]);
+
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+        1,
+        "$J=G91 G21 Y1.000 F3000",
+      );
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+        2,
+        "$J=G91 G21 X1.000 F3000",
+      );
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+        3,
+        "$J=G91 G21 Y-1.000 F3000",
+      );
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
+        4,
+        "$J=G91 G21 X-1.000 F3000",
+      );
+    });
+  }
 });
 
 // ── Z axis jog (servo / stepper) with explicit invert setting ───────────────

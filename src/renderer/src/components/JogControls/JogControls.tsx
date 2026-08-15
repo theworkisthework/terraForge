@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { isSolenoidPenType, type JogStep } from "../../../../types";
+import {
+  isSolenoidPenType,
+  type JogStep,
+  type OriginType,
+} from "../../../../types";
 import { useMachineStore } from "../../store/machineStore";
 import { Button } from "../ui";
 import { StepSelector } from "./StepSelector";
@@ -10,6 +14,14 @@ import { JogSpeedInput } from "./JogSpeedInput";
 import { PositioningSection } from "./PositioningSection";
 
 const STEPS: JogStep[] = [0.1, 1, 10, 100];
+
+function usesTopOrigin(origin?: OriginType): boolean {
+  return origin === "top-left" || origin === "top-right";
+}
+
+function usesRightOrigin(origin?: OriginType): boolean {
+  return origin === "bottom-right" || origin === "top-right";
+}
 
 interface Props {
   onClose?: () => void;
@@ -32,6 +44,9 @@ export function JogControls({ onClose }: Props) {
   const penDown = activeConfig?.penDownCommand ?? "";
   const penType = activeConfig?.penType ?? "solenoid-hardware";
   const invertZJogControls = !!activeConfig?.invertZJogControls;
+  const origin = activeConfig?.origin;
+  const invertXJogControls = usesRightOrigin(origin);
+  const invertYJogControls = usesTopOrigin(activeConfig?.origin);
 
   const movePen = async (action: "up" | "down") => {
     if (isSolenoidPenType(penType)) {
@@ -90,6 +105,8 @@ export function JogControls({ onClose }: Props) {
         connected={connected}
         jog={jog}
         goToOrigin={goToOrigin}
+        invertXJogControls={invertXJogControls}
+        invertYJogControls={invertYJogControls}
       />
 
       <PenControls
