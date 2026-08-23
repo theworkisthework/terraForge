@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMachineStore } from "../../store/machineStore";
 import { useTaskStore } from "../../store/taskStore";
 import { FsPane } from "./components/FsPane";
@@ -23,6 +23,17 @@ export function FileBrowserPanel({ onHide }: FileBrowserPanelProps = {}) {
 
   const { splitPx, containerRef, onDragStart } = useVerticalSplit(200);
   const uploadFn = useUploadFileAction(upsertTask);
+
+  // Stable identities — an inline arrow here would change on every App re-render
+  // (e.g. every machine status push while jogging), retriggering FsPane's mount effect.
+  const listInternalFiles = useCallback(
+    (p: string) => window.terraForge.fluidnc.listFiles(p),
+    [],
+  );
+  const listSdFiles = useCallback(
+    (p: string) => window.terraForge.fluidnc.listSDFiles(p),
+    [],
+  );
 
   const bothOpen = internalOpen && sdOpen;
 
@@ -74,7 +85,7 @@ export function FileBrowserPanel({ onHide }: FileBrowserPanelProps = {}) {
             label="internal"
             accentColor="blue"
             source="fs"
-            listFn={(p) => window.terraForge.fluidnc.listFiles(p)}
+            listFn={listInternalFiles}
             deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "fs")}
             open={internalOpen}
             onToggle={() => setInternalOpen((v) => !v)}
@@ -102,7 +113,7 @@ export function FileBrowserPanel({ onHide }: FileBrowserPanelProps = {}) {
             label="sdcard"
             accentColor="purple"
             source="sd"
-            listFn={(p) => window.terraForge.fluidnc.listSDFiles(p)}
+            listFn={listSdFiles}
             deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "sd")}
             open={sdOpen}
             onToggle={() => setSdOpen((v) => !v)}
