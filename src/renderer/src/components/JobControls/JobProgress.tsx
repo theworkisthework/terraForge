@@ -11,6 +11,10 @@ interface JobProgressProps {
   lineNum: number | null;
   /** Total line count, or null. */
   lineTotal: number | null;
+  /** Formatted remaining-time label ("Estimating…", "1d 02h 22m"), or null. */
+  etaLabel: string | null;
+  /** Estimated completion time in the user's locale (e.g. "21:53"), or null. */
+  etaTimeLabel: string | null;
 }
 
 /**
@@ -24,6 +28,8 @@ export function JobProgress({
   progress,
   lineNum,
   lineTotal,
+  etaLabel,
+  etaTimeLabel,
 }: JobProgressProps) {
   return (
     <>
@@ -56,6 +62,12 @@ export function JobProgress({
               {lineNum != null && lineTotal != null
                 ? `line ${lineNum.toLocaleString()} / ${lineTotal.toLocaleString()}${progress != null ? ` (${progress}%)` : ""}`
                 : ""}
+              {etaLabel &&
+                `${lineNum != null && lineTotal != null ? " · " : ""}${
+                  etaLabel === "Estimating…"
+                    ? etaLabel
+                    : `ETA ${etaTimeLabel} (~${etaLabel})`
+                }`}
             </span>
           </div>
         </div>

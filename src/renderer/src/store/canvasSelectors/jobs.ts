@@ -32,6 +32,7 @@ export const selectJobControlsCanvasState = (state: CanvasState) => ({
   selectToolpath: state.selectToolpath,
   gcodePreviewLoading: state.gcodePreviewLoading,
   setGcodePreviewLoading: state.setGcodePreviewLoading,
+  plotProgressFrontierIndex: state.plotProgressFrontierIndex,
 });
 
 export const selectPlotProgressCanvasState = (state: CanvasState) => ({

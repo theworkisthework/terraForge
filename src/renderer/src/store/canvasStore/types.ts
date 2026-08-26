@@ -82,6 +82,11 @@ export interface ToolpathSlice {
   toolpathOpacity: number;
   plotProgressCuts: string;
   plotProgressRapids: string;
+  /** Index of the last completed segment in gcodeToolpath.segments, or null.
+   *  Set by the coordinate-matching fallback tracker (usePlotProgress) so
+   *  consumers like the job ETA can estimate progress even when FluidNC
+   *  doesn't report Ln: in its status. */
+  plotProgressFrontierIndex: number | null;
   gcodePreviewLoading: boolean;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
   setGcodeSource: (
@@ -92,7 +97,11 @@ export interface ToolpathSlice {
   setToolpathColorized: (colorized: boolean) => void;
   setToolpathOpacity: (opacity: number) => void;
   setGcodePreviewLoading: (loading: boolean) => void;
-  setPlotProgress: (cuts: string, rapids: string) => void;
+  setPlotProgress: (
+    cuts: string,
+    rapids: string,
+    frontierIndex?: number | null,
+  ) => void;
   clearPlotProgress: () => void;
 }
 

@@ -12,6 +12,7 @@ export const createToolpathSlice: CanvasStateCreator<ToolpathSlice> = (
   toolpathOpacity: 1,
   plotProgressCuts: "",
   plotProgressRapids: "",
+  plotProgressFrontierIndex: null,
   gcodePreviewLoading: false,
 
   setGcodePreviewLoading: (loading) =>
@@ -27,6 +28,7 @@ export const createToolpathSlice: CanvasStateCreator<ToolpathSlice> = (
         state.toolpathSelected = false;
         state.plotProgressCuts = "";
         state.plotProgressRapids = "";
+        state.plotProgressFrontierIndex = null;
       }
     }),
 
@@ -55,15 +57,19 @@ export const createToolpathSlice: CanvasStateCreator<ToolpathSlice> = (
       state.toolpathOpacity = Math.max(0.1, Math.min(1, opacity));
     }),
 
-  setPlotProgress: (cuts, rapids) =>
+  setPlotProgress: (cuts, rapids, frontierIndex) =>
     set((state) => {
       state.plotProgressCuts = cuts;
       state.plotProgressRapids = rapids;
+      if (frontierIndex !== undefined) {
+        state.plotProgressFrontierIndex = frontierIndex;
+      }
     }),
 
   clearPlotProgress: () =>
     set((state) => {
       state.plotProgressCuts = "";
       state.plotProgressRapids = "";
+      state.plotProgressFrontierIndex = null;
     }),
 });
