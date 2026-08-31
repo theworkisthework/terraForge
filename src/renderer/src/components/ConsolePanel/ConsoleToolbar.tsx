@@ -10,6 +10,7 @@ interface ConsoleToolbarProps {
   showMachineCoordinates: boolean;
   resetting: boolean;
   showRestartConfirm: boolean;
+  collapsed?: boolean;
   onFirmwareReset: () => void;
   onClear: () => void;
   onAlarmClear: () => void;
@@ -27,12 +28,16 @@ export function ConsoleToolbar({
   showMachineCoordinates,
   resetting,
   showRestartConfirm,
+  collapsed = false,
   onFirmwareReset,
   onClear,
   onAlarmClear,
 }: ConsoleToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-1 border-b border-border-ui shrink-0">
+    <div
+      className={`flex items-center justify-between px-3 py-1 ${collapsed ? "" : "border-b border-border-ui"}`}
+      style={{ height: 28, minHeight: 28, maxHeight: 28 }}
+    >
       <div className="flex items-center gap-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">
           Console

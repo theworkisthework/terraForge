@@ -8,7 +8,13 @@ import { ConsoleToolbar } from "./ConsolePanel/ConsoleToolbar";
 import { ConsoleLog } from "./ConsolePanel/ConsoleLog";
 import { ConsoleInput } from "./ConsolePanel/ConsoleInput";
 
-export function ConsolePanel() {
+interface ConsolePanelProps {
+  collapsed?: boolean;
+  showLog?: boolean;
+  showInput?: boolean;
+}
+
+export function ConsolePanel({ collapsed = false, showLog = true, showInput = true }: ConsolePanelProps) {
   const lines = useConsoleStore((s) => s.lines);
   const clear = useConsoleStore((s) => s.clear);
   const appendLine = useConsoleStore((s) => s.appendLine);
@@ -62,22 +68,28 @@ export function ConsolePanel() {
         />
       )}
 
-      <ConsoleToolbar
-        status={status}
-        connected={connected}
-        isAlarm={isAlarm}
-        displayState={displayState}
-        showMachineCoordinates={showMachineCoordinates}
-        resetting={resetting}
-        showRestartConfirm={showRestartConfirm}
-        onFirmwareReset={() => setShowRestartConfirm(true)}
-        onClear={clear}
-        onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}
-      />
+      <div className="shrink-0" style={{ height: 28 }}>
+        <ConsoleToolbar
+          status={status}
+          connected={connected}
+          isAlarm={isAlarm}
+          displayState={displayState}
+          showMachineCoordinates={showMachineCoordinates}
+          resetting={resetting}
+          showRestartConfirm={showRestartConfirm}
+          collapsed={collapsed}
+          onFirmwareReset={() => setShowRestartConfirm(true)}
+          onClear={clear}
+          onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}
+        />
+      </div>
 
-      <ConsoleLog lines={lines} />
-
-      <ConsoleInput connected={connected} onSend={handleSend} />
+      {showLog && (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <ConsoleLog lines={lines} />
+          {showInput && <ConsoleInput connected={connected} onSend={handleSend} />}
+        </div>
+      )}
     </div>
   );
 }

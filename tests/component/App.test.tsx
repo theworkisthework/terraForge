@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   render,
   screen,
@@ -318,5 +317,81 @@ describe("App", () => {
 
     // Right-origin adds ruler spacing: (256 - 16) + 20 = 260.
     expect(jogPanel).toHaveStyle({ right: "260px" });
+  });
+
+  // ── Console resize ──────────────────────────────────────────────────────
+
+  it("renders the console resize handle", async () => {
+    render(<App />);
+    await act(async () => {});
+    expect(screen.getByLabelText("Resize console panel")).toBeInTheDocument();
+  });
+
+  it("drags the console resize handle to change console height", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    const handle = screen.getByLabelText("Resize console panel");
+    const consolePanel = handle.parentElement;
+    const centerColumn = consolePanel?.parentElement;
+    expect(consolePanel).toHaveStyle({ height: "160px" });
+
+    if (centerColumn) {
+      vi.spyOn(centerColumn, "clientHeight", "get").mockReturnValue(900);
+      vi.spyOn(centerColumn, "getBoundingClientRect").mockReturnValue({
+        height: 900,
+        width: 800,
+        top: 0,
+        left: 0,
+        right: 800,
+        bottom: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+    }
+
+    await act(async () => {
+      fireEvent.mouseDown(handle, { clientY: 500 });
+      fireEvent.mouseMove(document, { clientY: 450 });
+      fireEvent.mouseUp(document);
+    });
+
+    // Dragged 50px up -> height grows by 50
+    expect(consolePanel).toHaveStyle({ height: "210px" });
+  });
+
+  it("does not let the console exceed two-thirds of the viewport height", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    const handle = screen.getByLabelText("Resize console panel");
+    const consolePanel = handle.parentElement;
+
+    // Make the center column very tall so the max fraction is the limiting factor
+    const centerColumn = consolePanel?.parentElement;
+    if (centerColumn) {
+      vi.spyOn(centerColumn, "clientHeight", "get").mockReturnValue(900);
+      vi.spyOn(centerColumn, "getBoundingClientRect").mockReturnValue({
+        height: 900,
+        width: 800,
+        top: 0,
+        left: 0,
+        right: 800,
+        bottom: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+    }
+
+    await act(async () => {
+      fireEvent.mouseDown(handle, { clientY: 500 });
+      fireEvent.mouseMove(document, { clientY: 0 });
+      fireEvent.mouseUp(document);
+    });
+
+    // 2/3 of 900px = 600px
+    expect(consolePanel).toHaveStyle({ height: "600px" });
   });
 });

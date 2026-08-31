@@ -20,7 +20,7 @@ export function ConsoleInput({ connected, onSend }: ConsoleInputProps) {
   };
 
   return (
-    <div className="flex items-center border-t border-border-ui px-2 py-1 shrink-0 bg-terminal">
+    <div className="flex items-center border-t border-border-ui px-2 py-1 shrink-0 bg-terminal" style={{ minHeight: 0 }}>
       <span className="text-green-600 font-mono text-xs mr-2 shrink-0">
         {">"}
       </span>
