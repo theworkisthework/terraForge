@@ -18,6 +18,7 @@ import { useTaskStore } from "./store/taskStore";
 import { useConsoleStore } from "./store/consoleStore";
 import { useAppConfigStore } from "./store/appConfigStore";
 import { useThemeStore, applyTheme } from "./store/themeStore";
+import { useResizablePanel } from "./hooks/useResizablePanel";
 import { RULER_W } from "./features/canvas";
 import type { OriginType } from "@types/index";
 
@@ -71,6 +72,16 @@ export default function App() {
     useState(false);
   // null = use CSS default (aligned with right panel + 16px gap); set when user first drags
   const [jogPos, setJogPos] = useState<{ x: number; y: number } | null>(null);
+  const {
+    height: consoleHeight,
+    minHeight: consoleMinHeight,
+    containerRef: centerRef,
+    handleMouseDown: startConsoleResize,
+  } = useResizablePanel({ initialHeight: 160, maxHeightFraction: 2 / 3 });
+  // Dragging fully down leaves just the header bar — treated as collapsed.
+  // No intermediate snap thresholds: the wrapper always tracks the dragged
+  // height exactly and only the log output flexes to fill/lose space.
+  const isConsoleCollapsed = consoleHeight <= consoleMinHeight;
   const jogPanelRef = useRef<HTMLDivElement>(null);
   const jogDragRef = useRef<{
     mouseX: number;
@@ -384,7 +395,7 @@ export default function App() {
         </aside>
 
         {/* Centre column — canvas + bottom console/job row */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div ref={centerRef} className="flex-1 flex flex-col overflow-hidden">
           <main className="flex-1 overflow-visible relative">
             <PlotCanvas />
             {/* Toast stack — absolute within canvas area, clear of side panels */}
@@ -392,8 +403,20 @@ export default function App() {
           </main>
 
           {/* Bottom — console */}
-          <div className="h-40 bg-panel border-t border-border-ui shrink-0">
-            <ConsolePanel />
+          <div
+            className="bg-panel border-t border-border-ui shrink-0 flex flex-col overflow-hidden"
+            style={{ height: consoleHeight }}
+          >
+            <div
+              role="separator"
+              aria-label="Resize console panel"
+              title="Drag to resize console panel"
+              onMouseDown={startConsoleResize}
+              className="h-2 w-full -mt-1 cursor-row-resize select-none z-10"
+            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ConsolePanel collapsed={isConsoleCollapsed} />
+            </div>
           </div>
         </div>
 
