@@ -10,11 +10,9 @@ import { ConsoleInput } from "./ConsolePanel/ConsoleInput";
 
 interface ConsolePanelProps {
   collapsed?: boolean;
-  showLog?: boolean;
-  showInput?: boolean;
 }
 
-export function ConsolePanel({ collapsed = false, showLog = true, showInput = true }: ConsolePanelProps) {
+export function ConsolePanel({ collapsed = false }: ConsolePanelProps) {
   const lines = useConsoleStore((s) => s.lines);
   const clear = useConsoleStore((s) => s.clear);
   const appendLine = useConsoleStore((s) => s.appendLine);
@@ -84,12 +82,13 @@ export function ConsolePanel({ collapsed = false, showLog = true, showInput = tr
         />
       </div>
 
-      {showLog && (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <ConsoleLog lines={lines} />
-          {showInput && <ConsoleInput connected={connected} onSend={handleSend} />}
-        </div>
-      )}
+      {/* The log (flex-1 min-h-0) is the only element that absorbs resize;
+          header and input keep their natural height. Near minimum height the
+          input clips smoothly under overflow-hidden instead of snapping shut. */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <ConsoleLog lines={lines} />
+        <ConsoleInput connected={connected} onSend={handleSend} />
+      </div>
     </div>
   );
 }

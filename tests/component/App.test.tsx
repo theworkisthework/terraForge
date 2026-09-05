@@ -394,4 +394,81 @@ describe("App", () => {
     // 2/3 of 900px = 600px
     expect(consolePanel).toHaveStyle({ height: "600px" });
   });
+
+  it("shrinks the console smoothly through the old 96px threshold without snapping shut", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    const handle = screen.getByLabelText("Resize console panel");
+    const consolePanel = handle.parentElement;
+    const centerColumn = consolePanel?.parentElement;
+    expect(consolePanel).toHaveStyle({ height: "160px" });
+
+    if (centerColumn) {
+      vi.spyOn(centerColumn, "clientHeight", "get").mockReturnValue(900);
+      vi.spyOn(centerColumn, "getBoundingClientRect").mockReturnValue({
+        height: 900,
+        width: 800,
+        top: 0,
+        left: 0,
+        right: 800,
+        bottom: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+    }
+
+    // Drag down so the height lands at 70px — below the old 96px snap
+    // threshold. The wrapper must track the drag exactly, not snap to 28px.
+    await act(async () => {
+      fireEvent.mouseDown(handle, { clientY: 500 });
+      fireEvent.mouseMove(document, { clientY: 590 });
+      fireEvent.mouseUp(document);
+    });
+
+    expect(consolePanel).toHaveStyle({ height: "70px" });
+
+    // The log output and command input must stay mounted — only the log
+    // output shrinks to fill the reduced space.
+    expect(screen.getByLabelText("Send G-code command")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(screen.getByText("Console")).toBeInTheDocument();
+  });
+
+  it("collapses to just the header only at the true minimum height", async () => {
+    render(<App />);
+    await act(async () => {});
+
+    const handle = screen.getByLabelText("Resize console panel");
+    const consolePanel = handle.parentElement;
+    const centerColumn = consolePanel?.parentElement;
+
+    if (centerColumn) {
+      vi.spyOn(centerColumn, "clientHeight", "get").mockReturnValue(900);
+      vi.spyOn(centerColumn, "getBoundingClientRect").mockReturnValue({
+        height: 900,
+        width: 800,
+        top: 0,
+        left: 0,
+        right: 800,
+        bottom: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+    }
+
+    // Drag far past the bottom — height clamps to the 28px minimum (header only).
+    await act(async () => {
+      fireEvent.mouseDown(handle, { clientY: 500 });
+      fireEvent.mouseMove(document, { clientY: 2000 });
+      fireEvent.mouseUp(document);
+    });
+
+    expect(consolePanel).toHaveStyle({ height: "28px" });
+    // Header and input stay mounted; only the log output is squeezed to 0.
+    expect(screen.getByText("Console")).toBeInTheDocument();
+    expect(screen.getByLabelText("Send G-code command")).toBeInTheDocument();
+  });
 });

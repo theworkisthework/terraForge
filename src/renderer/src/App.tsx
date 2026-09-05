@@ -78,10 +78,10 @@ export default function App() {
     containerRef: centerRef,
     handleMouseDown: startConsoleResize,
   } = useResizablePanel({ initialHeight: 160, maxHeightFraction: 2 / 3 });
-  const isConsoleCollapsed = consoleHeight <= 96;
-  const showConsoleInput = consoleHeight >= 128;
-  const showConsoleLog = consoleHeight > 96;
-  const consoleWrapperHeight = isConsoleCollapsed ? 28 : Math.max(consoleHeight, 96);
+  // Dragging fully down leaves just the header bar — treated as collapsed.
+  // No intermediate snap thresholds: the wrapper always tracks the dragged
+  // height exactly and only the log output flexes to fill/lose space.
+  const isConsoleCollapsed = consoleHeight <= consoleMinHeight;
   const jogPanelRef = useRef<HTMLDivElement>(null);
   const jogDragRef = useRef<{
     mouseX: number;
@@ -405,7 +405,7 @@ export default function App() {
           {/* Bottom — console */}
           <div
             className="bg-panel border-t border-border-ui shrink-0 flex flex-col overflow-hidden"
-            style={{ height: consoleWrapperHeight }}
+            style={{ height: consoleHeight }}
           >
             <div
               role="separator"
@@ -415,7 +415,7 @@ export default function App() {
               className="h-2 w-full -mt-1 cursor-row-resize select-none z-10"
             />
             <div className="flex-1 min-h-0 overflow-hidden">
-              <ConsolePanel collapsed={isConsoleCollapsed} showLog={showConsoleLog} showInput={showConsoleInput} />
+              <ConsolePanel collapsed={isConsoleCollapsed} />
             </div>
           </div>
         </div>

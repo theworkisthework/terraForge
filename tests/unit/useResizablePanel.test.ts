@@ -133,6 +133,43 @@ describe("useResizablePanel", () => {
     expect(result.current.height).toBe(32);
   });
 
+  it("tracks the drag continuously with no snap threshold above the minimum", () => {
+    // Regression: dragging down used to snap from 96px straight to 28px.
+    // Every drag position between initial and minimum must map 1:1 to height.
+    const { result } = renderHook(() =>
+      useResizablePanel({ initialHeight: 160, minHeight: 28 }),
+    );
+
+    act(() => {
+      (result.current.containerRef as React.MutableRefObject<HTMLDivElement | null>).current = container;
+    });
+
+    act(() => {
+      result.current.handleMouseDown({
+        clientY: 500,
+        preventDefault: vi.fn(),
+      } as unknown as React.MouseEvent);
+    });
+
+    // Lands at 80px — below the old 96px snap threshold, above the minimum.
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousemove", { clientY: 580 }));
+    });
+    expect(result.current.height).toBe(80);
+
+    // One pixel above the minimum still tracks exactly (no early collapse).
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousemove", { clientY: 631 }));
+    });
+    expect(result.current.height).toBe(29);
+
+    // Only at/below the minimum does it clamp.
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousemove", { clientY: 900 }));
+    });
+    expect(result.current.height).toBe(28);
+  });
+
   it("stops dragging on mouseup", () => {
     const { result } = renderHook(() => useResizablePanel({ initialHeight: 160 }));
 
