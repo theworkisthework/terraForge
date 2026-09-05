@@ -320,7 +320,7 @@ export function usePlotProgress(): void {
         );
       }
       frontierRef.current = { idx: doneIdx + 1, t: 0 };
-      setPlotProgress(acc.cuts.trimStart(), acc.rapids.trimStart());
+      setPlotProgress(acc.cuts.trimStart(), acc.rapids.trimStart(), doneIdx);
       prevStateRef.current = state;
       return;
     }
@@ -416,6 +416,7 @@ export function usePlotProgress(): void {
             setPlotProgress(
               displayCutsR.trimStart(),
               displayRapidsR.trimStart(),
+              rIdx,
             );
             prevStateRef.current = state;
             return;
@@ -504,7 +505,7 @@ export function usePlotProgress(): void {
       else displayRapids += part;
     }
 
-    setPlotProgress(displayCuts.trimStart(), displayRapids.trimStart());
+    setPlotProgress(displayCuts.trimStart(), displayRapids.trimStart(), newIdx);
     prevStateRef.current = state;
 
     // Cleanup: cancel any pending clear timeout on unmount

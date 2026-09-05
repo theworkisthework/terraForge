@@ -9,6 +9,7 @@ import { useCanvasStore } from "../../store/canvasStore";
 import { selectJobControlsCanvasState } from "../../store/canvasSelectors";
 import { useStableMachineState } from "../../hooks/useStableMachineState";
 import { useJobStartHandler } from "./useJobStartHandler";
+import { useJobEta } from "./useJobEta";
 import { JobProgress } from "./JobProgress";
 import { JobFileIndicator } from "./JobFileIndicator";
 
@@ -30,9 +31,14 @@ export function JobControls() {
   const connected = useMachineStore((s) => s.connected);
   const status = useMachineStore((s) => s.status);
   const selectedJobFile = useMachineStore((s) => s.selectedJobFile);
-  const { gcodeSource, toolpathSelected, gcodePreviewLoading } = useCanvasStore(
-    useShallow(selectJobControlsCanvasState),
-  );
+  const activeConfig = useMachineStore((s) => s.activeConfig());
+  const {
+    gcodeSource,
+    gcodeToolpath,
+    toolpathSelected,
+    gcodePreviewLoading,
+    plotProgressFrontierIndex,
+  } = useCanvasStore(useShallow(selectJobControlsCanvasState));
 
   // When the canvas toolpath is selected and has a local file source, use it
   // as the job file even if nothing is explicitly set in the file browser.
@@ -61,6 +67,15 @@ export function JobControls() {
     lineNum != null && lineTotal != null && lineTotal > 0
       ? Math.round((lineNum / lineTotal) * 100)
       : null;
+
+  const { etaLabel, etaTimeLabel } = useJobEta({
+    status,
+    isRunning,
+    isHeld,
+    segments: gcodeToolpath?.segments,
+    activeConfig,
+    plotProgressFrontierIndex,
+  });
 
   const startJob = useJobStartHandler();
 
@@ -95,8 +110,10 @@ export function JobControls() {
         gcodePreviewLoading={gcodePreviewLoading}
         isHeld={isHeld}
         progress={progress}
-        lineNum={lineNum}
-        lineTotal={lineTotal}
+        lineNum={lineNum ?? null}
+        lineTotal={lineTotal ?? null}
+        etaLabel={etaLabel}
+        etaTimeLabel={etaTimeLabel}
       />
 
       <JobFileIndicator

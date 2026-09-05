@@ -77,6 +77,8 @@ export interface GcodeSegment {
    *  status messages, enabling reliable progress tracking without coordinate
    *  matching. */
   lineNum: number;
+  /** Active feedrate (mm/min) at this line, from the last F-word seen. 0/undefined if none seen yet. */
+  feed?: number;
 }
 
 export interface GcodeToolpath {
@@ -230,6 +232,7 @@ export function parseGcode(gcode: string): GcodeToolpath {
       layer: activeLayer ?? undefined,
       dip: activeDip ?? undefined,
       lineNum: lineCount,
+      feed: feedrate || undefined,
     });
 
     if (motionMode === 0) {

@@ -28,21 +28,18 @@ export function useJobStartHandler() {
     source: string;
     name: string;
   }) => {
+    const ctx: CanvasCtx = {
+      gcodeSource,
+      gcodeToolpath,
+      setGcodeToolpath,
+      setGcodeSource,
+      selectToolpath,
+      setGcodePreviewLoading,
+    };
     if (effectiveJobFile.source === "local") {
-      await startLocalFile(effectiveJobFile, upsertTask);
+      await startLocalFile(effectiveJobFile, ctx, upsertTask);
     } else {
-      await startRemoteFile(
-        effectiveJobFile,
-        {
-          gcodeSource,
-          gcodeToolpath,
-          setGcodeToolpath,
-          setGcodeSource,
-          selectToolpath,
-          setGcodePreviewLoading,
-        },
-        upsertTask,
-      );
+      await startRemoteFile(effectiveJobFile, ctx, upsertTask);
     }
   };
 
@@ -51,6 +48,7 @@ export function useJobStartHandler() {
 
 async function startLocalFile(
   file: { name: string; path: string },
+  ctx: CanvasCtx,
   upsertTask: ReturnType<typeof useTaskStore.getState>["upsertTask"],
 ) {
   const { name, path: localPath } = file;
@@ -64,6 +62,19 @@ async function startLocalFile(
     status: "running",
   });
   try {
+    // Load toolpath before running so plot-progress/ETA tracking works from the start.
+    // Best-effort: the job still runs without live tracking if this fails.
+    if (ctx.gcodeSource?.path !== localPath || !ctx.gcodeToolpath) {
+      try {
+        const text = await window.terraForge.fs.readFile(localPath);
+        const toolpath = parseGcode(text);
+        ctx.setGcodeToolpath(toolpath);
+        ctx.setGcodeSource({ path: localPath, name, source: "local" });
+        ctx.selectToolpath(true);
+      } catch {
+        // ignore — preview/tracking is best-effort
+      }
+    }
     await window.terraForge.fluidnc.uploadFile(taskId, localPath, remotePath);
     await window.terraForge.fluidnc.runFile(remotePath, "sd");
     upsertTask({
@@ -90,7 +101,7 @@ interface CanvasCtx {
   gcodeToolpath: GcodeToolpath | null;
   setGcodeToolpath: (tp: GcodeToolpath | null) => void;
   setGcodeSource: (
-    src: { path: string; name: string; source: "fs" | "sd" } | null,
+    src: { path: string; name: string; source: "local" | "fs" | "sd" } | null,
   ) => void;
   selectToolpath: (selected: boolean) => void;
   setGcodePreviewLoading: (loading: boolean) => void;
