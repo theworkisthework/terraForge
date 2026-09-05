@@ -16,7 +16,7 @@ export function ConsoleLog({ lines }: ConsoleLogProps) {
   }, [lines]);
 
   return (
-    <div className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-terminal text-green-400">
+    <div className="flex-1 min-h-0 overflow-y-auto font-mono text-xs p-2 bg-terminal text-green-400" style={{ minHeight: 0 }}>
       {lines.map((line, i) => (
         <div key={i} className="leading-5 whitespace-pre">
           {line}
