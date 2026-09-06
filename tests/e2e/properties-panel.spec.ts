@@ -56,7 +56,7 @@ test("Properties panel shows path count badge (e.g. '7p')", async () => {
 
 test("empty-state message is not visible after import", async () => {
   await expect(
-    window.locator("text=No objects. Import an SVG."),
+    window.locator("text=No objects. Import a vector or bitmap."),
   ).not.toBeVisible();
 });
 
@@ -261,7 +261,7 @@ test("clicking 'Delete import' ✕ removes the import row", async () => {
 });
 
 test("empty state message reappears after all imports are deleted", async () => {
-  await expect(window.locator("text=No objects. Import an SVG.")).toBeVisible({
+  await expect(window.locator("text=No objects. Import a vector or bitmap.")).toBeVisible({
     timeout: 3000,
   });
 });

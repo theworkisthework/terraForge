@@ -40,7 +40,7 @@ test("Import button is visible and enabled before any import", async () => {
 });
 
 test("Properties panel shows empty state before import", async () => {
-  const emptyMsg = window.locator("text=No objects. Import an SVG.");
+  const emptyMsg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(emptyMsg).toBeVisible();
 });
 
@@ -50,7 +50,7 @@ test("cancelling the dialog keeps canvas empty", async () => {
   await mockCancelDialog(electronApp);
   await window.locator("button:has-text('Import')").click();
 
-  const emptyMsg = window.locator("text=No objects. Import an SVG.");
+  const emptyMsg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(emptyMsg).toBeVisible({ timeout: 3000 });
 });
 
@@ -69,7 +69,7 @@ test("importing sample.pdf shows the import in Properties panel", async () => {
 });
 
 test("the empty state message disappears after PDF import", async () => {
-  const emptyMsg = window.locator("text=No objects. Import an SVG.");
+  const emptyMsg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(emptyMsg).not.toBeVisible();
 });
 
