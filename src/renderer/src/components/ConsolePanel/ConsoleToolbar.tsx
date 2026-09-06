@@ -1,6 +1,6 @@
 import { Button } from "../ui";
 import type { MachineStatus } from "../../../../types";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CircleStop } from "lucide-react";
 
 interface ConsoleToolbarProps {
   status: MachineStatus | null;
@@ -11,6 +11,7 @@ interface ConsoleToolbarProps {
   resetting: boolean;
   showRestartConfirm: boolean;
   collapsed?: boolean;
+  onEmergencyStop: () => void;
   onFirmwareReset: () => void;
   onClear: () => void;
   onAlarmClear: () => void;
@@ -29,13 +30,14 @@ export function ConsoleToolbar({
   resetting,
   showRestartConfirm,
   collapsed = false,
+  onEmergencyStop,
   onFirmwareReset,
   onClear,
   onAlarmClear,
 }: ConsoleToolbarProps) {
   return (
     <div
-      className={`flex items-center justify-between px-3 py-1 ${collapsed ? "" : "border-b border-border-ui"}`}
+      className={`relative flex items-center justify-between px-3 py-1 ${collapsed ? "" : "border-b border-border-ui"}`}
       style={{ height: 28, minHeight: 28, maxHeight: 28 }}
     >
       <div className="flex items-center gap-3">
@@ -80,6 +82,18 @@ export function ConsoleToolbar({
             )}
           </span>
         )}
+      </div>
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+        <Button
+          variant="danger"
+          size="xs"
+          onClick={onEmergencyStop}
+          disabled={!connected}
+          title="Emergency stop: immediately halt all motion (Feed Hold)"
+          icon={<CircleStop size={12} strokeWidth={2.5} />}
+        >
+          E-STOP
+        </Button>
       </div>
       <div className="flex items-center gap-2">
         {connected && (

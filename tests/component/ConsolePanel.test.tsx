@@ -176,6 +176,18 @@ describe("ConsolePanel", () => {
     expect(screen.queryByText(/Restart FW/)).not.toBeInTheDocument();
   });
 
+  it("keeps e-stop visible but disabled when disconnected", () => {
+    render(<ConsolePanel />);
+    expect(screen.getByRole("button", { name: /e-stop/i })).toBeDisabled();
+  });
+
+  it("sends Feed Hold immediately when e-stop clicked", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<ConsolePanel />);
+    await userEvent.click(screen.getByRole("button", { name: /e-stop/i }));
+    expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalledTimes(1);
+  });
+
   // ── Auto-scroll ─────────────────────────────────────────────────────────
 
   it("auto-scrolls when new lines are added", async () => {
