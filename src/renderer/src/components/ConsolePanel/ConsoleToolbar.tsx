@@ -37,7 +37,7 @@ export function ConsoleToolbar({
 }: ConsoleToolbarProps) {
   return (
     <div
-      className={`flex items-center justify-between px-3 py-1 ${collapsed ? "" : "border-b border-border-ui"}`}
+      className={`relative flex items-center justify-between px-3 py-1 ${collapsed ? "" : "border-b border-border-ui"}`}
       style={{ height: 28, minHeight: 28, maxHeight: 28 }}
     >
       <div className="flex items-center gap-3">
@@ -83,17 +83,19 @@ export function ConsoleToolbar({
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
         <Button
+          variant="danger"
           size="xs"
           onClick={onEmergencyStop}
           disabled={!connected}
           title="Emergency stop: immediately halt all motion (Feed Hold)"
-          className="h-[18px] border border-yellow-400 bg-red-700 px-1.5 font-bold uppercase leading-none text-white hover:border-yellow-300 hover:bg-red-600 disabled:border-yellow-400"
           icon={<CircleStop size={12} strokeWidth={2.5} />}
         >
           E-STOP
         </Button>
+      </div>
+      <div className="flex items-center gap-2">
         {connected && (
           <Button
             variant="secondary"
