@@ -93,7 +93,7 @@ export function ImportRowCard({
         onDragEnd={onDragEnd}
       />
 
-      {isExpanded && (
+      {isExpanded && imp.kind !== "bitmap" && (
         <>
           <div className="pl-6 pr-2 pt-1">
             <TabHeader<"layer" | "color">

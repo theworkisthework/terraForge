@@ -42,6 +42,32 @@ export function ImportLayer({
         onClick={(e) => e.stopPropagation()}
         style={{ cursor: "grab" }}
       >
+        {imp.kind === "bitmap" && imp.bitmapDataUrl && (
+          <>
+            {imp.bitmapSourceVisible !== false && (
+              <image
+                href={imp.bitmapDataUrl}
+                x={vbX}
+                y={vbY}
+                width={imp.svgWidth}
+                height={imp.svgHeight}
+                opacity={imp.bitmapOpacity ?? 0.25}
+                preserveAspectRatio="none"
+              />
+            )}
+            {imp.bitmapPreviewVisible !== false && imp.bitmapRendererPath && (
+              <path
+                d={imp.bitmapRendererPath}
+                fill="none"
+                stroke={selected ? "#60a0ff" : "#3a6aaa"}
+                strokeWidth={(imp.strokeWidthMM ?? 0.5) / Math.max(imp.scale, 0.001)}
+                opacity={imp.bitmapPreviewOpacity ?? 1}
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            )}
+          </>
+        )}
         <rect
           x={vbX}
           y={vbY}

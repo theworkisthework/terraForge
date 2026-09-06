@@ -59,6 +59,38 @@ describe("PropertiesPanel", () => {
     expect(screen.getByText("Y (mm)")).toBeInTheDocument();
   });
 
+  it("shows and updates bitmap renderer controls when a bitmap is selected", () => {
+    const imp = createSvgImport({
+      kind: "bitmap",
+      name: "photo",
+      paths: [],
+      bitmapRendererId: "spiral-amplitude",
+      bitmapRendererSettings: { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
+      bitmapRendererPath: "",
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    expect(screen.getByRole("combobox", { name: "Bitmap renderer" })).toHaveValue(
+      "spiral-amplitude",
+    );
+    const spacing = screen.getByRole("spinbutton", {
+      name: "Spiral spacing",
+    });
+    fireEvent.change(spacing, { target: { value: "2.5" } });
+    expect(useCanvasStore.getState().imports[0].bitmapRendererSettings).toMatchObject({
+      spacingMM: 2.5,
+      toothWidthMM: 1,
+      amplitude: 1.5,
+    });
+    expect(screen.getByRole("checkbox", { name: "Show source bitmap" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show source bitmap" }));
+    expect(useCanvasStore.getState().imports[0].bitmapSourceVisible).toBe(false);
+    expect(screen.getByRole("checkbox", { name: "Show render preview" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show render preview" }));
+    expect(useCanvasStore.getState().imports[0].bitmapPreviewVisible).toBe(false);
+  });
+
   // ── Name editing ────────────────────────────────────────────────────────
 
   it("allows renaming an import via double-click", async () => {

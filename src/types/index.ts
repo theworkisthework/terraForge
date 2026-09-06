@@ -312,12 +312,40 @@ export const DEFAULT_HATCH_ANGLE_DEG = 45;
 /** Default stroke width in mm — used on import and as the UI default. */
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
+export interface BitmapRendererSettings {
+  /** Distance between adjacent unmodulated spiral turns in millimetres. */
+  spacingMM: number;
+  /** Arc length of each sawtooth period in millimetres. */
+  toothWidthMM: number;
+  amplitude: number;
+}
+
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {
   id: string;
   /** Display name — defaults to filename without extension */
   name: string;
   paths: SvgPath[];
+  /** Absent for legacy SVG imports. Bitmap imports retain the same transform model. */
+  kind?: "svg" | "bitmap";
+  /** Embedded original bitmap, kept in layouts so they are portable. */
+  bitmapDataUrl?: string;
+  bitmapMimeType?: string;
+  /** The bitmap renderer that produced `bitmapRendererPath`. */
+  bitmapRendererId?: string;
+  bitmapRendererSettings?: BitmapRendererSettings;
+  /** Persisted renderer output in bitmap pixel coordinates, used for preview and G-code. */
+  bitmapRendererPath?: string;
+  /** Source scale used to convert renderer controls in mm into bitmap pixels. */
+  bitmapBaseScale?: number;
+  /** Opacity of the source image below the generated preview. */
+  bitmapOpacity?: number;
+  /** Whether the source image is shown below the generated preview. */
+  bitmapSourceVisible?: boolean;
+  /** Opacity of the generated renderer preview on the canvas. */
+  bitmapPreviewOpacity?: number;
+  /** Whether the generated renderer preview is shown on the canvas. */
+  bitmapPreviewVisible?: boolean;
   /** Position of the SVG's bottom-left corner on the bed (mm) */
   x: number;
   y: number;

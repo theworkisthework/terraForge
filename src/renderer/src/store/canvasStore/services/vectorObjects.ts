@@ -98,6 +98,17 @@ function projectPathToVectorObjects(
 
 export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {
   if (!imp.visible) return [];
+  if (imp.kind === "bitmap") {
+    return imp.bitmapRendererPath
+      ? [{
+          id: `${imp.id}-bitmap`, svgSource: "", path: imp.bitmapRendererPath,
+          x: imp.x, y: imp.y, scale: imp.scale, scaleX: imp.scaleX, scaleY: imp.scaleY,
+          rotation: imp.rotation, visible: true, originalWidth: imp.svgWidth,
+          originalHeight: imp.svgHeight, viewBoxX: imp.viewBoxX, viewBoxY: imp.viewBoxY,
+          layer: imp.name,
+        }]
+      : [];
+  }
   const hiddenLayerIds = imp.layers
     ? new Set(
         imp.layers.filter((layer) => !layer.visible).map((layer) => layer.id),

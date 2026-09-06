@@ -17,10 +17,11 @@ const GCODE_EXTENSIONS = [
 const IMPORT_FILTERS = [
   {
     name: "Supported Files",
-    extensions: ["svg", "pdf", ...GCODE_EXTENSIONS],
+    extensions: ["svg", "pdf", "png", "jpg", "jpeg", "webp", ...GCODE_EXTENSIONS],
   },
   { name: "SVG Files", extensions: ["svg"] },
   { name: "PDF Files", extensions: ["pdf"] },
+  { name: "Bitmap Files", extensions: ["png", "jpg", "jpeg", "webp"] },
   { name: "G-code Files", extensions: GCODE_EXTENSIONS },
 ];
 
