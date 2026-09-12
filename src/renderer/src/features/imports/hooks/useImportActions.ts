@@ -26,7 +26,7 @@ import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
 import { dataUrlFromBytes, materializeBitmapPath } from "../../bitmap-renderers/bitmapImage";
-import { SPIRAL_AMPLITUDE_RENDERER_ID, spiralAmplitudeDefaults } from "../../bitmap-renderers/spiralAmplitude";
+import { getBitmapRenderer } from "../../bitmap-renderers/registry";
 import {
   type SvgImport,
   type SvgPath,
@@ -411,10 +411,11 @@ export function useImportActions() {
         mimeType,
       );
       const baseScale = 25.4 / 96;
-      const bitmapRendererSettings = { ...spiralAmplitudeDefaults };
+      const defaultRenderer = getBitmapRenderer(undefined);
+      const bitmapRendererSettings = { ...defaultRenderer.defaults };
       const bitmapRendererPath = await materializeBitmapPath({
         bitmapDataUrl,
-        bitmapRendererId: SPIRAL_AMPLITUDE_RENDERER_ID,
+        bitmapRendererId: defaultRenderer.id,
         bitmapRendererSettings,
         bitmapBaseScale: baseScale,
       });
@@ -431,7 +432,7 @@ export function useImportActions() {
         id: uuid(), name, kind: "bitmap", paths: [], x: origin.includes("right") ? (activeMachineConfig?.bedWidth ?? 220) - objW : 0,
         y: origin.includes("top") ? -objH : 0, scale: baseScale, rotation: 0, visible: true,
         svgWidth: image.naturalWidth, svgHeight: image.naturalHeight, viewBoxX: 0, viewBoxY: 0,
-        bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: SPIRAL_AMPLITUDE_RENDERER_ID,
+        bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: defaultRenderer.id,
         bitmapRendererSettings, bitmapRendererPath, bitmapBaseScale: baseScale, bitmapOpacity: 0.25,
         bitmapSourceVisible: true,
         bitmapPreviewOpacity: 1,

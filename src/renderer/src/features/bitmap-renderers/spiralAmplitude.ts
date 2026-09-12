@@ -1,4 +1,5 @@
 import type { BitmapRendererSettings } from "../../../../../types";
+import type { BitmapLuminance, BitmapRendererDefinition } from "./types";
 
 export const SPIRAL_AMPLITUDE_RENDERER_ID = "spiral-amplitude";
 
@@ -8,22 +9,7 @@ export const spiralAmplitudeDefaults: BitmapRendererSettings = {
   amplitude: 10,
 };
 
-export interface BitmapLuminance {
-  width: number;
-  height: number;
-  values: Uint8Array;
-}
-
-export interface BitmapRendererDefinition {
-  id: string;
-  label: string;
-  defaults: BitmapRendererSettings;
-  render: (
-    luminance: BitmapLuminance,
-    settings: BitmapRendererSettings,
-    baseScale: number,
-  ) => string;
-}
+export type { BitmapLuminance, BitmapRendererDefinition };
 
 function format(value: number): string {
   return Number(value.toFixed(2)).toString();
@@ -68,10 +54,10 @@ export function generateSpiralAmplitudePath(
   }
 
   const pixelsPerMM = 1 / Math.max(baseScale, 0.001);
-  const spacingMM = Math.max(0.1, Math.min(settings.spacingMM, 20));
+  const spacingMM = Math.max(0.1, Math.min(Number(settings.spacingMM), 20));
   const spacing = spacingMM * pixelsPerMM;
-  const toothWidth = Math.max(0.1, Math.min(settings.toothWidthMM, 20)) * pixelsPerMM;
-  const amplitude = Math.max(0, Math.min(settings.amplitude, 10)) * pixelsPerMM;
+  const toothWidth = Math.max(0.1, Math.min(Number(settings.toothWidthMM), 20)) * pixelsPerMM;
+  const amplitude = Math.max(0, Math.min(Number(settings.amplitude), 10)) * pixelsPerMM;
   const centreX = image.width / 2;
   const centreY = image.height / 2;
   const maxRadius = Math.hypot(centreX, centreY);
@@ -125,5 +111,10 @@ export const spiralAmplitudeRenderer: BitmapRendererDefinition = {
   id: SPIRAL_AMPLITUDE_RENDERER_ID,
   label: "Spiral amplitude",
   defaults: spiralAmplitudeDefaults,
+  fields: [
+    { type: "number", key: "spacingMM", label: "Spacing (mm)", ariaLabel: "Spiral spacing", min: 0.1, max: 20, step: 0.1 },
+    { type: "number", key: "toothWidthMM", label: "Tooth width (mm)", ariaLabel: "Sawtooth width", min: 0.1, max: 20, step: 0.1 },
+    { type: "number", key: "amplitude", label: "Amplitude (mm)", ariaLabel: "Bitmap amplitude", min: 0, max: 10, step: 0.1 },
+  ],
   render: generateSpiralAmplitudePath,
 };

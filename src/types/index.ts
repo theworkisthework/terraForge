@@ -312,13 +312,12 @@ export const DEFAULT_HATCH_ANGLE_DEG = 45;
 /** Default stroke width in mm — used on import and as the UI default. */
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
-export interface BitmapRendererSettings {
-  /** Distance between adjacent unmodulated spiral turns in millimetres. */
-  spacingMM: number;
-  /** Arc length of each sawtooth period in millimetres. */
-  toothWidthMM: number;
-  amplitude: number;
-}
+/**
+ * Settings bag for a bitmap renderer. The field set and value types are owned
+ * by the renderer's own schema (see `BitmapRendererDefinition.fields`), not by
+ * this type — different renderers use different keys.
+ */
+export type BitmapRendererSettings = Record<string, number | boolean | string>;
 
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {

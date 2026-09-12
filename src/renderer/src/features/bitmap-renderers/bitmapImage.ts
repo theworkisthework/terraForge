@@ -1,6 +1,6 @@
 import type { SvgImport } from "../../../../../types";
 import { getBitmapRenderer } from "./registry";
-import type { BitmapLuminance } from "./spiralAmplitude";
+import type { BitmapLuminance } from "./types";
 
 export function dataUrlFromBytes(bytes: Uint8Array, mimeType: string): string {
   const chunkSize = 0x8000;
