@@ -133,6 +133,9 @@
     "files": [
       "out/**/*"
     ],
+    "asarUnpack": [
+      "out/main/pluginHostEntry.js"
+    ],
     "icon": "build/icon",
     "win": {
       "icon": "build/icon.ico",

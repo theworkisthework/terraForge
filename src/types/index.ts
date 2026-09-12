@@ -319,6 +319,93 @@ export const DEFAULT_STROKE_WIDTH_MM = 0.5;
  */
 export type BitmapRendererSettings = Record<string, number | boolean | string>;
 
+/** A decoded bitmap reduced to one tone byte per pixel (higher = more ink/darker). */
+export interface BitmapLuminance {
+  width: number;
+  height: number;
+  values: Uint8Array;
+}
+
+/**
+ * Icon identifiers a renderer's field schema can reference. The properties
+ * panel owns the mapping onto actual icon components, so renderer modules
+ * (including external plugins) stay free of any UI/React dependency.
+ */
+export type BitmapRendererIconName =
+  | "rotate-cw"
+  | "rotate-ccw"
+  | "arrow-left-right"
+  | "arrow-up-down"
+  | "flip-horizontal"
+  | "flip-vertical";
+
+interface BitmapRendererFieldBase {
+  /** Key into the renderer's settings bag. */
+  key: string;
+  /** Visible field label, e.g. "Spacing (mm)". */
+  label: string;
+  /** Accessible name for the control; falls back to `label` when omitted. */
+  ariaLabel?: string;
+}
+
+/** A quick-nudge button shown alongside a number field, e.g. a rotate step. */
+export interface BitmapRendererNumberPreset {
+  label: string;
+  ariaLabel?: string;
+  icon?: BitmapRendererIconName;
+  /** Added to the field's current value when the preset button is clicked (clamped to min/max). */
+  delta: number;
+}
+
+export interface BitmapRendererNumberFieldSchema extends BitmapRendererFieldBase {
+  type: "number";
+  /** Visual widget for the value; defaults to a plain number input. */
+  control?: "input" | "slider";
+  min: number;
+  max: number;
+  step: number;
+  presets?: BitmapRendererNumberPreset[];
+}
+
+export interface BitmapRendererBooleanFieldSchema extends BitmapRendererFieldBase {
+  type: "boolean";
+}
+
+export interface BitmapRendererSelectOption {
+  value: string;
+  label: string;
+  icon?: BitmapRendererIconName;
+}
+
+export interface BitmapRendererSelectFieldSchema extends BitmapRendererFieldBase {
+  type: "select";
+  /** Visual widget for the choice; defaults to a dropdown. "icon-buttons" renders
+   * `options` as a row of toggle buttons — e.g. a horizontal/vertical switch. */
+  control?: "dropdown" | "icon-buttons";
+  options: BitmapRendererSelectOption[];
+}
+
+/** Describes one control a renderer wants surfaced in the properties panel. */
+export type BitmapRendererFieldSchema =
+  | BitmapRendererNumberFieldSchema
+  | BitmapRendererBooleanFieldSchema
+  | BitmapRendererSelectFieldSchema;
+
+/**
+ * Metadata for an externally-installed bitmap renderer plugin, as discovered
+ * from its manifest.json — deliberately excludes the plugin's entry file path
+ * and any executable code; only main-process code ever resolves those.
+ */
+export interface BitmapPluginManifest {
+  id: string;
+  label: string;
+  apiVersion: number;
+  defaults: BitmapRendererSettings;
+  fields: BitmapRendererFieldSchema[];
+  /** Per-render timeout in ms before the plugin's host process is killed and restarted. */
+  renderTimeoutMs?: number;
+}
+
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {
   id: string;
@@ -345,6 +432,16 @@ export interface SvgImport {
   bitmapPreviewOpacity?: number;
   /** Whether the generated renderer preview is shown on the canvas. */
   bitmapPreviewVisible?: boolean;
+  /**
+   * How to break this bitmap's colour into separate ink layers before
+   * rendering. "none" (default) is today's single-renderer-output behavior;
+   * any other mode fans the same renderer out across multiple ink channels
+   * and populates `paths` with one synthesized path per ink (see
+   * BitmapRendererDefinition/colourSeparation.ts).
+   */
+  bitmapSeparationMode?: "none" | "rgb" | "cmy" | "cmyk" | "custom";
+  /** Custom palette swatches, used only when bitmapSeparationMode is "custom". */
+  bitmapSeparationPalette?: { label: string; color: string }[];
   /** Position of the SVG's bottom-left corner on the bed (mm) */
   x: number;
   y: number;
@@ -669,6 +766,22 @@ export interface ConfigApi {
   openPageSizesFile: () => Promise<void>;
 }
 
+export interface BitmapPluginsApi {
+  /** Metadata for every currently-discovered plugin (no plugin code is executed to produce this). */
+  list: () => Promise<BitmapPluginManifest[]>;
+  /** Re-scan the plugins directory on disk. Returns fresh metadata plus any per-folder discovery errors. */
+  rescan: () => Promise<{ manifests: BitmapPluginManifest[]; errors: { folder: string; message: string }[] }>;
+  /** Runs a plugin's render() in its isolated host process. Rejects on timeout, crash, or a thrown error. */
+  render: (
+    pluginId: string,
+    luminance: BitmapLuminance,
+    settings: BitmapRendererSettings,
+    baseScale: number,
+  ) => Promise<string>;
+  /** Ensures the plugins directory exists and reveals it in the OS file manager. */
+  openFolder: () => Promise<void>;
+}
+
 export interface AppApi {
   /** Returns the version string from package.json (via app.getVersion()). */
   getVersion: () => Promise<string>;
@@ -703,6 +816,7 @@ export interface TerraForgeAPI {
   config: ConfigApi;
   app: AppApi;
   edit: EditApi;
+  bitmapPlugins: BitmapPluginsApi;
 }
 
 // ─── Jog ─────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { app } from "electron";
+import { join } from "path";
 import { registerAppLifecycleHandlers } from "./bootstrap/lifecycle";
 import { createMainWindow, getMainWindow, safeSend } from "./bootstrap/window";
 import {
@@ -14,10 +15,14 @@ import {
   registerTaskIpcHandlers,
   registerFluidncIpcHandlers,
   registerFsIpcHandlers,
+  registerBitmapPluginIpcHandlers,
 } from "./ipc";
 import { FluidNCClient } from "../machine/fluidnc";
 import { SerialClient } from "../machine/serial";
 import { TaskManager } from "../tasks/taskManager";
+import { resolveBitmapPluginsDir } from "./plugins/pluginPaths";
+import { BitmapPluginRegistry } from "./plugins/pluginRegistry";
+import { PluginHostManager } from "./plugins/pluginHostManager";
 
 registerMenuStateHandlers();
 
@@ -30,6 +35,7 @@ registerAppLifecycleHandlers({
   // server slot, requiring a power cycle to recover.
   onBeforeQuit: () => {
     fluidnc.disconnectWebSocket();
+    bitmapPluginHostManager.terminateAll();
   },
 });
 
@@ -39,6 +45,12 @@ const fluidnc = new FluidNCClient();
 const serial = new SerialClient();
 const taskManager = new TaskManager();
 const persistence = createPersistence(app.getPath("userData"));
+const bitmapPluginsDir = resolveBitmapPluginsDir(app.getPath("userData"));
+const bitmapPluginRegistry = new BitmapPluginRegistry(bitmapPluginsDir);
+const bitmapPluginHostManager = new PluginHostManager(
+  join(__dirname, "pluginHostEntry.js"),
+  bitmapPluginRegistry,
+);
 
 // Tracks which transport is currently active so IPC handlers can route correctly.
 const connectionState = { type: null as "wifi" | "serial" | null };
@@ -98,3 +110,13 @@ registerFsIpcHandlers({
 registerTaskIpcHandlers(taskManager);
 
 registerJobIpcHandlers(taskManager, safeSend);
+
+// ─── IPC Handlers — Bitmap renderer plugins ───────────────────────────────────
+
+registerBitmapPluginIpcHandlers({
+  pluginsDir: bitmapPluginsDir,
+  registry: bitmapPluginRegistry,
+  hostManager: bitmapPluginHostManager,
+});
+
+void bitmapPluginRegistry.rescan();

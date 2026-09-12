@@ -25,7 +25,7 @@ import {
 import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
-import { dataUrlFromBytes, materializeBitmapPath } from "../../bitmap-renderers/bitmapImage";
+import { dataUrlFromBytes, materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
 import { getBitmapRenderer } from "../../bitmap-renderers/registry";
 import {
   type SvgImport,
@@ -411,9 +411,11 @@ export function useImportActions() {
         mimeType,
       );
       const baseScale = 25.4 / 96;
+      const importId = uuid();
       const defaultRenderer = getBitmapRenderer(undefined);
       const bitmapRendererSettings = { ...defaultRenderer.defaults };
-      const bitmapRendererPath = await materializeBitmapPath({
+      const { bitmapRendererPath } = await materializeBitmapLayers({
+        id: importId,
         bitmapDataUrl,
         bitmapRendererId: defaultRenderer.id,
         bitmapRendererSettings,
@@ -429,7 +431,7 @@ export function useImportActions() {
       const objH = image.naturalHeight * baseScale;
       const origin = activeMachineConfig?.origin ?? "bottom-left";
       const imp: SvgImport = {
-        id: uuid(), name, kind: "bitmap", paths: [], x: origin.includes("right") ? (activeMachineConfig?.bedWidth ?? 220) - objW : 0,
+        id: importId, name, kind: "bitmap", paths: [], x: origin.includes("right") ? (activeMachineConfig?.bedWidth ?? 220) - objW : 0,
         y: origin.includes("top") ? -objH : 0, scale: baseScale, rotation: 0, visible: true,
         svgWidth: image.naturalWidth, svgHeight: image.naturalHeight, viewBoxX: 0, viewBoxY: 0,
         bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: defaultRenderer.id,

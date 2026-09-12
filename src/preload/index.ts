@@ -8,6 +8,7 @@ import type {
   BackgroundTask,
   VectorObject,
   GcodeOptions,
+  BitmapPluginManifest,
 } from "../types";
 
 // ─── Utility: create a typed IPC invoker ─────────────────────────────────────
@@ -219,6 +220,26 @@ const editApi: TerraForgeAPI["edit"] = {
     ipcRenderer.send("menu:setEditMenuState", hasSelection),
 };
 
+// ─── Bitmap renderer plugins API ──────────────────────────────────────────────
+
+const bitmapPlugins: TerraForgeAPI["bitmapPlugins"] = {
+  list: () => invoke<BitmapPluginManifest[]>("bitmapPlugins:list"),
+  rescan: () =>
+    invoke<{
+      manifests: BitmapPluginManifest[];
+      errors: { folder: string; message: string }[];
+    }>("bitmapPlugins:rescan"),
+  render: (pluginId, luminance, settings, baseScale) =>
+    invoke<string>(
+      "bitmapPlugins:render",
+      pluginId,
+      luminance,
+      settings,
+      baseScale,
+    ),
+  openFolder: () => invoke<void>("bitmapPlugins:openFolder"),
+};
+
 // ─── Expose to renderer ───────────────────────────────────────────────────────
 
 const api: TerraForgeAPI = {
@@ -230,5 +251,6 @@ const api: TerraForgeAPI = {
   config,
   app: appApi,
   edit: editApi,
+  bitmapPlugins,
 };
 contextBridge.exposeInMainWorld("terraForge", api);

@@ -12,6 +12,7 @@ import { JogControls } from "./components/JogControls";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { useJobStartHandler } from "./components/JobControls/useJobStartHandler";
 import { useMachineStore } from "./store/machineStore";
+import { useBitmapPluginStore } from "./store/bitmapPluginStore";
 import { useCanvasStore } from "./store/canvasStore";
 import { selectJobControlsCanvasState } from "./store/canvasSelectors";
 import { useTaskStore } from "./store/taskStore";
@@ -38,6 +39,7 @@ const isGcodeFile = (name: string) =>
   GCODE_EXTS.some((ext) => name.toLowerCase().endsWith(ext));
 
 export default function App() {
+  const loadBitmapPlugins = useBitmapPluginStore((s) => s.loadBitmapPlugins);
   const setConfigs = useMachineStore((s) => s.setConfigs);
   const setStatus = useMachineStore((s) => s.setStatus);
   const setWsLive = useMachineStore((s) => s.setWsLive);
@@ -201,6 +203,7 @@ export default function App() {
   useEffect(() => {
     // Load machine configs
     window.terraForge.config.getMachineConfigs().then(setConfigs);
+    void loadBitmapPlugins();
     window.terraForge.config
       .getAppConfig()
       .then((cfg) => {
@@ -240,6 +243,7 @@ export default function App() {
     };
   }, [
     setConfigs,
+    loadBitmapPlugins,
     setStatus,
     setWsLive,
     setFwInfo,
