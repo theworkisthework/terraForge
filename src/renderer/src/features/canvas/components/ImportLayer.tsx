@@ -1,4 +1,4 @@
-import { type SvgImport } from "../../../../../types";
+import { type SvgImport, type SvgPath } from "../../../../../types";
 import { MM_TO_PX, PAD } from "../constants";
 
 interface ImportLayerProps {
@@ -6,6 +6,23 @@ interface ImportLayerProps {
   selected: boolean;
   onImportMouseDown: (e: React.MouseEvent, id: string) => void;
   getBedY: (mm: number) => number;
+}
+
+/** Mirrors the outline-visibility rules `vectorObjectsForImport`/`drawImportsLayer`
+ * already apply for regular SVG paths, so a separated bitmap's ink-channel
+ * "By Colour" show/hide toggles (which set `strokeEnabled`, not `visible`)
+ * actually affect the canvas preview instead of being silently ignored. */
+function isInkPathVisible(imp: SvgImport, path: SvgPath): boolean {
+  if (path.visible === false) return false;
+  if ((imp.strokeEnabled ?? true) === false) return false;
+  if ((path.strokeEnabled ?? true) === false) return false;
+  const sourceOutlineVisible =
+    typeof path.sourceOutlineVisible === "boolean"
+      ? path.sourceOutlineVisible
+      : path.outlineVisible !== false;
+  const generatedStrokeEnabled =
+    path.generatedStrokeEnabled ?? imp.generatedStrokeForNoStroke ?? false;
+  return sourceOutlineVisible || generatedStrokeEnabled;
 }
 
 export function ImportLayer({
@@ -55,18 +72,20 @@ export function ImportLayer({
                 preserveAspectRatio="none"
               />
             )}
-            {imp.bitmapPreviewVisible !== false && imp.paths.length > 0 && imp.paths.map((path) => (
-              <path
-                key={path.id}
-                d={path.d}
-                fill="none"
-                stroke={path.strokeColor ?? path.sourceColor ?? (selected ? "#60a0ff" : "#3a6aaa")}
-                strokeWidth={(imp.strokeWidthMM ?? 0.5) / Math.max(imp.scale, 0.001)}
-                opacity={imp.bitmapPreviewOpacity ?? 1}
-                vectorEffect="non-scaling-stroke"
-                pointerEvents="none"
-              />
-            ))}
+            {imp.bitmapPreviewVisible !== false && imp.paths.length > 0 && imp.paths
+              .filter((path) => isInkPathVisible(imp, path))
+              .map((path) => (
+                <path
+                  key={path.id}
+                  d={path.d}
+                  fill="none"
+                  stroke={path.strokeColor ?? path.sourceColor ?? (selected ? "#60a0ff" : "#3a6aaa")}
+                  strokeWidth={(imp.strokeWidthMM ?? 0.5) / Math.max(imp.scale, 0.001)}
+                  opacity={imp.bitmapPreviewOpacity ?? 1}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+              ))}
             {imp.bitmapPreviewVisible !== false && imp.paths.length === 0 && imp.bitmapRendererPath && (
               <path
                 d={imp.bitmapRendererPath}
