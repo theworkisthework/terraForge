@@ -72,20 +72,30 @@ export function ImportLayer({
                 preserveAspectRatio="none"
               />
             )}
-            {imp.bitmapPreviewVisible !== false && imp.paths.length > 0 && imp.paths
-              .filter((path) => isInkPathVisible(imp, path))
-              .map((path) => (
-                <path
-                  key={path.id}
-                  d={path.d}
-                  fill="none"
-                  stroke={path.strokeColor ?? path.sourceColor ?? (selected ? "#60a0ff" : "#3a6aaa")}
-                  strokeWidth={(imp.strokeWidthMM ?? 0.5) / Math.max(imp.scale, 0.001)}
-                  opacity={imp.bitmapPreviewOpacity ?? 1}
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
-                />
-              ))}
+            {imp.bitmapPreviewVisible !== false && imp.paths.length > 0 && (
+              // Isolated so "multiply" blends ink channels against each other
+              // (and the page beneath them) like stacked transparent ink,
+              // instead of each opaque stroke just occluding whatever's under
+              // it in z-order — and scoped so it doesn't also blend with the
+              // app's own dark canvas background outside this group.
+              <g style={{ isolation: "isolate" }}>
+                {imp.paths
+                  .filter((path) => isInkPathVisible(imp, path))
+                  .map((path) => (
+                    <path
+                      key={path.id}
+                      d={path.d}
+                      fill="none"
+                      stroke={path.strokeColor ?? path.sourceColor ?? (selected ? "#60a0ff" : "#3a6aaa")}
+                      strokeWidth={(imp.strokeWidthMM ?? 0.5) / Math.max(imp.scale, 0.001)}
+                      opacity={imp.bitmapPreviewOpacity ?? 1}
+                      style={{ mixBlendMode: "multiply" }}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ))}
+              </g>
+            )}
             {imp.bitmapPreviewVisible !== false && imp.paths.length === 0 && imp.bitmapRendererPath && (
               <path
                 d={imp.bitmapRendererPath}
