@@ -331,13 +331,21 @@ export interface BitmapLuminance {
  * panel owns the mapping onto actual icon components, so renderer modules
  * (including external plugins) stay free of any UI/React dependency.
  */
-export type BitmapRendererIconName =
-  | "rotate-cw"
-  | "rotate-ccw"
-  | "arrow-left-right"
-  | "arrow-up-down"
-  | "flip-horizontal"
-  | "flip-vertical";
+export const BITMAP_RENDERER_ICON_NAMES = [
+  "rotate-cw",
+  "rotate-ccw",
+  "arrow-left-right",
+  "arrow-up-down",
+  "flip-horizontal",
+  "flip-vertical",
+] as const;
+
+/**
+ * Kept as a runtime list so manifest validation and the properties panel's
+ * icon table are checked against the same source — a name that exists in one
+ * but not the other is a type error rather than a blank control at runtime.
+ */
+export type BitmapRendererIconName = (typeof BITMAP_RENDERER_ICON_NAMES)[number];
 
 interface BitmapRendererFieldBase {
   /** Key into the renderer's settings bag. */

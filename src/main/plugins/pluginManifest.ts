@@ -1,7 +1,12 @@
 import { existsSync, readdirSync } from "fs";
 import { readFile } from "fs/promises";
 import { join, resolve, sep } from "path";
-import type { BitmapPluginManifest, BitmapRendererFieldSchema } from "../../types";
+import {
+  BITMAP_RENDERER_ICON_NAMES,
+  type BitmapPluginManifest,
+  type BitmapRendererFieldSchema,
+  type BitmapRendererSettings,
+} from "../../types";
 
 /** Bitmap-renderer plugin API versions this build knows how to load. */
 const SUPPORTED_API_VERSIONS = [1];
@@ -24,49 +29,177 @@ export interface PluginDiscoveryResult {
   errors: PluginDiscoveryError[];
 }
 
+const ICON_NAMES = new Set<string>(BITMAP_RENDERER_ICON_NAMES);
+const NUMBER_CONTROLS = new Set(["input", "slider"]);
+const SELECT_CONTROLS = new Set(["dropdown", "icon-buttons"]);
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The value types a settings bag may hold — see `BitmapRendererSettings`. */
+function isSettingValue(value: unknown): value is number | boolean | string {
+  if (typeof value === "number") return Number.isFinite(value);
+  return typeof value === "boolean" || typeof value === "string";
+}
+
+function validateOptionalString(value: unknown, where: string): string | null {
+  if (value === undefined) return null;
+  return isNonEmptyString(value) ? null : `${where} must be a non-empty string`;
+}
+
+/**
+ * Icon names are checked here rather than left to the UI: the properties
+ * panel maps a name onto a React component, and an unmapped name would render
+ * `undefined` as an element type, which React treats as a fatal render error.
+ */
+function validateIcon(value: unknown, where: string): string | null {
+  if (value === undefined) return null;
+  if (!isNonEmptyString(value) || !ICON_NAMES.has(value)) {
+    return `${where}.icon must be one of ${[...ICON_NAMES].join(", ")}`;
+  }
+  return null;
+}
+
+function validatePreset(preset: unknown, where: string): string | null {
+  if (!isRecord(preset)) return `${where} is not an object`;
+  if (!isNonEmptyString(preset.label)) return `${where}.label is required`;
+  if (!isFiniteNumber(preset.delta)) return `${where}.delta must be a finite number`;
+  return (
+    validateOptionalString(preset.ariaLabel, `${where}.ariaLabel`) ?? validateIcon(preset.icon, where)
+  );
+}
+
+function validateOption(option: unknown, where: string): string | null {
+  if (!isRecord(option)) return `${where} is not an object`;
+  if (!isNonEmptyString(option.value)) return `${where}.value is required`;
+  if (!isNonEmptyString(option.label)) return `${where}.label is required`;
+  return validateIcon(option.icon, where);
+}
+
+function validateNumberField(f: Record<string, unknown>, where: string): string | null {
+  if (!isFiniteNumber(f.min) || !isFiniteNumber(f.max) || !isFiniteNumber(f.step)) {
+    return `${where} (number) requires finite numeric min/max/step`;
+  }
+  if (f.min > f.max) return `${where}.min must not be greater than ${where}.max`;
+  if (f.step <= 0) return `${where}.step must be greater than zero`;
+  if (f.control !== undefined && !NUMBER_CONTROLS.has(f.control as string)) {
+    return `${where}.control must be "input" or "slider"`;
+  }
+  if (f.presets !== undefined) {
+    if (!Array.isArray(f.presets)) return `${where}.presets must be an array`;
+    for (let i = 0; i < f.presets.length; i++) {
+      const error = validatePreset(f.presets[i], `${where}.presets[${i}]`);
+      if (error) return error;
+    }
+  }
+  return null;
+}
+
+function validateSelectField(f: Record<string, unknown>, where: string): string | null {
+  if (!Array.isArray(f.options) || f.options.length === 0) {
+    return `${where} (select) requires a non-empty options array`;
+  }
+  for (let i = 0; i < f.options.length; i++) {
+    const error = validateOption(f.options[i], `${where}.options[${i}]`);
+    if (error) return error;
+  }
+  if (f.control !== undefined && !SELECT_CONTROLS.has(f.control as string)) {
+    return `${where}.control must be "dropdown" or "icon-buttons"`;
+  }
+  return null;
+}
+
 function validateField(field: unknown, index: number): string | null {
-  if (typeof field !== "object" || field === null) return `fields[${index}] is not an object`;
-  const f = field as Record<string, unknown>;
-  if (!isNonEmptyString(f.key)) return `fields[${index}].key is required`;
-  if (!isNonEmptyString(f.label)) return `fields[${index}].label is required`;
-  if (f.type === "number") {
-    if (typeof f.min !== "number" || typeof f.max !== "number" || typeof f.step !== "number") {
-      return `fields[${index}] (number) requires numeric min/max/step`;
+  const where = `fields[${index}]`;
+  if (!isRecord(field)) return `${where} is not an object`;
+  if (!isNonEmptyString(field.key)) return `${where}.key is required`;
+  if (!isNonEmptyString(field.label)) return `${where}.label is required`;
+
+  const ariaError = validateOptionalString(field.ariaLabel, `${where}.ariaLabel`);
+  if (ariaError) return ariaError;
+
+  if (field.type === "number") return validateNumberField(field, where);
+  if (field.type === "boolean") return null;
+  if (field.type === "select") return validateSelectField(field, where);
+  return `${where}.type must be "number", "boolean", or "select"`;
+}
+
+/**
+ * Every declared field needs a default of the right type. The panel merges
+ * `defaults` under the import's saved settings, so a missing or wrongly-typed
+ * default silently produces a control with no sensible value rather than an
+ * obvious failure — better caught here, where it can name the field.
+ */
+function validateDefaults(
+  fields: BitmapRendererFieldSchema[],
+  defaults: Record<string, unknown>,
+): string | null {
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!isSettingValue(value)) {
+      return `manifest.defaults["${key}"] must be a finite number, boolean, or string`;
     }
-  } else if (f.type === "boolean") {
-    // no further fields required
-  } else if (f.type === "select") {
-    if (!Array.isArray(f.options) || f.options.length === 0) {
-      return `fields[${index}] (select) requires a non-empty options array`;
+  }
+
+  for (const field of fields) {
+    if (!Object.prototype.hasOwnProperty.call(defaults, field.key)) {
+      return `manifest.defaults is missing a value for field "${field.key}"`;
     }
-  } else {
-    return `fields[${index}].type must be "number", "boolean", or "select"`;
+    const value = defaults[field.key];
+    if (field.type === "number" && typeof value !== "number") {
+      return `manifest.defaults["${field.key}"] must be a number`;
+    }
+    if (field.type === "boolean" && typeof value !== "boolean") {
+      return `manifest.defaults["${field.key}"] must be a boolean`;
+    }
+    if (field.type === "select") {
+      if (typeof value !== "string") return `manifest.defaults["${field.key}"] must be a string`;
+      if (!field.options.some((option) => option.value === value)) {
+        return `manifest.defaults["${field.key}"] must be one of that field's option values`;
+      }
+    }
   }
   return null;
 }
 
 function validateManifestShape(raw: unknown, folder: string): string | null {
-  if (typeof raw !== "object" || raw === null) return "manifest.json is not an object";
-  const m = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return "manifest.json is not an object";
+  const m = raw;
   if (!isNonEmptyString(m.id)) return "manifest.id is required";
   if (!isNonEmptyString(m.label)) return "manifest.label is required";
   if (typeof m.apiVersion !== "number" || !SUPPORTED_API_VERSIONS.includes(m.apiVersion)) {
     return `manifest.apiVersion must be one of ${SUPPORTED_API_VERSIONS.join(", ")}`;
   }
   if (!isNonEmptyString(m.entry)) return "manifest.entry is required";
-  if (typeof m.defaults !== "object" || m.defaults === null) return "manifest.defaults is required";
+  if (!isRecord(m.defaults)) return "manifest.defaults is required";
   if (!Array.isArray(m.fields)) return "manifest.fields must be an array";
+
+  const seenKeys = new Set<string>();
   for (let i = 0; i < m.fields.length; i++) {
     const fieldError = validateField(m.fields[i], i);
     if (fieldError) return fieldError;
+    const key = (m.fields[i] as { key: string }).key;
+    if (seenKeys.has(key)) return `fields[${i}].key "${key}" is declared more than once`;
+    seenKeys.add(key);
   }
 
+  if (m.renderTimeoutMs !== undefined && (!isFiniteNumber(m.renderTimeoutMs) || m.renderTimeoutMs <= 0)) {
+    return "manifest.renderTimeoutMs must be a positive number of milliseconds";
+  }
+
+  const defaultsError = validateDefaults(m.fields as BitmapRendererFieldSchema[], m.defaults);
+  if (defaultsError) return defaultsError;
+
   const resolvedFolder = resolve(folder);
-  const entryPath = resolve(folder, m.entry as string);
+  const entryPath = resolve(folder, m.entry);
   if (entryPath !== resolvedFolder && !entryPath.startsWith(resolvedFolder + sep)) {
     return "manifest.entry must resolve inside the plugin's own folder";
   }
@@ -119,7 +252,7 @@ export async function discoverBitmapPlugins(pluginsDir: string): Promise<PluginD
           id,
           label: raw.label,
           apiVersion: raw.apiVersion,
-          defaults: raw.defaults,
+          defaults: raw.defaults as BitmapRendererSettings,
           fields: raw.fields as BitmapRendererFieldSchema[],
           renderTimeoutMs: typeof raw.renderTimeoutMs === "number" ? raw.renderTimeoutMs : undefined,
         },

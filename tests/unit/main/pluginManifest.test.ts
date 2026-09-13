@@ -127,4 +127,216 @@ describe("discoverBitmapPlugins", () => {
     expect(result.plugins).toEqual([]);
     expect(result.errors).toEqual([]);
   });
+
+  /**
+   * Field schemas drive React components in the properties panel, so a bad
+   * one used to be able to take the whole renderer down. Everything the panel
+   * reads has to be rejected here instead.
+   */
+  describe("field schema validation", () => {
+    async function errorFor(manifest: Record<string, unknown>): Promise<string> {
+      await writePlugin(pluginsDir, "candidate", manifest);
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.plugins).toEqual([]);
+      expect(result.errors).toHaveLength(1);
+      return result.errors[0].message;
+    }
+
+    const numberField = {
+      type: "number",
+      key: "angle",
+      label: "Angle",
+      min: -180,
+      max: 180,
+      step: 1,
+    };
+
+    const selectField = {
+      type: "select",
+      key: "axis",
+      label: "Axis",
+      options: [{ value: "x", label: "Horizontal" }],
+    };
+
+    it("accepts a manifest using every schema feature", async () => {
+      await writePlugin(pluginsDir, "rich", {
+        id: "acme.rich",
+        label: "Rich",
+        apiVersion: 1,
+        entry: "index.js",
+        renderTimeoutMs: 8000,
+        defaults: { angle: 0, invert: false, axis: "x" },
+        fields: [
+          {
+            ...numberField,
+            control: "slider",
+            presets: [
+              { label: "+90", delta: 90, icon: "rotate-cw" },
+              { label: "-90", delta: -90, icon: "rotate-ccw", ariaLabel: "Rotate left" },
+            ],
+          },
+          { type: "boolean", key: "invert", label: "Invert" },
+          {
+            ...selectField,
+            control: "icon-buttons",
+            options: [
+              { value: "x", label: "Horizontal", icon: "arrow-left-right" },
+              { value: "y", label: "Vertical", icon: "arrow-up-down" },
+            ],
+          },
+        ],
+      });
+
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.errors).toEqual([]);
+      expect(result.plugins).toHaveLength(1);
+    });
+
+    it("rejects an icon name this build has no component for", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { axis: "x" },
+        fields: [{ ...selectField, options: [{ value: "x", label: "X", icon: "sparkles" }] }],
+      });
+      expect(message).toMatch(/icon must be one of/);
+    });
+
+    it("rejects an unknown icon on a number field preset", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { angle: 0 },
+        fields: [{ ...numberField, presets: [{ label: "+90", delta: 90, icon: "spin" }] }],
+      });
+      expect(message).toMatch(/presets\[0\]\.icon/);
+    });
+
+    it("rejects a preset with no delta", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { angle: 0 },
+        fields: [{ ...numberField, presets: [{ label: "+90" }] }],
+      });
+      expect(message).toMatch(/presets\[0\]\.delta/);
+    });
+
+    it("rejects presets that are not an array", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { angle: 0 },
+        fields: [{ ...numberField, presets: "lots" }],
+      });
+      expect(message).toMatch(/presets must be an array/);
+    });
+
+    it("rejects select options that are not objects", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { axis: "x" },
+        fields: [{ ...selectField, options: ["x", "y"] }],
+      });
+      expect(message).toMatch(/options\[0\] is not an object/);
+    });
+
+    it("rejects a select option with no value", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { axis: "x" },
+        fields: [{ ...selectField, options: [{ label: "Horizontal" }] }],
+      });
+      expect(message).toMatch(/options\[0\]\.value/);
+    });
+
+    it("rejects a control the panel cannot render", async () => {
+      expect(
+        await errorFor({
+          ...validManifest,
+          defaults: { angle: 0 },
+          fields: [{ ...numberField, control: "dial" }],
+        }),
+      ).toMatch(/control must be "input" or "slider"/);
+    });
+
+    it("rejects an inverted range and a non-positive step", async () => {
+      expect(
+        await errorFor({
+          ...validManifest,
+          defaults: { angle: 0 },
+          fields: [{ ...numberField, min: 10, max: 1 }],
+        }),
+      ).toMatch(/min must not be greater than/);
+
+      expect(
+        await errorFor({
+          ...validManifest,
+          defaults: { angle: 0 },
+          fields: [{ ...numberField, step: 0 }],
+        }),
+      ).toMatch(/step must be greater than zero/);
+    });
+
+    it("rejects a non-finite bound (JSON overflows to Infinity)", async () => {
+      await writePlugin(
+        pluginsDir,
+        "candidate",
+        '{"id":"a","label":"A","apiVersion":1,"entry":"index.js","defaults":{"angle":0},' +
+          '"fields":[{"type":"number","key":"angle","label":"Angle","min":1e999,"max":10,"step":1}]}',
+      );
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.plugins).toEqual([]);
+      expect(result.errors[0].message).toMatch(/finite numeric min\/max\/step/);
+    });
+
+    it("rejects a field key declared twice", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { angle: 0 },
+        fields: [numberField, { ...numberField, label: "Angle again" }],
+      });
+      expect(message).toMatch(/declared more than once/);
+    });
+  });
+
+  describe("defaults validation", () => {
+    async function errorFor(manifest: Record<string, unknown>): Promise<string> {
+      await writePlugin(pluginsDir, "candidate", manifest);
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.plugins).toEqual([]);
+      expect(result.errors).toHaveLength(1);
+      return result.errors[0].message;
+    }
+
+    it("requires a default for every declared field", async () => {
+      const message = await errorFor({ ...validManifest, defaults: {} });
+      expect(message).toMatch(/missing a value for field "dotSize"/);
+    });
+
+    it("requires the default to match the field's type", async () => {
+      const message = await errorFor({ ...validManifest, defaults: { dotSize: "big" } });
+      expect(message).toMatch(/must be a number/);
+    });
+
+    it("requires a select default to be one of its own options", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { axis: "z" },
+        fields: [
+          { type: "select", key: "axis", label: "Axis", options: [{ value: "x", label: "X" }] },
+        ],
+      });
+      expect(message).toMatch(/one of that field's option values/);
+    });
+
+    it("rejects a default that is not a settings primitive", async () => {
+      const message = await errorFor({
+        ...validManifest,
+        defaults: { dotSize: 2, extra: { nested: true } },
+      });
+      expect(message).toMatch(/finite number, boolean, or string/);
+    });
+
+    it("rejects a non-positive renderTimeoutMs", async () => {
+      expect(await errorFor({ ...validManifest, renderTimeoutMs: 0 })).toMatch(/renderTimeoutMs/);
+      expect(await errorFor({ ...validManifest, renderTimeoutMs: -5 })).toMatch(/renderTimeoutMs/);
+    });
+  });
 });

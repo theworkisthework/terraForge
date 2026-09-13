@@ -17,8 +17,16 @@ const FIELD_ICONS: Record<BitmapRendererIconName, typeof RotateCw> = {
   "flip-vertical": FlipVertical,
 };
 
-function RendererFieldIcon({ name }: { name: BitmapRendererIconName }) {
-  const Icon = FIELD_ICONS[name];
+/**
+ * Falls back to the control's own text when a schema names an icon this build
+ * does not have. Manifest validation rejects unknown icon names before they
+ * reach the panel, so this only covers an in-tree renderer written against a
+ * newer icon set — but rendering `undefined` as an element type is a fatal
+ * React error, and a missing glyph is not worth that.
+ */
+function RendererFieldIcon({ name, fallback }: { name?: BitmapRendererIconName; fallback: string }) {
+  const Icon = name ? FIELD_ICONS[name] : undefined;
+  if (!Icon) return <>{fallback}</>;
   return <Icon size={12} strokeWidth={2} />;
 }
 
@@ -69,7 +77,7 @@ export function RendererFieldControl({
                     : "border-border-ui text-content-muted hover:text-content hover:bg-secondary/40"
                 }`}
               >
-                {option.icon ? <RendererFieldIcon name={option.icon} /> : option.label}
+                <RendererFieldIcon name={option.icon} fallback={option.label} />
               </button>
             ))}
           </div>
@@ -124,7 +132,7 @@ export function RendererFieldControl({
             onClick={() => onChange(clamp(numericValue + preset.delta))}
             className="p-1 rounded text-content-muted hover:text-accent hover:bg-secondary/40 transition-colors shrink-0"
           >
-            {preset.icon ? <RendererFieldIcon name={preset.icon} /> : preset.label}
+            <RendererFieldIcon name={preset.icon} fallback={preset.label} />
           </button>
         ))}
       </div>

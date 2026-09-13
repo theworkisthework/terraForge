@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SvgImport } from "../../../../../types";
+import { ErrorBoundary } from "../../../components/ErrorBoundary";
 import { useBitmapPluginStore } from "../../../store/bitmapPluginStore";
 import { materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
 import {
@@ -12,8 +13,9 @@ import { BitmapSeparationSection } from "./BitmapSeparationSection";
 import { RendererFieldControl } from "./RendererFieldControl";
 
 /** Debounce for settings-driven re-renders — a slider fires on every `input`
- * event, and a plugin render is now a subprocess round trip rather than a
- * free synchronous call, so every keystroke can't trigger one directly. */
+ * event, and a plugin render is now a round trip into that plugin's sandboxed
+ * host rather than a free synchronous call, so every keystroke can't trigger
+ * one directly. */
 const RENDER_DEBOUNCE_MS = 200;
 
 export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpdate: (changes: Partial<SvgImport>) => void }) {
@@ -93,16 +95,28 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
       )}
 
       {renderer && (
-        <div className="grid grid-cols-2 gap-2 mt-2">
-          {renderer.fields.map((field) => (
-            <RendererFieldControl
-              key={field.key}
-              field={field}
-              value={settings[field.key]}
-              onChange={(value) => updateSettings({ [field.key]: value })}
-            />
-          ))}
-        </div>
+        // Keyed on the renderer so switching to another one remounts the
+        // boundary — otherwise a plugin that broke its controls would keep
+        // showing the fallback after the user had already moved off it.
+        <ErrorBoundary
+          key={renderer.id}
+          fallback={() => (
+            <p className="mt-1.5 text-[10px] text-red-400">
+              This renderer&apos;s controls couldn&apos;t be displayed. Pick another renderer above.
+            </p>
+          )}
+        >
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {renderer.fields.map((field) => (
+              <RendererFieldControl
+                key={field.key}
+                field={field}
+                value={settings[field.key]}
+                onChange={(value) => updateSettings({ [field.key]: value })}
+              />
+            ))}
+          </div>
+        </ErrorBoundary>
       )}
       {renderer && <BitmapSeparationSection imp={imp} onUpdate={onUpdate} />}
       <div className="mt-2 pt-2 border-t border-border-ui/30">
