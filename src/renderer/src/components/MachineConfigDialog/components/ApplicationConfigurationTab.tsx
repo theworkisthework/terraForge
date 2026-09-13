@@ -3,6 +3,7 @@ import type { MachineConfigDialogController } from "../hooks/useMachineConfigDia
 import { AppTogglesSections } from "./Application/AppTogglesSections";
 import { VinylCuttingSection } from "./Application/VinylCuttingSection";
 import { InkServiceStationsSection } from "./Application/InkServiceStationsSection";
+import { BitmapPluginsSection } from "./Application/BitmapPluginsSection";
 
 interface ApplicationConfigurationTabProps {
   controller: MachineConfigDialogController;
@@ -16,6 +17,7 @@ export function ApplicationConfigurationTab({
       <AppTogglesSections controller={controller} />
       <VinylCuttingSection controller={controller} />
       <InkServiceStationsSection controller={controller} />
+      <BitmapPluginsSection />
     </div>
   );
 }
