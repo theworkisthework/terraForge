@@ -23,6 +23,12 @@ import { TaskManager } from "../tasks/taskManager";
 import { resolveBitmapPluginsDir } from "./plugins/pluginPaths";
 import { BitmapPluginRegistry } from "./plugins/pluginRegistry";
 import { PluginHostManager } from "./plugins/pluginHostManager";
+import { registerPluginScheme } from "./plugins/pluginSandbox";
+
+// Must run before the app's `ready` event: Electron only accepts privileged
+// scheme registration that early, and the sandboxed plugin host pages are
+// served over it.
+registerPluginScheme();
 
 registerMenuStateHandlers();
 
@@ -37,6 +43,7 @@ registerAppLifecycleHandlers({
     fluidnc.disconnectWebSocket();
     bitmapPluginHostManager.terminateAll();
   },
+  onAllAppWindowsClosed: () => bitmapPluginHostManager.terminateAll(),
 });
 
 // ─── Singletons ───────────────────────────────────────────────────────────────
@@ -48,7 +55,7 @@ const persistence = createPersistence(app.getPath("userData"));
 const bitmapPluginsDir = resolveBitmapPluginsDir(app.getPath("userData"));
 const bitmapPluginRegistry = new BitmapPluginRegistry(bitmapPluginsDir);
 const bitmapPluginHostManager = new PluginHostManager(
-  join(__dirname, "pluginHostEntry.js"),
+  join(__dirname, "../preload/pluginSandboxPreload.js"),
   bitmapPluginRegistry,
 );
 

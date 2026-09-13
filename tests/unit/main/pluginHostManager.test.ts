@@ -1,48 +1,88 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventEmitter } from "events";
 import type { BitmapPluginRegistry } from "../../../src/main/plugins/pluginRegistry";
 import type { BitmapPluginRecord } from "../../../src/main/plugins/pluginManifest";
 
-class FakeUtilityProcess extends EventEmitter {
-  killed = false;
-  stdout = null;
-  stderr = null;
-  sentMessages: unknown[] = [];
-
-  postMessage(message: unknown): void {
-    this.sentMessages.push(message);
-  }
-
-  kill(): void {
-    if (this.killed) return;
-    this.killed = true;
-    this.emit("exit", null);
-  }
+interface FakeWindow {
+  id: number;
+  destroyed: boolean;
+  sent: { channel: string; message: Record<string, unknown> }[];
+  handlers: Map<string, ((...args: unknown[]) => void)[]>;
+  webContents: {
+    id: number;
+    send: (channel: string, message: Record<string, unknown>) => void;
+    on: (event: string, cb: (...args: unknown[]) => void) => void;
+  };
+  on: (event: string, cb: (...args: unknown[]) => void) => void;
+  loadURL: (url: string) => Promise<void>;
+  isDestroyed: () => boolean;
+  destroy: () => void;
+  emit: (event: string, ...args: unknown[]) => void;
 }
 
 const mocks = vi.hoisted(() => ({
-  forkedProcesses: [] as FakeUtilityProcess[],
-  fork: vi.fn(),
+  windows: [] as FakeWindow[],
+  ipc: new Map<string, ((...args: unknown[]) => void)[]>(),
+  nextId: 1,
 }));
 
-vi.mock("electron", () => ({
-  utilityProcess: {
-    fork: mocks.fork,
-  },
+vi.mock("electron", () => {
+  const makeWindow = (): FakeWindow => {
+    const id = mocks.nextId++;
+    const handlers = new Map<string, ((...args: unknown[]) => void)[]>();
+    const on = (event: string, cb: (...args: unknown[]) => void) => {
+      handlers.set(event, [...(handlers.get(event) ?? []), cb]);
+    };
+    const win: FakeWindow = {
+      id,
+      destroyed: false,
+      sent: [],
+      handlers,
+      webContents: { id, send: (channel, message) => win.sent.push({ channel, message }), on },
+      on,
+      loadURL: async () => {},
+      isDestroyed: () => win.destroyed,
+      destroy: () => { win.destroyed = true; },
+      emit: (event, ...args) => (handlers.get(event) ?? []).forEach((cb) => cb(...args)),
+    };
+    mocks.windows.push(win);
+    return win;
+  };
+
+  class BrowserWindow {
+    constructor() { return makeWindow() as unknown as BrowserWindow; }
+  }
+
+  return {
+    BrowserWindow,
+    ipcMain: {
+      on: (channel: string, cb: (...args: unknown[]) => void) => {
+        mocks.ipc.set(channel, [...(mocks.ipc.get(channel) ?? []), cb]);
+      },
+      off: (channel: string, cb: (...args: unknown[]) => void) => {
+        mocks.ipc.set(channel, (mocks.ipc.get(channel) ?? []).filter((fn) => fn !== cb));
+      },
+    },
+    protocol: { registerSchemesAsPrivileged: vi.fn() },
+    session: {
+      fromPartition: () => ({
+        protocol: { handle: vi.fn(), isProtocolHandled: () => false },
+        webRequest: { onBeforeRequest: vi.fn() },
+        setPermissionRequestHandler: vi.fn(),
+        setPermissionCheckHandler: vi.fn(),
+      }),
+    },
+  };
+});
+
+vi.mock("../../../src/main/plugins/pluginSource", () => ({
+  readPluginModules: vi.fn(async () => ({ modules: { "index.js": "" }, entry: "index.js" })),
 }));
 
 import { PluginHostManager } from "../../../src/main/plugins/pluginHostManager";
 
-function makeRecord(id: string, overrides: Partial<BitmapPluginRecord["manifest"]> = {}): BitmapPluginRecord {
+function makeRecord(id: string, renderTimeoutMs?: number): BitmapPluginRecord {
   return {
-    manifest: {
-      id,
-      label: id,
-      apiVersion: 1,
-      defaults: {},
-      fields: [],
-      ...overrides,
-    },
+    manifest: { id, label: id, apiVersion: 1, defaults: {}, fields: [], renderTimeoutMs },
     entryPath: `/plugins/${id}/index.js`,
     folder: `/plugins/${id}`,
   };
@@ -56,196 +96,225 @@ function makeRegistry(records: BitmapPluginRecord[]): BitmapPluginRegistry {
   } as unknown as BitmapPluginRegistry;
 }
 
+/** Delivers a page→main message as the given window's webContents would. */
+function fromPage(win: FakeWindow, message: Record<string, unknown>): void {
+  (mocks.ipc.get("plugin-host:from-page") ?? []).forEach((cb) =>
+    cb({ sender: { id: win.webContents.id } }, message),
+  );
+}
+
+/** Drives a freshly spawned window through page load and plugin evaluation. */
+async function bringUp(win: FakeWindow): Promise<void> {
+  fromPage(win, { type: "page-ready" });
+  await vi.waitFor(() => expect(win.sent.some((s) => s.message.type === "init")).toBe(true));
+  fromPage(win, { type: "ready" });
+  await Promise.resolve();
+}
+
+const renders = (win: FakeWindow) => win.sent.filter((s) => s.message.type === "render");
 const luminance = { width: 1, height: 1, values: new Uint8Array([1]) };
 
 describe("PluginHostManager", () => {
   beforeEach(() => {
-    mocks.forkedProcesses = [];
-    mocks.fork.mockReset();
-    mocks.fork.mockImplementation(() => {
-      const proc = new FakeUtilityProcess();
-      mocks.forkedProcesses.push(proc);
-      return proc;
-    });
+    mocks.windows = [];
+    mocks.ipc = new Map();
+    mocks.nextId = 1;
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  afterEach(() => { vi.useRealTimers(); });
 
   it("rejects when the plugin id is not installed", async () => {
-    const manager = new PluginHostManager("/host-entry.js", makeRegistry([]));
+    const manager = new PluginHostManager("/preload.js", makeRegistry([]));
     await expect(manager.render("missing", luminance, {}, 1)).rejects.toThrow(/not installed/);
     manager.terminateAll();
   });
 
-  it("spawns a process, waits for ready, and resolves render from a result message", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("brings up a sandboxed window and resolves a render from its result", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const promise = manager.render("acme", luminance, { k: 1 }, 0.5);
+    const win = mocks.windows[0];
+    await bringUp(win);
 
-    const renderPromise = manager.render("acme", luminance, { k: 1 }, 0.5);
-    const proc = mocks.forkedProcesses[0];
+    const sent = renders(win)[0].message;
+    expect(sent).toMatchObject({ settings: { k: 1 }, baseScale: 0.5 });
+    fromPage(win, { type: "result", reqId: sent.reqId, path: "M0 0" });
 
-    expect(proc.sentMessages[0]).toMatchObject({ type: "init", entryPath: "/plugins/acme/index.js" });
-    proc.emit("message", { type: "ready" });
-
-    // ensureReady resolving unblocks the render() message post — allow the
-    // microtask queue to flush before asserting.
-    await Promise.resolve();
-    expect(proc.sentMessages[1]).toMatchObject({ type: "render", settings: { k: 1 }, baseScale: 0.5 });
-
-    const reqId = (proc.sentMessages[1] as { reqId: string }).reqId;
-    proc.emit("message", { type: "result", reqId, path: "M0 0" });
-
-    await expect(renderPromise).resolves.toBe("M0 0");
+    await expect(promise).resolves.toBe("M0 0");
     manager.terminateAll();
   });
 
-  it("reuses the same process across repeated renders", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
-
+  it("reuses one window across repeated renders", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
     const first = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
-    await Promise.resolve();
-    proc.emit("message", { type: "result", reqId: (proc.sentMessages[1] as { reqId: string }).reqId, path: "A" });
+    const win = mocks.windows[0];
+    await bringUp(win);
+    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, path: "A" });
     await first;
 
     const second = manager.render("acme", luminance, {}, 1);
-    await Promise.resolve();
-    proc.emit("message", { type: "result", reqId: (proc.sentMessages[2] as { reqId: string }).reqId, path: "B" });
+    await vi.waitFor(() => expect(renders(win)).toHaveLength(2));
+    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, path: "B" });
+
     await expect(second).resolves.toBe("B");
-
-    expect(mocks.fork).toHaveBeenCalledTimes(1);
+    expect(mocks.windows).toHaveLength(1);
     manager.terminateAll();
   });
 
-  it("rejects with the plugin's error message on a render error", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("rejects with the plugin's own message on a render error", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const promise = manager.render("acme", luminance, {}, 1);
+    const win = mocks.windows[0];
+    await bringUp(win);
+    fromPage(win, { type: "error", reqId: renders(win)[0].message.reqId, message: "deliberate failure" });
 
-    const renderPromise = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
-    await Promise.resolve();
-    const reqId = (proc.sentMessages[1] as { reqId: string }).reqId;
-    proc.emit("message", { type: "error", reqId, message: "deliberate failure" });
-
-    await expect(renderPromise).rejects.toThrow("deliberate failure");
+    await expect(promise).rejects.toThrow(/deliberate failure/);
     manager.terminateAll();
   });
 
-  it("rejects and does not reuse the process after a load-error", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("rejects and does not reuse the window after a load error", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const failed = manager.render("acme", luminance, {}, 1);
+    const first = mocks.windows[0];
+    fromPage(first, { type: "page-ready" });
+    await vi.waitFor(() => expect(first.sent.some((s) => s.message.type === "init")).toBe(true));
+    fromPage(first, { type: "load-error", message: "bad module" });
 
-    const first = manager.render("acme", luminance, {}, 1);
-    mocks.forkedProcesses[0].emit("message", { type: "load-error", message: "bad require" });
-    await expect(first).rejects.toThrow(/failed to load/);
-    expect(mocks.forkedProcesses[0].killed).toBe(true);
+    await expect(failed).rejects.toThrow(/failed to load: bad module/);
+    expect(first.destroyed).toBe(true);
 
-    const second = manager.render("acme", luminance, {}, 1);
-    expect(mocks.fork).toHaveBeenCalledTimes(2);
-    mocks.forkedProcesses[1].emit("message", { type: "ready" });
-    await Promise.resolve();
-    const reqId = (mocks.forkedProcesses[1].sentMessages[1] as { reqId: string }).reqId;
-    mocks.forkedProcesses[1].emit("message", { type: "result", reqId, path: "OK" });
-    await expect(second).resolves.toBe("OK");
+    const retry = manager.render("acme", luminance, {}, 1);
+    await vi.waitFor(() => expect(mocks.windows).toHaveLength(2));
+    const second = mocks.windows[1];
+    await bringUp(second);
+    fromPage(second, { type: "result", reqId: renders(second)[0].message.reqId, path: "OK" });
+    await expect(retry).resolves.toBe("OK");
     manager.terminateAll();
   });
 
-  it("rejects a pending render when the process exits unexpectedly", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("rejects pending work when the plugin's renderer process is gone", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const promise = manager.render("acme", luminance, {}, 1);
+    const win = mocks.windows[0];
+    await bringUp(win);
+    win.emit("render-process-gone", {}, { reason: "crashed" });
 
-    const renderPromise = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
-    await Promise.resolve();
-    proc.emit("exit", 1);
-
-    await expect(renderPromise).rejects.toThrow(/exited unexpectedly/);
+    await expect(promise).rejects.toThrow(/crashed/);
     manager.terminateAll();
   });
 
-  it("treats a fatal message as a crash: rejects pending work and kills the process", async () => {
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
-
-    const renderPromise = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
-    await Promise.resolve();
-    proc.emit("message", { type: "fatal", message: "uncaught exception in plugin timer" });
-
-    await expect(renderPromise).rejects.toThrow(/crashed/);
-    expect(proc.killed).toBe(true);
-    manager.terminateAll();
-  });
-
-  it("times out a hung render and kills the process", async () => {
+  it("times out a hung render, restarts the worker, and still serves work queued behind it", async () => {
     vi.useFakeTimers();
-    const registry = makeRegistry([makeRecord("acme", { renderTimeoutMs: 100 })]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme", 1000)]));
+    const hung = manager.render("acme", luminance, {}, 1);
+    // Settle-capture before advancing timers: the rejection lands while the
+    // timer callback runs, so the handler has to already be attached.
+    const hungOutcome = hung.then(() => null, (err: Error) => err.message);
+    const queued = manager.render("acme", luminance, {}, 1);
+    const win = mocks.windows[0];
 
-    const renderPromise = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
+    fromPage(win, { type: "page-ready" });
+    await vi.waitFor(() => expect(win.sent.some((s) => s.message.type === "init")).toBe(true));
+    fromPage(win, { type: "ready" });
     await Promise.resolve();
 
-    const assertion = expect(renderPromise).rejects.toThrow(/timed out/);
-    await vi.advanceTimersByTimeAsync(150);
-    await assertion;
-    expect(proc.killed).toBe(true);
+    // Only the first render is dispatched — the second waits its turn, so its
+    // timeout budget cannot be spent while it is still queued.
+    expect(renders(win)).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1001);
+    expect(await hungOutcome).toMatch(/timed out after 1000ms/);
+
+    // The window survives; only the worker is restarted.
+    expect(win.destroyed).toBe(false);
+    expect(win.sent.some((s) => s.message.type === "restart")).toBe(true);
+
+    fromPage(win, { type: "ready" });
+    await vi.waitFor(() => expect(renders(win)).toHaveLength(2));
+    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, path: "survived" });
+
+    await expect(queued).resolves.toBe("survived");
     manager.terminateAll();
   });
 
-  it("recycles an idle process after the idle window, but leaves a busy one alone", async () => {
-    vi.useFakeTimers();
-    const registry = makeRegistry([makeRecord("acme")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("dispatches renders one at a time so each timeout starts when its render does", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const all = [0, 1, 2, 3].map(() => manager.render("acme", luminance, {}, 1));
+    const win = mocks.windows[0];
+    await bringUp(win);
 
+    for (let i = 0; i < 4; i++) {
+      await vi.waitFor(() => expect(renders(win)).toHaveLength(i + 1));
+      fromPage(win, { type: "result", reqId: renders(win)[i].message.reqId, path: `c${i}` });
+    }
+
+    await expect(Promise.all(all)).resolves.toEqual(["c0", "c1", "c2", "c3"]);
+    expect(mocks.windows).toHaveLength(1);
+    manager.terminateAll();
+  });
+
+  it("fails a plugin that never finishes loading instead of hanging forever", async () => {
+    vi.useFakeTimers();
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const promise = manager.render("acme", luminance, {}, 1);
+    const outcome = promise.then(() => null, (err: Error) => err.message);
+    // Page comes up but the plugin's own module evaluation never returns, so
+    // no "ready" ever arrives.
+    fromPage(mocks.windows[0], { type: "page-ready" });
+
+    await vi.advanceTimersByTimeAsync(10001);
+    expect(await outcome).toMatch(/did not finish loading/);
+    expect(mocks.windows[0].destroyed).toBe(true);
+    manager.terminateAll();
+  });
+
+  it("ignores messages from a window that is not a known plugin host", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
+    const promise = manager.render("acme", luminance, {}, 1);
+    const win = mocks.windows[0];
+    await bringUp(win);
+    const reqId = renders(win)[0].message.reqId;
+
+    fromPage({ webContents: { id: 9999 } } as unknown as FakeWindow, { type: "result", reqId, path: "spoofed" });
+    fromPage(win, { type: "result", reqId, path: "genuine" });
+
+    await expect(promise).resolves.toBe("genuine");
+    manager.terminateAll();
+  });
+
+  it("drops warm hosts on invalidateAll so edited source is re-read", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
     const first = manager.render("acme", luminance, {}, 1);
-    const proc = mocks.forkedProcesses[0];
-    proc.emit("message", { type: "ready" });
-    await Promise.resolve();
-    proc.emit("message", { type: "result", reqId: (proc.sentMessages[1] as { reqId: string }).reqId, path: "A" });
+    const win = mocks.windows[0];
+    await bringUp(win);
+    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, path: "A" });
     await first;
 
-    // Well under the 5-minute idle window plus one sweep interval — should survive.
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(proc.killed).toBe(false);
+    manager.invalidateAll();
+    expect(win.destroyed).toBe(true);
 
-    // Past the 5-minute idle window plus another sweep — should be recycled.
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(proc.killed).toBe(true);
+    const next = manager.render("acme", luminance, {}, 1);
+    await vi.waitFor(() => expect(mocks.windows).toHaveLength(2));
+    const fresh = mocks.windows[1];
+    await bringUp(fresh);
+    fromPage(fresh, { type: "result", reqId: renders(fresh)[0].message.reqId, path: "B" });
+
+    await expect(next).resolves.toBe("B");
     manager.terminateAll();
   });
 
-  it("isolates plugins from one another: one crashing does not affect another's in-flight render", async () => {
-    const registry = makeRegistry([makeRecord("acme"), makeRecord("beta")]);
-    const manager = new PluginHostManager("/host-entry.js", registry);
+  it("isolates plugins: one crashing leaves another's in-flight render alone", async () => {
+    const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme"), makeRecord("beta")]));
+    const acme = manager.render("acme", luminance, {}, 1);
+    const beta = manager.render("beta", luminance, {}, 1);
+    const [acmeWin, betaWin] = mocks.windows;
+    await bringUp(acmeWin);
+    await bringUp(betaWin);
 
-    const acmeRender = manager.render("acme", luminance, {}, 1);
-    const acmeProc = mocks.forkedProcesses[0];
-    acmeProc.emit("message", { type: "ready" });
-    await Promise.resolve();
+    acmeWin.emit("render-process-gone", {}, { reason: "oom" });
+    await expect(acme).rejects.toThrow(/acme/);
 
-    const betaRender = manager.render("beta", luminance, {}, 1);
-    const betaProc = mocks.forkedProcesses[1];
-    betaProc.emit("message", { type: "ready" });
-    await Promise.resolve();
-
-    // acme crashes entirely — beta must be unaffected.
-    acmeProc.emit("message", { type: "fatal", message: "boom" });
-    await expect(acmeRender).rejects.toThrow(/crashed/);
-
-    const betaReqId = (betaProc.sentMessages[1] as { reqId: string }).reqId;
-    betaProc.emit("message", { type: "result", reqId: betaReqId, path: "still fine" });
-    await expect(betaRender).resolves.toBe("still fine");
-    expect(betaProc.killed).toBe(false);
-
+    fromPage(betaWin, { type: "result", reqId: renders(betaWin)[0].message.reqId, path: "still fine" });
+    await expect(beta).resolves.toBe("still fine");
     manager.terminateAll();
   });
 });

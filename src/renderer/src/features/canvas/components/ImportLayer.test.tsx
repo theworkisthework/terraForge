@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { ImportLayer } from "./ImportLayer";
+import { MM_TO_PX } from "../constants";
 import type { SvgImport } from "../../../../../types";
 
 function makeBitmapImport(overrides?: Partial<SvgImport>): SvgImport {
@@ -78,5 +79,32 @@ describe("ImportLayer bitmap preview", () => {
     const paths = container.querySelectorAll("path");
     expect(paths).toHaveLength(1);
     expect(paths[0].getAttribute("d")).toBe("M0 0 L5 5");
+  });
+
+  it("keeps the ink-channel stroke width constant regardless of the import's own scale (vector-effect=non-scaling-stroke already handles that)", () => {
+    const tinyScale = makeBitmapImport({
+      scale: 0.073,
+      strokeWidthMM: 0.5,
+      paths: [{ id: "ink-0", d: "M0 0 L1 1", svgSource: "", visible: true, strokeColor: "#00ffff" }],
+    });
+    const normalScale = makeBitmapImport({
+      scale: 1,
+      strokeWidthMM: 0.5,
+      paths: [{ id: "ink-0", d: "M0 0 L1 1", svgSource: "", visible: true, strokeColor: "#00ffff" }],
+    });
+
+    const tiny = render(<ImportLayer imp={tinyScale} {...defaultProps} />);
+    const normal = render(<ImportLayer imp={normalScale} {...defaultProps} />);
+
+    const expectedWidth = String(0.5 * MM_TO_PX);
+    expect(tiny.container.querySelector("path")?.getAttribute("stroke-width")).toBe(expectedWidth);
+    expect(normal.container.querySelector("path")?.getAttribute("stroke-width")).toBe(expectedWidth);
+  });
+
+  it("keeps the legacy single-path stroke width constant regardless of scale too", () => {
+    const imp = makeBitmapImport({ scale: 0.073, strokeWidthMM: 0.5, paths: [], bitmapRendererPath: "M0 0 L5 5" });
+
+    const { container } = render(<ImportLayer imp={imp} {...defaultProps} />);
+    expect(container.querySelector("path")?.getAttribute("stroke-width")).toBe(String(0.5 * MM_TO_PX));
   });
 });

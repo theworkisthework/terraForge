@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
   return {
     handlers,
     openPath: vi.fn(),
+    invalidateAll: vi.fn(),
   };
 });
 
@@ -24,6 +25,7 @@ vi.mock("electron", () => ({
 
 import { registerBitmapPluginIpcHandlers } from "../../../src/main/ipc/bitmapPlugins";
 import { BitmapPluginRegistry } from "../../../src/main/plugins/pluginRegistry";
+import type { PluginHostManager } from "../../../src/main/plugins/pluginHostManager";
 
 describe("registerBitmapPluginIpcHandlers", () => {
   let pluginsDir: string;
@@ -34,7 +36,9 @@ describe("registerBitmapPluginIpcHandlers", () => {
     mocks.handlers.clear();
     mocks.openPath.mockReset();
     registry = new BitmapPluginRegistry(pluginsDir);
-    registerBitmapPluginIpcHandlers({ pluginsDir, registry });
+    mocks.invalidateAll.mockReset();
+    const hostManager = { invalidateAll: mocks.invalidateAll } as unknown as PluginHostManager;
+    registerBitmapPluginIpcHandlers({ pluginsDir, registry, hostManager });
   });
 
   afterEach(async () => {
@@ -55,6 +59,11 @@ describe("registerBitmapPluginIpcHandlers", () => {
   it("rescan re-reads the plugins directory and returns manifests plus errors", async () => {
     const result = await mocks.handlers.get("bitmapPlugins:rescan")!();
     expect(result).toEqual({ manifests: [], errors: [] });
+  });
+
+  it("rescan drops warm plugin hosts so edited source is re-read", async () => {
+    await mocks.handlers.get("bitmapPlugins:rescan")!();
+    expect(mocks.invalidateAll).toHaveBeenCalledTimes(1);
   });
 
   it("openFolder reveals the plugins directory via shell.openPath", async () => {

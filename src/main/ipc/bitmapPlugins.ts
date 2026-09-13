@@ -20,6 +20,10 @@ export function registerBitmapPluginIpcHandlers({
 
   ipcMain.handle("bitmapPlugins:rescan", async () => {
     const { plugins, errors } = await registry.rescan();
+    // A warm host holds the plugin's modules in memory, so without this an
+    // edited plugin would keep rendering with its previous source until the
+    // idle sweep happened to recycle it.
+    hostManager.invalidateAll();
     return { manifests: plugins.map((plugin) => plugin.manifest), errors };
   });
 
