@@ -2,6 +2,7 @@ import type { SvgImport, SvgPath } from "../../../../../types";
 import { useBitmapPluginStore } from "../../store/bitmapPluginStore";
 import { separateCMY, separateCMYK, separateCustomPalette, separateRGB } from "./colourSeparation";
 import { findBitmapRenderer, getBitmapRenderer } from "./registry";
+import { validateRendererPath } from "./validatePath";
 import type { BitmapLuminance } from "./types";
 
 export function dataUrlFromBytes(bytes: Uint8Array, mimeType: string): string {
@@ -13,7 +14,27 @@ export function dataUrlFromBytes(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
+/**
+ * Decoding a data URL costs an Image load, a canvas draw and a full pixel
+ * readback — tens of milliseconds and tens of megabytes for a large photo.
+ * A bitmap's source never changes for the life of an import, but every
+ * settings change re-renders it, so without this every slider nudge paid for
+ * a fresh decode of the same image.
+ *
+ * One entry: renders come from whichever import is currently selected, so a
+ * second slot buys little while each entry holds a whole RGBA readback. The
+ * cached ImageData is shared with every caller and must be treated as
+ * read-only.
+ */
+let decodeCache: { dataUrl: string; image: ImageData } | null = null;
+
+/** Drops the cached decode. Exported for tests; the cache self-evicts otherwise. */
+export function clearBitmapDecodeCache(): void {
+  decodeCache = null;
+}
+
 async function decodeToImageData(dataUrl: string): Promise<ImageData> {
+  if (decodeCache?.dataUrl === dataUrl) return decodeCache.image;
   if (typeof Image === "undefined" || typeof document === "undefined") {
     throw new Error("Bitmap decoding is unavailable in this environment.");
   }
@@ -31,7 +52,9 @@ async function decodeToImageData(dataUrl: string): Promise<ImageData> {
     throw new Error("Could not read bitmap image pixels.");
   }
   context.drawImage(image, 0, 0);
-  return context.getImageData(0, 0, canvas.width, canvas.height);
+  const decoded = context.getImageData(0, 0, canvas.width, canvas.height);
+  decodeCache = { dataUrl, image: decoded };
+  return decoded;
 }
 
 export async function decodeBitmapLuminance(dataUrl: string): Promise<BitmapLuminance> {
@@ -92,6 +115,31 @@ type MaterializableBitmap = Pick<
 >;
 
 /**
+ * Identifies the inputs that determine a bitmap's rendered output, so the
+ * panel can tell "already rendered with exactly these settings" apart from
+ * "needs rendering". Without it, merely selecting a bitmap layer re-ran the
+ * renderer and wrote the result back, which for a plugin means a sandbox
+ * round trip and a document marked dirty for no change at all.
+ *
+ * `bitmapDataUrl` is fixed for the life of an import, so its length stands in
+ * for the image rather than hashing megabytes on every check. Settings keys
+ * are sorted so that a bag rebuilt in a different order still compares equal.
+ */
+export function bitmapRenderSignature(bitmap: MaterializableBitmap): string {
+  const settings = bitmap.bitmapRendererSettings ?? {};
+  return JSON.stringify([
+    bitmap.bitmapDataUrl?.length ?? 0,
+    bitmap.bitmapRendererId ?? "",
+    Object.keys(settings)
+      .sort()
+      .map((key) => [key, settings[key]]),
+    bitmap.bitmapBaseScale ?? null,
+    bitmap.bitmapSeparationMode ?? "none",
+    bitmap.bitmapSeparationPalette ?? [],
+  ]);
+}
+
+/**
  * Turns a bitmap import into plottable geometry: either the legacy single
  * path (`bitmapSeparationMode` "none"/unset — today's behavior, unchanged)
  * or, when colour separation is active, one synthesized `SvgPath` per ink
@@ -123,7 +171,7 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
   if (mode === "none") {
     const luminance = await decodeBitmapLuminance(bitmap.bitmapDataUrl);
     const path = await renderer.render(luminance, settings, baseScale);
-    return { bitmapRendererPath: path, paths: [] };
+    return { bitmapRendererPath: validateRendererPath(path, renderer.id), paths: [] };
   }
 
   const colorData = await decodeBitmapColor(bitmap.bitmapDataUrl);
@@ -136,7 +184,7 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
   const paths = await Promise.all(
     channels.map(async (channel, index): Promise<SvgPath> => ({
       id: `${bitmap.id}-ink-${index}`,
-      d: await renderer.render(channel.luminance, settings, baseScale),
+      d: validateRendererPath(await renderer.render(channel.luminance, settings, baseScale), renderer.id),
       svgSource: "",
       visible: true,
       label: channel.label,

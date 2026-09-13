@@ -14,9 +14,15 @@ export function registerBitmapPluginIpcHandlers({
   registry,
   hostManager,
 }: BitmapPluginIpcOptions): void {
-  ipcMain.handle("bitmapPlugins:list", () =>
-    registry.list().map((plugin) => plugin.manifest),
-  );
+  ipcMain.handle("bitmapPlugins:list", async () => {
+    // Awaiting the first scan is what stops a startup-time list() from
+    // returning empty while discovery is still in flight.
+    await registry.ready();
+    return {
+      manifests: registry.list().map((plugin) => plugin.manifest),
+      errors: registry.lastErrors(),
+    };
+  });
 
   ipcMain.handle("bitmapPlugins:rescan", async () => {
     const { plugins, errors } = await registry.rescan();
@@ -39,6 +45,9 @@ export function registerBitmapPluginIpcHandlers({
   );
 
   ipcMain.handle("bitmapPlugins:openFolder", async () => {
-    shell.openPath(pluginsDir);
+    // openPath resolves with an error string rather than rejecting, so an
+    // unopenable folder would otherwise look like success to the caller.
+    const failure = await shell.openPath(pluginsDir);
+    if (failure) throw new Error(`Could not open the plugins folder: ${failure}`);
   });
 }

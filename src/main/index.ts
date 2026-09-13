@@ -126,4 +126,4 @@ registerBitmapPluginIpcHandlers({
   hostManager: bitmapPluginHostManager,
 });
 
-void bitmapPluginRegistry.rescan();
+void bitmapPluginRegistry.ready();

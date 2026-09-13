@@ -203,7 +203,7 @@ if (typeof window !== "undefined") {
       onMenuAbout: vi.fn().mockReturnValue(() => {}),
     },
     bitmapPlugins: {
-      list: vi.fn().mockResolvedValue([]),
+      list: vi.fn().mockResolvedValue({ manifests: [], errors: [] }),
       rescan: vi.fn().mockResolvedValue({ manifests: [], errors: [] }),
       render: vi.fn().mockResolvedValue(""),
       openFolder: vi.fn().mockResolvedValue(undefined),

@@ -8,7 +8,7 @@ import type {
   BackgroundTask,
   VectorObject,
   GcodeOptions,
-  BitmapPluginManifest,
+  BitmapPluginScan,
 } from "../types";
 
 // ─── Utility: create a typed IPC invoker ─────────────────────────────────────
@@ -223,12 +223,8 @@ const editApi: TerraForgeAPI["edit"] = {
 // ─── Bitmap renderer plugins API ──────────────────────────────────────────────
 
 const bitmapPlugins: TerraForgeAPI["bitmapPlugins"] = {
-  list: () => invoke<BitmapPluginManifest[]>("bitmapPlugins:list"),
-  rescan: () =>
-    invoke<{
-      manifests: BitmapPluginManifest[];
-      errors: { folder: string; message: string }[];
-    }>("bitmapPlugins:rescan"),
+  list: () => invoke<BitmapPluginScan>("bitmapPlugins:list"),
+  rescan: () => invoke<BitmapPluginScan>("bitmapPlugins:rescan"),
   render: (pluginId, luminance, settings, baseScale) =>
     invoke<string>(
       "bitmapPlugins:render",

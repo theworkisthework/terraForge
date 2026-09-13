@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import type { SvgImport } from "../../../../../types";
 import { ErrorBoundary } from "../../../components/ErrorBoundary";
 import { useBitmapPluginStore } from "../../../store/bitmapPluginStore";
-import { materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
+import { bitmapRenderSignature, materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
 import {
   bitmapRenderers,
   findBitmapRenderer,
   getBitmapRenderer,
   pluginRendererFromManifest,
 } from "../../bitmap-renderers/registry";
+import { BitmapPluginsSection } from "./BitmapPluginsSection";
 import { BitmapSeparationSection } from "./BitmapSeparationSection";
 import { RendererFieldControl } from "./RendererFieldControl";
 
@@ -33,7 +34,19 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
   const [renderStatus, setRenderStatus] = useState<"idle" | "rendering" | "error">("idle");
   const [renderError, setRenderError] = useState<string | null>(null);
 
+  const renderSignature = bitmapRenderSignature(imp);
+
   useEffect(() => {
+    // The stored output already came from exactly these inputs, so selecting
+    // this layer again must not re-run the renderer — for a plugin that is a
+    // sandbox round trip, and the write-back would mark the document dirty
+    // without changing anything.
+    if (imp.bitmapRenderSignature === renderSignature) {
+      setRenderStatus("idle");
+      setRenderError(null);
+      return;
+    }
+
     let cancelled = false;
     setRenderStatus("rendering");
     setRenderError(null);
@@ -43,7 +56,7 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
         .then(({ bitmapRendererPath, paths }) => {
           if (cancelled) return;
           setRenderStatus("idle");
-          onUpdate({ bitmapRendererPath, paths });
+          onUpdate({ bitmapRendererPath, paths, bitmapRenderSignature: renderSignature });
         })
         .catch((err: unknown) => {
           if (cancelled) return;
@@ -59,14 +72,8 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [
-    imp.bitmapDataUrl,
-    imp.bitmapRendererId,
-    imp.bitmapRendererSettings,
-    imp.bitmapBaseScale,
-    imp.bitmapSeparationMode,
-    imp.bitmapSeparationPalette,
-  ]);
+    // renderSignature stands in for every input the render depends on.
+  }, [renderSignature, imp.bitmapRenderSignature]);
 
   const updateSettings = (changes: Partial<typeof settings>) =>
     onUpdate({ bitmapRendererSettings: { ...settings, ...changes }, bitmapRendererPath: undefined, paths: [] });
@@ -166,6 +173,7 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
           />
         </div>
       </div>
+      <BitmapPluginsSection />
     </div>
   );
 }

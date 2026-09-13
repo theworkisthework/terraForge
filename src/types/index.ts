@@ -313,6 +313,15 @@ export const DEFAULT_HATCH_ANGLE_DEG = 45;
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
 /**
+ * Ceiling on the path string a bitmap renderer may return. Generous enough
+ * that no plausible render approaches it, low enough that a runaway renderer
+ * cannot exhaust memory as its output is copied between processes. Enforced
+ * both inside the plugin sandbox (so an absurd string is never transported)
+ * and when the result is taken into the document.
+ */
+export const MAX_BITMAP_RENDERER_PATH_LENGTH = 16 * 1024 * 1024;
+
+/**
  * Settings bag for a bitmap renderer. The field set and value types are owned
  * by the renderer's own schema (see `BitmapRendererDefinition.fields`), not by
  * this type — different renderers use different keys.
@@ -430,6 +439,12 @@ export interface SvgImport {
   bitmapRendererSettings?: BitmapRendererSettings;
   /** Persisted renderer output in bitmap pixel coordinates, used for preview and G-code. */
   bitmapRendererPath?: string;
+  /**
+   * Fingerprint of the inputs that produced the stored output (see
+   * `bitmapRenderSignature`). Lets the panel skip re-rendering a bitmap whose
+   * settings have not changed, including after a layout is reopened.
+   */
+  bitmapRenderSignature?: string;
   /** Source scale used to convert renderer controls in mm into bitmap pixels. */
   bitmapBaseScale?: number;
   /** Opacity of the source image below the generated preview. */
@@ -774,11 +789,28 @@ export interface ConfigApi {
   openPageSizesFile: () => Promise<void>;
 }
 
+/** Why one plugin folder was rejected during discovery. */
+export interface BitmapPluginDiscoveryError {
+  /** The plugin folder's name, as it appears in the plugins directory. */
+  folder: string;
+  message: string;
+}
+
+export interface BitmapPluginScan {
+  manifests: BitmapPluginManifest[];
+  errors: BitmapPluginDiscoveryError[];
+}
+
 export interface BitmapPluginsApi {
-  /** Metadata for every currently-discovered plugin (no plugin code is executed to produce this). */
-  list: () => Promise<BitmapPluginManifest[]>;
+  /**
+   * Metadata for every currently-discovered plugin, plus the reason each
+   * rejected folder was rejected (no plugin code is executed to produce this).
+   * Waits for the app's initial scan rather than returning an empty list while
+   * it is still running.
+   */
+  list: () => Promise<BitmapPluginScan>;
   /** Re-scan the plugins directory on disk. Returns fresh metadata plus any per-folder discovery errors. */
-  rescan: () => Promise<{ manifests: BitmapPluginManifest[]; errors: { folder: string; message: string }[] }>;
+  rescan: () => Promise<BitmapPluginScan>;
   /** Runs a plugin's render() in its isolated host process. Rejects on timeout, crash, or a thrown error. */
   render: (
     pluginId: string,

@@ -25,7 +25,11 @@ import {
 import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
-import { dataUrlFromBytes, materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
+import {
+  bitmapRenderSignature,
+  dataUrlFromBytes,
+  materializeBitmapLayers,
+} from "../../bitmap-renderers/bitmapImage";
 import { getBitmapRenderer } from "../../bitmap-renderers/registry";
 import {
   type SvgImport,
@@ -414,13 +418,14 @@ export function useImportActions() {
       const importId = uuid();
       const defaultRenderer = getBitmapRenderer(undefined);
       const bitmapRendererSettings = { ...defaultRenderer.defaults };
-      const { bitmapRendererPath } = await materializeBitmapLayers({
+      const renderInputs = {
         id: importId,
         bitmapDataUrl,
         bitmapRendererId: defaultRenderer.id,
         bitmapRendererSettings,
         bitmapBaseScale: baseScale,
-      });
+      };
+      const { bitmapRendererPath } = await materializeBitmapLayers(renderInputs);
       const image = await new Promise<HTMLImageElement>((resolve, reject) => {
         const element = new Image();
         element.onload = () => resolve(element);
@@ -436,6 +441,9 @@ export function useImportActions() {
         svgWidth: image.naturalWidth, svgHeight: image.naturalHeight, viewBoxX: 0, viewBoxY: 0,
         bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: defaultRenderer.id,
         bitmapRendererSettings, bitmapRendererPath, bitmapBaseScale: baseScale, bitmapOpacity: 0.25,
+        // Stamped now so selecting the new import does not immediately
+        // re-render geometry that was just produced.
+        bitmapRenderSignature: bitmapRenderSignature(renderInputs),
         bitmapSourceVisible: true,
         bitmapPreviewOpacity: 1,
         bitmapPreviewVisible: true,
