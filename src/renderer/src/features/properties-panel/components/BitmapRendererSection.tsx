@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SvgImport } from "../../../../../types";
+import type { BitmapRendererSettings, SvgImport } from "../../../../../types";
 import { ErrorBoundary } from "../../../components/ErrorBoundary";
 import { useBitmapPluginStore } from "../../../store/bitmapPluginStore";
 import { bitmapRenderSignature, materializeBitmapLayers } from "../../bitmap-renderers/bitmapImage";
@@ -61,7 +61,13 @@ type RenderStatus = keyof typeof RENDER_STATUS_LABEL;
 
 export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpdate: (changes: Partial<SvgImport>) => void }) {
   const pluginManifests = useBitmapPluginStore((state) => state.plugins);
-  const allRenderers = [...bitmapRenderers, ...pluginManifests.map(pluginRendererFromManifest)];
+  // This panel drives a bitmap, so only offer renderers that can take a source
+  // image. A plugin declaring `"source": "none"` is a generator — it would run
+  // here and quietly ignore the picture, which is worse than not being listed.
+  const allRenderers = [
+    ...bitmapRenderers,
+    ...pluginManifests.filter((manifest) => manifest.source !== "none").map(pluginRendererFromManifest),
+  ];
 
   // An unset renderer id defaults (new import); a set-but-unresolvable id
   // (e.g. an uninstalled plugin) must surface as missing, not silently
@@ -168,7 +174,7 @@ export function BitmapRendererSection({ imp, onUpdate }: { imp: SvgImport; onUpd
    * geometry is not a slightly-out-of-date version of the new geometry, it is
    * a different kind of thing.
    */
-  const updateSettings = (changes: Partial<typeof settings>) =>
+  const updateSettings = (changes: BitmapRendererSettings) =>
     onUpdate({ bitmapRendererSettings: { ...settings, ...changes } });
 
   return (

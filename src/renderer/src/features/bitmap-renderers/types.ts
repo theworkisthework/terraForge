@@ -1,9 +1,10 @@
 import type {
-  BitmapLuminance,
   BitmapRendererFieldSchema,
   BitmapRendererIconName,
   BitmapRendererSettings,
-} from "../../../../../types";
+  RendererContext,
+  RendererOutput,
+} from "../../../../types";
 
 // The field-schema contract (BitmapRendererFieldSchema and its number/boolean/
 // select variants, BitmapRendererIconName, BitmapLuminance) lives in the
@@ -12,7 +13,10 @@ import type {
 // BitmapPluginManifest). Re-exported here so existing renderer-local imports
 // don't need to change.
 export type {
-  BitmapLuminance,
+  RendererSource,
+  RendererContext,
+  RendererLayer,
+  RendererOutput,
   BitmapRendererFieldSchema,
   BitmapRendererIconName,
   BitmapRendererBooleanFieldSchema,
@@ -20,7 +24,7 @@ export type {
   BitmapRendererNumberPreset,
   BitmapRendererSelectFieldSchema,
   BitmapRendererSelectOption,
-} from "../../../../../types";
+} from "../../../../types";
 
 export interface BitmapRendererDefinition {
   id: string;
@@ -30,12 +34,8 @@ export interface BitmapRendererDefinition {
   fields: BitmapRendererFieldSchema[];
   /**
    * Sync for in-tree renderers; an externally-installed plugin's equivalent
-   * runs in an isolated process and is always async, so this must accept
+   * runs in an isolated sandbox and is always async, so this must accept
    * either.
    */
-  render: (
-    luminance: BitmapLuminance,
-    settings: BitmapRendererSettings,
-    baseScale: number,
-  ) => string | Promise<string>;
+  render: (context: RendererContext) => RendererOutput | Promise<RendererOutput>;
 }

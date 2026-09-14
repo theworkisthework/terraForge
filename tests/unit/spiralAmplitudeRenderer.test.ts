@@ -5,7 +5,25 @@ import {
   luminanceAt,
   spiralAmplitudeDefaults,
 } from "../../src/renderer/src/features/bitmap-renderers/spiralAmplitude";
+import type {
+  BitmapRendererSettings,
+  RendererContext,
+  RendererSource,
+} from "../../src/types";
 import { vectorObjectsForImport } from "../../src/renderer/src/store/canvasStore/services/vectorObjects";
+
+/** Builds a render context the way the app does when a bitmap drives it. */
+const ctx = (
+  source: RendererSource,
+  settings: BitmapRendererSettings,
+  scale: number,
+): RendererContext => ({
+  width: source.width,
+  height: source.height,
+  scale,
+  settings,
+  source,
+});
 
 describe("generateSpiralAmplitudePath", () => {
   it("uses practical defaults for a legible initial render", () => {
@@ -34,11 +52,7 @@ describe("generateSpiralAmplitudePath", () => {
   });
 
   it("produces a bounded plot-ready spiral for luminance data", () => {
-    const path = generateSpiralAmplitudePath(
-      { width: 20, height: 10, values: new Uint8Array(200).fill(64) },
-      { spacingMM: 2, toothWidthMM: 1, amplitude: 1 },
-      25.4 / 96,
-    );
+    const path = generateSpiralAmplitudePath(ctx({ width: 20, height: 10, values: new Uint8Array(200).fill(64) }, { spacingMM: 2, toothWidthMM: 1, amplitude: 1 }, 25.4 / 96));
 
     expect(path).toMatch(/^M/);
     expect(path).toContain(" L");
@@ -47,46 +61,26 @@ describe("generateSpiralAmplitudePath", () => {
 
   it("returns no path for an empty image", () => {
     expect(
-      generateSpiralAmplitudePath(
-        { width: 0, height: 0, values: new Uint8Array() },
-        { spacingMM: 1, toothWidthMM: 1, amplitude: 1 },
-        1,
-      ),
+      generateSpiralAmplitudePath(ctx({ width: 0, height: 0, values: new Uint8Array() }, { spacingMM: 1, toothWidthMM: 1, amplitude: 1 }, 1)),
     ).toBe("");
   });
 
   it("uses sawtooth modulation only where the source is dark", () => {
-    const white = generateSpiralAmplitudePath(
-      { width: 40, height: 40, values: new Uint8Array(1600).fill(255) },
-      { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
-      1,
-    );
-    const black = generateSpiralAmplitudePath(
-      { width: 40, height: 40, values: new Uint8Array(1600).fill(0) },
-      { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
-      1,
-    );
+    const white = generateSpiralAmplitudePath(ctx({ width: 40, height: 40, values: new Uint8Array(1600).fill(255) }, { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 }, 1));
+    const black = generateSpiralAmplitudePath(ctx({ width: 40, height: 40, values: new Uint8Array(1600).fill(0) }, { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 }, 1));
 
     expect(black).not.toBe(white);
   });
 
   it("keeps a white bitmap on the smooth underlying spiral", () => {
-    const path = generateSpiralAmplitudePath(
-      { width: 20, height: 20, values: new Uint8Array(400).fill(255) },
-      { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
-      1,
-    );
+    const path = generateSpiralAmplitudePath(ctx({ width: 20, height: 20, values: new Uint8Array(400).fill(255) }, { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 }, 1));
 
     expect(path).not.toContain("NaN");
     expect(path).not.toContain("Infinity");
   });
 
   it("keeps waveform sampling dense at the outer spiral", () => {
-    const path = generateSpiralAmplitudePath(
-      { width: 200, height: 200, values: new Uint8Array(40_000).fill(0) },
-      { spacingMM: 10, toothWidthMM: 0.1, amplitude: 2 },
-      1,
-    );
+    const path = generateSpiralAmplitudePath(ctx({ width: 200, height: 200, values: new Uint8Array(40_000).fill(0) }, { spacingMM: 10, toothWidthMM: 0.1, amplitude: 2 }, 1));
 
     expect((path.match(/[ML]/g) ?? []).length).toBeGreaterThan(20_000);
   });

@@ -9,6 +9,8 @@ import type {
   VectorObject,
   GcodeOptions,
   BitmapPluginScan,
+  BitmapPluginExampleInstall,
+  RendererOutput,
 } from "../types";
 
 // ─── Utility: create a typed IPC invoker ─────────────────────────────────────
@@ -225,14 +227,9 @@ const editApi: TerraForgeAPI["edit"] = {
 const bitmapPlugins: TerraForgeAPI["bitmapPlugins"] = {
   list: () => invoke<BitmapPluginScan>("bitmapPlugins:list"),
   rescan: () => invoke<BitmapPluginScan>("bitmapPlugins:rescan"),
-  render: (pluginId, luminance, settings, baseScale) =>
-    invoke<string>(
-      "bitmapPlugins:render",
-      pluginId,
-      luminance,
-      settings,
-      baseScale,
-    ),
+  render: (pluginId, context) =>
+    invoke<RendererOutput>("bitmapPlugins:render", pluginId, context),
+  installExamples: () => invoke<BitmapPluginExampleInstall>("bitmapPlugins:installExamples"),
   openFolder: () => invoke<void>("bitmapPlugins:openFolder"),
 };
 

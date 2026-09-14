@@ -20,7 +20,7 @@ import {
 import { FluidNCClient } from "../machine/fluidnc";
 import { SerialClient } from "../machine/serial";
 import { TaskManager } from "../tasks/taskManager";
-import { resolveBitmapPluginsDir } from "./plugins/pluginPaths";
+import { resolveBitmapPluginsDir, resolveBundledExamplesDir } from "./plugins/pluginPaths";
 import { BitmapPluginRegistry } from "./plugins/pluginRegistry";
 import { PluginHostManager } from "./plugins/pluginHostManager";
 import { registerPluginScheme } from "./plugins/pluginSandbox";
@@ -122,6 +122,7 @@ registerJobIpcHandlers(taskManager, safeSend);
 
 registerBitmapPluginIpcHandlers({
   pluginsDir: bitmapPluginsDir,
+  examplesDir: resolveBundledExamplesDir(__dirname),
   registry: bitmapPluginRegistry,
   hostManager: bitmapPluginHostManager,
 });

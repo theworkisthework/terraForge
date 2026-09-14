@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { validateRendererPath } from "@renderer/features/bitmap-renderers/validatePath";
+import {
+  validateRendererOutput,
+  validateRendererPath,
+} from "@renderer/features/bitmap-renderers/validatePath";
 import {
   clearBitmapDecodeCache,
   materializeBitmapLayers,
@@ -118,5 +121,45 @@ describe("materializeBitmapLayers output checking", () => {
     await expect(
       materializeBitmapLayers({ ...bitmap, bitmapSeparationMode: "rgb" }),
     ).rejects.toThrow(/invalid path data/);
+  });
+});
+
+describe("validateRendererOutput", () => {
+  it("treats a bare path string as one unnamed layer", () => {
+    expect(validateRendererOutput("M0 0 L1 1", "acme")).toEqual([{ d: "M0 0 L1 1" }]);
+  });
+
+  it("accepts labelled, coloured layers for a renderer driving several pens", () => {
+    const layers = [
+      { d: "M0 0 L1 1", label: "Outline", color: "#ff0000" },
+      { d: "M2 2 L3 3", label: "Fill" },
+    ];
+    expect(validateRendererOutput(layers, "acme")).toEqual(layers);
+  });
+
+  it("checks the path data of every layer, not just the first", () => {
+    expect(() =>
+      validateRendererOutput([{ d: "M0 0" }, { d: "M0 0 LNaN 1" }], "acme"),
+    ).toThrow(/invalid path data/);
+  });
+
+  it("rejects a layer with no path data", () => {
+    expect(() => validateRendererOutput([{ label: "Outline" }], "acme")).toThrow(
+      /returned undefined instead/,
+    );
+  });
+
+  it("rejects layer metadata of the wrong type", () => {
+    expect(() => validateRendererOutput([{ d: "M0 0", label: 7 }], "acme")).toThrow(
+      /non-string label/,
+    );
+    expect(() => validateRendererOutput([{ d: "M0 0", color: {} }], "acme")).toThrow(
+      /non-string color/,
+    );
+  });
+
+  it("rejects anything that is neither a string nor an array", () => {
+    expect(() => validateRendererOutput({ d: "M0 0" }, "acme")).toThrow(/expected a path string/);
+    expect(() => validateRendererOutput(null, "acme")).toThrow(/returned null/);
   });
 });

@@ -22,6 +22,9 @@ interface BitmapPluginState {
   loadBitmapPlugins: () => Promise<void>;
   rescanBitmapPlugins: () => Promise<void>;
   openPluginsFolder: () => Promise<void>;
+  installExamplePlugins: () => Promise<void>;
+  /** What the last example install did, for a one-off confirmation message. */
+  lastInstall: { installed: string[]; skipped: string[]; unsupported: string[] } | null;
 }
 
 export const useBitmapPluginStore = create<BitmapPluginState>((set) => ({
@@ -29,6 +32,7 @@ export const useBitmapPluginStore = create<BitmapPluginState>((set) => ({
   errors: [],
   scanning: false,
   actionError: null,
+  lastInstall: null,
 
   setPlugins: (plugins) => set({ plugins }),
 
@@ -46,6 +50,22 @@ export const useBitmapPluginStore = create<BitmapPluginState>((set) => ({
     try {
       const { manifests, errors } = await window.terraForge.bitmapPlugins.rescan();
       set({ plugins: manifests, errors, scanning: false });
+    } catch (err) {
+      set({ scanning: false, actionError: describe(err) });
+    }
+  },
+
+  installExamplePlugins: async () => {
+    set({ scanning: true, actionError: null, lastInstall: null });
+    try {
+      const { manifests, errors, installed, skipped, unsupported } =
+        await window.terraForge.bitmapPlugins.installExamples();
+      set({
+        plugins: manifests,
+        errors,
+        scanning: false,
+        lastInstall: { installed, skipped, unsupported },
+      });
     } catch (err) {
       set({ scanning: false, actionError: describe(err) });
     }

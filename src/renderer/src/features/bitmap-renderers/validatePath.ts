@@ -1,4 +1,8 @@
-import { MAX_BITMAP_RENDERER_PATH_LENGTH } from "../../../../types";
+import {
+  MAX_BITMAP_RENDERER_PATH_LENGTH,
+  type RendererLayer,
+  type RendererOutput,
+} from "../../../../types";
 
 /**
  * Characters that may legally appear in SVG path data: command letters,
@@ -45,4 +49,39 @@ export function validateRendererPath(path: unknown, rendererId: string): string 
   }
 
   return path;
+}
+
+/**
+ * Normalises whatever a renderer returned into layers, checking each one.
+ *
+ * A bare string is the common case and stays valid — it becomes a single
+ * unnamed layer. An array lets a renderer drive several pens itself, which a
+ * generative renderer may well want to do without the caller having to run it
+ * once per colour the way bitmap colour separation does.
+ */
+export function validateRendererOutput(output: unknown, rendererId: string): RendererLayer[] {
+  if (typeof output === "string") {
+    return [{ d: validateRendererPath(output, rendererId) }];
+  }
+
+  if (!Array.isArray(output)) {
+    throw new Error(
+      `Renderer "${rendererId}" returned ${output === null ? "null" : typeof output}; ` +
+        "expected a path string or an array of layers.",
+    );
+  }
+
+  return (output as RendererOutput[]).map((layer, index) => {
+    if (typeof layer !== "object" || layer === null || Array.isArray(layer)) {
+      throw new Error(`Renderer "${rendererId}" layer ${index} is not an object.`);
+    }
+    const { d, label, color } = layer as RendererLayer;
+    if (label !== undefined && typeof label !== "string") {
+      throw new Error(`Renderer "${rendererId}" layer ${index} has a non-string label.`);
+    }
+    if (color !== undefined && typeof color !== "string") {
+      throw new Error(`Renderer "${rendererId}" layer ${index} has a non-string color.`);
+    }
+    return { d: validateRendererPath(d, rendererId), label, color };
+  });
 }

@@ -1,9 +1,9 @@
-import type { SvgImport, SvgPath } from "../../../../../types";
+import type { SvgImport, SvgPath } from "../../../../types";
 import { useBitmapPluginStore } from "../../store/bitmapPluginStore";
 import { separateCMY, separateCMYK, separateCustomPalette, separateRGB } from "./colourSeparation";
 import { findBitmapRenderer, getBitmapRenderer } from "./registry";
-import { validateRendererPath } from "./validatePath";
-import type { BitmapLuminance } from "./types";
+import { validateRendererOutput } from "./validatePath";
+import type { RendererSource } from "./types";
 
 export function dataUrlFromBytes(bytes: Uint8Array, mimeType: string): string {
   const chunkSize = 0x8000;
@@ -57,7 +57,7 @@ async function decodeToImageData(dataUrl: string): Promise<ImageData> {
   return decoded;
 }
 
-export async function decodeBitmapLuminance(dataUrl: string): Promise<BitmapLuminance> {
+export async function decodeBitmapLuminance(dataUrl: string): Promise<RendererSource> {
   const { data, width, height } = await decodeToImageData(dataUrl);
   const values = new Uint8Array(width * height);
   for (let index = 0; index < values.length; index++) {
@@ -139,6 +139,28 @@ export function bitmapRenderSignature(bitmap: MaterializableBitmap): string {
   ]);
 }
 
+/** One ink layer of a renderer's output, as a path the rest of the app understands. */
+function inkPath(
+  importId: string,
+  suffix: string,
+  d: string,
+  label: string | undefined,
+  color: string | undefined,
+): SvgPath {
+  return {
+    id: `${importId}-ink-${suffix}`,
+    d,
+    svgSource: "",
+    visible: true,
+    label: label ?? `Layer ${suffix}`,
+    hasFill: false,
+    strokeColor: color,
+    sourceColor: color,
+    sourceOutlineVisible: true,
+    outlineVisible: true,
+  };
+}
+
 /**
  * Turns a bitmap import into plottable geometry: either the legacy single
  * path (`bitmapSeparationMode` "none"/unset — today's behavior, unchanged)
@@ -169,9 +191,29 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
   const mode = bitmap.bitmapSeparationMode ?? "none";
 
   if (mode === "none") {
-    const luminance = await decodeBitmapLuminance(bitmap.bitmapDataUrl);
-    const path = await renderer.render(luminance, settings, baseScale);
-    return { bitmapRendererPath: validateRendererPath(path, renderer.id), paths: [] };
+    const source = await decodeBitmapLuminance(bitmap.bitmapDataUrl);
+    const layers = validateRendererOutput(
+      await renderer.render({
+        width: source.width,
+        height: source.height,
+        scale: baseScale,
+        settings,
+        source,
+      }),
+      renderer.id,
+    );
+
+    // A renderer that returned one unnamed path keeps the single-path
+    // representation; one that returned named layers is projected the same
+    // way a colour separation is, so multi-pen output needs no special case
+    // anywhere downstream.
+    if (layers.length === 1 && layers[0].label === undefined && layers[0].color === undefined) {
+      return { bitmapRendererPath: layers[0].d, paths: [] };
+    }
+    return {
+      bitmapRendererPath: "",
+      paths: layers.map((layer, index) => inkPath(bitmap.id, `${index}`, layer.d, layer.label, layer.color)),
+    };
   }
 
   const colorData = await decodeBitmapColor(bitmap.bitmapDataUrl);
@@ -181,19 +223,36 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
     : mode === "cmyk" ? separateCMYK(colorData)
     : separateCustomPalette(colorData, bitmap.bitmapSeparationPalette ?? []);
 
-  const paths = await Promise.all(
-    channels.map(async (channel, index): Promise<SvgPath> => ({
-      id: `${bitmap.id}-ink-${index}`,
-      d: validateRendererPath(await renderer.render(channel.luminance, settings, baseScale), renderer.id),
-      svgSource: "",
-      visible: true,
-      label: channel.label,
-      hasFill: false,
-      strokeColor: channel.color,
-      sourceColor: channel.color,
-      sourceOutlineVisible: true,
-      outlineVisible: true,
+  const perChannel = await Promise.all(
+    channels.map(async (channel, index) => ({
+      channel,
+      index,
+      layers: validateRendererOutput(
+        await renderer.render({
+          width: channel.luminance.width,
+          height: channel.luminance.height,
+          scale: baseScale,
+          settings,
+          source: channel.luminance,
+        }),
+        renderer.id,
+      ),
     })),
+  );
+
+  // A renderer may itself split a channel into several layers, so the ink
+  // channel and the renderer's own layer both contribute to the name and
+  // colour — the channel says which ink, the layer says which part of it.
+  const paths = perChannel.flatMap(({ channel, index, layers }) =>
+    layers.map((layer, layerIndex) =>
+      inkPath(
+        bitmap.id,
+        layers.length === 1 ? `${index}` : `${index}-${layerIndex}`,
+        layer.d,
+        layer.label ? `${channel.label} · ${layer.label}` : channel.label,
+        layer.color ?? channel.color,
+      ),
+    ),
   );
 
   return { bitmapRendererPath: "", paths };

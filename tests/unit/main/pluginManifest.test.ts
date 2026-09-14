@@ -334,6 +334,39 @@ describe("discoverBitmapPlugins", () => {
       expect(message).toMatch(/finite number, boolean, or string/);
     });
 
+    it("defaults a manifest that says nothing about a source to requiring one", async () => {
+      await writePlugin(pluginsDir, "tracer", validManifest);
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.plugins[0].manifest.source).toBe("required");
+    });
+
+    it("accepts a generator that declares it needs no source", async () => {
+      await writePlugin(pluginsDir, "generator", {
+        id: "acme.spirograph",
+        label: "Spirograph",
+        apiVersion: 1,
+        entry: "index.js",
+        source: "none",
+        defaults: { arms: 5 },
+        fields: [{ type: "number", key: "arms", label: "Arms", min: 1, max: 12, step: 1 }],
+      });
+
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.errors).toEqual([]);
+      expect(result.plugins[0].manifest.source).toBe("none");
+    });
+
+    it("accepts a generator that a source may optionally modulate", async () => {
+      await writePlugin(pluginsDir, "hybrid", { ...validManifest, source: "optional" });
+      const result = await discoverBitmapPlugins(pluginsDir);
+      expect(result.errors).toEqual([]);
+      expect(result.plugins[0].manifest.source).toBe("optional");
+    });
+
+    it("rejects an unknown source mode", async () => {
+      expect(await errorFor({ ...validManifest, source: "sometimes" })).toMatch(/manifest\.source/);
+    });
+
     it("rejects a non-positive renderTimeoutMs", async () => {
       expect(await errorFor({ ...validManifest, renderTimeoutMs: 0 })).toMatch(/renderTimeoutMs/);
       expect(await errorFor({ ...validManifest, renderTimeoutMs: -5 })).toMatch(/renderTimeoutMs/);

@@ -31,6 +31,7 @@ export interface PluginDiscoveryResult {
 
 const ICON_NAMES = new Set<string>(BITMAP_RENDERER_ICON_NAMES);
 const NUMBER_CONTROLS = new Set(["input", "slider"]);
+const SOURCE_MODES = new Set(["required", "optional", "none"]);
 const SELECT_CONTROLS = new Set(["dropdown", "icon-buttons"]);
 
 function isNonEmptyString(value: unknown): value is string {
@@ -195,6 +196,10 @@ function validateManifestShape(raw: unknown, folder: string): string | null {
     return "manifest.renderTimeoutMs must be a positive number of milliseconds";
   }
 
+  if (m.source !== undefined && !SOURCE_MODES.has(m.source as string)) {
+    return 'manifest.source must be "required", "optional", or "none"';
+  }
+
   const defaultsError = validateDefaults(m.fields as BitmapRendererFieldSchema[], m.defaults);
   if (defaultsError) return defaultsError;
 
@@ -255,6 +260,9 @@ export async function discoverBitmapPlugins(pluginsDir: string): Promise<PluginD
           defaults: raw.defaults as BitmapRendererSettings,
           fields: raw.fields as BitmapRendererFieldSchema[],
           renderTimeoutMs: typeof raw.renderTimeoutMs === "number" ? raw.renderTimeoutMs : undefined,
+          // Defaulted here so every consumer can read it without repeating the
+          // "absent means required" rule.
+          source: raw.source ?? "required",
         },
         entryPath: resolve(folder, raw.entry as string),
         folder,

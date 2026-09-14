@@ -1,16 +1,19 @@
 import { ipcMain, shell } from "electron";
-import type { BitmapLuminance, BitmapRendererSettings } from "../../types";
+import type { RendererContext } from "../../types";
+import { installExamplePlugins } from "../plugins/pluginPaths";
 import type { BitmapPluginRegistry } from "../plugins/pluginRegistry";
 import type { PluginHostManager } from "../plugins/pluginHostManager";
 
 export interface BitmapPluginIpcOptions {
   pluginsDir: string;
+  examplesDir: string;
   registry: BitmapPluginRegistry;
   hostManager: PluginHostManager;
 }
 
 export function registerBitmapPluginIpcHandlers({
   pluginsDir,
+  examplesDir,
   registry,
   hostManager,
 }: BitmapPluginIpcOptions): void {
@@ -33,16 +36,18 @@ export function registerBitmapPluginIpcHandlers({
     return { manifests: plugins.map((plugin) => plugin.manifest), errors };
   });
 
-  ipcMain.handle(
-    "bitmapPlugins:render",
-    (
-      _e,
-      pluginId: string,
-      luminance: BitmapLuminance,
-      settings: BitmapRendererSettings,
-      baseScale: number,
-    ) => hostManager.render(pluginId, luminance, settings, baseScale),
+  ipcMain.handle("bitmapPlugins:render", (_e, pluginId: string, context: RendererContext) =>
+    hostManager.render(pluginId, context),
   );
+
+  ipcMain.handle("bitmapPlugins:installExamples", async () => {
+    const result = await installExamplePlugins(examplesDir, pluginsDir);
+    // Rescan here so the caller never has to remember to, and drop warm hosts
+    // for the same reason a manual rescan does.
+    const { plugins, errors } = await registry.rescan();
+    hostManager.invalidateAll();
+    return { ...result, manifests: plugins.map((plugin) => plugin.manifest), errors };
+  });
 
   ipcMain.handle("bitmapPlugins:openFolder", async () => {
     // openPath resolves with an error string rather than rejecting, so an

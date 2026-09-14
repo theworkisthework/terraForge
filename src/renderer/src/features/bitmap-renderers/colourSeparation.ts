@@ -1,10 +1,10 @@
-import type { BitmapLuminance } from "./types";
+import type { RendererSource } from "./types";
 import type { BitmapColorData } from "./bitmapImage";
 
 export interface SeparatedChannel {
   label: string;
   color: string;
-  luminance: BitmapLuminance;
+  luminance: RendererSource;
 }
 
 export interface CustomPaletteSwatch {
@@ -13,7 +13,7 @@ export interface CustomPaletteSwatch {
 }
 
 /**
- * Renderers read `BitmapLuminance` as standard photographic luminance — 0 is
+ * Renderers read `RendererSource` as standard photographic luminance — 0 is
  * black/needs-ink, 255 is white/no-ink (see spiralAmplitude's `luminanceAt`).
  * Separation instead reasons in ink "density" (0 = no ink, 255 = full ink)
  * since that's how each mode below is naturally expressed, so every mode
@@ -30,7 +30,7 @@ function densityToLuminanceInPlace(
   density: Uint8Array,
   width: number,
   height: number,
-): BitmapLuminance {
+): RendererSource {
   for (let i = 0; i < density.length; i++) density[i] = 255 - density[i];
   return { width, height, values: density };
 }

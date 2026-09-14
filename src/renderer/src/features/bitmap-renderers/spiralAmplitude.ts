@@ -1,5 +1,5 @@
-import type { BitmapRendererSettings } from "../../../../../types";
-import type { BitmapLuminance, BitmapRendererDefinition } from "./types";
+import type { BitmapRendererSettings } from "../../../../types";
+import type { RendererContext, RendererSource, BitmapRendererDefinition } from "./types";
 
 export const SPIRAL_AMPLITUDE_RENDERER_ID = "spiral-amplitude";
 
@@ -9,13 +9,13 @@ export const spiralAmplitudeDefaults: BitmapRendererSettings = {
   amplitude: 10,
 };
 
-export type { BitmapLuminance, BitmapRendererDefinition };
+export type { RendererSource, RendererContext, BitmapRendererDefinition };
 
 function format(value: number): string {
   return Number(value.toFixed(2)).toString();
 }
 
-export function luminanceAt(image: BitmapLuminance, x: number, y: number): number {
+export function luminanceAt(image: RendererSource, x: number, y: number): number {
   const sampleX = Math.round(x);
   const sampleY = Math.round(y);
   // The spiral's circular extent can exceed a rectangular source bitmap. Do
@@ -44,14 +44,20 @@ export function bipolarToothPulse(phase: number): number {
  * the baseline at its sample point, then produces equal positive and negative
  * pulses whose amplitude is determined solely by that luminance sample.
  */
-export function generateSpiralAmplitudePath(
-  image: BitmapLuminance,
-  settings: BitmapRendererSettings,
-  baseScale: number,
-): string {
-  if (image.width < 1 || image.height < 1 || image.values.length === 0) {
+export function generateSpiralAmplitudePath({
+  source,
+  settings,
+  scale,
+  width,
+  height,
+}: RendererContext): string {
+  // This renderer traces tone, so it has nothing to draw without a source.
+  // Its manifest equivalent would declare `"source": "required"`.
+  if (!source || width < 1 || height < 1 || source.values.length === 0) {
     return "";
   }
+  const image = source;
+  const baseScale = scale;
 
   const pixelsPerMM = 1 / Math.max(baseScale, 0.001);
   const spacingMM = Math.max(0.1, Math.min(Number(settings.spacingMM), 20));

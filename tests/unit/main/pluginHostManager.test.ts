@@ -112,7 +112,8 @@ async function bringUp(win: FakeWindow): Promise<void> {
 }
 
 const renders = (win: FakeWindow) => win.sent.filter((s) => s.message.type === "render");
-const luminance = { width: 1, height: 1, values: new Uint8Array([1]) };
+const source = { width: 1, height: 1, values: new Uint8Array([1]) };
+const context = { width: 1, height: 1, scale: 1, settings: {}, source };
 
 describe("PluginHostManager", () => {
   beforeEach(() => {
@@ -125,19 +126,19 @@ describe("PluginHostManager", () => {
 
   it("rejects when the plugin id is not installed", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([]));
-    await expect(manager.render("missing", luminance, {}, 1)).rejects.toThrow(/not installed/);
+    await expect(manager.render("missing", context)).rejects.toThrow(/not installed/);
     manager.terminateAll();
   });
 
   it("brings up a sandboxed window and resolves a render from its result", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const promise = manager.render("acme", luminance, { k: 1 }, 0.5);
+    const promise = manager.render("acme", { ...context, settings: { k: 1 }, scale: 0.5 });
     const win = mocks.windows[0];
     await bringUp(win);
 
     const sent = renders(win)[0].message;
-    expect(sent).toMatchObject({ settings: { k: 1 }, baseScale: 0.5 });
-    fromPage(win, { type: "result", reqId: sent.reqId, path: "M0 0" });
+    expect(sent).toMatchObject({ context: { settings: { k: 1 }, scale: 0.5 } });
+    fromPage(win, { type: "result", reqId: sent.reqId, output: "M0 0" });
 
     await expect(promise).resolves.toBe("M0 0");
     manager.terminateAll();
@@ -145,15 +146,15 @@ describe("PluginHostManager", () => {
 
   it("reuses one window across repeated renders", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const first = manager.render("acme", luminance, {}, 1);
+    const first = manager.render("acme", context);
     const win = mocks.windows[0];
     await bringUp(win);
-    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, path: "A" });
+    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, output: "A" });
     await first;
 
-    const second = manager.render("acme", luminance, {}, 1);
+    const second = manager.render("acme", context);
     await vi.waitFor(() => expect(renders(win)).toHaveLength(2));
-    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, path: "B" });
+    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, output: "B" });
 
     await expect(second).resolves.toBe("B");
     expect(mocks.windows).toHaveLength(1);
@@ -162,7 +163,7 @@ describe("PluginHostManager", () => {
 
   it("rejects with the plugin's own message on a render error", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const promise = manager.render("acme", luminance, {}, 1);
+    const promise = manager.render("acme", context);
     const win = mocks.windows[0];
     await bringUp(win);
     fromPage(win, { type: "error", reqId: renders(win)[0].message.reqId, message: "deliberate failure" });
@@ -173,7 +174,7 @@ describe("PluginHostManager", () => {
 
   it("rejects and does not reuse the window after a load error", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const failed = manager.render("acme", luminance, {}, 1);
+    const failed = manager.render("acme", context);
     const first = mocks.windows[0];
     fromPage(first, { type: "page-ready" });
     await vi.waitFor(() => expect(first.sent.some((s) => s.message.type === "init")).toBe(true));
@@ -182,18 +183,18 @@ describe("PluginHostManager", () => {
     await expect(failed).rejects.toThrow(/failed to load: bad module/);
     expect(first.destroyed).toBe(true);
 
-    const retry = manager.render("acme", luminance, {}, 1);
+    const retry = manager.render("acme", context);
     await vi.waitFor(() => expect(mocks.windows).toHaveLength(2));
     const second = mocks.windows[1];
     await bringUp(second);
-    fromPage(second, { type: "result", reqId: renders(second)[0].message.reqId, path: "OK" });
+    fromPage(second, { type: "result", reqId: renders(second)[0].message.reqId, output: "OK" });
     await expect(retry).resolves.toBe("OK");
     manager.terminateAll();
   });
 
   it("rejects pending work when the plugin's renderer process is gone", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const promise = manager.render("acme", luminance, {}, 1);
+    const promise = manager.render("acme", context);
     const win = mocks.windows[0];
     await bringUp(win);
     win.emit("render-process-gone", {}, { reason: "crashed" });
@@ -205,11 +206,11 @@ describe("PluginHostManager", () => {
   it("times out a hung render, restarts the worker, and still serves work queued behind it", async () => {
     vi.useFakeTimers();
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme", 1000)]));
-    const hung = manager.render("acme", luminance, {}, 1);
+    const hung = manager.render("acme", context);
     // Settle-capture before advancing timers: the rejection lands while the
     // timer callback runs, so the handler has to already be attached.
     const hungOutcome = hung.then(() => null, (err: Error) => err.message);
-    const queued = manager.render("acme", luminance, {}, 1);
+    const queued = manager.render("acme", context);
     const win = mocks.windows[0];
 
     fromPage(win, { type: "page-ready" });
@@ -230,7 +231,7 @@ describe("PluginHostManager", () => {
 
     fromPage(win, { type: "ready" });
     await vi.waitFor(() => expect(renders(win)).toHaveLength(2));
-    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, path: "survived" });
+    fromPage(win, { type: "result", reqId: renders(win)[1].message.reqId, output: "survived" });
 
     await expect(queued).resolves.toBe("survived");
     manager.terminateAll();
@@ -238,13 +239,13 @@ describe("PluginHostManager", () => {
 
   it("dispatches renders one at a time so each timeout starts when its render does", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const all = [0, 1, 2, 3].map(() => manager.render("acme", luminance, {}, 1));
+    const all = [0, 1, 2, 3].map(() => manager.render("acme", context));
     const win = mocks.windows[0];
     await bringUp(win);
 
     for (let i = 0; i < 4; i++) {
       await vi.waitFor(() => expect(renders(win)).toHaveLength(i + 1));
-      fromPage(win, { type: "result", reqId: renders(win)[i].message.reqId, path: `c${i}` });
+      fromPage(win, { type: "result", reqId: renders(win)[i].message.reqId, output: `c${i}` });
     }
 
     await expect(Promise.all(all)).resolves.toEqual(["c0", "c1", "c2", "c3"]);
@@ -255,7 +256,7 @@ describe("PluginHostManager", () => {
   it("fails a plugin that never finishes loading instead of hanging forever", async () => {
     vi.useFakeTimers();
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const promise = manager.render("acme", luminance, {}, 1);
+    const promise = manager.render("acme", context);
     const outcome = promise.then(() => null, (err: Error) => err.message);
     // Page comes up but the plugin's own module evaluation never returns, so
     // no "ready" ever arrives.
@@ -269,13 +270,13 @@ describe("PluginHostManager", () => {
 
   it("ignores messages from a window that is not a known plugin host", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const promise = manager.render("acme", luminance, {}, 1);
+    const promise = manager.render("acme", context);
     const win = mocks.windows[0];
     await bringUp(win);
     const reqId = renders(win)[0].message.reqId;
 
-    fromPage({ webContents: { id: 9999 } } as unknown as FakeWindow, { type: "result", reqId, path: "spoofed" });
-    fromPage(win, { type: "result", reqId, path: "genuine" });
+    fromPage({ webContents: { id: 9999 } } as unknown as FakeWindow, { type: "result", reqId, output: "spoofed" });
+    fromPage(win, { type: "result", reqId, output: "genuine" });
 
     await expect(promise).resolves.toBe("genuine");
     manager.terminateAll();
@@ -283,20 +284,20 @@ describe("PluginHostManager", () => {
 
   it("drops warm hosts on invalidateAll so edited source is re-read", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme")]));
-    const first = manager.render("acme", luminance, {}, 1);
+    const first = manager.render("acme", context);
     const win = mocks.windows[0];
     await bringUp(win);
-    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, path: "A" });
+    fromPage(win, { type: "result", reqId: renders(win)[0].message.reqId, output: "A" });
     await first;
 
     manager.invalidateAll();
     expect(win.destroyed).toBe(true);
 
-    const next = manager.render("acme", luminance, {}, 1);
+    const next = manager.render("acme", context);
     await vi.waitFor(() => expect(mocks.windows).toHaveLength(2));
     const fresh = mocks.windows[1];
     await bringUp(fresh);
-    fromPage(fresh, { type: "result", reqId: renders(fresh)[0].message.reqId, path: "B" });
+    fromPage(fresh, { type: "result", reqId: renders(fresh)[0].message.reqId, output: "B" });
 
     await expect(next).resolves.toBe("B");
     manager.terminateAll();
@@ -304,8 +305,8 @@ describe("PluginHostManager", () => {
 
   it("isolates plugins: one crashing leaves another's in-flight render alone", async () => {
     const manager = new PluginHostManager("/preload.js", makeRegistry([makeRecord("acme"), makeRecord("beta")]));
-    const acme = manager.render("acme", luminance, {}, 1);
-    const beta = manager.render("beta", luminance, {}, 1);
+    const acme = manager.render("acme", context);
+    const beta = manager.render("beta", context);
     const [acmeWin, betaWin] = mocks.windows;
     await bringUp(acmeWin);
     await bringUp(betaWin);
@@ -313,7 +314,7 @@ describe("PluginHostManager", () => {
     acmeWin.emit("render-process-gone", {}, { reason: "oom" });
     await expect(acme).rejects.toThrow(/acme/);
 
-    fromPage(betaWin, { type: "result", reqId: renders(betaWin)[0].message.reqId, path: "still fine" });
+    fromPage(betaWin, { type: "result", reqId: renders(betaWin)[0].message.reqId, output: "still fine" });
     await expect(beta).resolves.toBe("still fine");
     manager.terminateAll();
   });

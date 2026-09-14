@@ -97,7 +97,8 @@ window.__terraForgePluginHost.onMessage(function (message) {
     // further use for it, and at full resolution that copy is megabytes on
     // every render. Only transfer a view that owns its whole buffer.
     var transfer = [];
-    var values = message.luminance && message.luminance.values;
+    var source = message.context && message.context.source;
+    var values = source && source.values;
     if (values && values.buffer && values.byteLength === values.buffer.byteLength) {
       transfer.push(values.buffer);
     }
@@ -191,26 +192,45 @@ self.onmessage = function (event) {
 
   if (message.type === "render") {
     Promise.resolve()
-      .then(function () { return pluginExports.render(message.luminance, message.settings, message.baseScale); })
-      .then(function (path) {
-        if (typeof path !== "string") {
-          throw new Error("render() must return a string, got " + typeof path + ".");
-        }
-        // Caught here so a runaway string is never transported out of the
-        // sandbox; the result is checked again before it enters the document.
-        if (path.length > ${MAX_BITMAP_RENDERER_PATH_LENGTH}) {
+      .then(function () { return pluginExports.render(message.context); })
+      .then(function (output) {
+        // Checked here so a runaway result is never transported out of the
+        // sandbox; it is validated again before it enters the document.
+        var total = outputLength(output);
+        if (total > ${MAX_BITMAP_RENDERER_PATH_LENGTH}) {
           throw new Error(
-            "render() returned " + path.length + " characters of path data, over the " +
+            "render() returned " + total + " characters of path data, over the " +
             ${MAX_BITMAP_RENDERER_PATH_LENGTH} + " limit."
           );
         }
-        self.postMessage({ type: "result", reqId: message.reqId, path: path });
+        self.postMessage({ type: "result", reqId: message.reqId, output: output });
       })
       .catch(function (err) {
         self.postMessage({ type: "error", reqId: message.reqId, message: describe(err) });
       });
   }
 };
+
+/**
+ * A renderer may return a single path string, or an array of layers when it
+ * wants to drive several pens itself. Totals the path data either way so the
+ * size ceiling covers both.
+ */
+function outputLength(output) {
+  if (typeof output === "string") return output.length;
+  if (!Array.isArray(output)) {
+    throw new Error("render() must return a path string or an array of layers, got " + typeof output + ".");
+  }
+  var total = 0;
+  for (var i = 0; i < output.length; i++) {
+    var layer = output[i];
+    if (!layer || typeof layer.d !== "string") {
+      throw new Error("render() layer " + i + " has no 'd' path string.");
+    }
+    total += layer.d.length;
+  }
+  return total;
+}
 
 function describe(err) {
   if (err instanceof Error) return err.stack || err.message;

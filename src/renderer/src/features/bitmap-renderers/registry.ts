@@ -1,4 +1,4 @@
-import type { BitmapPluginManifest } from "../../../../../types";
+import type { BitmapPluginManifest } from "../../../../types";
 import { spiralAmplitudeRenderer } from "./spiralAmplitude";
 import type { BitmapRendererDefinition } from "./types";
 
@@ -12,8 +12,7 @@ export function pluginRendererFromManifest(manifest: BitmapPluginManifest): Bitm
     label: manifest.label,
     defaults: manifest.defaults,
     fields: manifest.fields,
-    render: (luminance, settings, baseScale) =>
-      window.terraForge.bitmapPlugins.render(manifest.id, luminance, settings, baseScale),
+    render: (context) => window.terraForge.bitmapPlugins.render(manifest.id, context),
   };
 }
 

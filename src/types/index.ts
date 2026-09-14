@@ -313,13 +313,22 @@ export const DEFAULT_HATCH_ANGLE_DEG = 45;
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
 /**
- * Ceiling on the path string a bitmap renderer may return. Generous enough
- * that no plausible render approaches it, low enough that a runaway renderer
- * cannot exhaust memory as its output is copied between processes. Enforced
- * both inside the plugin sandbox (so an absurd string is never transported)
- * and when the result is taken into the document.
+ * Ceiling on the path data a renderer may return.
+ *
+ * Sized from measurement rather than intuition. A renderer that anchors its
+ * detail to the pen (0.1mm, below which nothing can appear on paper) produces
+ * output proportional to the drawing, not to any source image: roughly 3.4
+ * million points and 46MB for a metre-wide plot at 1mm line spacing. That is
+ * a legitimate drawing, so the ceiling has to sit above it — an earlier 16MB
+ * limit rejected work a plotter can genuinely do.
+ *
+ * What it still guards is memory. The finished path is cloned across the
+ * sandbox, host and renderer processes, so the transient cost is a few times
+ * this number; a runaway renderer producing gigabytes has to be stopped
+ * before it gets that far. Enforced inside the sandbox, so an absurd string is
+ * never transported, and again when the result enters the document.
  */
-export const MAX_BITMAP_RENDERER_PATH_LENGTH = 16 * 1024 * 1024;
+export const MAX_BITMAP_RENDERER_PATH_LENGTH = 64 * 1024 * 1024;
 
 /**
  * Settings bag for a bitmap renderer. The field set and value types are owned
@@ -328,12 +337,58 @@ export const MAX_BITMAP_RENDERER_PATH_LENGTH = 16 * 1024 * 1024;
  */
 export type BitmapRendererSettings = Record<string, number | boolean | string>;
 
-/** A decoded bitmap reduced to one tone byte per pixel (higher = more ink/darker). */
-export interface BitmapLuminance {
+/**
+ * Tone data covering a renderer's output area, one byte per output unit
+ * (0 = black/full ink, 255 = white/none). Produced by decoding a source
+ * bitmap today; a renderer that needs no source never receives one.
+ */
+export interface RendererSource {
   width: number;
   height: number;
   values: Uint8Array;
 }
+
+/**
+ * Everything a renderer is given for a single render.
+ *
+ * Passed as one object rather than positional arguments so that the set can
+ * grow without breaking existing plugins, and so a renderer that ignores the
+ * source — a generator producing geometry from its settings alone — reads
+ * naturally rather than having to accept and discard a first argument.
+ *
+ * Coordinates are in "output units": whatever space the returned path data is
+ * expressed in. For a bitmap renderer an output unit is one source pixel, so
+ * `width`/`height` match the image; `scale` converts to millimetres either way.
+ */
+export interface RendererContext {
+  /** Width of the output area, in output units. */
+  width: number;
+  /** Height of the output area, in output units. */
+  height: number;
+  /** Millimetres per output unit — use this to convert mm-denominated settings. */
+  scale: number;
+  /** Values for the controls this renderer declared in its manifest. */
+  settings: BitmapRendererSettings;
+  /** Tone data over the output area, when a source image is driving this render. */
+  source?: RendererSource;
+}
+
+/** One named, coloured layer of a renderer's output. */
+export interface RendererLayer {
+  /** Path data, in output units. */
+  d: string;
+  /** Name for this layer — an ink, a pen, a pass. */
+  label?: string;
+  /** Suggested stroke colour, as a CSS colour string. */
+  color?: string;
+}
+
+/**
+ * What a renderer returns: a single path, or several labelled layers when it
+ * wants to drive more than one pen itself. A bare string stays valid because
+ * it is the overwhelmingly common case and nothing should have to wrap it.
+ */
+export type RendererOutput = string | RendererLayer[];
 
 /**
  * Icon identifiers a renderer's field schema can reference. The properties
@@ -421,6 +476,16 @@ export interface BitmapPluginManifest {
   fields: BitmapRendererFieldSchema[];
   /** Per-render timeout in ms before the plugin's host process is killed and restarted. */
   renderTimeoutMs?: number;
+  /**
+   * Whether this renderer needs a source image. "required" (the default) is a
+   * bitmap renderer, which cannot run without one. "none" is a generator that
+   * synthesises geometry from its settings alone. "optional" is a generator
+   * that will use a source to modulate itself when given one.
+   *
+   * Declared rather than inferred so the app can tell, without executing any
+   * plugin code, which renderers may be offered where no image exists.
+   */
+  source?: "required" | "optional" | "none";
 }
 
 /** One imported SVG file, treated as a positioned group on the bed */
@@ -801,6 +866,16 @@ export interface BitmapPluginScan {
   errors: BitmapPluginDiscoveryError[];
 }
 
+/** Outcome of copying the bundled example plugins into the user's folder. */
+export interface BitmapPluginExampleInstall extends BitmapPluginScan {
+  /** Folder names copied in. */
+  installed: string[];
+  /** Folder names already present, left untouched. */
+  skipped: string[];
+  /** Folder names this build has no way to run yet, so not installed. */
+  unsupported: string[];
+}
+
 export interface BitmapPluginsApi {
   /**
    * Metadata for every currently-discovered plugin, plus the reason each
@@ -812,12 +887,12 @@ export interface BitmapPluginsApi {
   /** Re-scan the plugins directory on disk. Returns fresh metadata plus any per-folder discovery errors. */
   rescan: () => Promise<BitmapPluginScan>;
   /** Runs a plugin's render() in its isolated host process. Rejects on timeout, crash, or a thrown error. */
-  render: (
-    pluginId: string,
-    luminance: BitmapLuminance,
-    settings: BitmapRendererSettings,
-    baseScale: number,
-  ) => Promise<string>;
+  render: (pluginId: string, context: RendererContext) => Promise<RendererOutput>;
+  /**
+   * Copies the example plugins that ship with the app into the user's plugins
+   * folder, then rescans. Existing folders of the same name are left alone.
+   */
+  installExamples: () => Promise<BitmapPluginExampleInstall>;
   /** Ensures the plugins directory exists and reveals it in the OS file manager. */
   openFolder: () => Promise<void>;
 }

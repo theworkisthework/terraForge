@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from "electron";
-import type { BitmapLuminance, BitmapRendererSettings } from "../../types";
+import type { RendererContext, RendererOutput } from "../../types";
 import type { BitmapPluginRecord } from "./pluginManifest";
 import type { BitmapPluginRegistry } from "./pluginRegistry";
 import { PLUGIN_HOST_ORIGIN } from "./pluginSandboxAssets";
@@ -22,15 +22,13 @@ type PageToMainMessage =
   | { type: "page-ready" }
   | { type: "ready" }
   | { type: "load-error"; message: string }
-  | { type: "result"; reqId: string; path: string }
+  | { type: "result"; reqId: string; output: RendererOutput }
   | { type: "error"; reqId: string; message: string };
 
 interface PendingRender {
   reqId: string;
-  luminance: BitmapLuminance;
-  settings: BitmapRendererSettings;
-  baseScale: number;
-  resolve: (path: string) => void;
+  context: RendererContext;
+  resolve: (output: RendererOutput) => void;
   reject: (err: Error) => void;
 }
 
@@ -92,12 +90,7 @@ export class PluginHostManager {
     this.sweepTimer.unref();
   }
 
-  async render(
-    pluginId: string,
-    luminance: BitmapLuminance,
-    settings: BitmapRendererSettings,
-    baseScale: number,
-  ): Promise<string> {
+  async render(pluginId: string, context: RendererContext): Promise<RendererOutput> {
     const record = this.registry.find(pluginId);
     if (!record) {
       throw new Error(`Bitmap renderer plugin "${pluginId}" is not installed.`);
@@ -105,15 +98,8 @@ export class PluginHostManager {
 
     const host = await this.ensureReady(pluginId, record);
 
-    return new Promise<string>((resolve, reject) => {
-      host.queue.push({
-        reqId: String(this.nextReqId++),
-        luminance,
-        settings,
-        baseScale,
-        resolve,
-        reject,
-      });
+    return new Promise<RendererOutput>((resolve, reject) => {
+      host.queue.push({ reqId: String(this.nextReqId++), context, resolve, reject });
       host.lastUsedAt = Date.now();
       this.pump(host);
     });
@@ -239,7 +225,7 @@ export class PluginHostManager {
       case "result": {
         const pending = this.takeActive(host, message.reqId);
         if (!pending) return;
-        pending.resolve(message.path);
+        pending.resolve(message.output);
         this.pump(host);
         return;
       }
@@ -301,13 +287,7 @@ export class PluginHostManager {
     );
     host.activeTimer = setTimeout(() => this.onRenderTimeout(host, timeoutMs), timeoutMs);
 
-    host.win.webContents.send(TO_PAGE, {
-      type: "render",
-      reqId: next.reqId,
-      luminance: next.luminance,
-      settings: next.settings,
-      baseScale: next.baseScale,
-    });
+    host.win.webContents.send(TO_PAGE, { type: "render", reqId: next.reqId, context: next.context });
   }
 
   /**

@@ -14,7 +14,13 @@ const manifest = (id: string, label: string): BitmapPluginManifest => ({
 });
 
 beforeEach(() => {
-  useBitmapPluginStore.setState({ plugins: [], errors: [], scanning: false, actionError: null });
+  useBitmapPluginStore.setState({
+    plugins: [],
+    errors: [],
+    scanning: false,
+    actionError: null,
+    lastInstall: null,
+  });
   vi.clearAllMocks();
 });
 
@@ -62,7 +68,7 @@ describe("BitmapPluginsSection", () => {
   it("says so plainly when nothing is installed", () => {
     render(<BitmapPluginsSection />);
 
-    expect(screen.getByText(/no bitmap renderer plugins installed/i)).toBeInTheDocument();
+    expect(screen.getByText(/no renderer plugins installed/i)).toBeInTheDocument();
   });
 
   it("names the folder and the reason for every rejected plugin", () => {
@@ -89,5 +95,47 @@ describe("BitmapPluginsSection", () => {
     render(<BitmapPluginsSection />);
 
     expect(screen.getByText(/Could not open the plugins folder/)).toBeInTheDocument();
+  });
+
+  it("offers the bundled examples so there is something to try without downloading anything", async () => {
+    const installExamplePlugins = vi.fn().mockResolvedValue(undefined);
+    useBitmapPluginStore.setState({ installExamplePlugins });
+
+    render(<BitmapPluginsSection />);
+    await userEvent.click(screen.getByRole("button", { name: /install examples/i }));
+
+    expect(installExamplePlugins).toHaveBeenCalledTimes(1);
+  });
+
+  it("says what the install actually did", () => {
+    useBitmapPluginStore.setState({
+      lastInstall: { installed: ["spirograph"], skipped: ["tonal-lines"], unsupported: [] },
+    });
+
+    render(<BitmapPluginsSection />);
+
+    expect(screen.getByText(/Installed spirograph\./)).toBeInTheDocument();
+    expect(screen.getByText(/Left tonal-lines alone/)).toBeInTheDocument();
+  });
+
+  it("does not imply it installed something when everything was already there", () => {
+    useBitmapPluginStore.setState({
+      lastInstall: { installed: [], skipped: ["spirograph"], unsupported: [] },
+    });
+
+    render(<BitmapPluginsSection />);
+
+    expect(screen.getByText(/No new examples to install/)).toBeInTheDocument();
+  });
+
+  it("explains an example it held back rather than silently ignoring it", () => {
+    useBitmapPluginStore.setState({
+      lastInstall: { installed: ["tonal-lines"], skipped: [], unsupported: ["spirograph"] },
+    });
+
+    render(<BitmapPluginsSection />);
+
+    expect(screen.getByText(/Held back spirograph/)).toBeInTheDocument();
+    expect(screen.getByText(/generators cannot be placed on the bed yet/)).toBeInTheDocument();
   });
 });
