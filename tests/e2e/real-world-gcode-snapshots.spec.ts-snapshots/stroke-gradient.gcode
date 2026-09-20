@@ -7,7 +7,7 @@
 ; Joined   : no
 ; Lift end : yes
 ; Ret home : no
-; Pen delay: 50 ms
+; Pen delay: 0 ms
 ; Pen up delay: 0 ms
 ; Dip svc  : no
 ; Generated: <normalized>
