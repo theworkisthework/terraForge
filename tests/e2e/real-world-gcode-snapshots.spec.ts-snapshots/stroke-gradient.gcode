@@ -1,6 +1,6 @@
 ; -- terraForge G-code ------------------------------------------
 ; Machine  : <normalized>
-; Bed      : 220 x 200 mm
+; Bed      : 594 x 420 mm
 ; Origin   : bottom-left
 ; Optimised: no
 ; Path dir : minimize travel (reversal enabled)
@@ -14,15 +14,14 @@
 ; ---------------------------------------------------------------
 G90      ; Absolute coordinates
 G21      ; Units: mm
-M3S0 ; Pen up
+G0Z5 ; Pen up
 
 ; -- Color: url(#_linear1) (1 object) --
 ; -- Sequential path (1 subpaths) -----------
 ;@tf v=1 color=url(%23_linear1)
 G0 X25.786 Y22.661 ; Rapid travel
-F3000
-M3S1 ; Pen down
-G4 P0.05 ; Pen settle delay
+F6000
+G0Z0 ; Pen down
 G1 X25.793 Y22.628
 G1 X25.816 Y22.540
 G1 X25.909 Y22.246
@@ -214,7 +213,7 @@ G1 X51.932 Y11.498
 G1 X52.061 Y11.887
 G1 X52.132 Y12.133
 G1 X52.154 Y12.219
-M3S0 ; Pen up
+G0Z5 ; Pen up
 
 ; -- End of job -----------------------------------------------
-M3S0 ; Pen up - safe
+G0Z5 ; Pen up - safe
