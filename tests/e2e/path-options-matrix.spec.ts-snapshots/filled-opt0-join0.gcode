@@ -20,8 +20,17 @@ G0Z5 ; Pen up
 ; -- Color: #0072a4 (73 objects) --
 ; -- Color: #ebebeb (88 objects) --
 ; -- Color: #ff1616 (72 objects) --
-; -- Sequential path (156 subpaths) -----------
+; -- Sequential path (236 subpaths) -----------
 ;@tf v=1 color=%23000000
+G0 X81.478 Y330.337 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X261.025 Y330.337
+G1 X261.025 Y240.379
+G1 X81.478 Y240.379
+G1 X81.478 Y330.337
+G0Z5 ; Pen up
+
 G0 X8.480 Y72.999 ; Rapid travel
 F6000
 G0Z0 ; Pen down
@@ -35,356 +44,831 @@ G0Z0 ; Pen down
 G1 X8.480 Y72.999
 G0Z5 ; Pen up
 
+;@tf v=1 color=%230072a4
+G0 X119.881 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y382.013
+G0Z5 ; Pen up
+
+G0 X117.053 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y379.184
+G0Z5 ; Pen up
+
+G0 X114.225 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y376.356
+G0Z5 ; Pen up
+
+G0 X111.396 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y373.528
+G0Z5 ; Pen up
+
+G0 X108.568 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y370.699
+G0Z5 ; Pen up
+
+G0 X105.739 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y367.871
+G0Z5 ; Pen up
+
+G0 X102.911 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y365.042
+G0Z5 ; Pen up
+
+G0 X100.082 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y362.214
+G0Z5 ; Pen up
+
+G0 X97.254 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y359.385
+G0Z5 ; Pen up
+
+G0 X94.426 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y356.557
+G0Z5 ; Pen up
+
+G0 X91.597 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y353.729
+G0Z5 ; Pen up
+
+G0 X88.769 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y350.900
+G0Z5 ; Pen up
+
+G0 X85.940 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y348.072
+G0Z5 ; Pen up
+
+G0 X83.112 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y345.243
+G0Z5 ; Pen up
+
+G0 X80.283 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y342.415
+G0Z5 ; Pen up
+
+G0 X77.455 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y339.586
+G0Z5 ; Pen up
+
+G0 X74.627 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y336.758
+G0Z5 ; Pen up
+
+G0 X71.798 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y333.930
+G0Z5 ; Pen up
+
+G0 X68.970 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y331.101
+G0Z5 ; Pen up
+
+G0 X66.141 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y328.273
+G0Z5 ; Pen up
+
+G0 X63.313 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y325.444
+G0Z5 ; Pen up
+
+G0 X60.484 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y322.616
+G0Z5 ; Pen up
+
+G0 X57.656 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y319.787
+G0Z5 ; Pen up
+
+G0 X54.827 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y316.959
+G0Z5 ; Pen up
+
+G0 X51.999 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y314.131
+G0Z5 ; Pen up
+
+G0 X49.171 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y311.302
+G0Z5 ; Pen up
+
+G0 X46.342 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y308.474
+G0Z5 ; Pen up
+
+G0 X43.514 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y305.645
+G0Z5 ; Pen up
+
+G0 X40.686 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y302.817
+G0Z5 ; Pen up
+
+G0 X37.857 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X121.296 Y299.989
+G0Z5 ; Pen up
+
+G0 X35.028 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X119.456 Y298.999
+G0Z5 ; Pen up
+
+G0 X32.200 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X116.628 Y298.999
+G0Z5 ; Pen up
+
+G0 X29.372 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X113.799 Y298.999
+G0Z5 ; Pen up
+
+G0 X26.543 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X110.971 Y298.999
+G0Z5 ; Pen up
+
+G0 X23.715 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X108.143 Y298.999
+G0Z5 ; Pen up
+
+G0 X20.886 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X105.314 Y298.999
+G0Z5 ; Pen up
+
+G0 X18.058 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X102.486 Y298.999
+G0Z5 ; Pen up
+
+G0 X15.230 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X99.657 Y298.999
+G0Z5 ; Pen up
+
+G0 X12.401 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X96.829 Y298.999
+G0Z5 ; Pen up
+
+G0 X9.573 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X94.000 Y298.999
+G0Z5 ; Pen up
+
+G0 X6.744 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X91.172 Y298.999
+G0Z5 ; Pen up
+
+G0 X3.916 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X88.344 Y298.999
+G0Z5 ; Pen up
+
+G0 X1.087 Y383.427 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X85.515 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y381.686 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X82.687 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y378.858 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X79.858 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y376.029 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X77.030 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y373.201 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X74.202 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y370.372 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X71.373 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y367.544 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X68.545 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y364.715 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X65.716 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y361.887 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X62.888 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y359.059 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X60.059 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y356.230 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X57.231 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y353.402 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X54.403 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y350.573 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X51.574 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y347.745 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X48.746 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y344.916 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X45.917 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y342.088 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X43.089 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y339.260 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X40.260 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y336.431 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X37.432 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y333.603 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X34.604 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y330.774 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X31.775 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y327.946 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X28.947 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y325.117 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X26.118 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y322.289 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X23.290 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y319.461 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X20.461 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y316.632 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X17.633 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y313.804 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X14.804 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y310.975 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X11.976 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y308.147 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X9.148 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y305.319 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X6.319 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y302.490 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X3.491 Y298.999
+G0Z5 ; Pen up
+
+G0 X0.000 Y299.662 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X0.662 Y298.999
+G0Z5 ; Pen up
+
 ;@tf v=1 color=%23ebebeb
-G0 X198.960 Y200.000 ; Rapid travel
+G0 X200.254 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y214.263
+G0Z5 ; Pen up
+
+G0 X197.425 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y211.435
+G0Z5 ; Pen up
+
+G0 X194.597 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y208.606
+G0Z5 ; Pen up
+
+G0 X191.768 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y205.778
+G0Z5 ; Pen up
+
+G0 X188.940 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y202.949
+G0Z5 ; Pen up
+
+G0 X186.111 Y215.677 ; Rapid travel
+F6000
+G0Z0 ; Pen down
+G1 X201.668 Y200.121
+G0Z5 ; Pen up
+
+G0 X183.283 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y197.293
 G0Z5 ; Pen up
 
-G0 X196.132 Y200.000 ; Rapid travel
+G0 X180.455 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y194.464
 G0Z5 ; Pen up
 
-G0 X193.304 Y200.000 ; Rapid travel
+G0 X177.626 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y191.636
 G0Z5 ; Pen up
 
-G0 X190.475 Y200.000 ; Rapid travel
+G0 X174.798 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y188.807
 G0Z5 ; Pen up
 
-G0 X187.647 Y200.000 ; Rapid travel
+G0 X171.969 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y185.979
 G0Z5 ; Pen up
 
-G0 X184.818 Y200.000 ; Rapid travel
+G0 X169.141 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y183.151
 G0Z5 ; Pen up
 
-G0 X181.990 Y200.000 ; Rapid travel
+G0 X166.313 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y180.322
 G0Z5 ; Pen up
 
-G0 X179.161 Y200.000 ; Rapid travel
+G0 X163.484 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y177.494
 G0Z5 ; Pen up
 
-G0 X176.333 Y200.000 ; Rapid travel
+G0 X160.656 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y174.665
 G0Z5 ; Pen up
 
-G0 X173.505 Y200.000 ; Rapid travel
+G0 X157.827 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y171.837
 G0Z5 ; Pen up
 
-G0 X170.676 Y200.000 ; Rapid travel
+G0 X154.999 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y169.008
 G0Z5 ; Pen up
 
-G0 X167.848 Y200.000 ; Rapid travel
+G0 X152.170 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y166.180
 G0Z5 ; Pen up
 
-G0 X165.019 Y200.000 ; Rapid travel
+G0 X149.342 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y163.352
 G0Z5 ; Pen up
 
-G0 X162.191 Y200.000 ; Rapid travel
+G0 X146.514 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y160.523
 G0Z5 ; Pen up
 
-G0 X159.363 Y200.000 ; Rapid travel
+G0 X143.685 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y157.695
 G0Z5 ; Pen up
 
-G0 X156.534 Y200.000 ; Rapid travel
+G0 X140.856 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y154.866
 G0Z5 ; Pen up
 
-G0 X153.706 Y200.000 ; Rapid travel
+G0 X138.028 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y152.038
 G0Z5 ; Pen up
 
-G0 X150.877 Y200.000 ; Rapid travel
+G0 X135.200 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y149.209
 G0Z5 ; Pen up
 
-G0 X148.049 Y200.000 ; Rapid travel
+G0 X132.371 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y146.381
 G0Z5 ; Pen up
 
-G0 X145.220 Y200.000 ; Rapid travel
+G0 X129.543 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y143.553
 G0Z5 ; Pen up
 
-G0 X142.392 Y200.000 ; Rapid travel
+G0 X126.715 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y140.724
 G0Z5 ; Pen up
 
-G0 X139.564 Y200.000 ; Rapid travel
+G0 X123.886 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y137.896
 G0Z5 ; Pen up
 
-G0 X136.735 Y200.000 ; Rapid travel
+G0 X121.058 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X201.668 Y135.067
 G0Z5 ; Pen up
 
-G0 X133.907 Y200.000 ; Rapid travel
+G0 X118.229 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X200.076 Y133.830
 G0Z5 ; Pen up
 
-G0 X131.078 Y200.000 ; Rapid travel
+G0 X115.401 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X197.248 Y133.830
 G0Z5 ; Pen up
 
-G0 X128.250 Y200.000 ; Rapid travel
+G0 X112.572 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X194.419 Y133.830
 G0Z5 ; Pen up
 
-G0 X125.421 Y200.000 ; Rapid travel
+G0 X109.744 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X191.591 Y133.830
 G0Z5 ; Pen up
 
-G0 X122.593 Y200.000 ; Rapid travel
+G0 X106.915 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X188.762 Y133.830
 G0Z5 ; Pen up
 
-G0 X119.765 Y200.000 ; Rapid travel
+G0 X104.087 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X185.934 Y133.830
 G0Z5 ; Pen up
 
-G0 X116.936 Y200.000 ; Rapid travel
+G0 X101.259 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X183.106 Y133.830
 G0Z5 ; Pen up
 
-G0 X114.108 Y200.000 ; Rapid travel
+G0 X98.430 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X180.277 Y133.830
 G0Z5 ; Pen up
 
-G0 X111.279 Y200.000 ; Rapid travel
+G0 X95.602 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X177.449 Y133.830
 G0Z5 ; Pen up
 
-G0 X108.451 Y200.000 ; Rapid travel
+G0 X92.773 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X174.620 Y133.830
 G0Z5 ; Pen up
 
-G0 X105.622 Y200.000 ; Rapid travel
+G0 X89.945 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X171.792 Y133.830
 G0Z5 ; Pen up
 
-G0 X102.794 Y200.000 ; Rapid travel
+G0 X87.116 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X168.963 Y133.830
 G0Z5 ; Pen up
 
-G0 X99.966 Y200.000 ; Rapid travel
+G0 X84.288 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X166.135 Y133.830
 G0Z5 ; Pen up
 
-G0 X97.137 Y200.000 ; Rapid travel
+G0 X81.460 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X163.307 Y133.830
 G0Z5 ; Pen up
 
-G0 X94.309 Y200.000 ; Rapid travel
+G0 X78.631 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X160.478 Y133.830
 G0Z5 ; Pen up
 
-G0 X91.480 Y200.000 ; Rapid travel
+G0 X75.803 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X157.650 Y133.830
 G0Z5 ; Pen up
 
-G0 X88.652 Y200.000 ; Rapid travel
+G0 X72.974 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X154.821 Y133.830
 G0Z5 ; Pen up
 
-G0 X85.824 Y200.000 ; Rapid travel
+G0 X70.146 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X151.993 Y133.830
 G0Z5 ; Pen up
 
-G0 X82.995 Y200.000 ; Rapid travel
+G0 X67.317 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X149.164 Y133.830
 G0Z5 ; Pen up
 
-G0 X80.166 Y200.000 ; Rapid travel
+G0 X64.489 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X146.336 Y133.830
 G0Z5 ; Pen up
 
-G0 X77.338 Y200.000 ; Rapid travel
+G0 X61.661 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X143.508 Y133.830
 G0Z5 ; Pen up
 
-G0 X74.510 Y200.000 ; Rapid travel
+G0 X58.832 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X140.679 Y133.830
 G0Z5 ; Pen up
 
-G0 X71.681 Y200.000 ; Rapid travel
+G0 X56.004 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X137.851 Y133.830
 G0Z5 ; Pen up
 
-G0 X68.853 Y200.000 ; Rapid travel
+G0 X53.175 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X135.022 Y133.830
 G0Z5 ; Pen up
 
-G0 X66.025 Y200.000 ; Rapid travel
+G0 X50.347 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X132.194 Y133.830
 G0Z5 ; Pen up
 
-G0 X63.196 Y200.000 ; Rapid travel
+G0 X47.519 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X129.366 Y133.830
 G0Z5 ; Pen up
 
-G0 X60.367 Y200.000 ; Rapid travel
+G0 X44.690 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X126.537 Y133.830
 G0Z5 ; Pen up
 
-G0 X57.539 Y200.000 ; Rapid travel
+G0 X41.862 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X123.709 Y133.830
 G0Z5 ; Pen up
 
-G0 X54.711 Y200.000 ; Rapid travel
+G0 X39.033 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X120.880 Y133.830
 G0Z5 ; Pen up
 
-G0 X51.882 Y200.000 ; Rapid travel
+G0 X36.205 Y215.677 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X118.052 Y133.830
 G0Z5 ; Pen up
 
-G0 X49.054 Y200.000 ; Rapid travel
+G0 X34.656 Y214.398 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X115.223 Y133.830
 G0Z5 ; Pen up
 
-G0 X46.225 Y200.000 ; Rapid travel
+G0 X34.656 Y211.570 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X112.395 Y133.830
 G0Z5 ; Pen up
 
-G0 X43.397 Y200.000 ; Rapid travel
+G0 X34.656 Y208.741 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X109.567 Y133.830
 G0Z5 ; Pen up
 
-G0 X40.569 Y200.000 ; Rapid travel
+G0 X34.656 Y205.913 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X106.738 Y133.830
 G0Z5 ; Pen up
 
-G0 X37.740 Y200.000 ; Rapid travel
+G0 X34.656 Y203.084 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X103.910 Y133.830
 G0Z5 ; Pen up
 
-G0 X34.912 Y200.000 ; Rapid travel
+G0 X34.656 Y200.256 ; Rapid travel
 F6000
 G0Z0 ; Pen down
 G1 X101.081 Y133.830
