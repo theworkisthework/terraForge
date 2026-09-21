@@ -92,7 +92,7 @@ export function ConsoleToolbar({
           title="Emergency stop: immediately halt all motion (Feed Hold)"
           icon={<CircleStop size={12} strokeWidth={2.5} />}
         >
-          E-STOP
+          <span className="relative top-[0.5px]">E-STOP</span>
         </Button>
       </div>
       <div className="flex items-center gap-2">
