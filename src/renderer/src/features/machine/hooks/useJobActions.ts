@@ -148,11 +148,19 @@ export function useJobActions() {
   };
 
   /** Builds a GcodeOptions object from user preferences and the current page template. */
-  const buildOptions = (prefs: GcodePrefs): GcodeOptions => {
+  const buildOptions = async (prefs: GcodePrefs): Promise<GcodeOptions> => {
     const activePageSize = pageTemplate
       ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
       : undefined;
+    const terraForgeVersion = await window.terraForge.app
+      .getVersion()
+      .catch(() => "unknown");
+    const { connected, fwInfo } = useMachineStore.getState();
     return {
+      terraForgeVersion,
+      firmwareVersion: connected
+        ? (fwInfo?.replace(/^FluidNC\s+v/i, "") ?? "Unknown")
+        : "Not connected",
       arcFitting: false,
       arcTolerance: 0.01,
       optimisePaths: prefs.optimise,
@@ -240,7 +248,7 @@ export function useJobActions() {
 
     setGenerating(true);
     const taskId = uuid();
-    const options = buildOptions(prefs);
+    const options = await buildOptions(prefs);
 
     const worker = new Worker(
       new URL("../../../../../workers/svgWorker.ts", import.meta.url),
@@ -389,7 +397,7 @@ export function useJobActions() {
     cfg: ReturnType<typeof activeConfig>,
   ) => {
     if (!cfg) return;
-    const options = buildOptions(prefs);
+    const options = await buildOptions(prefs);
 
     type GroupEntry = {
       id: string | null;
@@ -514,7 +522,7 @@ export function useJobActions() {
     cfg: ReturnType<typeof activeConfig>,
   ) => {
     if (!cfg) return;
-    const options = buildOptions(prefs);
+    const options = await buildOptions(prefs);
 
     type LayerEntry = {
       importName: string;
@@ -671,7 +679,7 @@ export function useJobActions() {
     cfg: ReturnType<typeof activeConfig>,
   ) => {
     if (!cfg) return;
-    const options = buildOptions(prefs);
+    const options = await buildOptions(prefs);
 
     type ColorEntry = {
       color: string;
@@ -824,7 +832,7 @@ export function useJobActions() {
     saveDir: string | null,
   ) => {
     if (!cfg) return;
-    const options = buildOptions(prefs);
+    const options = await buildOptions(prefs);
 
     // Group hatch objects by their fill color (sourceColor)
     const allObjects = useCanvasStore.getState().toVectorObjects();

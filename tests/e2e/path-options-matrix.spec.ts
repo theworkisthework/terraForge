@@ -26,6 +26,8 @@ const combos = [
 function normalizeGcodeForSnapshot(gcode: string): string {
   return gcode
     .replace(/\r\n/g, "\n")
+    .replace(/^; Version\s+:.*\n?/gm, "")
+    .replace(/^; Firmware\s+:.*\n?/gm, "")
     .replace(/^; Machine\s+:.*$/m, "; Machine  : <normalized>")
     .replace(/^; Generated:.*$/m, "; Generated: <normalized>")
     .replace(/^; Vinyl\s+:.*\n?/gm, "")

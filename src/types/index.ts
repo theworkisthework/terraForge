@@ -436,6 +436,10 @@ export interface Job {
 // ─── G-code Generation Options ───────────────────────────────────────────────
 
 export interface GcodeOptions {
+  /** Application version that generated the output. */
+  terraForgeVersion?: string;
+  /** Connected FluidNC firmware version, or "Not connected". */
+  firmwareVersion?: string;
   arcFitting: boolean;
   arcTolerance: number; // mm tolerance for fitting arcs
   optimisePaths: boolean; // nearest-neighbour reorder to minimise rapid travel

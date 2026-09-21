@@ -145,12 +145,32 @@ describe("svgWorker — G-code header", () => {
 
     const gcode = msg.gcode as string;
     expect(gcode).toContain("; -- terraForge G-code --");
+    expect(gcode).toContain("; Version  : unknown");
     expect(gcode).toContain("Machine  : Test Plotter");
+    expect(gcode).toContain("; Firmware : Not connected");
     expect(gcode).toContain("Bed      : 200 x 200 mm");
     expect(gcode).toContain("Origin   : top-left");
     expect(gcode).toContain("Optimised: no");
     expect(gcode).toContain("G90");
     expect(gcode).toContain("G21");
+  });
+
+  it("includes supplied terraForge and FluidNC versions", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "header-versions",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({
+        terraForgeVersion: "1.4.0-RC7",
+        firmwareVersion: "4.0.4",
+      }),
+    });
+
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toContain("; Version  : 1.4.0-RC7");
+    expect(gcode).toContain("; Firmware : 4.0.4");
   });
 
   it("includes the pen up command in the header preamble", async () => {
