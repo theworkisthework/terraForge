@@ -672,7 +672,9 @@ async function generate(msg: GenerateMessage): Promise<void> {
   lines.push(
     "; -- terraForge G-code ------------------------------------------",
   );
+  lines.push(`; Version  : ${options?.terraForgeVersion ?? "unknown"}`);
   lines.push(`; Machine  : ${config.name}`);
+  lines.push(`; Firmware : ${options?.firmwareVersion ?? "Not connected"}`);
   lines.push(`; Bed      : ${config.bedWidth} x ${config.bedHeight} mm`);
   lines.push(`; Origin   : ${config.origin}`);
   if (options?.pageClip) {
