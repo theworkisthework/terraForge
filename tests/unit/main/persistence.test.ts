@@ -22,11 +22,30 @@ describe("main config persistence", () => {
     const persistence = createPersistence(tempDir);
 
     const first = await persistence.loadConfigs();
+    expect(first).toEqual([
+      {
+        id: "terrapen-default",
+        name: "TerraPen (Default)",
+        bedWidth: 594,
+        bedHeight: 420,
+        origin: "bottom-left",
+        penType: "stepper",
+        penUpCommand: "G0Z5",
+        penDownCommand: "G0Z0",
+        invertZJogControls: false,
+        penDownDelayMs: 0,
+        penUpDelayMs: 0,
+        jogSpeed: 6000,
+        drawSpeed: 6000,
+        connection: { type: "wifi", host: "terrapen.local", port: 80 },
+      },
+    ]);
+
     first[0].connection.host = "mutated.local";
 
     const second = await persistence.loadConfigs();
 
-    expect(second[0].connection.host).toBe("fluidnc.local");
+    expect(second[0].connection.host).toBe("terrapen.local");
     expect(second).not.toBe(first);
   });
 

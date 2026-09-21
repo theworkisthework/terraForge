@@ -113,8 +113,8 @@ test("clicking Generate G-code opens dialog; choosing save locally produces outp
   expect(content.length).toBeGreaterThan(0);
   // Should contain standard G-code commands
   expect(content).toContain("G");
-  // Should contain pen up/down commands from the default config
-  expect(content).toMatch(/M[35]/);
+  // Should contain pen up/down commands from the default TerraPen config
+  expect(content).toContain("G0Z0");
 });
 
 // ─── Options dialog ─────────────────────────────────────────────────────────
