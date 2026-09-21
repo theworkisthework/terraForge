@@ -76,6 +76,7 @@ export function ConsolePanel({ collapsed = false }: ConsolePanelProps) {
           resetting={resetting}
           showRestartConfirm={showRestartConfirm}
           collapsed={collapsed}
+          onEmergencyStop={() => void window.terraForge.fluidnc.pauseJob()}
           onFirmwareReset={() => setShowRestartConfirm(true)}
           onClear={clear}
           onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}

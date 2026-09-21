@@ -939,6 +939,12 @@ The console header shows:
 - **Machine state** badge (`Idle`, `Run`, `Hold`, `Alarm`, etc.)
 - **Position** `X:0.00 Y:0.00 Z:0.00` (work coordinates)
 
+### Emergency Stop
+
+The always-visible **E-STOP** button uses the red/yellow emergency-stop styling and is disabled only while disconnected. Click it to issue realtime Feed Hold (`!`), which decelerates the machine to a stop and flushes the motion planner or pauses a running job. It halts drawing, rapid moves, and jogs.
+
+> **Warning:** Feed Hold cannot recover the flushed motion. There is no confirmation dialog so the control remains useful when motion must stop immediately.
+
 ### Alarm Handling
 
 When the machine enters **Alarm** state, the state badge becomes a pulsing red button:

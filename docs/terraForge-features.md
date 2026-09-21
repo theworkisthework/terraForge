@@ -156,6 +156,7 @@
 - [x] Command input (send raw G-code commands)
 - [x] Console timestamp display toggle — **Application Configuration → Console Display** includes "Show date and time on console lines"; when enabled, each console entry is prefixed with a local `YYYY-MM-DD HH:mm:ss` timestamp
 - [x] Alarm state badge becomes a clickable button — sends `$X` to clear the alarm
+- [x] Emergency-stop button — persistent button in the console header; sends realtime Feed Hold (`!`) to halt motion without a confirmation dialog
 - [x] Firmware restart button — "⚠ Restart FW" button visible in console header when connected; sends `[ESP444]RESTART` to reboot the ESP32; automatically disconnects the app and shows a reconnect prompt; confirms with the user before firing
 
 ### Background Task UX
