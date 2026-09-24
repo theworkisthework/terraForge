@@ -4,6 +4,7 @@
   "description": "FluidNC pen plotter UI — SVG to G-code, job management, machine control",
   "main": "out/main/index.js",
   "scripts": {
+    "predev": "node scripts/copy-plugin-examples.mjs",
     "dev": "electron-vite dev",
     "dev:linux": "npm run dev -- -- --ozone-platform=x11 --disable-gpu --disable-software-rasterizer",
     "build": "electron-vite build && node scripts/copy-plugin-examples.mjs",
