@@ -106,7 +106,16 @@ export function RendererFieldControl({
   return (
     <label className="text-[10px] text-content-muted block">
       {field.label}
-      <div className="mt-1 flex items-center gap-1.5">
+      {/*
+        min-w-0 on the row and the slider itself: a flex/range-input child's
+        default automatic minimum size is its intrinsic content width, which
+        a plain `flex-1` does not override. Without this a slider in a narrow
+        column (this one is one of two per row, or narrower still once a
+        plugin adds presets alongside it) refuses to shrink and pushes its
+        right edge off the panel instead — the same fix StrokeWidthSection
+        already applies to its own range input.
+      */}
+      <div className="mt-1 flex min-w-0 items-center gap-1.5">
         <input
           aria-label={ariaLabel}
           type={field.control === "slider" ? "range" : "number"}
@@ -119,7 +128,7 @@ export function RendererFieldControl({
           }
           className={
             field.control === "slider"
-              ? "flex-1 accent-accent"
+              ? "min-w-0 flex-1 accent-accent"
               : `${inputClassName} mt-0`
           }
         />
