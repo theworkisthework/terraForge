@@ -1,6 +1,9 @@
 import type { BitmapPluginManifest } from "../../../../types";
 import { circularRingsRenderer } from "./circularRings";
 import { concentricBoxesRenderer } from "./concentricBoxes";
+import { concentricPolygonsRenderer } from "./concentricPolygons";
+import { isometricGridRenderer } from "./isometricGrid";
+import { radialBurstRenderer } from "./radialBurst";
 import { rasterLinesRenderer } from "./rasterLines";
 import { spiralAmplitudeRenderer } from "./spiralAmplitude";
 import type { BitmapRendererDefinition } from "./types";
@@ -11,6 +14,9 @@ export const bitmapRenderers: BitmapRendererDefinition[] = [
   circularRingsRenderer,
   rasterLinesRenderer,
   concentricBoxesRenderer,
+  concentricPolygonsRenderer,
+  radialBurstRenderer,
+  isometricGridRenderer,
 ];
 
 /** Wraps an installed plugin's manifest into the same definition shape an in-tree renderer uses. */
