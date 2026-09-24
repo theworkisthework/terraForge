@@ -96,14 +96,14 @@ test("default config form shows expected values", async () => {
     .first()
     .click();
 
-  // Check the form has populated fields — look for known default values
-  // Bed dimensions (220 x 200), feedrate (3000)
+  // Check the form has populated fields — look for known TerraPen defaults
+  // Bed dimensions (594 x 420)
   const widthInputs = formArea(window).locator('input[type="number"]');
   const allValues = await widthInputs.evaluateAll((els) =>
     els.map((el) => (el as HTMLInputElement).value),
   );
-  expect(allValues).toContain("220");
-  expect(allValues).toContain("200");
+  expect(allValues).toContain("594");
+  expect(allValues).toContain("420");
 });
 
 // ─── Create new config ──────────────────────────────────────────────────────
