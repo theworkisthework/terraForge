@@ -69,6 +69,11 @@ export function drawImportsLayer({
 
   for (const imp of imports) {
     if (!imp.visible) continue;
+    // Bitmap imports render their own preview in ImportLayer.tsx (respecting
+    // bitmapPreviewVisible/bitmapPreviewOpacity and per-ink colours) — this
+    // generic layer must not also draw a colour-separated bitmap's
+    // synthesized ink paths, or they'd render twice with no way to hide them.
+    if (imp.kind === "bitmap") continue;
 
     let impCache = cache.get(imp.id);
     if (

@@ -88,7 +88,7 @@ export function ImportHeaderRow({
       />
 
       <span className="text-[9px] text-content-faint shrink-0 ml-1">
-        {imp.paths.length}p
+        {imp.kind === "bitmap" ? "bitmap" : `${imp.paths.length}p`}
       </span>
       <Button
         variant="ghost"

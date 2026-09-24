@@ -98,6 +98,23 @@ function projectPathToVectorObjects(
 
 export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {
   if (!imp.visible) return [];
+  // A non-separated bitmap ("none"/unset mode) has no entries in `paths` and
+  // is represented as a single materialized path string instead. Once colour
+  // separation is active, `paths` holds one synthesized entry per ink and the
+  // bitmap is projected through the exact same path below as a regular SVG
+  // import — no separate handling needed, that's the whole point of
+  // synthesizing real SvgPath entries for separated ink channels.
+  if (imp.kind === "bitmap" && imp.paths.length === 0) {
+    return imp.bitmapRendererPath
+      ? [{
+          id: `${imp.id}-bitmap`, svgSource: "", path: imp.bitmapRendererPath,
+          x: imp.x, y: imp.y, scale: imp.scale, scaleX: imp.scaleX, scaleY: imp.scaleY,
+          rotation: imp.rotation, visible: true, originalWidth: imp.svgWidth,
+          originalHeight: imp.svgHeight, viewBoxX: imp.viewBoxX, viewBoxY: imp.viewBoxY,
+          layer: imp.name,
+        }]
+      : [];
+  }
   const hiddenLayerIds = imp.layers
     ? new Set(
         imp.layers.filter((layer) => !layer.visible).map((layer) => layer.id),

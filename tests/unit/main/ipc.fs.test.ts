@@ -75,7 +75,7 @@ describe("registerFsIpcHandlers", () => {
       "chosen.file",
     );
 
-    expect(mocks.showOpenDialog.mock.calls[0][1].filters).toHaveLength(4);
+    expect(mocks.showOpenDialog.mock.calls[0][1].filters).toHaveLength(5);
     expect(mocks.showOpenDialog.mock.calls[1][1].filters[0].name).toBe(
       "G-code Files",
     );

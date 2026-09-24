@@ -41,7 +41,7 @@ test("cancelling the SVG dialog keeps the canvas empty", async () => {
   await window.locator("button:has-text('Import')").click();
 
   // Properties panel should still show the empty state
-  const emptyMsg = window.locator("text=No objects. Import an SVG.");
+  const emptyMsg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(emptyMsg).toBeVisible({ timeout: 3000 });
 });
 
@@ -60,7 +60,7 @@ test("importing sample.svg shows it in Properties panel", async () => {
 });
 
 test("the empty state message disappears after import", async () => {
-  const emptyMsg = window.locator("text=No objects. Import an SVG.");
+  const emptyMsg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(emptyMsg).not.toBeVisible();
 });
 

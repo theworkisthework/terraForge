@@ -312,12 +312,224 @@ export const DEFAULT_HATCH_ANGLE_DEG = 45;
 /** Default stroke width in mm — used on import and as the UI default. */
 export const DEFAULT_STROKE_WIDTH_MM = 0.5;
 
+/**
+ * Ceiling on the path data a renderer may return.
+ *
+ * Sized from measurement rather than intuition. A renderer that anchors its
+ * detail to the pen (0.1mm, below which nothing can appear on paper) produces
+ * output proportional to the drawing, not to any source image: roughly 3.4
+ * million points and 46MB for a metre-wide plot at 1mm line spacing. That is
+ * a legitimate drawing, so the ceiling has to sit above it — an earlier 16MB
+ * limit rejected work a plotter can genuinely do.
+ *
+ * What it still guards is memory. The finished path is cloned across the
+ * sandbox, host and renderer processes, so the transient cost is a few times
+ * this number; a runaway renderer producing gigabytes has to be stopped
+ * before it gets that far. Enforced inside the sandbox, so an absurd string is
+ * never transported, and again when the result enters the document.
+ */
+export const MAX_BITMAP_RENDERER_PATH_LENGTH = 64 * 1024 * 1024;
+
+/**
+ * Settings bag for a bitmap renderer. The field set and value types are owned
+ * by the renderer's own schema (see `BitmapRendererDefinition.fields`), not by
+ * this type — different renderers use different keys.
+ */
+export type BitmapRendererSettings = Record<string, number | boolean | string>;
+
+/**
+ * Tone data covering a renderer's output area, one byte per output unit
+ * (0 = black/full ink, 255 = white/none). Produced by decoding a source
+ * bitmap today; a renderer that needs no source never receives one.
+ */
+export interface RendererSource {
+  width: number;
+  height: number;
+  values: Uint8Array;
+}
+
+/**
+ * Everything a renderer is given for a single render.
+ *
+ * Passed as one object rather than positional arguments so that the set can
+ * grow without breaking existing plugins, and so a renderer that ignores the
+ * source — a generator producing geometry from its settings alone — reads
+ * naturally rather than having to accept and discard a first argument.
+ *
+ * Coordinates are in "output units": whatever space the returned path data is
+ * expressed in. For a bitmap renderer an output unit is one source pixel, so
+ * `width`/`height` match the image; `scale` converts to millimetres either way.
+ */
+export interface RendererContext {
+  /** Width of the output area, in output units. */
+  width: number;
+  /** Height of the output area, in output units. */
+  height: number;
+  /** Millimetres per output unit — use this to convert mm-denominated settings. */
+  scale: number;
+  /** Values for the controls this renderer declared in its manifest. */
+  settings: BitmapRendererSettings;
+  /** Tone data over the output area, when a source image is driving this render. */
+  source?: RendererSource;
+}
+
+/** One named, coloured layer of a renderer's output. */
+export interface RendererLayer {
+  /** Path data, in output units. */
+  d: string;
+  /** Name for this layer — an ink, a pen, a pass. */
+  label?: string;
+  /** Suggested stroke colour, as a CSS colour string. */
+  color?: string;
+}
+
+/**
+ * What a renderer returns: a single path, or several labelled layers when it
+ * wants to drive more than one pen itself. A bare string stays valid because
+ * it is the overwhelmingly common case and nothing should have to wrap it.
+ */
+export type RendererOutput = string | RendererLayer[];
+
+/**
+ * Icon identifiers a renderer's field schema can reference. The properties
+ * panel owns the mapping onto actual icon components, so renderer modules
+ * (including external plugins) stay free of any UI/React dependency.
+ */
+export const BITMAP_RENDERER_ICON_NAMES = [
+  "rotate-cw",
+  "rotate-ccw",
+  "arrow-left-right",
+  "arrow-up-down",
+  "flip-horizontal",
+  "flip-vertical",
+] as const;
+
+/**
+ * Kept as a runtime list so manifest validation and the properties panel's
+ * icon table are checked against the same source — a name that exists in one
+ * but not the other is a type error rather than a blank control at runtime.
+ */
+export type BitmapRendererIconName = (typeof BITMAP_RENDERER_ICON_NAMES)[number];
+
+interface BitmapRendererFieldBase {
+  /** Key into the renderer's settings bag. */
+  key: string;
+  /** Visible field label, e.g. "Spacing (mm)". */
+  label: string;
+  /** Accessible name for the control; falls back to `label` when omitted. */
+  ariaLabel?: string;
+}
+
+/** A quick-nudge button shown alongside a number field, e.g. a rotate step. */
+export interface BitmapRendererNumberPreset {
+  label: string;
+  ariaLabel?: string;
+  icon?: BitmapRendererIconName;
+  /** Added to the field's current value when the preset button is clicked (clamped to min/max). */
+  delta: number;
+}
+
+export interface BitmapRendererNumberFieldSchema extends BitmapRendererFieldBase {
+  type: "number";
+  /** Visual widget for the value; defaults to a plain number input. */
+  control?: "input" | "slider";
+  min: number;
+  max: number;
+  step: number;
+  presets?: BitmapRendererNumberPreset[];
+}
+
+export interface BitmapRendererBooleanFieldSchema extends BitmapRendererFieldBase {
+  type: "boolean";
+}
+
+export interface BitmapRendererSelectOption {
+  value: string;
+  label: string;
+  icon?: BitmapRendererIconName;
+}
+
+export interface BitmapRendererSelectFieldSchema extends BitmapRendererFieldBase {
+  type: "select";
+  /** Visual widget for the choice; defaults to a dropdown. "icon-buttons" renders
+   * `options` as a row of toggle buttons — e.g. a horizontal/vertical switch. */
+  control?: "dropdown" | "icon-buttons";
+  options: BitmapRendererSelectOption[];
+}
+
+/** Describes one control a renderer wants surfaced in the properties panel. */
+export type BitmapRendererFieldSchema =
+  | BitmapRendererNumberFieldSchema
+  | BitmapRendererBooleanFieldSchema
+  | BitmapRendererSelectFieldSchema;
+
+/**
+ * Metadata for an externally-installed bitmap renderer plugin, as discovered
+ * from its manifest.json — deliberately excludes the plugin's entry file path
+ * and any executable code; only main-process code ever resolves those.
+ */
+export interface BitmapPluginManifest {
+  id: string;
+  label: string;
+  apiVersion: number;
+  defaults: BitmapRendererSettings;
+  fields: BitmapRendererFieldSchema[];
+  /** Per-render timeout in ms before the plugin's host process is killed and restarted. */
+  renderTimeoutMs?: number;
+  /**
+   * Whether this renderer needs a source image. "required" (the default) is a
+   * bitmap renderer, which cannot run without one. "none" is a generator that
+   * synthesises geometry from its settings alone. "optional" is a generator
+   * that will use a source to modulate itself when given one.
+   *
+   * Declared rather than inferred so the app can tell, without executing any
+   * plugin code, which renderers may be offered where no image exists.
+   */
+  source?: "required" | "optional" | "none";
+}
+
 /** One imported SVG file, treated as a positioned group on the bed */
 export interface SvgImport {
   id: string;
   /** Display name — defaults to filename without extension */
   name: string;
   paths: SvgPath[];
+  /** Absent for legacy SVG imports. Bitmap imports retain the same transform model. */
+  kind?: "svg" | "bitmap";
+  /** Embedded original bitmap, kept in layouts so they are portable. */
+  bitmapDataUrl?: string;
+  bitmapMimeType?: string;
+  /** The bitmap renderer that produced `bitmapRendererPath`. */
+  bitmapRendererId?: string;
+  bitmapRendererSettings?: BitmapRendererSettings;
+  /** Persisted renderer output in bitmap pixel coordinates, used for preview and G-code. */
+  bitmapRendererPath?: string;
+  /**
+   * Fingerprint of the inputs that produced the stored output (see
+   * `bitmapRenderSignature`). Lets the panel skip re-rendering a bitmap whose
+   * settings have not changed, including after a layout is reopened.
+   */
+  bitmapRenderSignature?: string;
+  /** Source scale used to convert renderer controls in mm into bitmap pixels. */
+  bitmapBaseScale?: number;
+  /** Opacity of the source image below the generated preview. */
+  bitmapOpacity?: number;
+  /** Whether the source image is shown below the generated preview. */
+  bitmapSourceVisible?: boolean;
+  /** Opacity of the generated renderer preview on the canvas. */
+  bitmapPreviewOpacity?: number;
+  /** Whether the generated renderer preview is shown on the canvas. */
+  bitmapPreviewVisible?: boolean;
+  /**
+   * How to break this bitmap's colour into separate ink layers before
+   * rendering. "none" (default) is today's single-renderer-output behavior;
+   * any other mode fans the same renderer out across multiple ink channels
+   * and populates `paths` with one synthesized path per ink (see
+   * BitmapRendererDefinition/colourSeparation.ts).
+   */
+  bitmapSeparationMode?: "none" | "rgb" | "cmy" | "cmyk" | "custom";
+  /** Custom palette swatches, used only when bitmapSeparationMode is "custom". */
+  bitmapSeparationPalette?: { label: string; color: string }[];
   /** Position of the SVG's bottom-left corner on the bed (mm) */
   x: number;
   y: number;
@@ -646,6 +858,49 @@ export interface ConfigApi {
   openPageSizesFile: () => Promise<void>;
 }
 
+/** Why one plugin folder was rejected during discovery. */
+export interface BitmapPluginDiscoveryError {
+  /** The plugin folder's name, as it appears in the plugins directory. */
+  folder: string;
+  message: string;
+}
+
+export interface BitmapPluginScan {
+  manifests: BitmapPluginManifest[];
+  errors: BitmapPluginDiscoveryError[];
+}
+
+/** Outcome of copying the bundled example plugins into the user's folder. */
+export interface BitmapPluginExampleInstall extends BitmapPluginScan {
+  /** Folder names copied in. */
+  installed: string[];
+  /** Folder names already present, left untouched. */
+  skipped: string[];
+  /** Folder names this build has no way to run yet, so not installed. */
+  unsupported: string[];
+}
+
+export interface BitmapPluginsApi {
+  /**
+   * Metadata for every currently-discovered plugin, plus the reason each
+   * rejected folder was rejected (no plugin code is executed to produce this).
+   * Waits for the app's initial scan rather than returning an empty list while
+   * it is still running.
+   */
+  list: () => Promise<BitmapPluginScan>;
+  /** Re-scan the plugins directory on disk. Returns fresh metadata plus any per-folder discovery errors. */
+  rescan: () => Promise<BitmapPluginScan>;
+  /** Runs a plugin's render() in its isolated host process. Rejects on timeout, crash, or a thrown error. */
+  render: (pluginId: string, context: RendererContext) => Promise<RendererOutput>;
+  /**
+   * Copies the example plugins that ship with the app into the user's plugins
+   * folder, then rescans. Existing folders of the same name are left alone.
+   */
+  installExamples: () => Promise<BitmapPluginExampleInstall>;
+  /** Ensures the plugins directory exists and reveals it in the OS file manager. */
+  openFolder: () => Promise<void>;
+}
+
 export interface AppApi {
   /** Returns the version string from package.json (via app.getVersion()). */
   getVersion: () => Promise<string>;
@@ -680,6 +935,7 @@ export interface TerraForgeAPI {
   config: ConfigApi;
   app: AppApi;
   edit: EditApi;
+  bitmapPlugins: BitmapPluginsApi;
 }
 
 // ─── Jog ─────────────────────────────────────────────────────────────────────

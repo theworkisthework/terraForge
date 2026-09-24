@@ -12,6 +12,7 @@ import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeOptionsSection } from "./StrokeOptionsSection";
 import { StrokeWidthSection } from "./StrokeWidthSection";
 import { TransformControlsSection } from "./TransformControlsSection";
+import { BitmapRendererSection } from "./BitmapRendererSection";
 
 export function ImportPropertiesForm({
   imp,
@@ -80,6 +81,7 @@ export function ImportPropertiesForm({
 
   return (
     <>
+      {imp.kind === "bitmap" && <BitmapRendererSection imp={imp} onUpdate={onUpdate} />}
       {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
       <PositionFieldsRow
         x={imp.x}
@@ -121,22 +123,12 @@ export function ImportPropertiesForm({
         sharedTransformProps={sharedTransformProps}
       />
 
-      <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
-
-      <StrokeWidthSection
-        strokeWidthMM={imp.strokeWidthMM}
-        defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM}
-        onChangeStrokeWidth={onChangeStrokeWidth}
-      />
-
-      <HatchFillSection
-        imp={imp}
-        defaultSpacingMM={DEFAULT_HATCH_SPACING_MM}
-        defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG}
-        onApplyHatch={onApplyHatch}
-      />
-
-      <PlotPointsSection imp={imp} onUpdate={onUpdate} />
+      {imp.kind !== "bitmap" && <>
+        <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
+        <StrokeWidthSection strokeWidthMM={imp.strokeWidthMM} defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM} onChangeStrokeWidth={onChangeStrokeWidth} />
+        <HatchFillSection imp={imp} defaultSpacingMM={DEFAULT_HATCH_SPACING_MM} defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG} onApplyHatch={onApplyHatch} />
+        <PlotPointsSection imp={imp} onUpdate={onUpdate} />
+      </>}
     </>
   );
 }

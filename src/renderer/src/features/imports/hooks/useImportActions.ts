@@ -26,6 +26,12 @@ import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
 import {
+  bitmapRenderSignature,
+  dataUrlFromBytes,
+  materializeBitmapLayers,
+} from "../../bitmap-renderers/bitmapImage";
+import { getBitmapRenderer } from "../../bitmap-renderers/registry";
+import {
   type SvgImport,
   type SvgPath,
   type SvgLayer,
@@ -395,6 +401,60 @@ export function useImportActions() {
     }
   };
 
+  const handleImportBitmapFile = async (filePath: string) => {
+    const taskId = uuid();
+    const extension = filePath.split(".").pop()?.toLowerCase() ?? "png";
+    const mimeType = extension === "jpg" || extension === "jpeg"
+      ? "image/jpeg"
+      : extension === "webp" ? "image/webp" : "image/png";
+    const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "bitmap";
+    upsertTask({ id: taskId, type: "svg-parse", label: `Importing ${name}…`, progress: null, status: "running" });
+    try {
+      const bitmapDataUrl = dataUrlFromBytes(
+        await window.terraForge.fs.readFileBinary(filePath),
+        mimeType,
+      );
+      const baseScale = 25.4 / 96;
+      const importId = uuid();
+      const defaultRenderer = getBitmapRenderer(undefined);
+      const bitmapRendererSettings = { ...defaultRenderer.defaults };
+      const renderInputs = {
+        id: importId,
+        bitmapDataUrl,
+        bitmapRendererId: defaultRenderer.id,
+        bitmapRendererSettings,
+        bitmapBaseScale: baseScale,
+      };
+      const { bitmapRendererPath } = await materializeBitmapLayers(renderInputs);
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Could not decode bitmap image."));
+        element.src = bitmapDataUrl;
+      });
+      const objW = image.naturalWidth * baseScale;
+      const objH = image.naturalHeight * baseScale;
+      const origin = activeMachineConfig?.origin ?? "bottom-left";
+      const imp: SvgImport = {
+        id: importId, name, kind: "bitmap", paths: [], x: origin.includes("right") ? (activeMachineConfig?.bedWidth ?? 220) - objW : 0,
+        y: origin.includes("top") ? -objH : 0, scale: baseScale, rotation: 0, visible: true,
+        svgWidth: image.naturalWidth, svgHeight: image.naturalHeight, viewBoxX: 0, viewBoxY: 0,
+        bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: defaultRenderer.id,
+        bitmapRendererSettings, bitmapRendererPath, bitmapBaseScale: baseScale, bitmapOpacity: 0.25,
+        // Stamped now so selecting the new import does not immediately
+        // re-render geometry that was just produced.
+        bitmapRenderSignature: bitmapRenderSignature(renderInputs),
+        bitmapSourceVisible: true,
+        bitmapPreviewOpacity: 1,
+        bitmapPreviewVisible: true,
+      };
+      addImport(imp);
+      upsertTask({ id: taskId, type: "svg-parse", label: `Bitmap imported: ${name}`, progress: 100, status: "completed" });
+    } catch (err) {
+      upsertTask({ id: taskId, type: "svg-parse", label: "Bitmap import failed", progress: null, status: "error", error: String(err) });
+    }
+  };
+
   /** Imports a G-code file directly into the canvas toolpath. */
   const handleImportGcodeFile = async (filePath: string) => {
     const name = filePath.split(/[\\/]/).pop() ?? "import.gcode";
@@ -442,6 +502,8 @@ export function useImportActions() {
       await handleImportSvgFile(filePath);
     } else if (ext === "pdf") {
       await handleImportPdfFile(filePath);
+    } else if (["png", "jpg", "jpeg", "webp"].includes(ext)) {
+      await handleImportBitmapFile(filePath);
     } else {
       await handleImportGcodeFile(filePath);
     }
@@ -451,6 +513,7 @@ export function useImportActions() {
     handleImport,
     handleImportSvgFile,
     handleImportPdfFile,
+    handleImportBitmapFile,
     handleImportGcodeFile,
   };
 }
