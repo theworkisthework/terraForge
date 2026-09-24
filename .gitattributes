@@ -1,2 +1,20 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# G-code and SVG fixtures/snapshots must check out as LF on every platform.
+# Playwright compares the *generated* G-code against these files after
+# stripping \r\n in test code, but that only normalizes the actual output —
+# the snapshot file itself is read from disk as-is. On Windows, `core.autocrlf
+# =true` (the Git-for-Windows installer default) converts these to CRLF on
+# checkout even though the repo stores LF, which is enough by itself to fail
+# every snapshot comparison locally. `eol=lf` overrides the user's local
+# autocrlf setting for these paths specifically.
+tests/e2e/**/*.gcode text eol=lf
+tests/fixtures/**/*.svg text eol=lf
+tests/fixtures/**/*.gcode text eol=lf
+
+# sample.pdf is binary. A wildcard like `tests/fixtures/** text` would force
+# git to run line-ending normalization on it too, corrupting the file on
+# checkout or commit — keep it explicitly excluded rather than relying on
+# nobody ever widening the glob above.
+tests/fixtures/sample.pdf -text
