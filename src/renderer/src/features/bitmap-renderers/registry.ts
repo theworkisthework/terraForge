@@ -1,9 +1,17 @@
 import type { BitmapPluginManifest } from "../../../../types";
+import { circularRingsRenderer } from "./circularRings";
+import { concentricBoxesRenderer } from "./concentricBoxes";
+import { rasterLinesRenderer } from "./rasterLines";
 import { spiralAmplitudeRenderer } from "./spiralAmplitude";
 import type { BitmapRendererDefinition } from "./types";
 
 /** In-tree renderers, shipped in the app bundle. */
-export const bitmapRenderers: BitmapRendererDefinition[] = [spiralAmplitudeRenderer];
+export const bitmapRenderers: BitmapRendererDefinition[] = [
+  spiralAmplitudeRenderer,
+  circularRingsRenderer,
+  rasterLinesRenderer,
+  concentricBoxesRenderer,
+];
 
 /** Wraps an installed plugin's manifest into the same definition shape an in-tree renderer uses. */
 export function pluginRendererFromManifest(manifest: BitmapPluginManifest): BitmapRendererDefinition {

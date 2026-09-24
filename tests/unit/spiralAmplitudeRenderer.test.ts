@@ -31,6 +31,10 @@ describe("generateSpiralAmplitudePath", () => {
       spacingMM: 8,
       toothWidthMM: 9,
       amplitude: 10,
+      waveform: "triangle",
+      angleDeg: 0,
+      originXPct: 50,
+      originYPct: 50,
     });
   });
 
