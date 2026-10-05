@@ -24,6 +24,17 @@ export interface HttpResult {
 
 const isNative = () => Capacitor.isNativePlatform();
 
+/**
+ * In `npm run mobile:dev` (a desktop browser) route plotter requests through
+ * the Vite dev server, which has no CORS restrictions — see
+ * vite.mobile.config.mjs. Production/native builds go direct.
+ */
+function viaDevProxy(url: string): string {
+  if (!import.meta.env.DEV || isNative()) return url;
+  const m = /^http:\/\/([^/]+)(\/.*)?$/.exec(url);
+  return m ? `/__fluidnc/${m[1]}${m[2] ?? "/"}` : url;
+}
+
 function abortError(signal: AbortSignal): Error {
   return signal.reason instanceof Error
     ? signal.reason
@@ -80,7 +91,7 @@ export async function http(
   const onAbort = () => controller.abort(signal ? abortError(signal) : undefined);
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const res = await fetch(url, {
+    const res = await fetch(viaDevProxy(url), {
       method,
       headers,
       body,
@@ -123,7 +134,7 @@ export async function httpBinary(
     onProgress?.(100);
     return out;
   }
-  const res = await fetch(url, { signal });
+  const res = await fetch(viaDevProxy(url), { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status} GET ${url}`);
   const total = Number(res.headers.get("content-length") ?? 0);
   const reader = res.body?.getReader();
@@ -171,7 +182,7 @@ export function uploadMultipart(
     form.append("file", blob, file.name);
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
+    xhr.open("POST", viaDevProxy(url));
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && e.total > 0)
         onProgress?.(Math.min(95, Math.round((e.loaded / e.total) * 95)));

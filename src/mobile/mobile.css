@@ -2,7 +2,7 @@
    Tailwind would only scan this folder by default — point it at the shared
    renderer sources too. */
 @import "../renderer/src/index.css";
-@source "../renderer/src";
+@source "../renderer/src/components/ui";
 @source "./";
 
 /* ── Touch tuning ─────────────────────────────────────────────────────────── */

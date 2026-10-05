@@ -376,6 +376,11 @@ export class WebFluidNCClient extends Emitter<Events> {
     const gen = ++this.wsGeneration;
     const ws = new WebSocket(`ws://${this.wsHost}:${this.wsPort}/`);
     this.ws = ws;
+    // FluidNC sends command output (e.g. the $$ dump, error:/[MSG:] lines) as
+    // binary frames. Node's `ws` stringifies those for us; a browser would
+    // hand back Blobs, so ask for ArrayBuffers and decode them ourselves.
+    ws.binaryType = "arraybuffer";
+    const decoder = new TextDecoder();
     let opened = false;
 
     ws.onopen = () => {
@@ -392,7 +397,13 @@ export class WebFluidNCClient extends Emitter<Events> {
 
     ws.onmessage = (ev) => {
       if (gen !== this.wsGeneration) return;
-      const text = (typeof ev.data === "string" ? ev.data : "").trim();
+      const text = (
+        typeof ev.data === "string"
+          ? ev.data
+          : ev.data instanceof ArrayBuffer
+            ? decoder.decode(ev.data)
+            : ""
+      ).trim();
       if (text.startsWith("<")) return this.emit("status", parseMachineStatus(text));
       if (text === "PING" || text.startsWith("PING:")) return this.emit("ping");
       if (/^(currentID|CURRENT_ID|activeID|ACTIVE_ID):/.test(text)) return;
