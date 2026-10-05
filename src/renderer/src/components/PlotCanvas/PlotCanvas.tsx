@@ -257,6 +257,7 @@ export function PlotCanvas() {
   return (
     <div
       ref={containerRef}
+      data-plot-canvas=""
       className="w-full h-full overflow-hidden bg-app relative select-none"
       style={{ cursor }}
       onMouseDown={onContainerMouseDown}

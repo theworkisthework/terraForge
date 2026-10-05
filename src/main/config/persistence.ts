@@ -1,21 +1,18 @@
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
+import type { AppConfig, MachineConfig, PageSize } from "../../types";
 
-function normalizePenType(penType: unknown): PenType {
-  switch (penType) {
-    case "solenoid":
-    case "solenoid-hardware":
-      return "solenoid-hardware";
-    case "solenoid-software":
-    case "servo":
-    case "stepper":
-      return penType;
-    default:
-      return "solenoid-hardware";
-  }
-}
+import {
+  BUILT_IN_PAGE_SIZES,
+  DEFAULT_APP_CONFIG,
+  DEFAULT_MACHINE_CONFIGS,
+  cloneMachineConfigs,
+  clonePageSizes,
+  normalizeConfigs,
+} from "./defaults";
+
+export { DEFAULT_MACHINE_CONFIGS, BUILT_IN_PAGE_SIZES };
 
 export interface MainPersistence {
   configPath: string;
@@ -26,110 +23,6 @@ export interface MainPersistence {
   loadPageSizes: () => Promise<PageSize[]>;
   loadAppConfig: () => Promise<AppConfig>;
   saveAppConfig: (config: AppConfig) => Promise<void>;
-}
-
-export const DEFAULT_MACHINE_CONFIGS: MachineConfig[] = [
-  {
-    id: "terrapen-default",
-    name: "TerraPen (Default)",
-    bedWidth: 594,
-    bedHeight: 420,
-    origin: "bottom-left",
-    penType: "stepper",
-    penUpCommand: "G0Z5",
-    penDownCommand: "G0Z0",
-    invertZJogControls: false,
-    penDownDelayMs: 0,
-    penUpDelayMs: 0,
-    jogSpeed: 6000,
-    drawSpeed: 6000,
-    connection: {
-      type: "wifi",
-      host: "terrapen.local",
-      port: 80,
-    },
-  },
-];
-
-export const BUILT_IN_PAGE_SIZES: PageSize[] = [
-  { id: "a2", name: "A2", widthMM: 420, heightMM: 594 },
-  { id: "a3", name: "A3", widthMM: 297, heightMM: 420 },
-  { id: "a4", name: "A4", widthMM: 210, heightMM: 297 },
-  { id: "a5", name: "A5", widthMM: 148, heightMM: 210 },
-  { id: "a6", name: "A6", widthMM: 105, heightMM: 148 },
-  { id: "letter", name: "Letter", widthMM: 215.9, heightMM: 279.4 },
-  { id: "legal", name: "Legal", widthMM: 215.9, heightMM: 355.6 },
-  { id: "tabloid", name: "Tabloid", widthMM: 279.4, heightMM: 431.8 },
-];
-
-export const DEFAULT_APP_CONFIG: AppConfig = {
-  debugLoggingEnabled: false,
-  showConsoleTimestamps: true,
-};
-
-function cloneMachineConfigs(configs: MachineConfig[]): MachineConfig[] {
-  return configs.map((config) => ({
-    ...config,
-    connection: { ...config.connection },
-  }));
-}
-
-function defaultPenDownDelayMs(penType: PenType): number {
-  switch (penType) {
-    case "solenoid-hardware":
-    case "solenoid-software":
-      return 50;
-    case "servo":
-    case "stepper":
-      return 0;
-    default:
-      return 0;
-  }
-}
-
-function defaultPenUpDelayMs(_penType: PenType): number {
-  return 0;
-}
-
-function normalizeConfig(config: MachineConfig): MachineConfig {
-  // Migrate legacy single-feedrate configs written before the jog/draw split.
-  const legacy = (config as unknown as Record<string, unknown>).feedrate as
-    | number
-    | undefined;
-  const legacySpeed = typeof legacy === "number" && legacy >= 1 ? legacy : 3000;
-  const penType = normalizePenType(config.penType);
-  return {
-    ...config,
-    penType,
-    penDownDelayMs:
-      typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
-        ? config.penDownDelayMs
-        : defaultPenDownDelayMs(penType),
-    penUpDelayMs:
-      typeof config.penUpDelayMs === "number" && config.penUpDelayMs >= 0
-        ? config.penUpDelayMs
-        : defaultPenUpDelayMs(penType),
-    jogSpeed:
-      typeof config.jogSpeed === "number" && config.jogSpeed >= 1
-        ? config.jogSpeed
-        : legacySpeed,
-    drawSpeed:
-      typeof config.drawSpeed === "number" && config.drawSpeed >= 1
-        ? config.drawSpeed
-        : legacySpeed,
-    invertZJogControls:
-      typeof config.invertZJogControls === "boolean"
-        ? config.invertZJogControls
-        : false,
-  };
-}
-
-function normalizeConfigs(configs: MachineConfig[]): MachineConfig[] {
-  return configs.map(normalizeConfig);
-}
-
-function clonePageSizes(pageSizes: PageSize[]): PageSize[] {
-  return pageSizes.map((pageSize) => ({ ...pageSize }));
 }
 
 export function createPersistence(userDataPath: string): MainPersistence {

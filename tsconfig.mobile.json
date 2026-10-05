@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.web.json",
+  "compilerOptions": {
+    "composite": false,
+    "types": ["vite/client", "node"],
+    "paths": { "@types/*": ["./src/types/*"] }
+  },
+  "include": [
+    "src/mobile/**/*.ts",
+    "src/mobile/**/*.tsx",
+    "src/renderer/src/**/*.d.ts",
+    "src/types/**/*.ts"
+  ],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

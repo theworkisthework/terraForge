@@ -26,7 +26,12 @@
     "lint:complexity": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\"",
     "doc:screenshots": "electron-vite build && playwright test --config=tests/e2e/playwright.screenshots.config.ts",
     "generate-icons": "node --experimental-strip-types scripts/generate-icons.ts",
-    "generate-svg-components": "node --experimental-strip-types scripts/generate-svg-components.ts"
+    "generate-svg-components": "node --experimental-strip-types scripts/generate-svg-components.ts",
+    "mobile:dev": "vite --config vite.mobile.config.mjs",
+    "mobile:build": "vite build --config vite.mobile.config.mjs",
+    "mobile:sync": "npm run mobile:build && cap sync",
+    "mobile:android": "npm run mobile:sync && cap open android",
+    "mobile:apk": "npm run mobile:sync && cd android && ./gradlew assembleDebug"
   },
   "keywords": [
     "electron",
@@ -64,7 +69,13 @@
     "svgson": "^5.3.1",
     "uuid": "^13.0.0",
     "ws": "^8.18.0",
-    "zustand": "^5.0.3"
+    "zustand": "^5.0.3",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/browser": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "events": "^3.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -95,7 +106,8 @@
     "typescript": "^5.7.3",
     "vite": "^7.0.0",
     "vite-plugin-svgr": "^4.5.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "@capacitor/cli": "^7.0.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-android-arm-eabi": "*",

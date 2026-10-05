@@ -19,6 +19,8 @@ import { useConsoleStore } from "./store/consoleStore";
 import { useAppConfigStore } from "./store/appConfigStore";
 import { useThemeStore, applyTheme } from "./store/themeStore";
 import { useResizablePanel } from "./hooks/useResizablePanel";
+import { useIsMobile } from "./hooks/useIsMobile";
+import { MobileShell } from "./components/MobileShell";
 import { RULER_W } from "./features/canvas";
 import type { OriginType } from "@types/index";
 
@@ -59,6 +61,7 @@ export default function App() {
     (s) => s.setShowConsoleTimestamps,
   );
   const theme = useThemeStore((s) => s.theme);
+  const isMobile = useIsMobile();
 
   // Keep <html> class in sync with theme store
   useEffect(() => {
@@ -248,6 +251,10 @@ export default function App() {
     setDebugLoggingEnabled,
     setShowConsoleTimestamps,
   ]);
+
+  if (isMobile) {
+    return <MobileShell />;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-app text-content overflow-hidden">

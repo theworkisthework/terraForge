@@ -689,8 +689,26 @@ export type JogStep = 0.1 | 1 | 10 | 100;
 export type JogDirection = 1 | -1;
 
 // Augment Window so the renderer can reference the typed API
+/**
+ * Present only in the mobile (Capacitor) build. Lets the shared renderer's
+ * mobile layout trigger actions that desktop exposes through native menus.
+ */
+export type MobileMenuAction =
+  | "import"
+  | "openLayout"
+  | "saveLayout"
+  | "closeLayout"
+  | "about";
+
+export interface MobileHost {
+  triggerMenu: (action: MobileMenuAction) => void;
+  /** Subscribe to "layout has imports" state; returns an unsubscribe fn. */
+  onLayoutState: (cb: (hasImports: boolean) => void) => () => void;
+}
+
 declare global {
   interface Window {
     terraForge: TerraForgeAPI;
+    terraForgeMobile?: MobileHost;
   }
 }

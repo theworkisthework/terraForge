@@ -141,3 +141,10 @@ dist
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# mobile
+dist-mobile/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public/
