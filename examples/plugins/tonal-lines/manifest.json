@@ -1,0 +1,21 @@
+{
+  "id": "example.tonal-lines",
+  "label": "Tonal Lines (example)",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "source": "required",
+  "renderTimeoutMs": 8000,
+  "defaults": { "spacingMM": 2, "amplitudeMM": 1.2, "direction": "horizontal", "skipWhite": true },
+  "fields": [
+    { "type": "number", "key": "spacingMM", "label": "Line spacing (mm)", "min": 0.2, "max": 20, "step": 0.1 },
+    { "type": "number", "key": "amplitudeMM", "label": "Wave height (mm)", "control": "slider", "min": 0, "max": 6, "step": 0.1 },
+    {
+      "type": "select", "key": "direction", "label": "Direction", "control": "icon-buttons",
+      "options": [
+        { "value": "horizontal", "label": "Horizontal", "icon": "arrow-left-right" },
+        { "value": "vertical", "label": "Vertical", "icon": "arrow-up-down" }
+      ]
+    },
+    { "type": "boolean", "key": "skipWhite", "label": "Lift pen over white" }
+  ]
+}

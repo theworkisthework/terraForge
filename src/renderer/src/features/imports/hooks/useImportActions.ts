@@ -4,6 +4,7 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectImportActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
+import { useAppConfigStore } from "../../../store/appConfigStore";
 import {
   findContainingLayerId,
   getEffectiveFill,
@@ -25,6 +26,13 @@ import {
 import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
+import {
+  bitmapRenderSignature,
+  dataUrlFromBytes,
+  materializeBitmapLayers,
+} from "../../bitmap-renderers/bitmapImage";
+import { getBitmapRenderer } from "../../bitmap-renderers/registry";
+import { computeBitmapFitScale } from "../../properties-panel/utils/pageBounds";
 import {
   type SvgImport,
   type SvgPath,
@@ -79,11 +87,12 @@ function computeRenderedPathBounds(pathDs: string[]) {
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
-  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath } =
+  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath, pageTemplate, pageSizes } =
     useCanvasStore(useShallow(selectImportActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const activeMachineConfig = useMachineStore((s) => s.activeConfig());
+  const bitmapRendererEnabled = useAppConfigStore((s) => s.bitmapRendererEnabled);
 
   /**
    * Imports a single SVG file — parses layers, shapes, fills, hatch lines, and
@@ -395,6 +404,72 @@ export function useImportActions() {
     }
   };
 
+  const handleImportBitmapFile = async (filePath: string) => {
+    const taskId = uuid();
+    const extension = filePath.split(".").pop()?.toLowerCase() ?? "png";
+    const mimeType = extension === "jpg" || extension === "jpeg"
+      ? "image/jpeg"
+      : extension === "webp" ? "image/webp" : "image/png";
+    const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "bitmap";
+    upsertTask({ id: taskId, type: "svg-parse", label: `Importing ${name}…`, progress: null, status: "running" });
+    try {
+      const bitmapDataUrl = dataUrlFromBytes(
+        await window.terraForge.fs.readFileBinary(filePath),
+        mimeType,
+      );
+      // Needed before the renderer runs, not just for display afterwards:
+      // the fit-capped scale below depends on the image's native pixel size,
+      // and every tone-spine/halftone renderer's point count scales with the
+      // import's physical size — an oversized default produces an unworkable
+      // amount of preview geometry, so the cap has to land before materialize.
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Could not decode bitmap image."));
+        element.src = bitmapDataUrl;
+      });
+      const baseScale = computeBitmapFitScale({
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        bedW: activeMachineConfig?.bedWidth ?? 220,
+        bedH: activeMachineConfig?.bedHeight ?? 200,
+        pageTemplate,
+        pageSizes,
+      });
+      const importId = uuid();
+      const defaultRenderer = getBitmapRenderer(undefined);
+      const bitmapRendererSettings = { ...defaultRenderer.defaults };
+      const renderInputs = {
+        id: importId,
+        bitmapDataUrl,
+        bitmapRendererId: defaultRenderer.id,
+        bitmapRendererSettings,
+        bitmapBaseScale: baseScale,
+      };
+      const { bitmapRendererPath } = await materializeBitmapLayers(renderInputs);
+      const objW = image.naturalWidth * baseScale;
+      const objH = image.naturalHeight * baseScale;
+      const origin = activeMachineConfig?.origin ?? "bottom-left";
+      const imp: SvgImport = {
+        id: importId, name, kind: "bitmap", paths: [], x: origin.includes("right") ? (activeMachineConfig?.bedWidth ?? 220) - objW : 0,
+        y: origin.includes("top") ? -objH : 0, scale: baseScale, rotation: 0, visible: true,
+        svgWidth: image.naturalWidth, svgHeight: image.naturalHeight, viewBoxX: 0, viewBoxY: 0,
+        bitmapDataUrl, bitmapMimeType: mimeType, bitmapRendererId: defaultRenderer.id,
+        bitmapRendererSettings, bitmapRendererPath, bitmapBaseScale: baseScale, bitmapOpacity: 0.25,
+        // Stamped now so selecting the new import does not immediately
+        // re-render geometry that was just produced.
+        bitmapRenderSignature: bitmapRenderSignature(renderInputs),
+        bitmapSourceVisible: true,
+        bitmapPreviewOpacity: 1,
+        bitmapPreviewVisible: true,
+      };
+      addImport(imp);
+      upsertTask({ id: taskId, type: "svg-parse", label: `Bitmap imported: ${name}`, progress: 100, status: "completed" });
+    } catch (err) {
+      upsertTask({ id: taskId, type: "svg-parse", label: "Bitmap import failed", progress: null, status: "error", error: String(err) });
+    }
+  };
+
   /** Imports a G-code file directly into the canvas toolpath. */
   const handleImportGcodeFile = async (filePath: string) => {
     const name = filePath.split(/[\\/]/).pop() ?? "import.gcode";
@@ -435,13 +510,28 @@ export function useImportActions() {
 
   /** Unified import entry point — opens the file dialog and routes by extension. */
   const handleImport = async () => {
-    const filePath = await window.terraForge.fs.openImportDialog();
+    const filePath = await window.terraForge.fs.openImportDialog({ allowBitmap: bitmapRendererEnabled });
     if (!filePath) return;
     const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
     if (ext === "svg") {
       await handleImportSvgFile(filePath);
     } else if (ext === "pdf") {
       await handleImportPdfFile(filePath);
+    } else if (["png", "jpg", "jpeg", "webp"].includes(ext)) {
+      // The dialog itself already hides bitmap extensions when the feature
+      // is off; this is defence in depth against an OS-level "All Files"
+      // fallback some platforms add regardless of the filters we pass.
+      if (!bitmapRendererEnabled) {
+        upsertTask({
+          id: uuid(),
+          type: "svg-parse",
+          label: "Bitmap import is an experimental feature — enable it in Application Configuration.",
+          progress: null,
+          status: "error",
+        });
+        return;
+      }
+      await handleImportBitmapFile(filePath);
     } else {
       await handleImportGcodeFile(filePath);
     }
@@ -451,6 +541,7 @@ export function useImportActions() {
     handleImport,
     handleImportSvgFile,
     handleImportPdfFile,
+    handleImportBitmapFile,
     handleImportGcodeFile,
   };
 }

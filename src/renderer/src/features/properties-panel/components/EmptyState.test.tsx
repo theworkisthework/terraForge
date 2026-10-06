@@ -4,9 +4,9 @@ import { EmptyState } from "./EmptyState";
 
 describe("EmptyState", () => {
   it("renders the provided message", () => {
-    render(<EmptyState message="No objects. Import an SVG." />);
+    render(<EmptyState message="No objects. Import a vector or bitmap." />);
 
-    expect(screen.getByText("No objects. Import an SVG.")).toBeDefined();
+    expect(screen.getByText("No objects. Import a vector or bitmap.")).toBeDefined();
   });
 
   it("updates message text on rerender", () => {

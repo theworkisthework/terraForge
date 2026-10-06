@@ -129,7 +129,7 @@ test("opening a layout on an empty canvas loads its imports directly", async () 
   await discardBtn.click();
 
   // Canvas should now be empty.
-  await expect(window.locator("text=No objects. Import an SVG.")).toBeVisible({
+  await expect(window.locator("text=No objects. Import a vector or bitmap.")).toBeVisible({
     timeout: 5_000,
   });
 
@@ -202,7 +202,7 @@ test("confirming close layout clears all imports", async () => {
   await expect(discardBtn).toBeVisible({ timeout: 5_000 });
   await discardBtn.click();
 
-  await expect(window.locator("text=No objects. Import an SVG.")).toBeVisible({
+  await expect(window.locator("text=No objects. Import a vector or bitmap.")).toBeVisible({
     timeout: 5_000,
   });
 });

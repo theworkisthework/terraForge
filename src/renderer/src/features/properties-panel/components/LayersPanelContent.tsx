@@ -158,7 +158,7 @@ export function LayersPanelContent() {
   return (
     <PanelScrollBody>
       {imports.length === 0 && !gcodeToolpath ? (
-        <EmptyState message="No objects. Import an SVG." />
+        <EmptyState message="No objects. Import a vector or bitmap." />
       ) : (
         <>
           {/* G-code section heading + row — shown when a .gcode file has been loaded */}

@@ -5,4 +5,6 @@ export const selectImportActionsCanvasState = (state: CanvasState) => ({
   setGcodeToolpath: state.setGcodeToolpath,
   setGcodeSource: state.setGcodeSource,
   selectToolpath: state.selectToolpath,
+  pageTemplate: state.pageTemplate,
+  pageSizes: state.pageSizes,
 });

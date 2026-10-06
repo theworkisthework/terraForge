@@ -12,6 +12,7 @@ import { PositionFieldsRow } from "./PositionFieldsRow";
 import { StrokeOptionsSection } from "./StrokeOptionsSection";
 import { StrokeWidthSection } from "./StrokeWidthSection";
 import { TransformControlsSection } from "./TransformControlsSection";
+import { BitmapRendererSection } from "./BitmapRendererSection";
 
 export function ImportPropertiesForm({
   imp,
@@ -80,6 +81,7 @@ export function ImportPropertiesForm({
 
   return (
     <>
+      {imp.kind === "bitmap" && <BitmapRendererSection imp={imp} onUpdate={onUpdate} />}
       {/* X / Y — two columns (unconstrained: G-code clips to bed) */}
       <PositionFieldsRow
         x={imp.x}
@@ -121,21 +123,17 @@ export function ImportPropertiesForm({
         sharedTransformProps={sharedTransformProps}
       />
 
-      <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
-
-      <StrokeWidthSection
-        strokeWidthMM={imp.strokeWidthMM}
-        defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM}
-        onChangeStrokeWidth={onChangeStrokeWidth}
-      />
-
-      <HatchFillSection
-        imp={imp}
-        defaultSpacingMM={DEFAULT_HATCH_SPACING_MM}
-        defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG}
-        onApplyHatch={onApplyHatch}
-      />
-
+      {imp.kind !== "bitmap" && <>
+        <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
+        <StrokeWidthSection strokeWidthMM={imp.strokeWidthMM} defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM} onChangeStrokeWidth={onChangeStrokeWidth} />
+      </>}
+      {/*
+        Not bitmap-excluded: a dot-producing bitmap renderer (e.g. dot
+        halftone) synthesizes real hasFill/pointTap paths, and both sections
+        already self-gate on those being present — so they stay hidden for
+        every other bitmap renderer without a kind check here.
+      */}
+      <HatchFillSection imp={imp} defaultSpacingMM={DEFAULT_HATCH_SPACING_MM} defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG} onApplyHatch={onApplyHatch} />
       <PlotPointsSection imp={imp} onUpdate={onUpdate} />
     </>
   );

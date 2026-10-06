@@ -111,7 +111,7 @@ test("properties panel is visible", async () => {
 });
 
 test("properties panel shows empty state message", async () => {
-  const msg = window.locator("text=No objects. Import an SVG.");
+  const msg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(msg).toBeVisible();
 });
 

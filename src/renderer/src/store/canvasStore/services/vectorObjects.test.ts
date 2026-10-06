@@ -197,6 +197,61 @@ describe("canvasStore vectorObjects service", () => {
     expect(result[0].id).toBe("pb");
   });
 
+  it("projects a non-separated bitmap (paths empty) from its single materialized path", () => {
+    const imp = makeImport({
+      kind: "bitmap",
+      paths: [],
+      bitmapRendererPath: "M0 0 L10 10",
+    });
+
+    const result = vectorObjectsForImport(imp);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "imp-1-bitmap", path: "M0 0 L10 10" });
+  });
+
+  it("returns nothing for a non-separated bitmap with no materialized path yet", () => {
+    const imp = makeImport({ kind: "bitmap", paths: [], bitmapRendererPath: undefined });
+    expect(vectorObjectsForImport(imp)).toEqual([]);
+  });
+
+  it("projects a colour-separated bitmap through the regular per-path pipeline, carrying each ink's colour", () => {
+    const imp = makeImport({
+      kind: "bitmap",
+      bitmapRendererPath: "M999 999", // must be ignored once paths[] is populated
+      paths: [
+        {
+          id: "imp-1-ink-0",
+          d: "M0 0 L1 1",
+          svgSource: "",
+          visible: true,
+          label: "Cyan",
+          hasFill: false,
+          strokeColor: "#00ffff",
+          sourceColor: "#00ffff",
+          sourceOutlineVisible: true,
+          outlineVisible: true,
+        },
+        {
+          id: "imp-1-ink-1",
+          d: "M2 2 L3 3",
+          svgSource: "",
+          visible: true,
+          label: "Magenta",
+          hasFill: false,
+          strokeColor: "#ff00ff",
+          sourceColor: "#ff00ff",
+          sourceOutlineVisible: true,
+          outlineVisible: true,
+        },
+      ],
+    });
+
+    const result = vectorObjectsForImport(imp);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ id: "imp-1-ink-0", path: "M0 0 L1 1", sourceColor: "#00ffff" });
+    expect(result[1]).toMatchObject({ id: "imp-1-ink-1", path: "M2 2 L3 3", sourceColor: "#ff00ff" });
+  });
+
   it("normalizes non-zero viewBox offsets for gcode flattening", () => {
     const imp = makeImport({
       x: 0,
