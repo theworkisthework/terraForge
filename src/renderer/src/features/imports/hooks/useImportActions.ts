@@ -31,6 +31,7 @@ import {
   materializeBitmapLayers,
 } from "../../bitmap-renderers/bitmapImage";
 import { getBitmapRenderer } from "../../bitmap-renderers/registry";
+import { computeBitmapFitScale } from "../../properties-panel/utils/pageBounds";
 import {
   type SvgImport,
   type SvgPath,
@@ -85,7 +86,7 @@ function computeRenderedPathBounds(pathDs: string[]) {
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
-  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath } =
+  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath, pageTemplate, pageSizes } =
     useCanvasStore(useShallow(selectImportActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
@@ -414,7 +415,25 @@ export function useImportActions() {
         await window.terraForge.fs.readFileBinary(filePath),
         mimeType,
       );
-      const baseScale = 25.4 / 96;
+      // Needed before the renderer runs, not just for display afterwards:
+      // the fit-capped scale below depends on the image's native pixel size,
+      // and every tone-spine/halftone renderer's point count scales with the
+      // import's physical size — an oversized default produces an unworkable
+      // amount of preview geometry, so the cap has to land before materialize.
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Could not decode bitmap image."));
+        element.src = bitmapDataUrl;
+      });
+      const baseScale = computeBitmapFitScale({
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        bedW: activeMachineConfig?.bedWidth ?? 220,
+        bedH: activeMachineConfig?.bedHeight ?? 200,
+        pageTemplate,
+        pageSizes,
+      });
       const importId = uuid();
       const defaultRenderer = getBitmapRenderer(undefined);
       const bitmapRendererSettings = { ...defaultRenderer.defaults };
@@ -426,12 +445,6 @@ export function useImportActions() {
         bitmapBaseScale: baseScale,
       };
       const { bitmapRendererPath } = await materializeBitmapLayers(renderInputs);
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const element = new Image();
-        element.onload = () => resolve(element);
-        element.onerror = () => reject(new Error("Could not decode bitmap image."));
-        element.src = bitmapDataUrl;
-      });
       const objW = image.naturalWidth * baseScale;
       const objH = image.naturalHeight * baseScale;
       const origin = activeMachineConfig?.origin ?? "bottom-left";
