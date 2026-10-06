@@ -126,9 +126,15 @@ export function ImportPropertiesForm({
       {imp.kind !== "bitmap" && <>
         <StrokeOptionsSection imp={imp} onUpdate={onUpdate} />
         <StrokeWidthSection strokeWidthMM={imp.strokeWidthMM} defaultStrokeWidthMM={DEFAULT_STROKE_WIDTH_MM} onChangeStrokeWidth={onChangeStrokeWidth} />
-        <HatchFillSection imp={imp} defaultSpacingMM={DEFAULT_HATCH_SPACING_MM} defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG} onApplyHatch={onApplyHatch} />
-        <PlotPointsSection imp={imp} onUpdate={onUpdate} />
       </>}
+      {/*
+        Not bitmap-excluded: a dot-producing bitmap renderer (e.g. dot
+        halftone) synthesizes real hasFill/pointTap paths, and both sections
+        already self-gate on those being present — so they stay hidden for
+        every other bitmap renderer without a kind check here.
+      */}
+      <HatchFillSection imp={imp} defaultSpacingMM={DEFAULT_HATCH_SPACING_MM} defaultAngleDeg={DEFAULT_HATCH_ANGLE_DEG} onApplyHatch={onApplyHatch} />
+      <PlotPointsSection imp={imp} onUpdate={onUpdate} />
     </>
   );
 }

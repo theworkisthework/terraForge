@@ -98,12 +98,14 @@ function projectPathToVectorObjects(
 
 export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {
   if (!imp.visible) return [];
-  // A non-separated bitmap ("none"/unset mode) has no entries in `paths` and
-  // is represented as a single materialized path string instead. Once colour
-  // separation is active, `paths` holds one synthesized entry per ink and the
-  // bitmap is projected through the exact same path below as a regular SVG
-  // import — no separate handling needed, that's the whole point of
-  // synthesizing real SvgPath entries for separated ink channels.
+  // A bitmap whose renderer output stays a single unnamed stroke ("none"
+  // separation, non-dot renderer) has no entries in `paths` and is
+  // represented as a single materialized path string instead. Once colour
+  // separation is active, or the active renderer produces independent dots
+  // (`BitmapRendererDefinition.producesDots`), `paths` holds one synthesized
+  // entry per ink/dot and the bitmap is projected through the exact same
+  // path below as a regular SVG import — no separate handling needed,
+  // that's the whole point of synthesizing real SvgPath entries.
   if (imp.kind === "bitmap" && imp.paths.length === 0) {
     return imp.bitmapRendererPath
       ? [{

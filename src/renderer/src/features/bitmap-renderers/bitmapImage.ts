@@ -162,14 +162,69 @@ function inkPath(
 }
 
 /**
- * Turns a bitmap import into plottable geometry: either the legacy single
- * path (`bitmapSeparationMode` "none"/unset — today's behavior, unchanged)
- * or, when colour separation is active, one synthesized `SvgPath` per ink
- * channel, tagged with that ink's colour so the existing colour-group/
- * layer-group machinery (built for SVG imports) picks them up unmodified.
+ * Splits a dot-producing renderer's output into one `SvgPath` per dot, each
+ * fillable and plot-tappable at its own centre — see
+ * `BitmapRendererDefinition.producesDots`. Splits on subpath boundaries
+ * (`M`) rather than parsing the path grammar: valid because a `producesDots`
+ * renderer emits only closed `M...L...Z` polylines, never curves or arcs.
+ * Each dot's centre is the mean of its own vertices, which is exact for an
+ * evenly-sampled circle — the symmetric points average to the true centre —
+ * so no separate centroid geometry is needed.
  *
- * The renderer itself never changes between these two cases — separation is
- * a fan-out one level above `render()`, not a different rendering mode.
+ * `idPrefix` distinguishes one channel's dots from another's when a
+ * colour-separated render calls this once per channel (default `"dot"` for
+ * the single-channel case); `color`/`label` tag each dot with its ink, the
+ * same way `inkPath` tags a whole separated layer.
+ */
+export function splitDotPaths(
+  importId: string,
+  d: string,
+  options: { idPrefix?: string; color?: string; label?: string } = {},
+): SvgPath[] {
+  const { idPrefix = "dot", color, label } = options;
+  const subpaths = d.split(/(?=M)/).map((s) => s.trim()).filter(Boolean);
+  return subpaths.map((subpath, index) => {
+    const coords = (subpath.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+    let sumX = 0;
+    let sumY = 0;
+    let count = 0;
+    for (let i = 0; i + 1 < coords.length; i += 2) {
+      sumX += coords[i];
+      sumY += coords[i + 1];
+      count++;
+    }
+    return {
+      id: `${importId}-${idPrefix}-${index}`,
+      d: subpath,
+      svgSource: "",
+      visible: true,
+      hasFill: true,
+      fillColor: color,
+      strokeColor: color,
+      sourceColor: color,
+      sourceOutlineVisible: true,
+      outlineVisible: true,
+      label,
+      pointTap: count > 0 ? { x: sumX / count, y: sumY / count } : undefined,
+    };
+  });
+}
+
+/**
+ * Turns a bitmap import into plottable geometry. Three shapes, depending on
+ * the renderer and whether colour separation is active:
+ * - Legacy single path: no separation, and the renderer's output is one
+ *   continuous stroke (`producesDots` unset) — today's original behaviour.
+ * - One `SvgPath` per ink channel: separation active, non-dot renderer —
+ *   tagged with that ink's colour so the existing colour-group/layer-group
+ *   machinery (built for SVG imports) picks them up unmodified.
+ * - One `SvgPath` per dot (optionally further split per ink channel under
+ *   separation): a `producesDots` renderer, via `splitDotPaths` — each dot
+ *   independently fillable and plot-tappable.
+ *
+ * The renderer itself never changes between these cases — separation and dot
+ * splitting are both a fan-out one level above `render()`, not a different
+ * rendering mode.
  */
 export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Promise<MaterializedBitmap> {
   if (!bitmap.bitmapDataUrl) return { bitmapRendererPath: "", paths: [] };
@@ -208,6 +263,9 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
     // way a colour separation is, so multi-pen output needs no special case
     // anywhere downstream.
     if (layers.length === 1 && layers[0].label === undefined && layers[0].color === undefined) {
+      if (renderer.producesDots) {
+        return { bitmapRendererPath: "", paths: splitDotPaths(bitmap.id, layers[0].d) };
+      }
       return { bitmapRendererPath: layers[0].d, paths: [] };
     }
     return {
@@ -239,6 +297,23 @@ export async function materializeBitmapLayers(bitmap: MaterializableBitmap): Pro
       ),
     })),
   );
+
+  // A dot-producing renderer's per-channel output still needs splitting into
+  // individually fillable/tappable dots, exactly as the non-separated case
+  // does — just tagged with that channel's colour and label, and namespaced
+  // per channel so two channels' dots never collide on id.
+  if (renderer.producesDots) {
+    const dotPaths = perChannel.flatMap(({ channel, index, layers }) =>
+      layers.flatMap((layer, layerIndex) =>
+        splitDotPaths(bitmap.id, layer.d, {
+          idPrefix: layers.length === 1 ? `ink-${index}` : `ink-${index}-${layerIndex}`,
+          color: layer.color ?? channel.color,
+          label: layer.label ? `${channel.label} · ${layer.label}` : channel.label,
+        }),
+      ),
+    );
+    return { bitmapRendererPath: "", paths: dotPaths };
+  }
 
   // A renderer may itself split a channel into several layers, so the ink
   // channel and the renderer's own layer both contribute to the name and

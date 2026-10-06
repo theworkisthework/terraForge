@@ -42,7 +42,7 @@ describe("PlotPointsSection", () => {
     );
 
     expect(screen.getByText("Plot points").getAttribute("title")).toBe(
-      "Plot the center point of a circle. Applies only to SVG circle elements and does not affect stroke or fill options.",
+      "Plot the center point of a circle or dot. Applies only to SVG circle elements and dot-producing bitmap renderers, and does not affect stroke or fill options.",
     );
   });
 

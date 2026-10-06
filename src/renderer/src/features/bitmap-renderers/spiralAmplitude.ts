@@ -1,7 +1,8 @@
 import type { BitmapRendererSettings } from "../../../../types";
 import { renderToneSpine, type SpineStrand } from "./toneSpine/engine";
 import { luminanceAt } from "./toneSpine/sampling";
-import { angleField, DEFAULT_ANGLE_DEG, DEFAULT_ORIGIN_PCT, originFields, waveformField } from "./toneSpine/fields";
+import { angleField, DEFAULT_ANGLE_DEG, DEFAULT_ORIGIN_PCT, originFields } from "./sharedFields";
+import { waveformField } from "./toneSpine/fields";
 import { bipolarToothPulse, DEFAULT_WAVEFORM, type WaveformId } from "./toneSpine/waveforms";
 import type { RendererContext, RendererSource, BitmapRendererDefinition } from "./types";
 

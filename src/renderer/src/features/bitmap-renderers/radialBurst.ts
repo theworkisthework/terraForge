@@ -1,6 +1,7 @@
 import type { BitmapRendererSettings } from "../../../../types";
 import { renderToneSpine, type SpineStrand } from "./toneSpine/engine";
-import { angleField, DEFAULT_ANGLE_DEG, DEFAULT_ORIGIN_PCT, originFields, waveformField } from "./toneSpine/fields";
+import { angleField, DEFAULT_ANGLE_DEG, DEFAULT_ORIGIN_PCT, originFields } from "./sharedFields";
+import { waveformField } from "./toneSpine/fields";
 import { clipLineToRect } from "./toneSpine/lineFamily";
 import { DEFAULT_WAVEFORM, type WaveformId } from "./toneSpine/waveforms";
 import type { BitmapRendererDefinition, RendererContext } from "./types";

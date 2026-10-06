@@ -2,6 +2,7 @@ import type { BitmapPluginManifest } from "../../../../types";
 import { circularRingsRenderer } from "./circularRings";
 import { concentricBoxesRenderer } from "./concentricBoxes";
 import { concentricPolygonsRenderer } from "./concentricPolygons";
+import { dotHalftoneRenderer } from "./dotHalftone";
 import { isometricGridRenderer } from "./isometricGrid";
 import { radialBurstRenderer } from "./radialBurst";
 import { rasterLinesRenderer } from "./rasterLines";
@@ -17,6 +18,7 @@ export const bitmapRenderers: BitmapRendererDefinition[] = [
   concentricPolygonsRenderer,
   radialBurstRenderer,
   isometricGridRenderer,
+  dotHalftoneRenderer,
 ];
 
 /** Wraps an installed plugin's manifest into the same definition shape an in-tree renderer uses. */
@@ -26,6 +28,7 @@ export function pluginRendererFromManifest(manifest: BitmapPluginManifest): Bitm
     label: manifest.label,
     defaults: manifest.defaults,
     fields: manifest.fields,
+    producesDots: manifest.producesDots,
     render: (context) => window.terraForge.bitmapPlugins.render(manifest.id, context),
   };
 }

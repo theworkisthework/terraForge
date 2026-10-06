@@ -486,6 +486,13 @@ export interface BitmapPluginManifest {
    * plugin code, which renderers may be offered where no image exists.
    */
   source?: "required" | "optional" | "none";
+  /**
+   * Declares that this renderer's closed subpaths are independent dots meant
+   * to be filled or plot-tapped individually rather than one continuous
+   * stroke — see `BitmapRendererDefinition.producesDots` for how the app
+   * uses this.
+   */
+  producesDots?: boolean;
 }
 
 /** One imported SVG file, treated as a positioned group on the bed */
