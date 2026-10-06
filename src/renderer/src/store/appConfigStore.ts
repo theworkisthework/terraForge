@@ -73,6 +73,7 @@ interface AppConfigState {
   showConsoleTimestamps: boolean;
   showMachineCoordinates: boolean;
   respectSvgColorsOnCanvas: boolean;
+  bitmapRendererEnabled: boolean;
   vinylCuttingEnabled: boolean;
   vinylBladeOffsetMM: number;
   vinylCornerAngleThresholdDeg: number;
@@ -84,6 +85,7 @@ interface AppConfigState {
   setShowConsoleTimestamps: (enabled: boolean) => void;
   setShowMachineCoordinates: (enabled: boolean) => void;
   setRespectSvgColorsOnCanvas: (enabled: boolean) => void;
+  setBitmapRendererEnabled: (enabled: boolean) => void;
   setVinylCuttingEnabled: (enabled: boolean) => void;
   setVinylBladeOffsetMM: (value: number) => void;
   setVinylCornerAngleThresholdDeg: (value: number) => void;
@@ -106,6 +108,7 @@ export const useAppConfigStore = create<AppConfigState>()(
       showConsoleTimestamps: true,
       showMachineCoordinates: false,
       respectSvgColorsOnCanvas: false,
+      bitmapRendererEnabled: false,
       vinylCuttingEnabled: false,
       vinylBladeOffsetMM: 0.25,
       vinylCornerAngleThresholdDeg: 10,
@@ -122,6 +125,8 @@ export const useAppConfigStore = create<AppConfigState>()(
         set({ showMachineCoordinates: enabled }),
       setRespectSvgColorsOnCanvas: (enabled) =>
         set({ respectSvgColorsOnCanvas: enabled }),
+      setBitmapRendererEnabled: (enabled) =>
+        set({ bitmapRendererEnabled: enabled }),
       setVinylCuttingEnabled: (enabled) =>
         set({ vinylCuttingEnabled: enabled }),
       setVinylBladeOffsetMM: (value) =>

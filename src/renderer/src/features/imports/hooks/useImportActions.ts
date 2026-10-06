@@ -4,6 +4,7 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectImportActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
+import { useAppConfigStore } from "../../../store/appConfigStore";
 import {
   findContainingLayerId,
   getEffectiveFill,
@@ -91,6 +92,7 @@ export function useImportActions() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const activeMachineConfig = useMachineStore((s) => s.activeConfig());
+  const bitmapRendererEnabled = useAppConfigStore((s) => s.bitmapRendererEnabled);
 
   /**
    * Imports a single SVG file — parses layers, shapes, fills, hatch lines, and
@@ -508,7 +510,7 @@ export function useImportActions() {
 
   /** Unified import entry point — opens the file dialog and routes by extension. */
   const handleImport = async () => {
-    const filePath = await window.terraForge.fs.openImportDialog();
+    const filePath = await window.terraForge.fs.openImportDialog({ allowBitmap: bitmapRendererEnabled });
     if (!filePath) return;
     const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
     if (ext === "svg") {
@@ -516,6 +518,19 @@ export function useImportActions() {
     } else if (ext === "pdf") {
       await handleImportPdfFile(filePath);
     } else if (["png", "jpg", "jpeg", "webp"].includes(ext)) {
+      // The dialog itself already hides bitmap extensions when the feature
+      // is off; this is defence in depth against an OS-level "All Files"
+      // fallback some platforms add regardless of the filters we pass.
+      if (!bitmapRendererEnabled) {
+        upsertTask({
+          id: uuid(),
+          type: "svg-parse",
+          label: "Bitmap import is an experimental feature — enable it in Application Configuration.",
+          progress: null,
+          status: "error",
+        });
+        return;
+      }
       await handleImportBitmapFile(filePath);
     } else {
       await handleImportGcodeFile(filePath);
