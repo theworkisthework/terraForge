@@ -11,6 +11,7 @@ import { type GcodeOptions, type VectorObject } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
 import { normalizeSvgColor } from "../../imports/services/svgImportHelpers";
 import { vectorObjectsForImportLayer } from "../../../store/canvasStore/services/vectorObjects";
+import { flushBitmapRenders } from "../../bitmap-renderers/bitmapRenderService";
 
 type GcodeProgressStage =
   | "preparing"
@@ -230,6 +231,22 @@ export function useJobActions() {
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
+
+    // A bitmap setting changed moments ago may still be inside its render
+    // debounce, or mid-render; generating now would plot the previous output.
+    try {
+      await flushBitmapRenders();
+    } catch (err) {
+      upsertTask({
+        id: uuid(),
+        type: "gcode-generate",
+        label: "G-code failed",
+        progress: null,
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
 
     if (prefs.exportPerLayer) {
       await handleGenerateGcodePerLayer(prefs, cfg);

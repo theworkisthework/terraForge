@@ -11,12 +11,13 @@
  *   • LOD: sub-pixel segments are skipped based on current zoom level
  *   • RAF debouncing: rapid pan/zoom events collapse into one repaint per frame
  */
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { MM_TO_PX, PAD } from "../constants";
 import type { Vp } from "../types";
 import type { SvgImport, LayerGroup } from "../../../../../types";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import type { Theme } from "../../../store/themeStore";
+import { bitmapPreviewRasterizer } from "../bitmapPreview/previewRasterizer";
 import {
   drawImportsLayer,
   drawToolpathLayer,
@@ -103,6 +104,15 @@ export function ToolpathOverlay({
     path: null,
   });
 
+  // Bitmap previews arrive asynchronously as rasterised images; each arrival
+  // needs a redraw even though no prop changed.
+  const bitmapPreviews = bitmapPreviewRasterizer();
+  const [bitmapPreviewVersion, setBitmapPreviewVersion] = useState(0);
+  useEffect(
+    () => bitmapPreviews?.subscribe(() => setBitmapPreviewVersion((version) => version + 1)),
+    [bitmapPreviews],
+  );
+
   useEffect(() => {
     let rafId: number | null = null;
 
@@ -170,6 +180,7 @@ export function ToolpathOverlay({
         canvasH,
         respectSvgColorsOnCanvas,
         cache: importPath2DCacheRef.current,
+        bitmapPreviews,
       });
 
       if (!gcodeToolpath) return;
@@ -226,6 +237,8 @@ export function ToolpathOverlay({
     canvasH,
     respectSvgColorsOnCanvas,
     theme,
+    bitmapPreviews,
+    bitmapPreviewVersion,
   ]);
 
   return (

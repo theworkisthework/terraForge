@@ -8,6 +8,9 @@ import type {
   BackgroundTask,
   VectorObject,
   GcodeOptions,
+  BitmapPluginScan,
+  BitmapPluginExampleInstall,
+  RendererOutput,
 } from "../types";
 
 // ─── Utility: create a typed IPC invoker ─────────────────────────────────────
@@ -101,7 +104,8 @@ const fs: TerraForgeAPI["fs"] = {
   openPdfDialog: () => invoke<string | null>("fs:openPdfDialog"),
   openFileDialog: () => invoke<string | null>("fs:openFileDialog"),
   openGcodeDialog: () => invoke<string | null>("fs:openGcodeDialog"),
-  openImportDialog: () => invoke<string | null>("fs:openImportDialog"),
+  openImportDialog: (opts?: { allowBitmap?: boolean }) =>
+    invoke<string | null>("fs:openImportDialog", opts),
   readFile: (filePath) => invoke<string>("fs:readFile", filePath),
   readFileBinary: (filePath) =>
     invoke<Uint8Array>("fs:readFileBinary", filePath),
@@ -219,6 +223,17 @@ const editApi: TerraForgeAPI["edit"] = {
     ipcRenderer.send("menu:setEditMenuState", hasSelection),
 };
 
+// ─── Bitmap renderer plugins API ──────────────────────────────────────────────
+
+const bitmapPlugins: TerraForgeAPI["bitmapPlugins"] = {
+  list: () => invoke<BitmapPluginScan>("bitmapPlugins:list"),
+  rescan: () => invoke<BitmapPluginScan>("bitmapPlugins:rescan"),
+  render: (pluginId, context) =>
+    invoke<RendererOutput>("bitmapPlugins:render", pluginId, context),
+  installExamples: () => invoke<BitmapPluginExampleInstall>("bitmapPlugins:installExamples"),
+  openFolder: () => invoke<void>("bitmapPlugins:openFolder"),
+};
+
 // ─── Expose to renderer ───────────────────────────────────────────────────────
 
 const api: TerraForgeAPI = {
@@ -230,5 +245,6 @@ const api: TerraForgeAPI = {
   config,
   app: appApi,
   edit: editApi,
+  bitmapPlugins,
 };
 contextBridge.exposeInMainWorld("terraForge", api);

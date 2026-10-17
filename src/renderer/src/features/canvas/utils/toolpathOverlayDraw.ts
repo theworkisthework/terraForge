@@ -7,6 +7,7 @@ import type { Vp } from "../types";
 import { LOD_PX, MM_TO_PX, PAD } from "../constants";
 import { scaleHexColor } from "./geometry";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
+import type { BitmapPreviewRasterizer } from "../bitmapPreview/previewRasterizer";
 
 export interface ImportPath2DCacheEntry {
   impRef: SvgImport;
@@ -36,6 +37,37 @@ interface DrawImportsLayerParams {
   canvasH: number;
   respectSvgColorsOnCanvas: boolean;
   cache: Map<string, ImportPath2DCacheEntry>;
+  /** Draws bitmap imports from rasterised images; when absent, ImportLayer's SVG draws them. */
+  bitmapPreviews?: BitmapPreviewRasterizer | null;
+}
+
+/** Sets `ctx` to map an import's local (viewBox) coordinates onto the canvas,
+ * the same placement ImportLayer gives it in the SVG scene. */
+function applyImportTransform(
+  ctx: CanvasRenderingContext2D,
+  imp: SvgImport,
+  vpMatrix: [number, number, number],
+  isBottom: boolean,
+  canvasH: number,
+): { impSX: number; impSY: number } {
+  const [vpA, vpE, vpF] = vpMatrix;
+  const impSX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
+  const impSY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
+  const vbX = imp.viewBoxX ?? 0;
+  const vbY = imp.viewBoxY ?? 0;
+  const left = PAD + imp.x * MM_TO_PX;
+  const impTop = isBottom
+    ? canvasH - PAD - (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX
+    : PAD + (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX;
+  const cxSvg = left + (imp.svgWidth * impSX) / 2;
+  const cySvg = impTop + (imp.svgHeight * impSY) / 2;
+  const deg = imp.rotation ?? 0;
+  ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
+  ctx.translate(cxSvg, cySvg);
+  if (deg !== 0) ctx.rotate((deg * Math.PI) / 180);
+  ctx.scale(impSX, impSY);
+  ctx.translate(-(vbX + imp.svgWidth / 2), -(vbY + imp.svgHeight / 2));
+  return { impSX, impSY };
 }
 
 export function drawImportsLayer({
@@ -51,6 +83,7 @@ export function drawImportsLayer({
   canvasH,
   respectSvgColorsOnCanvas,
   cache,
+  bitmapPreviews,
 }: DrawImportsLayerParams): void {
   const vpA = vp.zoom * dpr;
   const vpE = vp.panX * dpr;
@@ -66,9 +99,28 @@ export function drawImportsLayer({
   for (const id of cache.keys()) {
     if (!imports.some((imp) => imp.id === id)) cache.delete(id);
   }
+  bitmapPreviews?.prune(new Set(imports.map((imp) => imp.id)));
+
+  const isSelected = (imp: SvgImport) =>
+    allImportsSelected ||
+    imp.id === selectedImportId ||
+    (!!selectedGroupId && !!layerGroups.find((g) => g.id === selectedGroupId)?.importIds.includes(imp.id));
 
   for (const imp of imports) {
     if (!imp.visible) continue;
+    // A bitmap's preview (and source image) are drawn from rasterised images
+    // — never as the generic vector outline below, which would draw a
+    // colour-separated bitmap's ink paths a second time with no way to hide
+    // them. Without a rasteriser, ImportLayer's SVG draws them instead.
+    if (imp.kind === "bitmap") {
+      if (bitmapPreviews) {
+        ctx.save();
+        applyImportTransform(ctx, imp, [vpA, vpE, vpF], isBottom, canvasH);
+        bitmapPreviews.draw(ctx, imp, isSelected(imp), dpr);
+        ctx.restore();
+      }
+      continue;
+    }
 
     let impCache = cache.get(imp.id);
     if (
@@ -153,36 +205,11 @@ export function drawImportsLayer({
       cache.set(imp.id, impCache);
     }
 
-    const impSX = (imp.scaleX ?? imp.scale) * MM_TO_PX;
-    const impSY = (imp.scaleY ?? imp.scale) * MM_TO_PX;
-    const vbX = imp.viewBoxX ?? 0;
-    const vbY = imp.viewBoxY ?? 0;
-    const left = PAD + imp.x * MM_TO_PX;
-    const impTop = isBottom
-      ? canvasH -
-        PAD -
-        (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX
-      : PAD + (imp.y + imp.svgHeight * (imp.scaleY ?? imp.scale)) * MM_TO_PX;
-    const bboxW = imp.svgWidth * impSX;
-    const bboxH = imp.svgHeight * impSY;
-    const cxSvg = left + bboxW / 2;
-    const cySvg = impTop + bboxH / 2;
-    const deg = imp.rotation ?? 0;
-    const avgImpScale = Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
-    const isImpSelected =
-      allImportsSelected ||
-      imp.id === selectedImportId ||
-      (!!selectedGroupId &&
-        !!layerGroups
-          .find((g) => g.id === selectedGroupId)
-          ?.importIds.includes(imp.id));
+    const isImpSelected = isSelected(imp);
 
     ctx.save();
-    ctx.setTransform(vpA, 0, 0, vpA, vpE, vpF);
-    ctx.translate(cxSvg, cySvg);
-    if (deg !== 0) ctx.rotate((deg * Math.PI) / 180);
-    ctx.scale(impSX, impSY);
-    ctx.translate(-(vbX + imp.svgWidth / 2), -(vbY + imp.svgHeight / 2));
+    const { impSX, impSY } = applyImportTransform(ctx, imp, [vpA, vpE, vpF], isBottom, canvasH);
+    const avgImpScale = Math.sqrt(Math.abs(impSX) * Math.abs(impSY)) * vp.zoom;
     ctx.setLineDash([]);
 
     const groupColor = groupColorMap.get(imp.id);

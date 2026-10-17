@@ -202,6 +202,12 @@ if (typeof window !== "undefined") {
       openExternal: vi.fn().mockResolvedValue(undefined),
       onMenuAbout: vi.fn().mockReturnValue(() => {}),
     },
+    bitmapPlugins: {
+      list: vi.fn().mockResolvedValue({ manifests: [], errors: [] }),
+      rescan: vi.fn().mockResolvedValue({ manifests: [], errors: [] }),
+      render: vi.fn().mockResolvedValue(""),
+      openFolder: vi.fn().mockResolvedValue(undefined),
+    },
     edit: {
       onMenuCopy: vi.fn().mockReturnValue(() => {}),
       onMenuCut: vi.fn().mockReturnValue(() => {}),
