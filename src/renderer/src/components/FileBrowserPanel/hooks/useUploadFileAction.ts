@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useTaskStore } from "../../../store/taskStore";
 
-type UpsertTask = ReturnType<typeof useTaskStore>["upsertTask"];
+type UpsertTask = ReturnType<typeof useTaskStore.getState>["upsertTask"];
 
 export function useUploadFileAction(upsertTask: UpsertTask) {
   return useCallback(

@@ -23,7 +23,7 @@ export function Tooltip({
 }: TooltipProps) {
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const show = () => {
     timer.current = setTimeout(() => {

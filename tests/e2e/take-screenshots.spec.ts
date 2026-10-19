@@ -120,7 +120,7 @@ test("02-settings-btn — toolbar with settings button highlighted", async () =>
 
 test("03-machine-config-empty — config dialog before selecting a config", async () => {
   // Open the settings dialog
-  const settingsBtn = window.locator("button[aria-label='Machine settings']");
+  const settingsBtn = window.locator("button[aria-label='Machine and application settings']");
   await settingsBtn.click();
 
   const dialog = window.locator("div[role='dialog']").first();
@@ -141,7 +141,7 @@ test("04-machine-config-completed — default TerraPen config selected", async (
   // Ensure the settings dialog is open for this test when run in isolation.
   const dialog = window.locator("div[role='dialog']").first();
   if ((await dialog.count()) === 0) {
-    await window.locator("button[aria-label='Machine settings']").click();
+    await window.locator("button[aria-label='Machine and application settings']").click();
     await window
       .locator("div[role='dialog']")
       .first()

@@ -322,12 +322,12 @@ async function extractPagePaths(page: any): Promise<string[]> {
         };
 
       // ── Everything else passes through unchanged ─────────────────────────
-      const val = (target as Record<string, unknown>)[key];
+      const val = (target as unknown as Record<string, unknown>)[key];
       if (typeof val === "function") return (val as Function).bind(target);
       return val;
     },
     set(target, prop: string | symbol, value: unknown) {
-      (target as Record<string, unknown>)[prop as string] = value;
+      (target as unknown as Record<string, unknown>)[prop as string] = value;
       return true;
     },
   };

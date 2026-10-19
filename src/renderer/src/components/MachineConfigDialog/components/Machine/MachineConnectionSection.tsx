@@ -1,5 +1,5 @@
 import React from "react";
-import type { ConnectionType } from "../../../../../types";
+import type { ConnectionType } from "../../../../../../types";
 import type { MachineConfigDialogController } from "../../hooks/useMachineConfigDialogController";
 import { Field } from "../Field";
 import { Section } from "../Section";

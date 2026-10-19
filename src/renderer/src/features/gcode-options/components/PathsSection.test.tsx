@@ -16,6 +16,7 @@ describe("PathsSection", () => {
         onToggleOpen={onToggleOpen}
         onTogglePref={onTogglePref}
         onJoinToleranceChange={onJoinToleranceChange}
+        onPathDirectionModeChange={vi.fn()}
       />,
     );
 

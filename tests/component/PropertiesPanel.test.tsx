@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCanvasStore } from "@renderer/store/canvasStore";
@@ -57,6 +57,86 @@ describe("PropertiesPanel", () => {
     // The properties panel should show position inputs
     expect(screen.getByText("X (mm)")).toBeInTheDocument();
     expect(screen.getByText("Y (mm)")).toBeInTheDocument();
+  });
+
+  it("shows and updates bitmap renderer controls when a bitmap is selected", () => {
+    const imp = createSvgImport({
+      kind: "bitmap",
+      name: "photo",
+      paths: [],
+      bitmapRendererId: "spiral-amplitude",
+      bitmapRendererSettings: { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
+      bitmapRendererPath: "",
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    expect(screen.getByRole("combobox", { name: "Bitmap renderer" })).toHaveValue(
+      "spiral-amplitude",
+    );
+    const spacing = screen.getByRole("spinbutton", {
+      name: "Spiral spacing",
+    });
+    fireEvent.change(spacing, { target: { value: "2.5" } });
+    // Saved under spiral's old "amplitude" key; the edit stores it under the
+    // current one, value intact.
+    expect(useCanvasStore.getState().imports[0].bitmapRendererSettings).toMatchObject({
+      spacingMM: 2.5,
+      toothWidthMM: 1,
+      amplitudeMM: 1.5,
+    });
+    expect(useCanvasStore.getState().imports[0].bitmapRendererSettings).not.toHaveProperty("amplitude");
+    expect(screen.getByRole("checkbox", { name: "Show source bitmap" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show source bitmap" }));
+    expect(useCanvasStore.getState().imports[0].bitmapSourceVisible).toBe(false);
+    expect(screen.getByRole("checkbox", { name: "Show render preview" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show render preview" }));
+    expect(useCanvasStore.getState().imports[0].bitmapPreviewVisible).toBe(false);
+  });
+
+  it("shows a custom-palette swatch editor for a bitmap's colour separation mode", () => {
+    const imp = createSvgImport({
+      kind: "bitmap",
+      name: "photo",
+      paths: [],
+      bitmapRendererId: "spiral-amplitude",
+      bitmapRendererSettings: { spacingMM: 3, toothWidthMM: 1, amplitude: 1.5 },
+      bitmapRendererPath: "",
+    });
+    useCanvasStore.setState({ imports: [imp], selectedImportId: imp.id });
+    render(<PropertiesPanel />);
+
+    const mode = screen.getByRole("combobox", { name: "Colour separation mode" });
+    expect(mode).toHaveValue("none");
+    // RGB comes in both paper variants, each saying which it is for.
+    expect(screen.getByRole("option", { name: "RGB (light inks on dark paper)" })).toHaveValue("rgb");
+    expect(screen.getByRole("option", { name: "RGB (white paper)" })).toHaveValue("rgb-white");
+    expect(screen.queryByRole("button", { name: /add colour/i })).not.toBeInTheDocument();
+
+    // Offsetting only applies to a separation, and is on unless turned off.
+    expect(screen.queryByRole("checkbox", { name: "Offset each ink" })).not.toBeInTheDocument();
+    fireEvent.change(mode, { target: { value: "cmyk" } });
+    const offset = screen.getByRole("checkbox", { name: "Offset each ink" });
+    expect(offset).toBeChecked();
+    fireEvent.click(offset);
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationOffset).toBe(false);
+
+    fireEvent.change(mode, { target: { value: "custom" } });
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationMode).toBe("custom");
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationPalette).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: "Swatch 1 label" })).toHaveValue("Colour 1");
+
+    fireEvent.click(screen.getByRole("button", { name: /add colour/i }));
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationPalette).toHaveLength(2);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Swatch 2 label" }), {
+      target: { value: "Sky" },
+    });
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationPalette?.[1].label).toBe("Sky");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove swatch 1" }));
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationPalette).toHaveLength(1);
+    expect(useCanvasStore.getState().imports[0].bitmapSeparationPalette?.[0].label).toBe("Sky");
   });
 
   // ── Name editing ────────────────────────────────────────────────────────

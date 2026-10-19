@@ -13,7 +13,7 @@ import {
   MIN_ZOOM,
   MAX_ZOOM,
 } from "@renderer/features/canvas/constants";
-import type { SvgImport } from "@types/index";
+import type { SvgImport } from "../../../../src/types";
 
 describe("geometry", () => {
   const bedW = 220;
@@ -89,6 +89,8 @@ describe("geometry", () => {
     it("computes AABB for single unrotated import", () => {
       const imp: SvgImport = {
         id: "imp1",
+        name: "imp1",
+        visible: true,
         x: 10,
         y: 10,
         svgWidth: 50,
@@ -99,7 +101,6 @@ describe("geometry", () => {
         rotation: 0,
         viewBoxX: 0,
         viewBoxY: 0,
-        layerAssignmentId: null,
         paths: [],
         layers: [],
       };
@@ -114,6 +115,8 @@ describe("geometry", () => {
       const imps: SvgImport[] = [
         {
           id: "imp1",
+          name: "imp1",
+          visible: true,
           x: 10,
           y: 10,
           svgWidth: 30,
@@ -124,12 +127,13 @@ describe("geometry", () => {
           rotation: 0,
           viewBoxX: 0,
           viewBoxY: 0,
-          layerAssignmentId: null,
-          paths: [],
+            paths: [],
           layers: [],
         },
         {
           id: "imp2",
+          name: "imp2",
+          visible: true,
           x: 60,
           y: 60,
           svgWidth: 30,
@@ -140,8 +144,7 @@ describe("geometry", () => {
           rotation: 0,
           viewBoxX: 0,
           viewBoxY: 0,
-          layerAssignmentId: null,
-          paths: [],
+            paths: [],
           layers: [],
         },
       ];
@@ -155,6 +158,8 @@ describe("geometry", () => {
     it("handles rotated imports (checks all corners)", () => {
       const imp: SvgImport = {
         id: "imp1",
+        name: "imp1",
+        visible: true,
         x: 50,
         y: 50,
         svgWidth: 40,
@@ -165,7 +170,6 @@ describe("geometry", () => {
         rotation: 45, // rotated 45 degrees
         viewBoxX: 0,
         viewBoxY: 0,
-        layerAssignmentId: null,
         paths: [],
         layers: [],
       };
@@ -185,6 +189,8 @@ describe("geometry", () => {
     it("computes OBB with 0 rotation", () => {
       const imp: SvgImport = {
         id: "imp1",
+        name: "imp1",
+        visible: true,
         x: 10,
         y: 10,
         svgWidth: 50,
@@ -195,7 +201,6 @@ describe("geometry", () => {
         rotation: 0,
         viewBoxX: 0,
         viewBoxY: 0,
-        layerAssignmentId: null,
         paths: [],
         layers: [],
       };
@@ -210,6 +215,8 @@ describe("geometry", () => {
     it("stores accumulated rotation angle", () => {
       const imp: SvgImport = {
         id: "imp1",
+        name: "imp1",
+        visible: true,
         x: 10,
         y: 10,
         svgWidth: 50,
@@ -220,7 +227,6 @@ describe("geometry", () => {
         rotation: 0,
         viewBoxX: 0,
         viewBoxY: 0,
-        layerAssignmentId: null,
         paths: [],
         layers: [],
       };
@@ -305,12 +311,12 @@ describe("geometry", () => {
     });
 
     it("works with various colors", () => {
-      const testCases = [
+      const testCases: [string, number][] = [
         ["#3a6aaa", 1.35],
         ["#60a0ff", 0.65],
       ];
       for (const [color, factor] of testCases) {
-        const result = scaleHexColor(color, factor as number);
+        const result = scaleHexColor(color, factor);
         expect(result).toMatch(/^#[0-9a-f]{6}$/);
       }
     });

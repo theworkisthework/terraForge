@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Errors fail the build; warnings (complexity, length) are advisory.
+      # Same result on every OS, so run once.
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run lint
+
       - name: Run unit & component tests
         run: npm test
 

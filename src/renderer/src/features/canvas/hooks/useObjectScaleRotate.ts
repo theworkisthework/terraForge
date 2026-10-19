@@ -16,6 +16,34 @@ import { MM_TO_PX } from "../constants";
 import type { HandlePos, ScalingState, RotatingState, Vp } from "../types";
 import type { SvgImport } from "../../../../../types";
 import { useCanvasStore } from "../../../store/canvasStore";
+import { canvasPoint, HANDLE_DIRECTIONS } from "../utils/handleGeometry";
+
+/**
+ * The scale a handle drag of (dx, dy) canvas pixels gives. With the ratio
+ * locked, one uniform scale follows the handle's horizontal pull (its
+ * vertical one for the top and bottom edges); unlocked, each axis the handle
+ * moves scales on its own. Never below 0.001.
+ */
+export function scalePatch(
+  scaling: ScalingState,
+  dx: number,
+  dy: number,
+): { scale?: number; scaleX?: number; scaleY?: number } {
+  const dir = HANDLE_DIRECTIONS[scaling.handle];
+  if (scaling.ratioLocked) {
+    const delta = dir.x !== 0 ? dir.x * dx : dir.y * dy;
+    const dimPx = dir.x === 0 ? scaling.startH : scaling.startW;
+    return {
+      scale: Math.max(0.001, scaling.startScale * (1 + delta / dimPx)),
+      scaleX: undefined,
+      scaleY: undefined,
+    };
+  }
+  const patch: { scaleX?: number; scaleY?: number } = {};
+  if (dir.x !== 0) patch.scaleX = Math.max(0.001, scaling.startScaleX * (1 + (dir.x * dx) / scaling.startW));
+  if (dir.y !== 0) patch.scaleY = Math.max(0.001, scaling.startScaleY * (1 + (dir.y * dy) / scaling.startH));
+  return patch;
+}
 
 export function useObjectScaleRotate(
   containerRef: RefObject<HTMLDivElement | null>,
@@ -67,12 +95,9 @@ export function useObjectScaleRotate(
       useCanvasStore.getState().snapshotForGesture();
       const imp = useCanvasStore.getState().imports.find((i) => i.id === id);
       if (!imp) return;
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const vp = vpRef.current;
-      const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-      const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
+      const pt = canvasPoint(containerRef.current, vpRef.current, e);
+      if (!pt) return;
+      const { x: mx, y: my } = pt;
       setRotating({
         id,
         cx: cxSvg,
@@ -90,58 +115,7 @@ export function useObjectScaleRotate(
       const zoom = vpRef.current.zoom;
       const dx = (e.clientX - scaling.startMouseX) / zoom;
       const dy = (e.clientY - scaling.startMouseY) / zoom;
-      const h = scaling.handle;
-
-      if (scaling.ratioLocked) {
-        // Locked: uniform scale
-        let delta = 0;
-        if (h === "tl" || h === "bl") delta = -dx;
-        else if (h === "tr" || h === "br") delta = dx;
-        else if (h === "t") delta = -dy;
-        else if (h === "b") delta = dy;
-        else if (h === "r") delta = dx;
-        else if (h === "l") delta = -dx;
-        const dimPx = h === "t" || h === "b" ? scaling.startH : scaling.startW;
-        const rawScale = Math.max(
-          0.001,
-          scaling.startScale * (1 + delta / dimPx),
-        );
-        updateImport(scaling.id, {
-          scale: rawScale,
-          scaleX: undefined,
-          scaleY: undefined,
-        });
-      } else {
-        // Unlocked: drive each axis independently
-        const affectsX =
-          h === "l" ||
-          h === "r" ||
-          h === "tl" ||
-          h === "tr" ||
-          h === "br" ||
-          h === "bl";
-        const affectsY =
-          h === "t" ||
-          h === "b" ||
-          h === "tl" ||
-          h === "tr" ||
-          h === "br" ||
-          h === "bl";
-        const deltaX = h === "r" || h === "tr" || h === "br" ? dx : -dx;
-        const deltaY = h === "b" || h === "br" || h === "bl" ? dy : -dy;
-        const patch: { scaleX?: number; scaleY?: number } = {};
-        if (affectsX)
-          patch.scaleX = Math.max(
-            0.001,
-            scaling.startScaleX * (1 + deltaX / scaling.startW),
-          );
-        if (affectsY)
-          patch.scaleY = Math.max(
-            0.001,
-            scaling.startScaleY * (1 + deltaY / scaling.startH),
-          );
-        updateImport(scaling.id, patch);
-      }
+      updateImport(scaling.id, scalePatch(scaling, dx, dy));
     },
     [scaling, vpRef, updateImport],
   );
@@ -149,12 +123,9 @@ export function useObjectScaleRotate(
   const updateRotateMove = useCallback(
     (e: MouseEvent) => {
       if (!rotating) return;
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const vp = vpRef.current;
-      const mx = (e.clientX - rect.left - vp.panX) / vp.zoom;
-      const my = (e.clientY - rect.top - vp.panY) / vp.zoom;
+      const pt = canvasPoint(containerRef.current, vpRef.current, e);
+      if (!pt) return;
+      const { x: mx, y: my } = pt;
       const angle = Math.atan2(my - rotating.cy, mx - rotating.cx);
       const delta = (angle - rotating.startAngle) * (180 / Math.PI);
       updateImport(rotating.id, { rotation: rotating.startRotation + delta });

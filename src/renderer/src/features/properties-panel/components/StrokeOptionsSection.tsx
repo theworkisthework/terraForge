@@ -1,4 +1,4 @@
-import type { SvgImport } from "../../../../types";
+import type { SvgImport } from "../../../../../types";
 
 interface StrokeOptionsSectionProps {
   imp: SvgImport;

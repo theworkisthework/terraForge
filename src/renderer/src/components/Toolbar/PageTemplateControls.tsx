@@ -1,19 +1,21 @@
 import { PenLine } from "lucide-react";
 import type { PageSize, PageTemplate } from "../../../../types";
 import { Button } from "../ui";
+import { DEFAULT_PAPER_COLOR, DEFAULT_PEN_COLOR, PAPER_PRESETS } from "../../utils/paper";
+
+const swatchClassName =
+  "w-6 h-6 p-0 border border-border-ui rounded cursor-pointer bg-transparent [&::-webkit-color-swatch-wrapper]:p-0.5 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-none";
 
 interface PageTemplateControlsProps {
   pageTemplate: PageTemplate | null;
   pageSizes: PageSize[];
   setPageTemplate: (t: PageTemplate | null) => void;
-  setPageSizes: (sizes: PageSize[]) => void;
 }
 
 export function PageTemplateControls({
   pageTemplate,
   pageSizes,
   setPageTemplate,
-  setPageSizes,
 }: PageTemplateControlsProps) {
   return (
     <div className="flex items-center gap-1">
@@ -27,6 +29,7 @@ export function PageTemplateControls({
             setPageTemplate(null);
           } else {
             setPageTemplate({
+              ...pageTemplate,
               sizeId: id,
               landscape: pageTemplate?.landscape ?? true,
               marginMM: pageTemplate?.marginMM ?? 20,
@@ -114,6 +117,34 @@ export function PageTemplateControls({
             title="Page margin in mm"
           />
           <span className="text-xs text-content-muted">mm</span>
+        </div>
+      )}
+
+      {/* Paper and pen — what the preview shows the drawing on and with */}
+      {pageTemplate && (
+        <div className="flex items-center gap-1">
+          <input
+            type="color"
+            aria-label="Paper colour"
+            title="Paper colour — shown on the canvas, and what colour separation mixes inks against"
+            list="paper-color-presets"
+            value={pageTemplate.paperColor ?? DEFAULT_PAPER_COLOR}
+            onChange={(e) => setPageTemplate({ ...pageTemplate, paperColor: e.target.value })}
+            className={swatchClassName}
+          />
+          <datalist id="paper-color-presets">
+            {PAPER_PRESETS.map((preset) => (
+              <option key={preset.color} value={preset.color} label={preset.label} />
+            ))}
+          </datalist>
+          <input
+            type="color"
+            aria-label="Pen colour"
+            title="Pen colour — the preview colour of anything without an ink colour of its own"
+            value={pageTemplate.penColor ?? DEFAULT_PEN_COLOR}
+            onChange={(e) => setPageTemplate({ ...pageTemplate, penColor: e.target.value })}
+            className={swatchClassName}
+          />
         </div>
       )}
 

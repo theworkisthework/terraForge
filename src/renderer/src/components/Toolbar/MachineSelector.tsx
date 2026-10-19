@@ -46,6 +46,7 @@ export function MachineSelector({
           variant="secondary"
           onClick={handleDisconnect}
           className="hover:bg-accent"
+          title="Disconnect from the machine"
         >
           Disconnect
         </Button>
@@ -55,6 +56,7 @@ export function MachineSelector({
           onClick={handleConnect}
           disabled={!activeConfigId || isConnecting}
           loading={isConnecting}
+          title={activeConfigId ? "Connect to the selected machine" : "Select a machine to connect"}
         >
           {isConnecting ? "Connecting…" : "Connect"}
         </Button>
@@ -73,7 +75,12 @@ export function MachineSelector({
       </Button>
 
       {/* Jog toggle */}
-      <Button variant="toggle" selected={showJog} onClick={onToggleJog}>
+      <Button
+        variant="toggle"
+        selected={showJog}
+        onClick={onToggleJog}
+        title={showJog ? "Hide jog controls" : "Show jog controls"}
+      >
         Jog
       </Button>
     </>

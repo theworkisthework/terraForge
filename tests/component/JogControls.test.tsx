@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { JogControls } from "@renderer/components/JogControls";
 import { useMachineStore } from "@renderer/store/machineStore";
@@ -737,5 +737,19 @@ describe("JogControls — zero-Z button disabled with solenoid pen types", () =>
     render(<JogControls />);
     const zeroZButton = screen.getByRole("button", { name: "Zero Z" });
     expect(zeroZButton).not.toBeDisabled();
+  });
+
+  it("describes each jog button in a tooltip, like the pen controls", () => {
+    vi.useFakeTimers();
+    try {
+      render(<JogControls />);
+      fireEvent.mouseEnter(screen.getByRole("button", { name: "Jog X+" }).parentElement!);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByText(/^Move X \+/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

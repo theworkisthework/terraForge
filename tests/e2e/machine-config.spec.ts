@@ -16,7 +16,7 @@
  * machine-selector `<select>`.
  */
 import { test, expect } from "@playwright/test";
-import { launchApp, closeApp, mockSaveDialog, mockOpenDialog } from "./helpers";
+import { launchApp, closeApp, mockSaveDialog } from "./helpers";
 import type { ElectronApplication, Page } from "playwright";
 import * as path from "path";
 import * as os from "os";
@@ -40,7 +40,7 @@ const sidebarEntry = (page: Page, name: string) =>
 async function openMachineConfigs(page: Page): Promise<void> {
   const dlg = dialog(page);
   if ((await dlg.count()) === 0) {
-    await page.locator("button[aria-label='Machine settings']").click();
+    await page.locator("button[aria-label='Machine and application settings']").click();
     await dlg.waitFor({ timeout: 5000 });
   }
 
@@ -322,7 +322,7 @@ test("machine selector in toolbar now shows the new active config", async () => 
   const selectedName = await window
     .locator("select[aria-label='Machine selector']")
     .evaluate((select) => {
-      const option = select.selectedOptions[0];
+      const option = (select as HTMLSelectElement).selectedOptions[0];
       return option?.textContent?.trim() ?? "";
     });
   expect(selectedName).toContain("Test Machine E2E");

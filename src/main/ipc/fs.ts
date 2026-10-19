@@ -14,15 +14,33 @@ const GCODE_EXTENSIONS = [
   "tap",
 ];
 
+const BITMAP_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
+
 const IMPORT_FILTERS = [
   {
     name: "Supported Files",
-    extensions: ["svg", "pdf", ...GCODE_EXTENSIONS],
+    extensions: ["svg", "pdf", ...BITMAP_EXTENSIONS, ...GCODE_EXTENSIONS],
   },
   { name: "SVG Files", extensions: ["svg"] },
   { name: "PDF Files", extensions: ["pdf"] },
+  { name: "Bitmap Files", extensions: BITMAP_EXTENSIONS },
   { name: "G-code Files", extensions: GCODE_EXTENSIONS },
 ];
+
+/**
+ * Bitmap import is an experimental, user-togglable feature (see
+ * `appConfigStore`'s `bitmapRendererEnabled`) — when it's off, the dialog
+ * must not let a user pick a bitmap file at all, not just decline to import
+ * whatever they picked, so this strips bitmap extensions out of every
+ * filter rather than just dropping the dedicated "Bitmap Files" entry.
+ */
+function buildImportFilters(allowBitmap: boolean): typeof IMPORT_FILTERS {
+  if (allowBitmap) return IMPORT_FILTERS;
+  return IMPORT_FILTERS.filter((filter) => filter.name !== "Bitmap Files").map((filter) => ({
+    ...filter,
+    extensions: filter.extensions.filter((ext) => !BITMAP_EXTENSIONS.includes(ext)),
+  }));
+}
 
 export interface FsIpcOptions {
   getMainWindow: () => BrowserWindow | null;
@@ -65,12 +83,12 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     return result.canceled ? null : result.filePaths[0];
   });
 
-  ipcMain.handle("fs:openImportDialog", async () => {
+  ipcMain.handle("fs:openImportDialog", async (_event, opts?: { allowBitmap?: boolean }) => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Import File",
-      filters: IMPORT_FILTERS,
+      filters: buildImportFilters(opts?.allowBitmap ?? true),
       properties: ["openFile"],
     });
     return result.canceled ? null : result.filePaths[0];

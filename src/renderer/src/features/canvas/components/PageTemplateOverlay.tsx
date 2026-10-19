@@ -25,6 +25,29 @@ interface PageTemplateOverlayProps {
   getBedY: (mmY: number) => number;
 }
 
+/**
+ * The page's rectangle in canvas pixels (before the viewport transform), or
+ * null when no page is shown. Shared by this outline and the paper fill the
+ * canvas draws beneath imports, so the two always line up.
+ */
+export function pageRectPx(
+  pageTemplate: PageTemplateOption | null,
+  pageSizes: PageSizeOption[],
+  getBedX: (mmX: number) => number,
+  getBedY: (mmY: number) => number,
+): { x: number; y: number; w: number; h: number } | null {
+  if (!pageTemplate) return null;
+  const activeSize = pageSizes.find((ps) => ps.id === pageTemplate.sizeId);
+  if (!activeSize) return null;
+  const pgW = pageTemplate.landscape ? activeSize.heightMM : activeSize.widthMM;
+  const pgH = pageTemplate.landscape ? activeSize.widthMM : activeSize.heightMM;
+  const x0 = getBedX(0);
+  const x1 = getBedX(pgW);
+  const y0 = getBedY(pgH);
+  const y1 = getBedY(0);
+  return { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) };
+}
+
 export function PageTemplateOverlay({
   pageTemplate,
   pageSizes,
@@ -32,21 +55,10 @@ export function PageTemplateOverlay({
   getBedX,
   getBedY,
 }: PageTemplateOverlayProps) {
-  if (!pageTemplate) return null;
-  const activeSize = pageSizes.find((ps) => ps.id === pageTemplate.sizeId);
-  if (!activeSize) return null;
-
-  const pgW = pageTemplate.landscape ? activeSize.heightMM : activeSize.widthMM;
-  const pgH = pageTemplate.landscape ? activeSize.widthMM : activeSize.heightMM;
-
-  const svgX0 = getBedX(0);
-  const svgX1 = getBedX(pgW);
-  const svgY0 = getBedY(pgH);
-  const svgY1 = getBedY(0);
-  const rectX = Math.min(svgX0, svgX1);
-  const rectY = Math.min(svgY0, svgY1);
-  const rectW = Math.abs(svgX1 - svgX0);
-  const rectH = Math.abs(svgY1 - svgY0);
+  const rect = pageRectPx(pageTemplate, pageSizes, getBedX, getBedY);
+  if (!pageTemplate || !rect) return null;
+  const activeSize = pageSizes.find((ps) => ps.id === pageTemplate.sizeId)!;
+  const { x: rectX, y: rectY, w: rectW, h: rectH } = rect;
   const label = `${activeSize.name} ${pageTemplate.landscape ? "Landscape" : "Portrait"}`;
   const labelSize = 11 / vp.zoom;
 

@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useGroupOBB } from "./useGroupOBB";
 import { useCanvasStore } from "../../../store/canvasStore";
 import { createSvgImport } from "../../../../../../tests/helpers/factories";
 import type { Vp } from "../types";
+
+import type { SvgImport } from "../../../../../types";
+
+type UpdateImport = (id: string, patch: Partial<SvgImport>) => void;
 
 const INITIAL_STORE = {
   imports: [],
@@ -53,11 +58,11 @@ function defaultHook(
     selectedGroupId?: string | null;
     isBottom?: boolean;
     canvasH?: number;
-    updateImport?: ReturnType<typeof vi.fn>;
+    updateImport?: Mock<UpdateImport>;
   } = {},
 ) {
   const { containerRef, vpRef } = makeRefs();
-  const updateImport = overrides.updateImport ?? vi.fn();
+  const updateImport = overrides.updateImport ?? vi.fn<UpdateImport>();
   return {
     containerRef,
     vpRef,
@@ -97,8 +102,8 @@ describe("useGroupOBB", () => {
       });
 
       const { containerRef, vpRef } = makeRefs();
-      const updateImport = vi.fn();
-      const { result, rerender } = renderHook(
+      const updateImport = vi.fn<UpdateImport>();
+      const { result } = renderHook(
         ({ all }: { all: boolean }) =>
           useGroupOBB(containerRef, vpRef, updateImport, true, 630, all, null),
         { initialProps: { all: true } },
@@ -205,7 +210,7 @@ describe("useGroupOBB", () => {
 
   describe("updateGroupScaleMove", () => {
     it("does nothing when groupScaling is null", () => {
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = defaultHook({ updateImport });
       act(() =>
         result.current.updateGroupScaleMove(
@@ -234,7 +239,7 @@ describe("useGroupOBB", () => {
       });
       useCanvasStore.setState({ imports: [imp1, imp2] });
 
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { containerRef, vpRef } = makeRefs();
       const { result } = renderHook(() =>
         useGroupOBB(containerRef, vpRef, updateImport, true, 630, true, null),
@@ -261,7 +266,7 @@ describe("useGroupOBB", () => {
 
   describe("updateGroupRotateMove", () => {
     it("does nothing when groupRotating is null", () => {
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = defaultHook({ updateImport });
       act(() =>
         result.current.updateGroupRotateMove(

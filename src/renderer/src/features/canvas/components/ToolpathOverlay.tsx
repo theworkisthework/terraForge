@@ -11,12 +11,15 @@
  *   • LOD: sub-pixel segments are skipped based on current zoom level
  *   • RAF debouncing: rapid pan/zoom events collapse into one repaint per frame
  */
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { MM_TO_PX, PAD } from "../constants";
 import type { Vp } from "../types";
-import type { SvgImport, LayerGroup } from "../../../../../types";
+import type { SvgImport, LayerGroup, PageSize, PageTemplate } from "../../../../../types";
+import { pageColors } from "../../../utils/paper";
+import { pageRectPx } from "./PageTemplateOverlay";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import type { Theme } from "../../../store/themeStore";
+import { bitmapPreviewRasterizer } from "../bitmapPreview/previewRasterizer";
 import {
   drawImportsLayer,
   drawToolpathLayer,
@@ -52,6 +55,26 @@ export interface ToolpathOverlayProps {
   plotProgressRapids: string | null;
   respectSvgColorsOnCanvas: boolean;
   theme: Theme;
+  /** The shown page, filled with its paper colour beneath the imports. */
+  pageTemplate?: PageTemplate | null;
+  pageSizes?: PageSize[];
+}
+
+/** The shown page's paper and pen, and its rectangle in canvas pixels —
+ * placed exactly as PageTemplateOverlay's outline. */
+function pagePaper(
+  pageTemplate: PageTemplate | null,
+  pageSizes: PageSize[],
+  { isRight, isBottom, bedW, canvasH }: { isRight: boolean; isBottom: boolean; bedW: number; canvasH: number },
+) {
+  const colors = pageColors(pageTemplate);
+  const rect = pageRectPx(
+    pageTemplate,
+    pageSizes,
+    (mmX) => (isRight ? PAD + (bedW - mmX) * MM_TO_PX : PAD + mmX * MM_TO_PX),
+    (mmY) => (isBottom ? canvasH - PAD - mmY * MM_TO_PX : PAD + mmY * MM_TO_PX),
+  );
+  return colors && rect ? { ...colors, rect } : null;
 }
 
 export function ToolpathOverlay({
@@ -81,6 +104,8 @@ export function ToolpathOverlay({
   plotProgressRapids,
   respectSvgColorsOnCanvas,
   theme,
+  pageTemplate = null,
+  pageSizes = [],
 }: ToolpathOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -102,6 +127,15 @@ export function ToolpathOverlay({
     text: "",
     path: null,
   });
+
+  // Bitmap previews arrive asynchronously as rasterised images; each arrival
+  // needs a redraw even though no prop changed.
+  const bitmapPreviews = bitmapPreviewRasterizer();
+  const [bitmapPreviewVersion, setBitmapPreviewVersion] = useState(0);
+  useEffect(
+    () => bitmapPreviews?.subscribe(() => setBitmapPreviewVersion((version) => version + 1)),
+    [bitmapPreviews],
+  );
 
   useEffect(() => {
     let rafId: number | null = null;
@@ -170,6 +204,8 @@ export function ToolpathOverlay({
         canvasH,
         respectSvgColorsOnCanvas,
         cache: importPath2DCacheRef.current,
+        bitmapPreviews,
+        page: pagePaper(pageTemplate, pageSizes, { isRight, isBottom, bedW, canvasH }),
       });
 
       if (!gcodeToolpath) return;
@@ -180,6 +216,7 @@ export function ToolpathOverlay({
         gcodeToolpath,
         toolpathSelected,
         useMetadataColors: toolpathColorized,
+        penColor: pageColors(pageTemplate)?.pen ?? null,
         toolpathOpacity,
         plotProgressCuts,
         plotProgressRapids,
@@ -226,6 +263,10 @@ export function ToolpathOverlay({
     canvasH,
     respectSvgColorsOnCanvas,
     theme,
+    bitmapPreviews,
+    bitmapPreviewVersion,
+    pageTemplate,
+    pageSizes,
   ]);
 
   return (

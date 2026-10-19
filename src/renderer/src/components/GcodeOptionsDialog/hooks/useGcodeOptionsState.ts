@@ -18,6 +18,26 @@ interface UseGcodeOptionsStateArgs {
   onConfirm: (prefs: GcodePrefs) => void;
 }
 
+const SPLIT_KEYS = ["exportPerLayer", "exportPerGroup", "exportPerColor"] as const;
+
+/**
+ * Flips one boolean preference. The split-output modes are exclusive:
+ * turning one on turns the others off, and per-colour hatch files stay on
+ * only while per-colour export is.
+ */
+export function togglePref(prefs: GcodePrefs, key: keyof GcodePrefs): GcodePrefs {
+  if (!(SPLIT_KEYS as readonly string[]).includes(key)) return { ...prefs, [key]: !prefs[key] };
+  const next = !prefs[key];
+  const split = Object.fromEntries(
+    SPLIT_KEYS.map((splitKey) => [splitKey, splitKey === key ? next : next ? false : prefs[splitKey]]),
+  );
+  return {
+    ...prefs,
+    ...split,
+    exportPerHatch: key === "exportPerColor" && next ? prefs.exportPerHatch : false,
+  };
+}
+
 export function useGcodeOptionsState({
   onCancel,
   onConfirm,
@@ -31,130 +51,36 @@ export function useGcodeOptionsState({
   const [activeTab, setActiveTab] = useState<GcodeOptionsTab>("output");
   const [customGcodeOpen, setCustomGcodeOpen] = useState(false);
 
-  const toggle = (key: keyof GcodePrefs) =>
-    setPrefs((currentPrefs) => {
-      if (
-        key === "exportPerLayer" ||
-        key === "exportPerGroup" ||
-        key === "exportPerColor"
-      ) {
-        const next = !currentPrefs[key];
-        const nextSplitPrefs = {
-          exportPerLayer:
-            key === "exportPerLayer"
-              ? next
-              : next
-                ? false
-                : currentPrefs.exportPerLayer,
-          exportPerGroup:
-            key === "exportPerGroup"
-              ? next
-              : next
-                ? false
-                : currentPrefs.exportPerGroup,
-          exportPerColor:
-            key === "exportPerColor"
-              ? next
-              : next
-                ? false
-                : currentPrefs.exportPerColor,
-        };
-
-        return {
-          ...currentPrefs,
-          ...nextSplitPrefs,
-          exportPerHatch:
-            key === "exportPerColor" && next
-              ? currentPrefs.exportPerHatch
-              : false,
-        };
-      }
-
-      return { ...currentPrefs, [key]: !currentPrefs[key] };
-    });
+  const toggle = (key: keyof GcodePrefs) => setPrefs((currentPrefs) => togglePref(currentPrefs, key));
 
   const setTextField = (key: keyof GcodePrefs) => (value: string) =>
     setPrefs((currentPrefs) => ({ ...currentPrefs, [key]: value }));
 
-  const setJoinTolerance = (value: string) => {
-    const next = parsePositiveNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({ ...currentPrefs, joinTolerance: next }));
-    }
-  };
+  /** A setter for a numeric field typed as text: ignores input that does not
+   * parse, so a half-typed value never replaces the last good one. */
+  const numberField =
+    <K extends keyof GcodePrefs>(key: K, parse: (value: string) => number | null, adjust = (n: number) => n) =>
+    (value: string) => {
+      const next = parse(value);
+      if (next !== null) setPrefs((currentPrefs) => ({ ...currentPrefs, [key]: adjust(next) }));
+    };
+  const choice =
+    <K extends keyof GcodePrefs>(key: K) =>
+    (value: GcodePrefs[K]) =>
+      setPrefs((currentPrefs) => ({ ...currentPrefs, [key]: value }));
 
-  const setClipOffsetMM = (value: string) => {
-    const next = parseNonNegativeNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({ ...currentPrefs, clipOffsetMM: next }));
-    }
-  };
-
-  const setClipMode = (mode: GcodePrefs["clipMode"]) => {
-    setPrefs((currentPrefs) => ({ ...currentPrefs, clipMode: mode }));
-  };
-
-  const setPathDirectionMode = (mode: GcodePrefs["pathDirectionMode"]) => {
-    setPrefs((currentPrefs) => ({ ...currentPrefs, pathDirectionMode: mode }));
-  };
-
-  const setPenDownDelayMs = (value: string) => {
-    const next = parseNonNegativeNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({ ...currentPrefs, penDownDelayMs: next }));
-    }
-  };
-
-  const setPenUpDelayMs = (value: string) => {
-    const next = parseNonNegativeNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({ ...currentPrefs, penUpDelayMs: next }));
-    }
-  };
-
-  const setDrawSpeedOverride = (value: string) => {
-    const next = parsePositiveNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({
-        ...currentPrefs,
-        drawSpeedOverride: next,
-      }));
-    }
-  };
-
-  const setInkServiceMode = (mode: GcodePrefs["inkServiceMode"]) => {
-    setPrefs((currentPrefs) => ({ ...currentPrefs, inkServiceMode: mode }));
-  };
-
-  const setInkServiceTriggerTravelMM = (value: string) => {
-    const next = parsePositiveNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({
-        ...currentPrefs,
-        inkServiceTriggerTravelMM: next,
-      }));
-    }
-  };
-
-  const setInkServiceTriggerJitterPct = (value: string) => {
-    const next = parseNonNegativeNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({
-        ...currentPrefs,
-        inkServiceTriggerJitterPct: next,
-      }));
-    }
-  };
-
-  const setInkServiceWashEveryNDips = (value: string) => {
-    const next = parsePositiveNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({
-        ...currentPrefs,
-        inkServiceWashEveryNDips: Math.round(next),
-      }));
-    }
-  };
+  const setJoinTolerance = numberField("joinTolerance", parsePositiveNumber);
+  const setClipOffsetMM = numberField("clipOffsetMM", parseNonNegativeNumber);
+  const setClipMode = choice("clipMode");
+  const setPathDirectionMode = choice("pathDirectionMode");
+  const setPenDownDelayMs = numberField("penDownDelayMs", parseNonNegativeNumber);
+  const setPenUpDelayMs = numberField("penUpDelayMs", parseNonNegativeNumber);
+  const setDrawSpeedOverride = numberField("drawSpeedOverride", parsePositiveNumber);
+  const setInkServiceMode = choice("inkServiceMode");
+  const setInkServiceTriggerTravelMM = numberField("inkServiceTriggerTravelMM", parsePositiveNumber);
+  const setInkServiceTriggerJitterPct = numberField("inkServiceTriggerJitterPct", parseNonNegativeNumber);
+  const setInkServiceWashEveryNDips = numberField("inkServiceWashEveryNDips", parsePositiveNumber, Math.round);
+  const setVinylWeedBorderMargin = numberField("vinylWeedBorderMarginMM", parseNonNegativeNumber);
 
   const setInkServiceLayerDipStation = (
     layerName: string,
@@ -169,16 +95,6 @@ export function useGcodeOptionsState({
       }
       return { ...currentPrefs, inkServiceLayerDipMap: nextMap };
     });
-  };
-
-  const setVinylWeedBorderMargin = (value: string) => {
-    const next = parseNonNegativeNumber(value);
-    if (next !== null) {
-      setPrefs((currentPrefs) => ({
-        ...currentPrefs,
-        vinylWeedBorderMarginMM: next,
-      }));
-    }
   };
 
   const neitherOutput = !prefs.uploadToSd && !prefs.saveLocally;

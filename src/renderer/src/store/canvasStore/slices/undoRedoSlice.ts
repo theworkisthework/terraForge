@@ -3,6 +3,11 @@ import type { CanvasStateCreator, UndoRedoSlice } from "../types";
 
 // Holds a snapshot captured at gesture-start (drag/scale/rotate mousedown).
 // Committed to undoStack on mouseup only if imports actually changed.
+//
+// Snapshots are the store's own `imports` arrays, not copies: immer never
+// changes state in place, so an old array stays as it was. Deep-copying
+// instead took about a second per drag on a dense render (a halftone is a
+// path per dot), both to copy and for immer to freeze the copy.
 let gestureSnapshot: SvgImport[] | null = null;
 
 const gestureFingerprint = (imports: SvgImport[]) =>
@@ -21,7 +26,7 @@ export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
   redoStack: [],
 
   snapshotForGesture: () => {
-    gestureSnapshot = structuredClone(get().imports);
+    gestureSnapshot = get().imports;
     set((state) => {
       state.redoStack = [];
     });
@@ -44,9 +49,9 @@ export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
     const stack = get().undoStack;
     if (stack.length === 0) return;
     const prev = stack[stack.length - 1];
-    const currentSnap = structuredClone(get().imports);
+    const currentSnap = get().imports;
     set((state) => {
-      state.imports = structuredClone(prev);
+      state.imports = prev;
       state.undoStack.pop();
       state.redoStack.push(currentSnap);
       if (state.redoStack.length > 50)
@@ -61,9 +66,9 @@ export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
     const stack = get().redoStack;
     if (stack.length === 0) return;
     const next = stack[stack.length - 1];
-    const currentSnap = structuredClone(get().imports);
+    const currentSnap = get().imports;
     set((state) => {
-      state.imports = structuredClone(next);
+      state.imports = next;
       state.redoStack.pop();
       state.undoStack.push(currentSnap);
       if (state.undoStack.length > 50)

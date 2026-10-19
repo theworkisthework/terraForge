@@ -1,7 +1,7 @@
 import type { DragEvent } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "../../../components/ui";
-import type { LayerGroup } from "../../../../types";
+import type { LayerGroup } from "../../../../../types";
 
 interface GroupHeaderRowProps {
   group: LayerGroup;

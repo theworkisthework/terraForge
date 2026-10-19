@@ -3,18 +3,25 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createToolpathSlice } from "./toolpathSlice";
 
-type ToolpathState = ReturnType<typeof createToolpathSlice>;
+// The slice plus the selection fields its side effects touch.
+type ToolpathState = ReturnType<typeof createToolpathSlice> & {
+  toolpathSelected: boolean;
+  selectedImportId: string | null;
+  selectedPathId: string | null;
+  allImportsSelected: boolean;
+  selectedGroupId: string | null;
+};
 
 function makeStore() {
   return create<ToolpathState>()(
-    immer((set, get) => ({
+    immer((set, get, store) => ({
       // Include selection fields used by the slice side-effects.
       toolpathSelected: false,
       selectedImportId: null,
       selectedPathId: null,
       allImportsSelected: false,
       selectedGroupId: null,
-      ...createToolpathSlice(set as any, get as any),
+      ...createToolpathSlice(set as any, get as any, store as any),
     })),
   );
 }

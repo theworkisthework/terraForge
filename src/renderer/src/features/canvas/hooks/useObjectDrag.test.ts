@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useObjectDrag } from "./useObjectDrag";
 import { useCanvasStore } from "../../../store/canvasStore";
 import { createSvgImport } from "../../../../../../tests/helpers/factories";
 import type { CanvasOrigin, Vp } from "../types";
+
+import type { SvgImport } from "../../../../../types";
+
+type UpdateImport = (id: string, patch: Partial<SvgImport>) => void;
 
 // ── Store reset ───────────────────────────────────────────────────────────────
 
@@ -34,7 +39,7 @@ function makeSpaceRef(held = false) {
 }
 
 function mountHook(
-  updateImport: ReturnType<typeof vi.fn>,
+  updateImport: Mock<UpdateImport>,
   origin: CanvasOrigin = "bottom-left",
   zoom = 1,
 ) {
@@ -139,7 +144,7 @@ describe("useObjectDrag", () => {
 
   describe("updateDragMove", () => {
     it("does nothing when not dragging", () => {
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = renderHook(() =>
         useObjectDrag(makeVpRef(), makeSpaceRef(), vi.fn(), updateImport),
       );
@@ -154,7 +159,7 @@ describe("useObjectDrag", () => {
     it("keeps existing bottom-left drag behavior", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = mountHook(updateImport, "bottom-left", 1);
       // Start drag at (100, 100)
       act(() =>
@@ -176,7 +181,7 @@ describe("useObjectDrag", () => {
     it("uses top-left y-axis direction for drag deltas", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = mountHook(updateImport, "top-left", 1);
 
       act(() =>
@@ -197,7 +202,7 @@ describe("useObjectDrag", () => {
     it("uses top-right axis directions for drag deltas", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = mountHook(updateImport, "top-right", 1);
 
       act(() =>
@@ -218,7 +223,7 @@ describe("useObjectDrag", () => {
     it("uses bottom-right axis directions for drag deltas", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const { result } = mountHook(updateImport, "bottom-right", 1);
 
       act(() =>
@@ -239,7 +244,7 @@ describe("useObjectDrag", () => {
     it("applies zoom to delta calculation", () => {
       const imp = createSvgImport({ id: "imp1", x: 0, y: 0 });
       useCanvasStore.setState({ imports: [imp] });
-      const updateImport = vi.fn();
+      const updateImport = vi.fn<UpdateImport>();
       const vpRef = makeVpRef(2); // zoom=2
       const { result } = renderHook(() =>
         useObjectDrag(vpRef, makeSpaceRef(), vi.fn(), updateImport),

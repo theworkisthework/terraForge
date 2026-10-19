@@ -17,6 +17,9 @@ export function useMachineConfigDialogStores() {
   const respectSvgColorsOnCanvas = useAppConfigStore(
     (state) => state.respectSvgColorsOnCanvas,
   );
+  const bitmapRendererEnabled = useAppConfigStore(
+    (state) => state.bitmapRendererEnabled,
+  );
   const vinylCuttingEnabled = useAppConfigStore(
     (state) => state.vinylCuttingEnabled,
   );
@@ -49,6 +52,9 @@ export function useMachineConfigDialogStores() {
   );
   const setRespectSvgColorsOnCanvas = useAppConfigStore(
     (state) => state.setRespectSvgColorsOnCanvas,
+  );
+  const setBitmapRendererEnabled = useAppConfigStore(
+    (state) => state.setBitmapRendererEnabled,
   );
   const setVinylCuttingEnabled = useAppConfigStore(
     (state) => state.setVinylCuttingEnabled,
@@ -84,6 +90,7 @@ export function useMachineConfigDialogStores() {
       showConsoleTimestamps,
       showMachineCoordinates,
       respectSvgColorsOnCanvas,
+      bitmapRendererEnabled,
       vinylCuttingEnabled,
       vinylBladeOffsetMM,
       vinylCornerAngleThresholdDeg,
@@ -95,6 +102,7 @@ export function useMachineConfigDialogStores() {
       setShowConsoleTimestamps,
       setShowMachineCoordinates,
       setRespectSvgColorsOnCanvas,
+      setBitmapRendererEnabled,
       setVinylCuttingEnabled,
       setVinylBladeOffsetMM,
       setVinylCornerAngleThresholdDeg,

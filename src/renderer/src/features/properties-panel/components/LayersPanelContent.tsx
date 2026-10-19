@@ -4,6 +4,7 @@ import { ToolpathSection } from "./ToolpathSection";
 import { LayersHeader } from "./LayersHeader";
 import { EmptyState } from "./EmptyState";
 import { ImportsByGroupList } from "./ImportsByGroupList";
+import type { ImportsByGroupListProps } from "./ImportsByGroupList.types";
 import { useAddLayerGroup } from "../hooks/useAddLayerGroup";
 import { useInspectorInteractionState } from "../hooks/useInspectorInteractionState";
 import { useImportDragDrop } from "../hooks/useImportDragDrop";
@@ -21,144 +22,117 @@ import { useSyncedStrokeWidth } from "../hooks/useSyncedStrokeWidth";
  *
  * Extracted from PropertiesPanel.tsx to keep the top-level component thin.
  */
-export function LayersPanelContent() {
-  // ── Store subscriptions ─────────────────────────────────────────────────
-  const {
-    imports,
-    selectedImportId,
-    selectImport,
-    removeImport,
-    updateImport,
-    updatePath,
-    updateImportLayer,
-    removePath,
-    applyHatch,
-    showCentreMarker,
-    toggleCentreMarker,
-    gcodeToolpath,
-    gcodeSource,
-    setGcodeToolpath,
-    toolpathSelected,
-    selectToolpath,
-    toolpathVisible,
-    setToolpathVisible,
-    toolpathColorized,
-    setToolpathColorized,
-    toolpathOpacity,
-    setToolpathOpacity,
-    layerGroups,
-    addLayerGroup,
-    removeLayerGroup,
-    updateLayerGroup,
-    assignImportToGroup,
-    selectedGroupId,
-    selectGroup,
-    pageTemplate,
-    pageSizes,
-    activeConfig,
-    machineStatus,
-  } = usePropertiesPanelStoreBindings();
+type StoreBindings = ReturnType<typeof usePropertiesPanelStoreBindings>;
+type DerivedData = ReturnType<typeof usePropertiesPanelDerivedData>;
 
-  // ── Derived values ───────────────────────────────────────────────────────
-  const {
-    importGroupId,
-    isJobActive,
-    fallbackFeedrate,
-    bedW,
-    bedH,
-    origin,
-    toolpathFileName,
-  } = usePropertiesPanelDerivedData({
-    layerGroups,
-    machineStatus,
-    activeConfig,
-    gcodeSource,
+/**
+ * Everything the imports list needs: the panel's expansion, inspector,
+ * drag-and-drop, renaming and stroke-width hooks, wired to the store.
+ */
+function useImportsListProps(store: StoreBindings, derived: DerivedData): ImportsByGroupListProps {
+  const expansion = usePanelExpansionState();
+  const inspector = useInspectorInteractionState();
+  const dragDrop = useImportDragDrop({
+    assignImportToGroup: store.assignImportToGroup,
+    importGroupId: derived.importGroupId,
+    setCollapsedGroupIds: expansion.setCollapsedGroupIds,
   });
-
-  // ── Expansion / collapse state ───────────────────────────────────────────
-  const {
-    expandedIds,
-    collapsedGroupIds,
-    expandedLayerKeys,
-    setCollapsedGroupIds,
-    toggleExpand,
-    toggleGroupCollapse,
-    toggleLayerCollapse,
-  } = usePanelExpansionState();
-
-  // ── Inspector interaction state ──────────────────────────────────────────
-  const {
-    rotStep,
-    stepFlyoutOpen,
-    ratioLocked,
-    templateAlignEnabled,
-    templateAlignTarget,
-    templateScaleEnabled,
-    templateScaleTarget,
-    setRatioLocked,
-    setTemplateAlignEnabled,
-    setTemplateAlignTarget,
-    setTemplateScaleEnabled,
-    setTemplateScaleTarget,
-    toggleStepFlyout,
-    closeStepFlyout,
-    selectRotStep,
-  } = useInspectorInteractionState();
-
-  // ── Drag-and-drop ────────────────────────────────────────────────────────
-  const {
-    draggingImportId,
-    dragOverGroupId,
-    showUngroupedHint,
-    handleImportDragStart,
-    handleImportDragEnd,
-    handleGroupDragOver,
-    handleGroupDragLeave,
-    handleGroupDrop,
-    handleUngroupedDragOver,
-    handleUngroupedDragLeave,
-    handleUngroupedDrop,
-  } = useImportDragDrop({
-    assignImportToGroup,
-    importGroupId,
-    setCollapsedGroupIds,
-  });
-
-  // ── Inline rename editing ────────────────────────────────────────────────
-  const {
-    editingName,
-    editingGroupName,
-    startImportRename,
-    changeImportRename,
-    commitImportRename,
-    cancelImportRename,
-    startGroupRename,
-    changeGroupRename,
-    commitGroupRename,
-    cancelGroupRename,
-  } = usePanelNameEditing({
-    updateImport,
-    updateLayerGroup,
-  });
-
-  // ── Stroke-width sync ────────────────────────────────────────────────────
+  const naming = usePanelNameEditing({ updateImport: store.updateImport, updateLayerGroup: store.updateLayerGroup });
   const syncStrokeWidth = useSyncedStrokeWidth({
-    imports,
-    layerGroups,
-    importGroupId,
-    updateImport,
+    imports: store.imports,
+    layerGroups: store.layerGroups,
+    importGroupId: derived.importGroupId,
+    updateImport: store.updateImport,
   });
 
-  // ── Add layer group ──────────────────────────────────────────────────────
-  const handleAddLayerGroup = useAddLayerGroup({
-    groupCount: layerGroups.length,
-    addLayerGroup,
+  return {
+    imports: store.imports,
+    layerGroups: store.layerGroups,
+    selectedImportId: store.selectedImportId,
+    selectedGroupId: store.selectedGroupId,
+    expandedIds: expansion.expandedIds,
+    collapsedGroupIds: expansion.collapsedGroupIds,
+    expandedLayerKeys: expansion.expandedLayerKeys,
+    draggingImportId: dragDrop.draggingImportId,
+    dragOverGroupId: dragDrop.dragOverGroupId,
+    showUngroupedHint: dragDrop.showUngroupedHint,
+    bedW: derived.bedW,
+    bedH: derived.bedH,
+    origin: derived.origin,
+    pageTemplate: store.pageTemplate,
+    pageSizes: store.pageSizes,
+    templateAlignEnabled: inspector.templateAlignEnabled,
+    templateAlignTarget: inspector.templateAlignTarget,
+    templateScaleEnabled: inspector.templateScaleEnabled,
+    templateScaleTarget: inspector.templateScaleTarget,
+    ratioLocked: inspector.ratioLocked,
+    rotStep: inspector.rotStep,
+    stepFlyoutOpen: inspector.stepFlyoutOpen,
+    showCentreMarker: store.showCentreMarker,
+    editingName: naming.editingName,
+    editingGroupName: naming.editingGroupName,
+    importGroupId: derived.importGroupId,
+    onSelectImport: store.selectImport,
+    onSelectGroup: store.selectGroup,
+    onToggleExpand: expansion.toggleExpand,
+    onToggleGroupCollapse: expansion.toggleGroupCollapse,
+    onToggleLayerCollapse: expansion.toggleLayerCollapse,
+    onUpdateImport: store.updateImport,
+    onUpdateImportLayer: store.updateImportLayer,
+    onUpdatePath: store.updatePath,
+    onUpdateLayerGroup: store.updateLayerGroup,
+    onRemoveImport: store.removeImport,
+    onRemovePath: store.removePath,
+    onRemoveLayerGroup: store.removeLayerGroup,
+    onApplyHatch: store.applyHatch,
+    onSyncStrokeWidth: syncStrokeWidth,
+    onToggleCentreMarker: store.toggleCentreMarker,
+    onTemplateAlignEnabledChange: inspector.setTemplateAlignEnabled,
+    onTemplateAlignTargetChange: inspector.setTemplateAlignTarget,
+    onTemplateScaleEnabledChange: inspector.setTemplateScaleEnabled,
+    onTemplateScaleTargetChange: inspector.setTemplateScaleTarget,
+    onRatioLockedChange: inspector.setRatioLocked,
+    onToggleStepFlyout: inspector.toggleStepFlyout,
+    onCloseStepFlyout: inspector.closeStepFlyout,
+    onSelectRotStep: inspector.selectRotStep,
+    onImportDragStart: dragDrop.handleImportDragStart,
+    onImportDragEnd: dragDrop.handleImportDragEnd,
+    onGroupDragOver: dragDrop.handleGroupDragOver,
+    onGroupDragLeave: dragDrop.handleGroupDragLeave,
+    onGroupDrop: dragDrop.handleGroupDrop,
+    onUngroupedDragOver: dragDrop.handleUngroupedDragOver,
+    onUngroupedDragLeave: dragDrop.handleUngroupedDragLeave,
+    onUngroupedDrop: dragDrop.handleUngroupedDrop,
+    onStartImportRename: naming.startImportRename,
+    onChangeImportRename: naming.changeImportRename,
+    onCommitImportRename: naming.commitImportRename,
+    onCancelImportRename: naming.cancelImportRename,
+    onStartGroupRename: naming.startGroupRename,
+    onChangeGroupRename: naming.changeGroupRename,
+    onCommitGroupRename: naming.commitGroupRename,
+    onCancelGroupRename: naming.cancelGroupRename,
+  };
+}
+
+export function LayersPanelContent() {
+  const store = usePropertiesPanelStoreBindings();
+  const derived = usePropertiesPanelDerivedData({
+    layerGroups: store.layerGroups,
+    machineStatus: store.machineStatus,
+    activeConfig: store.activeConfig,
+    gcodeSource: store.gcodeSource,
   });
+  const listProps = useImportsListProps(store, derived);
+  const handleAddLayerGroup = useAddLayerGroup({
+    groupCount: store.layerGroups.length,
+    addLayerGroup: store.addLayerGroup,
+  });
+  const { imports, gcodeToolpath, toolpathSelected } = store;
 
   return (
     <PanelScrollBody>
       {imports.length === 0 && !gcodeToolpath ? (
-        <EmptyState message="No objects. Import an SVG." />
+        <EmptyState message="No objects. Import a vector or bitmap." />
       ) : (
         <>
           {/* G-code section heading + row — shown when a .gcode file has been loaded */}
@@ -171,98 +145,27 @@ export function LayersPanelContent() {
               </div>
               <ToolpathSection
                 toolpath={gcodeToolpath}
-                fileName={toolpathFileName}
+                fileName={derived.toolpathFileName}
                 selected={toolpathSelected}
-                visible={toolpathVisible}
-                colorized={toolpathColorized}
-                opacity={toolpathOpacity}
-                isJobActive={isJobActive}
-                fallbackFeedrate={fallbackFeedrate}
-                onToggleSelected={() => selectToolpath(!toolpathSelected)}
-                onSetVisible={setToolpathVisible}
-                onSetColorized={setToolpathColorized}
-                onSetOpacity={setToolpathOpacity}
-                onClear={() => setGcodeToolpath(null)}
+                visible={store.toolpathVisible}
+                colorized={store.toolpathColorized}
+                opacity={store.toolpathOpacity}
+                isJobActive={derived.isJobActive}
+                fallbackFeedrate={derived.fallbackFeedrate}
+                onToggleSelected={() => store.selectToolpath(!toolpathSelected)}
+                onSetVisible={store.setToolpathVisible}
+                onSetColorized={store.setToolpathColorized}
+                onSetOpacity={store.setToolpathOpacity}
+                onClear={() => store.setGcodeToolpath(null)}
               />
             </>
           )}
 
           {/* "Layers" section heading + add-group button */}
-          <LayersHeader
-            show={imports.length > 0}
-            onAddGroup={handleAddLayerGroup}
-          />
+          <LayersHeader show={imports.length > 0} onAddGroup={handleAddLayerGroup} />
 
           {/* All imports, organised into collapsible layer groups */}
-          {imports.length > 0 && (
-            <ImportsByGroupList
-              imports={imports}
-              layerGroups={layerGroups}
-              selectedImportId={selectedImportId}
-              selectedGroupId={selectedGroupId}
-              expandedIds={expandedIds}
-              collapsedGroupIds={collapsedGroupIds}
-              expandedLayerKeys={expandedLayerKeys}
-              draggingImportId={draggingImportId}
-              dragOverGroupId={dragOverGroupId}
-              showUngroupedHint={showUngroupedHint}
-              bedW={bedW}
-              bedH={bedH}
-              origin={origin}
-              pageTemplate={pageTemplate}
-              pageSizes={pageSizes}
-              templateAlignEnabled={templateAlignEnabled}
-              templateAlignTarget={templateAlignTarget}
-              templateScaleEnabled={templateScaleEnabled}
-              templateScaleTarget={templateScaleTarget}
-              ratioLocked={ratioLocked}
-              rotStep={rotStep}
-              stepFlyoutOpen={stepFlyoutOpen}
-              showCentreMarker={showCentreMarker}
-              editingName={editingName}
-              editingGroupName={editingGroupName}
-              importGroupId={importGroupId}
-              onSelectImport={selectImport}
-              onSelectGroup={selectGroup}
-              onToggleExpand={toggleExpand}
-              onToggleGroupCollapse={toggleGroupCollapse}
-              onToggleLayerCollapse={toggleLayerCollapse}
-              onUpdateImport={updateImport}
-              onUpdateImportLayer={updateImportLayer}
-              onUpdatePath={updatePath}
-              onUpdateLayerGroup={updateLayerGroup}
-              onRemoveImport={removeImport}
-              onRemovePath={removePath}
-              onRemoveLayerGroup={removeLayerGroup}
-              onApplyHatch={applyHatch}
-              onSyncStrokeWidth={syncStrokeWidth}
-              onToggleCentreMarker={toggleCentreMarker}
-              onTemplateAlignEnabledChange={setTemplateAlignEnabled}
-              onTemplateAlignTargetChange={setTemplateAlignTarget}
-              onTemplateScaleEnabledChange={setTemplateScaleEnabled}
-              onTemplateScaleTargetChange={setTemplateScaleTarget}
-              onRatioLockedChange={setRatioLocked}
-              onToggleStepFlyout={toggleStepFlyout}
-              onCloseStepFlyout={closeStepFlyout}
-              onSelectRotStep={selectRotStep}
-              onImportDragStart={handleImportDragStart}
-              onImportDragEnd={handleImportDragEnd}
-              onGroupDragOver={handleGroupDragOver}
-              onGroupDragLeave={handleGroupDragLeave}
-              onGroupDrop={handleGroupDrop}
-              onUngroupedDragOver={handleUngroupedDragOver}
-              onUngroupedDragLeave={handleUngroupedDragLeave}
-              onUngroupedDrop={handleUngroupedDrop}
-              onStartImportRename={startImportRename}
-              onChangeImportRename={changeImportRename}
-              onCommitImportRename={commitImportRename}
-              onCancelImportRename={cancelImportRename}
-              onStartGroupRename={startGroupRename}
-              onChangeGroupRename={changeGroupRename}
-              onCommitGroupRename={commitGroupRename}
-              onCancelGroupRename={cancelGroupRename}
-            />
-          )}
+          {imports.length > 0 && <ImportsByGroupList {...listProps} />}
         </>
       )}
     </PanelScrollBody>

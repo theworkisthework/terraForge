@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Check, CircleX, X } from "lucide-react";
 import { useTaskStore } from "../store/taskStore";
-import type { BackgroundTask } from "../../../../types";
+import type { BackgroundTask } from "../../../types";
 import { Button } from "./ui";
 
 /** Completed / cancelled toasts auto-dismiss after this delay. */

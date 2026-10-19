@@ -60,6 +60,23 @@ describe("Toolbar", () => {
     expect(screen.getByText("Disconnect")).toBeInTheDocument();
   });
 
+  it("explains the Connect and Disconnect buttons in tooltips", () => {
+    useMachineStore.setState({ activeConfigId: null, connected: false });
+    const { unmount } = render(<Toolbar />);
+    expect(screen.getByText("Connect").closest("button")).toHaveAttribute("title", "Select a machine to connect");
+    unmount();
+
+    const cfg = createMachineConfig({ name: "My Plotter" });
+    useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id, connected: false });
+    const second = render(<Toolbar />);
+    expect(screen.getByText("Connect").closest("button")).toHaveAttribute("title", "Connect to the selected machine");
+    second.unmount();
+
+    useMachineStore.setState({ connected: true });
+    render(<Toolbar />);
+    expect(screen.getByText("Disconnect").closest("button")).toHaveAttribute("title", "Disconnect from the machine");
+  });
+
   it("shows Offline status when not connected", () => {
     render(<Toolbar />);
     expect(screen.getByText("Offline")).toBeInTheDocument();
@@ -135,9 +152,16 @@ describe("Toolbar", () => {
     expect(screen.getByText("Jog")).toBeInTheDocument();
   });
 
+  it("says in the Jog button's tooltip whether it shows or hides the jog controls", () => {
+    const { rerender } = render(<Toolbar showJog={false} onToggleJog={vi.fn()} />);
+    expect(screen.getByText("Jog").closest("button")).toHaveAttribute("title", "Show jog controls");
+    rerender(<Toolbar showJog onToggleJog={vi.fn()} />);
+    expect(screen.getByText("Jog").closest("button")).toHaveAttribute("title", "Hide jog controls");
+  });
+
   it("renders settings button", () => {
     render(<Toolbar />);
-    expect(screen.getByTitle("Machine settings")).toBeInTheDocument();
+    expect(screen.getByTitle("Machine and application settings")).toBeInTheDocument();
   });
 
   it("disables machine selector while connected", () => {
@@ -285,11 +309,11 @@ describe("Toolbar", () => {
 
   // ── Settings dialog toggle ────────────────────────────────────────────
 
-  it("Machine settings button opens Machine Config dialog", async () => {
+  it("Settings button opens the machine and application settings dialog", async () => {
     const cfg = createMachineConfig({ name: "My Plotter" });
     useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
     render(<Toolbar />);
-    await userEvent.click(screen.getByTitle("Machine settings"));
+    await userEvent.click(screen.getByTitle("Machine and application settings"));
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
   });
 
@@ -1937,7 +1961,7 @@ describe("Toolbar", () => {
     });
   });
 
-  // ── Machine settings dialog ────────────────────────────────────────────────
+  // ── Machine and application settings dialog ────────────────────────────────
 
   it("settings button opens Machine Configurations dialog", async () => {
     const cfg = createMachineConfig({ name: "My Plotter" });
@@ -1946,7 +1970,7 @@ describe("Toolbar", () => {
       window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
     ).mockResolvedValue([cfg]);
     render(<Toolbar />);
-    await userEvent.click(screen.getByTitle("Machine settings"));
+    await userEvent.click(screen.getByTitle("Machine and application settings"));
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
   });
 
@@ -1957,7 +1981,7 @@ describe("Toolbar", () => {
       window.terraForge.config.getMachineConfigs as ReturnType<typeof vi.fn>
     ).mockResolvedValue([cfg]);
     render(<Toolbar />);
-    await userEvent.click(screen.getByTitle("Machine settings"));
+    await userEvent.click(screen.getByTitle("Machine and application settings"));
     expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
 
     // Click the Close button inside MachineConfigDialog

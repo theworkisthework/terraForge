@@ -68,6 +68,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs,
       saveConfigs,
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -90,6 +92,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs,
       saveConfigs,
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -113,6 +117,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs,
       saveConfigs,
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -150,6 +156,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs,
       saveConfigs,
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -182,6 +190,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs,
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -207,6 +217,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),
@@ -227,6 +239,8 @@ describe("registerConfigIpcHandlers", () => {
 
     registerConfigIpcHandlers({
       getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
       loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),

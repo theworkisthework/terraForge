@@ -24,6 +24,12 @@ describe("OptionsSection", () => {
         open
         customGcodeOpen={false}
         prefs={buildPrefs({ clipMode: "page" })}
+        machinePenDownDelayMs={0}
+        machinePenUpDelayMs={0}
+        machineDrawSpeed={3000}
+        onSetPenDownDelayMs={vi.fn()}
+        onSetPenUpDelayMs={vi.fn()}
+        onSetDrawSpeedOverride={vi.fn()}
         hasPageTemplate
         onToggleOpen={onToggleOpen}
         onToggleCustomGcodeOpen={onToggleCustomGcodeOpen}
