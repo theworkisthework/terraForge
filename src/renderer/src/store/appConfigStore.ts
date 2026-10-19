@@ -108,7 +108,7 @@ export const useAppConfigStore = create<AppConfigState>()(
       showConsoleTimestamps: true,
       showMachineCoordinates: false,
       respectSvgColorsOnCanvas: false,
-      bitmapRendererEnabled: false,
+      bitmapRendererEnabled: true,
       vinylCuttingEnabled: false,
       vinylBladeOffsetMM: 0.25,
       vinylCornerAngleThresholdDeg: 10,
