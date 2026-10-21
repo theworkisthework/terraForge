@@ -11,6 +11,7 @@ import {
   parseSvgLengthMM,
   parseColorToRgb,
   parseSvgStylesheet,
+  resolveSvgUserSpace,
   shapeToPathD,
 } from "./svgImportHelpers";
 import {
@@ -59,6 +60,67 @@ describe("svgImportHelpers", () => {
     expect(parseSvgLengthMM(undefined)).toBeNull();
     expect(parseSvgLengthMM("abc")).toBeNull();
     expect(parseSvgLengthMM("100%")).toBeNull();
+  });
+
+  it("treats user units as px when there is no viewBox", () => {
+    // Affinity-style export: unit-suffixed size, no viewBox.
+    const px = resolveSvgUserSpace(
+      firstMatch(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1872px" height="2448px"/>',
+        "svg",
+      ),
+    );
+    expect(px).toEqual({
+      viewBoxX: 0,
+      viewBoxY: 0,
+      width: 1872,
+      height: 2448,
+      scale: 25.4 / 96,
+    });
+
+    const mm = resolveSvgUserSpace(
+      firstMatch(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="50mm" height="25.4mm"/>',
+        "svg",
+      ),
+    );
+    expect(mm.width).toBeCloseTo(50 * (96 / 25.4), 6);
+    expect(mm.height).toBeCloseTo(96, 6);
+    expect(mm.scale).toBeCloseTo(25.4 / 96, 9);
+  });
+
+  it("scales the viewBox to the physical width", () => {
+    const space = resolveSvgUserSpace(
+      firstMatch(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="10 20 200 100"/>',
+        "svg",
+      ),
+    );
+    expect(space).toEqual({
+      viewBoxX: 10,
+      viewBoxY: 20,
+      width: 200,
+      height: 100,
+      scale: 0.5,
+    });
+  });
+
+  it("ignores a malformed viewBox instead of producing NaN", () => {
+    for (const viewBox of ["0 0 0 0", "0 0 abc 10", "0 0 10"]) {
+      const space = resolveSvgUserSpace(
+        firstMatch(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="96px" height="96px" viewBox="${viewBox}"/>`,
+          "svg",
+        ),
+      );
+      expect(space).toEqual({
+        viewBoxX: 0,
+        viewBoxY: 0,
+        width: 96,
+        height: 96,
+        scale: 25.4 / 96,
+      });
+    }
   });
 
   it("detects layer groups by display style or Inkscape marker", () => {

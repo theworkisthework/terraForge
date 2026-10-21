@@ -13,8 +13,8 @@ import {
   isDisplayNone,
   isLayerGroup,
   normalizeSvgColor,
-  parseSvgLengthMM,
   parseSvgStylesheet,
+  resolveSvgUserSpace,
   shapeToPathD,
 } from "../services/svgImportHelpers";
 import {
@@ -106,25 +106,13 @@ export function useImportActions() {
 
       const svgEl = doc.querySelector("svg");
       const stylesheet = parseSvgStylesheet(doc);
-      const vbParts = svgEl
-        ?.getAttribute("viewBox")
-        ?.trim()
-        .split(/[\s,]+/)
-        .map(Number);
-      const viewBoxX = vbParts?.[0] ?? 0;
-      const viewBoxY = vbParts?.[1] ?? 0;
-      const svgWidth = vbParts?.[2] ?? +(svgEl?.getAttribute("width") ?? 100);
-      const svgHeight = vbParts?.[3] ?? +(svgEl?.getAttribute("height") ?? 100);
-
-      // Compute initial scale: mm per SVG user-unit.
-      const physW = parseSvgLengthMM(svgEl?.getAttribute("width"));
-      const physH = parseSvgLengthMM(svgEl?.getAttribute("height"));
-      const initScale =
-        physW != null
-          ? physW / svgWidth
-          : physH != null
-            ? physH / svgHeight
-            : 25.4 / 96;
+      const {
+        viewBoxX,
+        viewBoxY,
+        width: svgWidth,
+        height: svgHeight,
+        scale: initScale,
+      } = resolveSvgUserSpace(svgEl);
 
       const name =
         filePath

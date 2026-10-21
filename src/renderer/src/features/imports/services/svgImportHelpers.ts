@@ -363,6 +363,59 @@ export function parseSvgLengthMM(
   return num * (25.4 / 96);
 }
 
+const MM_PER_PX = 25.4 / 96;
+
+export interface SvgUserSpace {
+  viewBoxX: number;
+  viewBoxY: number;
+  /** Document width in SVG user units. */
+  width: number;
+  /** Document height in SVG user units. */
+  height: number;
+  /** mm per SVG user unit. */
+  scale: number;
+}
+
+/**
+ * Resolves the root <svg>'s user coordinate space and its physical scale.
+ * Without a usable viewBox, one user unit is one CSS px, so width/height
+ * (which may carry units such as "1872px" or "50mm") only set the extent.
+ */
+export function resolveSvgUserSpace(svgEl: Element | null): SvgUserSpace {
+  const physW = parseSvgLengthMM(svgEl?.getAttribute("width"));
+  const physH = parseSvgLengthMM(svgEl?.getAttribute("height"));
+
+  const vb = svgEl
+    ?.getAttribute("viewBox")
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  if (
+    vb &&
+    vb.length === 4 &&
+    vb.every(Number.isFinite) &&
+    vb[2] > 0 &&
+    vb[3] > 0
+  ) {
+    const [viewBoxX, viewBoxY, width, height] = vb;
+    const scale =
+      physW != null && physW > 0
+        ? physW / width
+        : physH != null && physH > 0
+          ? physH / height
+          : MM_PER_PX;
+    return { viewBoxX, viewBoxY, width, height, scale };
+  }
+
+  return {
+    viewBoxX: 0,
+    viewBoxY: 0,
+    width: physW != null && physW > 0 ? physW / MM_PER_PX : 100,
+    height: physH != null && physH > 0 ? physH / MM_PER_PX : 100,
+    scale: MM_PER_PX,
+  };
+}
+
 /** Converts supported SVG shapes into equivalent path data. */
 export function shapeToPathD(el: Element): string {
   const tag = el.tagName.toLowerCase();
