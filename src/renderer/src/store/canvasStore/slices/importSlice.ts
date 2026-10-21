@@ -7,6 +7,7 @@ import {
   applyImportHatch,
   regenerateImportHatching,
 } from "../services/hatching";
+import { refitImportToPaths } from "../services/importBounds";
 import { vectorObjectsForImports } from "../services/vectorObjects";
 import type { CanvasStateCreator, ImportSlice } from "../types";
 
@@ -113,6 +114,7 @@ export function createImportSlice(
         const imp = state.imports.find((item) => item.id === importId);
         if (!imp) return;
         imp.paths = imp.paths.filter((item) => item.id !== pathId);
+        refitImportToPaths(imp);
         if (state.selectedPathId === pathId) state.selectedPathId = null;
       }),
 

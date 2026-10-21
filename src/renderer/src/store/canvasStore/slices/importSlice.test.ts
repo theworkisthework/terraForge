@@ -219,3 +219,37 @@ describe("importSlice", () => {
     expect(imp.paths[0].generatedStrokeEnabled).toBeUndefined();
   });
 });
+
+describe("importSlice removePath", () => {
+  it("removePath refits the bounding box to the remaining paths", () => {
+    const store = makeStore();
+    store.getState().addImport({
+      id: "imp1",
+      name: "page with art",
+      paths: [
+        { id: "page", d: "M0 0 H100 V200 H0 Z", svgSource: "", visible: true },
+        { id: "art", d: "M60 20 H70 V30 H60 Z", svgSource: "", visible: true },
+      ],
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      svgWidth: 100,
+      svgHeight: 200,
+      viewBoxX: 0,
+      viewBoxY: 0,
+    });
+
+    store.getState().removePath("imp1", "page");
+
+    expect(store.getState().imports[0]).toMatchObject({
+      x: 60,
+      y: 170,
+      svgWidth: 10,
+      svgHeight: 10,
+      viewBoxX: 60,
+      viewBoxY: 20,
+    });
+  });
+});

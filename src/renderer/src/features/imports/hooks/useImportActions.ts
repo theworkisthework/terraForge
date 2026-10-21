@@ -20,7 +20,7 @@ import {
 import {
   getAccumulatedTransform,
   applyMatrixToPathD,
-  computePathsBounds,
+  computeImportPathBounds,
 } from "../../../utils/svgTransform";
 import { generateHatchPaths } from "../../../utils/hatchFill";
 import { parseGcode } from "../../../utils/gcodeParser";
@@ -32,50 +32,6 @@ import {
   DEFAULT_HATCH_SPACING_MM,
   DEFAULT_HATCH_ANGLE_DEG,
 } from "../../../../../types";
-
-function computeRenderedPathBounds(pathDs: string[]) {
-  if (typeof document === "undefined" || pathDs.length === 0) return null;
-
-  const ns = "http://www.w3.org/2000/svg";
-  const probeSvg = document.createElementNS(ns, "svg");
-  probeSvg.setAttribute("width", "0");
-  probeSvg.setAttribute("height", "0");
-  probeSvg.style.position = "fixed";
-  probeSvg.style.left = "-10000px";
-  probeSvg.style.top = "-10000px";
-  probeSvg.style.pointerEvents = "none";
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  document.body.appendChild(probeSvg);
-  try {
-    for (const d of pathDs) {
-      if (!d) continue;
-      const p = document.createElementNS(ns, "path");
-      p.setAttribute("d", d);
-      probeSvg.appendChild(p);
-      try {
-        const b = p.getBBox();
-        if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-        if (b.x < minX) minX = b.x;
-        if (b.y < minY) minY = b.y;
-        if (b.x + b.width > maxX) maxX = b.x + b.width;
-        if (b.y + b.height > maxY) maxY = b.y + b.height;
-      } catch {
-        // Ignore invalid individual paths; parser fallback covers full import.
-      }
-      p.remove();
-    }
-  } finally {
-    probeSvg.remove();
-  }
-
-  if (!Number.isFinite(minX)) return null;
-  return { minX, minY, maxX, maxY };
-}
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
@@ -249,8 +205,7 @@ export function useImportActions() {
       }
 
       const pathDs = paths.map((p) => p.d);
-      const bounds =
-        computeRenderedPathBounds(pathDs) ?? computePathsBounds(pathDs);
+      const bounds = computeImportPathBounds(pathDs);
       const normX = bounds?.minX ?? viewBoxX;
       const normY = bounds?.minY ?? viewBoxY;
       const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
