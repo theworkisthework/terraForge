@@ -88,7 +88,16 @@ export function openFluidNCWebSocket(
   }
 
   const generation = ++state.wsGeneration;
-  const ws = new WebSocket(`ws://${state.wsHost}:${state.wsPort}/`);
+  // `independent_session` gives this socket a FluidNC session of its own.
+  // FluidNC 4.0.4+ closes older websockets in the same session whenever a new
+  // one connects ("the newest websocket for a session wins", WSChannel.cpp),
+  // and a client without a sessionId cookie -- this one, or a pendant such as
+  // terraDial -- lands in the shared empty session. Two such clients then
+  // close each other's sockets on every reconnect, every few seconds. With
+  // the flag the session is this socket's own IP:port. 3.x ignores it.
+  const ws = new WebSocket(
+    `ws://${state.wsHost}:${state.wsPort}/?independent_session=1`,
+  );
   state.ws = ws;
 
   ws.on("open", () => {

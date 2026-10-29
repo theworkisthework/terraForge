@@ -80,7 +80,9 @@ describe("FluidNC WebSocket lifecycle", () => {
 
     lastWs().emit("open");
 
-    expect(lastWs().url).toBe("ws://192.168.1.100:80/");
+    expect(lastWs().url).toBe(
+      "ws://192.168.1.100:80/?independent_session=1",
+    );
     expect(emitConsole).toHaveBeenCalledWith(
       "[terraForge] WebSocket connected",
     );
