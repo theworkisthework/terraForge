@@ -126,7 +126,7 @@ test("03-machine-config-empty — config dialog before selecting a config", asyn
   const dialog = window.locator("div[role='dialog']").first();
   await dialog.waitFor({ timeout: 5000 });
   await dialog
-    .locator("button:has-text('Machine Configurations')")
+    .locator("button:has-text('Machines')")
     .first()
     .waitFor({ timeout: 5000 });
 
@@ -150,7 +150,7 @@ test("04-machine-config-completed — default TerraPen config selected", async (
 
   // Ensure we're on the Machine Configurations tab.
   await window
-    .locator("div[role='dialog'] button:has-text('Machine Configurations')")
+    .locator("div[role='dialog'] button:has-text('Machines')")
     .first()
     .click();
 
@@ -864,7 +864,7 @@ test("24-app-config-pass-setting — application configuration pass override opt
 
   // Switch to Application Configuration tab
   await window
-    .locator("button:has-text('Application Configuration')")
+    .locator("button:has-text('Application')")
     .first()
     .click();
   await window

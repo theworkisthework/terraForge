@@ -135,7 +135,7 @@ export function useImportActions() {
       // is off; this is defence in depth against an OS-level "All Files"
       // fallback some platforms add regardless of the filters we pass.
       if (!bitmapRendererEnabled) {
-        report(uuid(), "Bitmap import is an experimental feature — enable it in Application Configuration.", null, "error");
+        report(uuid(), "Bitmap import is an experimental feature — enable it in Settings → Application.", null, "error");
         return;
       }
       await handleImportBitmapFile(filePath);

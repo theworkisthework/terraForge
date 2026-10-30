@@ -49,13 +49,13 @@ describe("MachineConfigDialog", () => {
   it("renders the dialog heading", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
-    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
-    expect(screen.getByText("Application Configuration")).toBeInTheDocument();
+    expect(screen.getByText("Machines")).toBeInTheDocument();
+    expect(screen.getByText("Application")).toBeInTheDocument();
   });
 
   it("shows application setting on Application Configuration tab", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     expect(
       screen.getByText(
         "Enable per-path pass overrides in the Properties panel",
@@ -69,7 +69,7 @@ describe("MachineConfigDialog", () => {
 
   it("updates persisted app setting when per-path override checkbox toggled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     const checkbox = screen.getByRole("checkbox", {
       name: /Enable per-path pass overrides in the Properties panel/i,
     });
@@ -79,7 +79,7 @@ describe("MachineConfigDialog", () => {
 
   it("updates canvas imported-colour setting when toggled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     const checkbox = screen.getByRole("checkbox", {
       name: /Show imported SVG colours on canvas/i,
     });
@@ -90,7 +90,7 @@ describe("MachineConfigDialog", () => {
 
   it("shows vinyl cutting app settings when the experimental toggle is enabled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     expect(screen.getAllByText("Experimental")).not.toHaveLength(0);
     const checkbox = screen.getByRole("checkbox", {
       name: /Enable vinyl cutting features/i,
@@ -117,7 +117,7 @@ describe("MachineConfigDialog", () => {
 
   it("saves debug logging setting when toggled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     const checkbox = screen.getByRole("checkbox", {
       name: /Enable debug command logging in console/i,
     });
@@ -131,7 +131,7 @@ describe("MachineConfigDialog", () => {
 
   it("saves console timestamp setting when toggled", async () => {
     render(<MachineConfigDialog onClose={onClose} />);
-    await userEvent.click(screen.getByText("Application Configuration"));
+    await userEvent.click(screen.getByText("Application"));
     const checkbox = screen.getByRole("checkbox", {
       name: /Show date and time on console lines/i,
     });
@@ -713,6 +713,6 @@ describe("MachineConfigDialog", () => {
     render(<MachineConfigDialog onClose={onClose} />);
     await act(async () => {});
     // Dialog should still render normally after catch sets portList=[]
-    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+    expect(screen.getByText("Machines")).toBeInTheDocument();
   });
 });

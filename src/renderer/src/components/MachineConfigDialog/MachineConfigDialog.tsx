@@ -48,8 +48,8 @@ export function MachineConfigDialog({ onClose }: Props) {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 tabs={[
-                  { id: "machines", label: "Machine Configurations" },
-                  { id: "application", label: "Application Configuration" },
+                  { id: "machines", label: "Machines" },
+                  { id: "application", label: "Application" },
                 ]}
                 className="border-b-0"
               />
