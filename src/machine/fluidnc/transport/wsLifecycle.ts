@@ -116,13 +116,15 @@ export function openFluidNCWebSocket(
 
   ws.on("message", (raw) => {
     if (generation !== state.wsGeneration) return;
+    // Any frame proves the socket is live. Not every firmware sends PING
+    // frames (or sends them often enough), but status reports arrive steadily.
+    handlers.emitPing();
     const text = raw.toString().trim();
     if (text.startsWith("<")) {
       handlers.emitStatus(handlers.parseStatus(text));
       return;
     }
     if (text === "PING" || text.startsWith("PING:")) {
-      handlers.emitPing();
       return;
     }
     if (
