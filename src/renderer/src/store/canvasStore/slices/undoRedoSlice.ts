@@ -1,5 +1,5 @@
 import type { SvgImport } from "../../../../../types";
-import type { CanvasStateCreator, UndoRedoSlice } from "../types";
+import type { CanvasState, CanvasStateCreator, UndoRedoSlice } from "../types";
 
 // Holds a snapshot captured at gesture-start (drag/scale/rotate mousedown).
 // Committed to undoStack on mouseup only if imports actually changed.
@@ -17,6 +17,23 @@ const gestureFingerprint = (imports: SvgImport[]) =>
         `${item.id}:${item.x},${item.y},${item.scale},${item.scaleX ?? ""},${item.scaleY ?? ""},${item.rotation ?? 0}`,
     )
     .join("|");
+
+// Undo/redo swaps the imports array, so keep the selection where its target
+// still exists (a move/scale/rotate undo must not deselect) and drop it
+// where it does not (e.g. undoing an import).
+const reconcileSelection = (state: CanvasState) => {
+  const imp = state.imports.find((i) => i.id === state.selectedImportId);
+  if (!imp) {
+    state.selectedImportId = null;
+    state.selectedPathId = null;
+  } else if (
+    state.selectedPathId &&
+    !imp.paths.some((p) => p.id === state.selectedPathId)
+  ) {
+    state.selectedPathId = null;
+  }
+  if (state.imports.length === 0) state.allImportsSelected = false;
+};
 
 export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
   set,
@@ -56,9 +73,7 @@ export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
       state.redoStack.push(currentSnap);
       if (state.redoStack.length > 50)
         state.redoStack.splice(0, state.redoStack.length - 50);
-      state.selectedImportId = null;
-      state.selectedPathId = null;
-      state.allImportsSelected = false;
+      reconcileSelection(state);
     });
   },
 
@@ -73,9 +88,7 @@ export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
       state.undoStack.push(currentSnap);
       if (state.undoStack.length > 50)
         state.undoStack.splice(0, state.undoStack.length - 50);
-      state.selectedImportId = null;
-      state.selectedPathId = null;
-      state.allImportsSelected = false;
+      reconcileSelection(state);
     });
   },
 });
