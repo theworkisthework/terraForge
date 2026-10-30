@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createImportSlice } from "./importSlice";
@@ -21,19 +22,19 @@ type ImportState = ReturnType<ReturnType<typeof createImportSlice>> & {
   }>;
 };
 
-let pushUndo: ReturnType<typeof vi.fn>;
+let pushUndo: Mock<() => void>;
 
 function makeStore() {
-  pushUndo = vi.fn();
+  pushUndo = vi.fn<() => void>();
   return create<ImportState>()(
-    immer((set, get) => ({
+    immer((set, get, store) => ({
       selectedImportId: null,
       selectedPathId: null,
       allImportsSelected: false,
       selectedGroupId: null,
       pageTemplate: null,
       layerGroups: [],
-      ...createImportSlice(pushUndo)(set as any, get as any),
+      ...createImportSlice(pushUndo)(set as any, get as any, store as any),
     })),
   );
 }

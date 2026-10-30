@@ -2,6 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SvgImport } from "../../../../../types";
 import { useImportsByGroupListModel } from "./useImportsByGroupListModel";
+import type { ImportsByGroupListProps } from "../components/ImportsByGroupList.types";
 
 const resolvePageBoundsMock = vi.fn();
 const useImportRowRendererMock = vi.fn();
@@ -42,6 +43,8 @@ describe("useImportsByGroupListModel", () => {
       templateAlignTarget: "page" as const,
       templateScaleEnabled: false,
       templateScaleTarget: "page" as const,
+      onTemplateScaleEnabledChange: vi.fn(),
+      onTemplateScaleTargetChange: vi.fn(),
       ratioLocked: true,
       rotStep: 45 as const,
       stepFlyoutOpen: false,
@@ -73,7 +76,10 @@ describe("useImportsByGroupListModel", () => {
       onApplyHatch: vi.fn(),
     };
 
-    const { result } = renderHook(() => useImportsByGroupListModel(args));
+    // Only what the hook reads before handing rows to the (mocked) renderer.
+    const { result } = renderHook(() =>
+      useImportsByGroupListModel(args as unknown as ImportsByGroupListProps),
+    );
 
     expect(resolvePageBoundsMock).toHaveBeenCalledWith({
       bedW: 220,

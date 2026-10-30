@@ -7,8 +7,8 @@ type SelectionState = ReturnType<typeof createSelectionSlice>;
 
 function makeStore() {
   return create<SelectionState>()(
-    immer((set, get) => ({
-      ...createSelectionSlice(set as any, get as any),
+    immer((set, get, store) => ({
+      ...createSelectionSlice(set as any, get as any, store as any),
     })),
   );
 }

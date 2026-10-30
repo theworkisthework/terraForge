@@ -13,8 +13,6 @@ import { PenControls } from "./PenControls";
 import { JogSpeedInput } from "./JogSpeedInput";
 import { PositioningSection } from "./PositioningSection";
 
-const STEPS: JogStep[] = [0.1, 1, 10, 100];
-
 function usesTopOrigin(origin?: OriginType): boolean {
   return origin === "top-left" || origin === "top-right";
 }
@@ -114,7 +112,6 @@ export function JogControls({ onClose }: Props) {
         penType={penType}
         penDown={penDown}
         penUp={penUp}
-        step={step}
         onMovePen={movePen}
         onZeroZ={zeroZ}
       />

@@ -8,7 +8,7 @@ import type {
   InkServiceStationAction,
   MachineConfig,
   PenType,
-} from "../../../../types";
+} from "../../../../../types";
 import { useMachineConfigDialogStores } from "./useMachineConfigDialogStores";
 import { EMPTY_CONFIG, PEN_DEFAULTS } from "../utils/machineConfigDefaults";
 import {
@@ -82,47 +82,12 @@ export function useMachineConfigDialogController() {
     setIsDirty(true);
   };
 
-  const handlePenTypeChange = (newType: PenType) => {
-    const defaults = PEN_DEFAULTS[newType];
-    const currentDefaults = PEN_DEFAULTS[form.penType];
-    const commandsAreCustomised =
-      form.penUpCommand !== currentDefaults.penUpCommand ||
-      form.penDownCommand !== currentDefaults.penDownCommand;
-    if (commandsAreCustomised) {
-      setPendingPenType(newType);
-    } else {
-      change({
-        penType: newType,
-        penUpCommand: defaults.penUpCommand,
-        penDownCommand: defaults.penDownCommand,
-        penDownDelayMs: defaults.penDownDelayMs,
-        penUpDelayMs: defaults.penUpDelayMs,
-      });
-    }
-  };
-
-  const handleSwapCommands = () => {
-    change({
-      penUpCommand: form.penDownCommand,
-      penDownCommand: form.penUpCommand,
-    });
-  };
-
-  const handleMachineCoordinateToggle = (enabled: boolean) => {
-    change({
-      penUpCommand: enabled
-        ? addMachineCoordinatePrefix(form.penUpCommand)
-        : removeMachineCoordinatePrefix(form.penUpCommand),
-      penDownCommand: enabled
-        ? addMachineCoordinatePrefix(form.penDownCommand)
-        : removeMachineCoordinatePrefix(form.penDownCommand),
-    });
-  };
-
-  const softwareSolenoidUsesMachineCoordinates =
-    form.penType === "solenoid-software" &&
-    hasMachineCoordinatePrefix(form.penUpCommand) &&
-    hasMachineCoordinatePrefix(form.penDownCommand);
+  const {
+    handlePenTypeChange,
+    handleSwapCommands,
+    handleMachineCoordinateToggle,
+    softwareSolenoidUsesMachineCoordinates,
+  } = penCommandActions(form, change, setPendingPenType);
 
   const handleSave = async () => {
     if (isNew) {
@@ -172,48 +137,6 @@ export function useMachineConfigDialogController() {
     setIsDirty(false);
   };
 
-  const handleExport = async () => {
-    try {
-      const path = await window.terraForge.config.exportConfigs();
-      if (path)
-        setAlertInfo({
-          title: "Configs Exported",
-          message: `Saved to:\n${path}`,
-        });
-    } catch (err) {
-      setAlertInfo({ title: "Export Failed", message: String(err) });
-    }
-  };
-
-  const handleImport = async () => {
-    try {
-      const result = await window.terraForge.config.importConfigs();
-      if (result.added === 0 && result.skipped === 0) return;
-      const updated = await window.terraForge.config.getMachineConfigs();
-      setConfigs(updated);
-      if (result.added > 0) {
-        const newId = updated[updated.length - result.added]?.id;
-        if (newId) {
-          setSelectedId(newId);
-          setIsNew(false);
-        }
-      }
-      const parts: string[] = [];
-      if (result.added > 0)
-        parts.push(
-          `${result.added} config${result.added === 1 ? "" : "s"} imported`,
-        );
-      if (result.skipped > 0)
-        parts.push(`${result.skipped} skipped (already exist by ID or name)`);
-      setAlertInfo({
-        title: "Import Complete",
-        message: parts.join(" • ") + ".",
-      });
-    } catch (err) {
-      setAlertInfo({ title: "Import Failed", message: String(err) });
-    }
-  };
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
@@ -231,80 +154,15 @@ export function useMachineConfigDialogController() {
     if (selectedId) setActiveConfig(selectedId);
   };
 
-  const saveAppConfig = (overrides: Partial<AppConfig>) => {
-    void window.terraForge.config.saveAppConfig({
-      debugLoggingEnabled: appConfig.debugLoggingEnabled,
-      showConsoleTimestamps: appConfig.showConsoleTimestamps,
-      ...overrides,
-    });
-  };
-
-  const handleDebugLoggingChange = (enabled: boolean) => {
-    appConfig.setDebugLoggingEnabled(enabled);
-    saveAppConfig({ debugLoggingEnabled: enabled });
-  };
-
-  const handleShowConsoleTimestampsChange = (enabled: boolean) => {
-    appConfig.setShowConsoleTimestamps(enabled);
-    saveAppConfig({ showConsoleTimestamps: enabled });
-  };
-
-  const updateStationField = <K extends keyof InkServiceStation>(
-    stationId: string,
-    key: K,
-    value: InkServiceStation[K],
-  ) => {
-    appConfig.updateInkServiceStation(stationId, {
-      [key]: value,
-    } as Partial<InkServiceStation>);
-  };
-
-  const updateStationActionField = (
-    station: InkServiceStation,
-    patch: Partial<InkServiceStationAction>,
-  ) => {
-    const baseAction =
-      station.action ?? defaultStationActionForType(station.type);
-    if (!baseAction) return;
-    appConfig.updateInkServiceStation(station.id, {
-      action: {
-        ...baseAction,
-        ...patch,
-      } as InkServiceStationAction,
-    });
-  };
-
-  const handleTestStationLocation = async (station: InkServiceStation) => {
-    if (!connected) {
-      setAlertInfo({
-        title: "Machine Offline",
-        message: "Connect to your machine before testing station locations.",
-      });
-      return;
-    }
-    const cfg = activeConfigId
-      ? configs.find((c) => c.id === activeConfigId)
-      : null;
-    if (!cfg) {
-      setAlertInfo({
-        title: "No Active Machine",
-        message:
-          "Set an active machine profile before testing station locations.",
-      });
-      return;
-    }
-    try {
-      await window.terraForge.fluidnc.sendCommand(cfg.penUpCommand);
-      await window.terraForge.fluidnc.sendCommand(
-        `G0 X${station.x.toFixed(3)} Y${station.y.toFixed(3)}`,
-      );
-    } catch (err) {
-      setAlertInfo({
-        title: "Station Test Failed",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  };
+  const { handleExport, handleImport } = configFileActions({ setConfigs, setSelectedId, setIsNew, setAlertInfo });
+  const { handleDebugLoggingChange, handleShowConsoleTimestampsChange } = appPreferenceActions(appConfig);
+  const { updateStationField, updateStationActionField, handleTestStationLocation } = inkStationActions({
+    appConfig,
+    connected,
+    configs,
+    activeConfigId,
+    setAlertInfo,
+  });
 
   const handleDisconnectForEdit = async () => {
     const activeCfg = configs.find((c) => c.id === activeConfigId);
@@ -366,3 +224,185 @@ export function useMachineConfigDialogController() {
 export type MachineConfigDialogController = ReturnType<
   typeof useMachineConfigDialogController
 >;
+
+type AlertInfo = { title: string; message: string } | null;
+type Stores = ReturnType<typeof useMachineConfigDialogStores>;
+
+/** The alert text after importing configs: how many came in, and how many
+ * were skipped as already present. */
+export function importSummary(result: { added: number; skipped: number }): string {
+  const parts: string[] = [];
+  if (result.added > 0) parts.push(`${result.added} config${result.added === 1 ? "" : "s"} imported`);
+  if (result.skipped > 0) parts.push(`${result.skipped} skipped (already exist by ID or name)`);
+  return parts.join(" • ") + ".";
+}
+
+/** Exporting all machine configs to a file, and importing them from one
+ * (selecting the first new config). */
+function configFileActions({
+  setConfigs,
+  setSelectedId,
+  setIsNew,
+  setAlertInfo,
+}: {
+  setConfigs: Stores["machineStore"]["setConfigs"];
+  setSelectedId: (id: string | null) => void;
+  setIsNew: (isNew: boolean) => void;
+  setAlertInfo: (info: AlertInfo) => void;
+}) {
+  const handleExport = async () => {
+    try {
+      const path = await window.terraForge.config.exportConfigs();
+      if (path) setAlertInfo({ title: "Configs Exported", message: `Saved to:\n${path}` });
+    } catch (err) {
+      setAlertInfo({ title: "Export Failed", message: String(err) });
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const result = await window.terraForge.config.importConfigs();
+      if (result.added === 0 && result.skipped === 0) return;
+      const updated = await window.terraForge.config.getMachineConfigs();
+      setConfigs(updated);
+      if (result.added > 0) {
+        const newId = updated[updated.length - result.added]?.id;
+        if (newId) {
+          setSelectedId(newId);
+          setIsNew(false);
+        }
+      }
+      setAlertInfo({ title: "Import Complete", message: importSummary(result) });
+    } catch (err) {
+      setAlertInfo({ title: "Import Failed", message: String(err) });
+    }
+  };
+
+  return { handleExport, handleImport };
+}
+
+/** App-wide preferences set in this dialog, saved as they change. */
+function appPreferenceActions(appConfig: Stores["appConfig"]) {
+  const saveAppConfig = (overrides: Partial<AppConfig>) => {
+    void window.terraForge.config.saveAppConfig({
+      debugLoggingEnabled: appConfig.debugLoggingEnabled,
+      showConsoleTimestamps: appConfig.showConsoleTimestamps,
+      ...overrides,
+    });
+  };
+  return {
+    handleDebugLoggingChange: (enabled: boolean) => {
+      appConfig.setDebugLoggingEnabled(enabled);
+      saveAppConfig({ debugLoggingEnabled: enabled });
+    },
+    handleShowConsoleTimestampsChange: (enabled: boolean) => {
+      appConfig.setShowConsoleTimestamps(enabled);
+      saveAppConfig({ showConsoleTimestamps: enabled });
+    },
+  };
+}
+
+/** Editing ink service stations, and moving the pen to one to check where
+ * it is (which needs a connected, active machine). */
+export function inkStationActions({
+  appConfig,
+  connected,
+  configs,
+  activeConfigId,
+  setAlertInfo,
+}: {
+  appConfig: Stores["appConfig"];
+  connected: boolean;
+  configs: MachineConfig[];
+  activeConfigId: string | null;
+  setAlertInfo: (info: AlertInfo) => void;
+}) {
+  const updateStationField = <K extends keyof InkServiceStation>(
+    stationId: string,
+    key: K,
+    value: InkServiceStation[K],
+  ) => {
+    appConfig.updateInkServiceStation(stationId, { [key]: value } as Partial<InkServiceStation>);
+  };
+
+  const updateStationActionField = (station: InkServiceStation, patch: Partial<InkServiceStationAction>) => {
+    const baseAction = station.action ?? defaultStationActionForType(station.type);
+    if (!baseAction) return;
+    appConfig.updateInkServiceStation(station.id, {
+      action: { ...baseAction, ...patch } as InkServiceStationAction,
+    });
+  };
+
+  const handleTestStationLocation = async (station: InkServiceStation) => {
+    if (!connected) {
+      setAlertInfo({ title: "Machine Offline", message: "Connect to your machine before testing station locations." });
+      return;
+    }
+    const cfg = activeConfigId ? configs.find((c) => c.id === activeConfigId) : null;
+    if (!cfg) {
+      setAlertInfo({
+        title: "No Active Machine",
+        message: "Set an active machine profile before testing station locations.",
+      });
+      return;
+    }
+    try {
+      await window.terraForge.fluidnc.sendCommand(cfg.penUpCommand);
+      await window.terraForge.fluidnc.sendCommand(`G0 X${station.x.toFixed(3)} Y${station.y.toFixed(3)}`);
+    } catch (err) {
+      setAlertInfo({ title: "Station Test Failed", message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  return { updateStationField, updateStationActionField, handleTestStationLocation };
+}
+
+/**
+ * Pen command editing. Changing the pen type loads its default commands —
+ * unless the current ones were customised, which asks first (via
+ * `setPendingPenType`).
+ */
+function penCommandActions(
+  form: Omit<MachineConfig, "id">,
+  change: (patch: Partial<Omit<MachineConfig, "id">>) => void,
+  setPendingPenType: (type: PenType | null) => void,
+) {
+  const handlePenTypeChange = (newType: PenType) => {
+    const defaults = PEN_DEFAULTS[newType];
+    const currentDefaults = PEN_DEFAULTS[form.penType];
+    const commandsAreCustomised =
+      form.penUpCommand !== currentDefaults.penUpCommand || form.penDownCommand !== currentDefaults.penDownCommand;
+    if (commandsAreCustomised) {
+      setPendingPenType(newType);
+    } else {
+      change({
+        penType: newType,
+        penUpCommand: defaults.penUpCommand,
+        penDownCommand: defaults.penDownCommand,
+        penDownDelayMs: defaults.penDownDelayMs,
+        penUpDelayMs: defaults.penUpDelayMs,
+      });
+    }
+  };
+
+  const handleSwapCommands = () => {
+    change({ penUpCommand: form.penDownCommand, penDownCommand: form.penUpCommand });
+  };
+
+  const handleMachineCoordinateToggle = (enabled: boolean) => {
+    const prefix = enabled ? addMachineCoordinatePrefix : removeMachineCoordinatePrefix;
+    change({ penUpCommand: prefix(form.penUpCommand), penDownCommand: prefix(form.penDownCommand) });
+  };
+
+  const softwareSolenoidUsesMachineCoordinates =
+    form.penType === "solenoid-software" &&
+    hasMachineCoordinatePrefix(form.penUpCommand) &&
+    hasMachineCoordinatePrefix(form.penDownCommand);
+
+  return {
+    handlePenTypeChange,
+    handleSwapCommands,
+    handleMachineCoordinateToggle,
+    softwareSolenoidUsesMachineCoordinates,
+  };
+}

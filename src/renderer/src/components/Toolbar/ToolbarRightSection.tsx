@@ -44,8 +44,8 @@ export function ToolbarRightSection({
         variant="secondary"
         size="sm"
         onClick={onOpenSettings}
-        aria-label="Machine settings"
-        title="Machine settings"
+        aria-label="Machine and application settings"
+        title="Machine and application settings"
       >
         <Settings size={14} aria-hidden="true" />
       </Button>

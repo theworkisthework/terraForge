@@ -23,6 +23,7 @@ Import SVG and PDF artwork, position it on the machine bed, generate optimised G
 - **SVG** — full shape support (`path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`), physical unit detection (`mm`, `cm`, `in`, `pt`, `pc`, `px`), `transform` attribute resolution (including Inkscape layer matrices), and **sub-layer detection** — Inkscape-style `<g>` layers are imported as collapsible sub-layers in the Properties panel, preserving the original SVG visibility state with per-layer toggle controls
 - **PDF** — vector path extraction from all pages; physical scale preserved (`25.4 ÷ 72 mm/pt`)
 - **G-code** — import local `.gcode`/`.nc`/`.g` files for canvas preview and direct plotting
+- **Images (experimental)** — turn PNG, JPEG or WebP images into plottable lines or dots with built-in or plugin renderers (spirals, rings, line screens, halftone and more), including colour separation into several pens
 
 ### Canvas
 
@@ -75,7 +76,7 @@ Import SVG and PDF artwork, position it on the machine bed, generate optimised G
 - Console with real-time FluidNC output, command input, alarm clear (`$X`), and firmware restart
 - Background task toasts (progress, cancel, errors)
 - Layer groups for multi-pen workflows
-- Page template overlays (A2–A6, Letter, Legal, Tabloid) with margin and page-clip support
+- Page template overlays (A2–A6, Letter, Legal, Tabloid) with margin and page-clip support, and paper and pen colours for a realistic plot preview
 - Save/open/close `.tforge` layout files
 - Dark and light themes
 

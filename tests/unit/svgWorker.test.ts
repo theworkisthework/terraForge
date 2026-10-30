@@ -1822,3 +1822,41 @@ describe("svgWorker — error handling", () => {
     expect(typeof msg.error).toBe("string");
   });
 });
+
+describe("svgWorker — ink service without a usable station", () => {
+  const station = (id: string, type: "prime" | "wipe" | "dip" | "wash", enabled: boolean) => ({
+    id,
+    name: id,
+    type,
+    x: 5,
+    y: 5,
+    dwellMs: 100,
+    enabled,
+  });
+  const generateWith = async (taskId: string, mode: "prime-wipe" | "brush-dip", stations: ReturnType<typeof station>[]) => {
+    dispatch({
+      type: "generate",
+      taskId,
+      objects: [createVectorObject({ path: "M 0 0 L 100 0 L 100 50" })],
+      config: createMachineConfig(),
+      options: createGcodeOptions({ inkService: { mode, triggerTravelMM: 10, triggerJitterPct: 0, stations } }),
+    });
+    return (await waitForMsgById("complete", taskId)).gcode as string;
+  };
+
+  // Retrying a service move that could never happen used to repeat a pen-up
+  // line at every point of the drawing until generation ran out of memory.
+  it("draws the job without service moves when brush-dip has no enabled dip tray", async () => {
+    const gcode = await generateWith("ink-no-dip", "brush-dip", [station("dip", "dip", false), station("wash", "wash", true)]);
+    expect(gcode).toContain("G1 X100.000 Y0.000");
+    expect(gcode).not.toContain("Ink service: brush dip");
+    expect(gcode).not.toContain("Pen up for service move");
+  });
+
+  it("draws the job without service moves when prime-wipe has no prime or wipe station", async () => {
+    const gcode = await generateWith("ink-no-prime", "prime-wipe", [station("prime", "prime", false), station("wash", "wash", true)]);
+    expect(gcode).toContain("G1 X100.000 Y0.000");
+    expect(gcode).not.toContain("Ink service: prime and wipe");
+    expect(gcode).not.toContain("Pen up for service move");
+  });
+});

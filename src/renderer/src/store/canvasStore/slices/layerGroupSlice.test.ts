@@ -30,10 +30,10 @@ type LayerGroupState = ReturnType<typeof createLayerGroupSlice> & {
 
 function makeStore() {
   return create<LayerGroupState>()(
-    immer((set, get) => ({
+    immer((set, get, store) => ({
       imports: [],
       selectedGroupId: null,
-      ...createLayerGroupSlice(set as any, get as any),
+      ...createLayerGroupSlice(set as any, get as any, store as any),
     })),
   );
 }

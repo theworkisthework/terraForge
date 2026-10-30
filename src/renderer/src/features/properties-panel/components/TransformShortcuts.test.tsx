@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { ROT_STEPS } from "../utils/rotation";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { TransformShortcuts } from "./TransformShortcuts";
 
@@ -17,7 +18,7 @@ describe("TransformShortcuts", () => {
         fitScaleX={1.5}
         fitScaleY={1.2}
         rotStep={45}
-        rotSteps={[1, 5, 15, 45, 90]}
+        rotSteps={ROT_STEPS}
         stepFlyoutOpen={false}
         showCentreMarker={true}
         ratioLocked={true}
@@ -73,7 +74,7 @@ describe("TransformShortcuts", () => {
         fitScaleX={2}
         fitScaleY={2}
         rotStep={45}
-        rotSteps={[1, 5, 15, 45, 90]}
+        rotSteps={ROT_STEPS}
         stepFlyoutOpen={true}
         showCentreMarker={false}
         ratioLocked={true}
@@ -100,8 +101,8 @@ describe("TransformShortcuts", () => {
     fireEvent.click(screen.getByTitle("Change rotation step"));
     expect(onToggleStepFlyout).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText("90°"));
-    expect(onSelectRotStep).toHaveBeenCalledWith(90);
+    fireEvent.click(screen.getByText("30°"));
+    expect(onSelectRotStep).toHaveBeenCalledWith(30);
 
     const backdrop = container.querySelector(".fixed.inset-0.z-10");
     if (!backdrop) throw new Error("expected flyout backdrop");
@@ -116,7 +117,7 @@ describe("TransformShortcuts", () => {
         fitScaleX={2}
         fitScaleY={2}
         rotStep={45}
-        rotSteps={[1, 5, 15, 45, 90]}
+        rotSteps={ROT_STEPS}
         stepFlyoutOpen={false}
         showCentreMarker={false}
         ratioLocked={true}

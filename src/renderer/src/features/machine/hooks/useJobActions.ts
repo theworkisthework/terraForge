@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
 import { useCanvasStore } from "../../../store/canvasStore";
@@ -7,37 +7,20 @@ import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
 import { useAppConfigStore } from "../../../store/appConfigStore";
 import { parseGcode } from "../../../utils/gcodeParser";
-import { type GcodeOptions, type VectorObject } from "../../../../../types";
+import { type GcodeOptions } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
-import { normalizeSvgColor } from "../../imports/services/svgImportHelpers";
-import { vectorObjectsForImportLayer } from "../../../store/canvasStore/services/vectorObjects";
-
-type GcodeProgressStage =
-  | "preparing"
-  | "optimizing"
-  | "joining"
-  | "postprocessing"
-  | "emitting";
-
-function formatGcodeProgressLabel(
-  target: string,
-  stage?: GcodeProgressStage,
-): string {
-  const action =
-    stage === "preparing"
-      ? "Preparing"
-      : stage === "optimizing"
-        ? "Optimizing"
-        : stage === "joining"
-          ? "Joining"
-          : stage === "postprocessing"
-            ? "Post-processing"
-            : stage === "emitting"
-              ? "Emitting"
-              : "Generating";
-
-  return target ? `${action} ${target}…` : `${action} G-code`;
-}
+import { flushBitmapRenders } from "../../bitmap-renderers/bitmapRenderService";
+import {
+  colorFiles,
+  groupFiles,
+  hatchFiles,
+  layerFiles,
+  generateWholeJob,
+  runSplitFiles,
+  type SplitFile,
+} from "../utils/splitGcodeFiles";
+import { buildGcodeOptions } from "../utils/buildGcodeOptions";
+import { connectMachine, disconnectMachine } from "../utils/machineConnection";
 
 /** Orchestrates machine connection, disconnection, and G-code generation. */
 export function useJobActions() {
@@ -46,12 +29,8 @@ export function useJobActions() {
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const vinylCuttingEnabled = useAppConfigStore((s) => s.vinylCuttingEnabled);
   const vinylBladeOffsetMM = useAppConfigStore((s) => s.vinylBladeOffsetMM);
-  const vinylCornerAngleThresholdDeg = useAppConfigStore(
-    (s) => s.vinylCornerAngleThresholdDeg,
-  );
-  const vinylMicroJogMagnitudeMM = useAppConfigStore(
-    (s) => s.vinylMicroJogMagnitudeMM,
-  );
+  const vinylCornerAngleThresholdDeg = useAppConfigStore((s) => s.vinylCornerAngleThresholdDeg);
+  const vinylMicroJogMagnitudeMM = useAppConfigStore((s) => s.vinylMicroJogMagnitudeMM);
   const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
 
   const {
@@ -70,66 +49,20 @@ export function useJobActions() {
 
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const registerCancelCallback = useTaskStore((s) => s.registerCancelCallback);
-  const unregisterCancelCallback = useTaskStore(
-    (s) => s.unregisterCancelCallback,
-  );
+  const unregisterCancelCallback = useTaskStore((s) => s.unregisterCancelCallback);
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  // Holds a reference to the active G-code worker so cancellation can reach it.
-  const activeWorkerRef = useRef<{ worker: Worker; taskId: string } | null>(
-    null,
-  );
+
 
   /** Connects to the active machine via Wi-Fi WebSocket or serial port. */
   const handleConnect = async () => {
     const cfg = activeConfig();
     if (!cfg) return;
-    const taskId = uuid();
-    const label =
-      cfg.connection.type === "wifi"
-        ? `Connecting to ${cfg.connection.host}…`
-        : `Connecting to ${cfg.connection.serialPath}…`;
-    upsertTask({
-      id: taskId,
-      type: "ws-connect",
-      label,
-      progress: null,
-      status: "running",
-    });
     setIsConnecting(true);
     try {
-      if (cfg.connection.type === "wifi") {
-        await window.terraForge.fluidnc.connectWebSocket(
-          cfg.connection.host!,
-          cfg.connection.port ?? 80,
-          cfg.connection.wsPort,
-        );
-      } else {
-        await window.terraForge.serial.connect(
-          cfg.connection.serialPath!,
-          115200,
-        );
-      }
-      setConnected(true);
-      upsertTask({
-        id: taskId,
-        type: "ws-connect",
-        label: "Connected",
-        progress: 100,
-        status: "completed",
-      });
-    } catch (err) {
-      console.error("Connection failed", err);
-      upsertTask({
-        id: taskId,
-        type: "ws-connect",
-        label: "Connection failed",
-        progress: null,
-        status: "error",
-        error: err instanceof Error ? err.message : String(err),
-      });
+      await connectMachine(cfg, upsertTask, () => setConnected(true));
     } finally {
       setIsConnecting(false);
     }
@@ -139,88 +72,24 @@ export function useJobActions() {
   const handleDisconnect = async () => {
     const cfg = activeConfig();
     if (!cfg) return;
-    if (cfg.connection.type === "wifi") {
-      await window.terraForge.fluidnc.disconnectWebSocket();
-    } else {
-      await window.terraForge.serial.disconnect();
-    }
+    await disconnectMachine(cfg);
     setConnected(false);
   };
 
-  /** Builds a GcodeOptions object from user preferences and the current page template. */
+  /** The worker's options, from the user's preferences and the app's state. */
   const buildOptions = async (prefs: GcodePrefs): Promise<GcodeOptions> => {
-    const activePageSize = pageTemplate
-      ? pageSizes.find((ps) => ps.id === pageTemplate.sizeId)
-      : undefined;
-    const terraForgeVersion = await window.terraForge.app
-      .getVersion()
-      .catch(() => "unknown");
+    const terraForgeVersion = await window.terraForge.app.getVersion().catch(() => "unknown");
     const { connected, fwInfo } = useMachineStore.getState();
-    return {
+    return buildGcodeOptions(prefs, {
       terraForgeVersion,
-      firmwareVersion: connected
-        ? (fwInfo?.replace(/^FluidNC\s+v/i, "") ?? "Unknown")
-        : "Not connected",
-      arcFitting: false,
-      arcTolerance: 0.01,
-      optimisePaths: prefs.optimise,
-      pathDirectionMode: prefs.pathDirectionMode,
-      joinPaths: prefs.joinPaths,
-      joinTolerance: prefs.joinTolerance,
-      liftPenAtEnd: prefs.liftPenAtEnd,
-      returnToHome: prefs.returnToHome,
-      penDownDelayMsOverride: prefs.penDownDelayOverrideEnabled
-        ? prefs.penDownDelayMs
-        : undefined,
-      penUpDelayMsOverride: prefs.penUpDelayOverrideEnabled
-        ? prefs.penUpDelayMs
-        : undefined,
-      drawSpeedOverride: prefs.drawSpeedOverrideEnabled
-        ? prefs.drawSpeedOverride
-        : undefined,
-      customStartGcode: prefs.customStartGcode,
-      customEndGcode: prefs.customEndGcode,
-      pageClip:
-        activePageSize && prefs.clipMode !== "none"
-          ? {
-              widthMM: pageTemplate!.landscape
-                ? activePageSize.heightMM
-                : activePageSize.widthMM,
-              heightMM: pageTemplate!.landscape
-                ? activePageSize.widthMM
-                : activePageSize.heightMM,
-              marginMM:
-                prefs.clipMode === "margin"
-                  ? (pageTemplate!.marginMM ?? 20)
-                  : (prefs.clipOffsetMM ?? 0),
-            }
-          : undefined,
-      vinylCutting:
-        vinylCuttingEnabled && prefs.generateVinylCuttingGcode
-          ? {
-              bladeOffsetMM: vinylBladeOffsetMM,
-              cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg,
-              microJogMagnitudeMM: vinylMicroJogMagnitudeMM,
-            }
-          : undefined,
-      vinylWeedBorder: prefs.generateVinylWeedBorderGcode
-        ? {
-            marginMM: prefs.vinylWeedBorderMarginMM,
-          }
-        : undefined,
-      inkService: prefs.inkServiceEnabled
-        ? {
-            mode: prefs.inkServiceMode,
-            triggerTravelMM: prefs.inkServiceTriggerTravelMM,
-            triggerJitterPct: prefs.inkServiceTriggerJitterPct,
-            stations: inkServiceStations,
-            randomizeDipStation: prefs.inkServiceRandomizeDipStation,
-            includeWashMove: prefs.inkServiceIncludeWashMove,
-            washEveryNDips: prefs.inkServiceWashEveryNDips,
-            layerDipStations: prefs.inkServiceLayerDipMap,
-          }
-        : undefined,
-    };
+      firmwareVersion: connected ? (fwInfo?.replace(/^FluidNC\s+v/i, "") ?? "Unknown") : "Not connected",
+      pageTemplate,
+      pageSizes,
+      vinyl: vinylCuttingEnabled
+        ? { bladeOffsetMM: vinylBladeOffsetMM, cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg, microJogMagnitudeMM: vinylMicroJogMagnitudeMM }
+        : null,
+      inkServiceStations,
+    });
   };
 
   /**
@@ -230,6 +99,22 @@ export function useJobActions() {
   const handleGenerateGcode = async (prefs: GcodePrefs) => {
     const cfg = activeConfig();
     if (!cfg || imports.length === 0) return;
+
+    // A bitmap setting changed moments ago may still be inside its render
+    // debounce, or mid-render; generating now would plot the previous output.
+    try {
+      await flushBitmapRenders();
+    } catch (err) {
+      upsertTask({
+        id: uuid(),
+        type: "gcode-generate",
+        label: "G-code failed",
+        progress: null,
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
 
     if (prefs.exportPerLayer) {
       await handleGenerateGcodePerLayer(prefs, cfg);
@@ -247,177 +132,67 @@ export function useJobActions() {
     }
 
     setGenerating(true);
-    const taskId = uuid();
     const options = await buildOptions(prefs);
-
-    const worker = new Worker(
-      new URL("../../../../../workers/svgWorker.ts", import.meta.url),
-      { type: "module" },
-    );
-
-    activeWorkerRef.current = { worker, taskId };
-
-    registerCancelCallback(taskId, () => {
-      worker.postMessage({ type: "cancel", taskId });
-    });
-
-    upsertTask({
-      id: taskId,
-      type: "gcode-generate",
-      label: formatGcodeProgressLabel("", "preparing"),
-      progress: 0,
-      status: "running",
-    });
-
-    worker.onmessage = async (e) => {
-      const msg = e.data;
-      if (msg.type === "progress") {
-        upsertTask({
-          id: taskId,
-          type: "gcode-generate",
-          label: formatGcodeProgressLabel("", msg.stage),
-          progress: msg.percent,
-          status: "running",
-        });
-      } else if (msg.type === "complete") {
-        worker.terminate();
-        activeWorkerRef.current = null;
-        unregisterCancelCallback(taskId);
-        setGenerating(false);
-
-        const selectedGroup = selectedGroupId
-          ? layerGroups.find((group) => group.id === selectedGroupId)
-          : null;
-        const selectedImport = selectedImportId
-          ? imports.find((imp) => imp.id === selectedImportId)
-          : null;
-        const baseName =
-          selectedGroup?.name ||
-          selectedImport?.name ||
-          imports[0]?.name ||
-          "untitled";
-        const safeName = baseName
-          .replace(/\.[^.]+$/, "")
-          .replace(/[\\/:*?"<>|]/g, "_");
-        const defaultFilename = prefs.optimise
-          ? `${safeName}_opt.gcode`
-          : `${safeName}.gcode`;
-
-        upsertTask({
-          id: taskId,
-          type: "gcode-generate",
-          label: "G-code ready",
-          progress: 100,
-          status: "completed",
-        });
-
-        const toolpath = parseGcode(msg.gcode);
-        setGcodeToolpath(toolpath);
-        selectToolpath(true);
-
-        if (prefs.uploadToSd && useMachineStore.getState().connected) {
-          const uploadTaskId = uuid();
-          const remotePath = "/" + defaultFilename;
-          try {
-            await window.terraForge.fluidnc.uploadGcode(
-              uploadTaskId,
-              msg.gcode,
-              remotePath,
-            );
-            setSelectedJobFile({
-              path: remotePath,
-              source: "sd",
-              name: defaultFilename,
-            });
-            setGcodeSource({
-              path: remotePath,
-              name: defaultFilename,
-              source: "sd",
-            });
-          } catch {
-            // Upload error is already surfaced via the upload task toast
-          }
-        }
-
-        if (prefs.saveLocally) {
-          const savePath =
-            await window.terraForge.fs.saveGcodeDialog(defaultFilename);
-          if (savePath) {
-            await window.terraForge.fs.writeFile(savePath, msg.gcode);
-            setGcodeSource({
-              path: savePath,
-              name: defaultFilename,
-              source: "local",
-            });
-          }
-        }
-      } else if (msg.type === "cancelled") {
-        upsertTask({
-          id: taskId,
-          type: "gcode-generate",
-          label: "G-code cancelled",
-          progress: null,
-          status: "cancelled",
-        });
-        worker.terminate();
-        activeWorkerRef.current = null;
-        unregisterCancelCallback(taskId);
-        setGenerating(false);
-      } else if (msg.type === "error") {
-        upsertTask({
-          id: taskId,
-          type: "gcode-generate",
-          label: "G-code failed",
-          progress: null,
-          status: "error",
-          error: msg.error,
-        });
-        worker.terminate();
-        activeWorkerRef.current = null;
-        unregisterCancelCallback(taskId);
-        setGenerating(false);
-      }
-    };
-
-    worker.postMessage({
-      type: "generate",
-      taskId,
+    const gcode = await generateWholeJob({
       objects: useCanvasStore.getState().toVectorObjects(),
       config: cfg,
       options,
+      upsertTask,
+      registerCancelCallback,
+      unregisterCancelCallback,
     });
+    setGenerating(false);
+    if (gcode === null) return;
+
+    const filename = wholeJobFilename(prefs.optimise);
+    setGcodeToolpath(parseGcode(gcode));
+    selectToolpath(true);
+
+    if (prefs.uploadToSd && useMachineStore.getState().connected) {
+      const remotePath = "/" + filename;
+      try {
+        await window.terraForge.fluidnc.uploadGcode(uuid(), gcode, remotePath);
+        setSelectedJobFile({ path: remotePath, source: "sd", name: filename });
+        setGcodeSource({ path: remotePath, name: filename, source: "sd" });
+      } catch {
+        // Upload error is already surfaced via the upload task toast
+      }
+    }
+
+    if (prefs.saveLocally) {
+      const savePath = await window.terraForge.fs.saveGcodeDialog(filename);
+      if (savePath) {
+        await window.terraForge.fs.writeFile(savePath, gcode);
+        setGcodeSource({ path: savePath, name: filename, source: "local" });
+      }
+    }
+  };
+
+  /** A whole job is named after the selected group or import, else the
+   * first import. */
+  const wholeJobFilename = (optimise: boolean) => {
+    const selectedGroup = selectedGroupId ? layerGroups.find((group) => group.id === selectedGroupId) : null;
+    const selectedImport = selectedImportId ? imports.find((imp) => imp.id === selectedImportId) : null;
+    const baseName = selectedGroup?.name || selectedImport?.name || imports[0]?.name || "untitled";
+    const safeName = baseName.replace(/\.[^.]+$/, "").replace(/[\\/:*?"<>|]/g, "_");
+    return optimise ? `${safeName}_opt.gcode` : `${safeName}.gcode`;
   };
 
   /**
-   * Generates separate G-code files for each layer group.
-   * Runs workers sequentially — one per group — and saves/uploads each output.
+   * Generates a split job: the files `buildFiles` lists, saved to a folder
+   * chosen first (if saving) and/or uploaded. `after` runs within the same
+   * job, given that folder — hatch files follow colour files this way.
    */
-  const handleGenerateGcodePerGroup = async (
+  const generateSplit = async (
     prefs: GcodePrefs,
     cfg: ReturnType<typeof activeConfig>,
+    buildFiles: () => SplitFile[],
+    after?: (saveDir: string | null) => Promise<void>,
   ) => {
     if (!cfg) return;
     const options = await buildOptions(prefs);
-
-    type GroupEntry = {
-      id: string | null;
-      name: string;
-      objects: VectorObject[];
-    };
-    const ungroupedObjects = toVectorObjectsUngrouped();
-    const allEntries: GroupEntry[] = [
-      ...(ungroupedObjects.length > 0
-        ? [{ id: null, name: "ungrouped", objects: ungroupedObjects }]
-        : []),
-      ...layerGroups
-        .map((g) => ({
-          id: g.id,
-          name: g.name,
-          objects: toVectorObjectsForGroup(g.id),
-        }))
-        .filter((e) => e.objects.length > 0),
-    ];
-    if (allEntries.length === 0) return;
+    const files = buildFiles();
+    if (files.length === 0) return;
 
     let saveDir: string | null = null;
     if (prefs.saveLocally) {
@@ -426,526 +201,38 @@ export function useJobActions() {
     }
 
     setGenerating(true);
-
-    for (const group of allEntries) {
-      const objects = group.objects;
-      const taskId = uuid();
-      const safeName = group.name.replace(/[\\/:*?"<>|]/g, "_");
-      const defaultFilename = prefs.optimise
-        ? `${safeName}_opt.gcode`
-        : `${safeName}.gcode`;
-
-      upsertTask({
-        id: taskId,
-        type: "gcode-generate",
-        label: formatGcodeProgressLabel(group.name, "preparing"),
-        progress: 0,
-        status: "running",
-      });
-
-      const gcode = await new Promise<string | null>((resolve) => {
-        const worker = new Worker(
-          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e) => {
-          const msg = e.data;
-          if (msg.type === "progress") {
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: formatGcodeProgressLabel(group.name, msg.stage),
-              progress: msg.percent,
-              status: "running",
-            });
-          } else if (msg.type === "complete") {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${group.name} ready`,
-              progress: 100,
-              status: "completed",
-            });
-            resolve(msg.gcode as string);
-          } else {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${group.name} failed`,
-              progress: null,
-              status: "error",
-            });
-            resolve(null);
-          }
-        };
-        worker.postMessage({
-          type: "generate",
-          taskId,
-          objects,
-          config: cfg,
-          options,
-        });
-      });
-
-      if (!gcode) continue;
-
-      if (prefs.saveLocally && saveDir) {
-        const savePath = `${saveDir}/${defaultFilename}`;
-        await window.terraForge.fs.writeFile(savePath, gcode);
-      }
-
-      if (prefs.uploadToSd && useMachineStore.getState().connected) {
-        const uploadTaskId = uuid();
-        const remotePath = "/" + defaultFilename;
-        try {
-          await window.terraForge.fluidnc.uploadGcode(
-            uploadTaskId,
-            gcode,
-            remotePath,
-          );
-        } catch {
-          // Upload error surfaced via upload task toast
-        }
-      }
-    }
-
+    await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask });
+    await after?.(saveDir);
     setGenerating(false);
   };
 
-  /**
-   * Generates separate G-code files per source SVG layer.
-   */
-  const handleGenerateGcodePerLayer = async (
-    prefs: GcodePrefs,
-    cfg: ReturnType<typeof activeConfig>,
-  ) => {
-    if (!cfg) return;
-    const options = await buildOptions(prefs);
+  const uploadWanted = (prefs: GcodePrefs) => () => prefs.uploadToSd && useMachineStore.getState().connected;
 
-    type LayerEntry = {
-      importName: string;
-      layerId: string;
-      layerName: string;
-      objects: VectorObject[];
-    };
+  const handleGenerateGcodePerGroup = (prefs: GcodePrefs, cfg: ReturnType<typeof activeConfig>) =>
+    generateSplit(prefs, cfg, () =>
+      groupFiles(
+        toVectorObjectsUngrouped(),
+        layerGroups.map((g) => ({ name: g.name, objects: toVectorObjectsForGroup(g.id) })),
+        prefs.optimise,
+      ),
+    );
 
-    const allEntries: LayerEntry[] = useCanvasStore
-      .getState()
-      .imports.flatMap((imp) => {
-        const layerIds = new Set(
-          imp.paths
-            .map((path) => path.layer)
-            .filter((layer): layer is string => !!layer),
-        );
+  const handleGenerateGcodePerLayer = (prefs: GcodePrefs, cfg: ReturnType<typeof activeConfig>) =>
+    generateSplit(prefs, cfg, () => layerFiles(useCanvasStore.getState().imports, prefs.optimise));
 
-        return Array.from(layerIds).map((layerId) => {
-          const objects = vectorObjectsForImportLayer(imp, layerId);
-          return {
-            importName: imp.name,
-            layerId,
-            layerName:
-              imp.layers?.find((layer) => layer.id === layerId)?.name ??
-              layerId,
-            objects,
-          };
-        });
-      })
-      .filter((entry) => entry.objects.length > 0)
-      .sort((a, b) => {
-        const importCompare = a.importName.localeCompare(b.importName);
-        if (importCompare !== 0) return importCompare;
-        return a.layerName.localeCompare(b.layerName);
-      });
-
-    if (allEntries.length === 0) return;
-
-    const toSafeFilenameBase = (...parts: Array<string | undefined>) => {
-      const raw = parts.filter((part) => !!part && part.trim()).join("_");
-      return (
-        raw
-          .replace(/\s+/g, "_")
-          .replace(/[^a-z0-9._-]/gi, "_")
-          .replace(/^_+|_+$/g, "") || "layer"
-      );
-    };
-
-    let saveDir: string | null = null;
-    if (prefs.saveLocally) {
-      saveDir = await window.terraForge.fs.chooseDirectory();
-      if (!saveDir) return;
-    }
-
-    setGenerating(true);
-
-    for (const entry of allEntries) {
-      const taskId = uuid();
-      const safeName = toSafeFilenameBase(entry.importName, entry.layerName);
-      const defaultFilename = prefs.optimise
-        ? `${safeName}_opt.gcode`
-        : `${safeName}.gcode`;
-
-      upsertTask({
-        id: taskId,
-        type: "gcode-generate",
-        label: formatGcodeProgressLabel(
-          `${entry.importName} / ${entry.layerName}`,
-          "preparing",
-        ),
-        progress: 0,
-        status: "running",
-      });
-
-      const gcode = await new Promise<string | null>((resolve) => {
-        const worker = new Worker(
-          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e) => {
-          const msg = e.data;
-          if (msg.type === "progress") {
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: formatGcodeProgressLabel(
-                `${entry.importName} / ${entry.layerName}`,
-                msg.stage,
-              ),
-              progress: msg.percent,
-              status: "running",
-            });
-          } else if (msg.type === "complete") {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${entry.importName} / ${entry.layerName} ready`,
-              progress: 100,
-              status: "completed",
-            });
-            resolve(msg.gcode as string);
-          } else {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${entry.importName} / ${entry.layerName} failed`,
-              progress: null,
-              status: "error",
-            });
-            resolve(null);
-          }
-        };
-        worker.postMessage({
-          type: "generate",
-          taskId,
-          objects: entry.objects,
-          config: cfg,
-          options,
-        });
-      });
-
-      if (!gcode) continue;
-
-      if (prefs.saveLocally && saveDir) {
-        const savePath = `${saveDir}/${defaultFilename}`;
-        await window.terraForge.fs.writeFile(savePath, gcode);
-      }
-
-      if (prefs.uploadToSd && useMachineStore.getState().connected) {
-        const uploadTaskId = uuid();
-        const remotePath = "/" + defaultFilename;
-        try {
-          await window.terraForge.fluidnc.uploadGcode(
-            uploadTaskId,
-            gcode,
-            remotePath,
-          );
-        } catch {
-          // Upload error surfaced via upload task toast
-        }
-      }
-    }
-
-    setGenerating(false);
-  };
-
-  /**
-   * Generates separate G-code files per source stroke and/or fill color group.
-   */
-  const handleGenerateGcodePerColor = async (
-    prefs: GcodePrefs,
-    cfg: ReturnType<typeof activeConfig>,
-  ) => {
-    if (!cfg) return;
-    const options = await buildOptions(prefs);
-
-    type ColorEntry = {
-      color: string;
-      objects: VectorObject[];
-    };
-
-    const allObjects = useCanvasStore.getState().toVectorObjects();
-    const byColor = new Map<string, VectorObject[]>();
-
-    for (const obj of allObjects) {
-      // When hatch-only export is enabled, keep hatch objects out of mixed files.
-      if (prefs.exportPerHatch && obj.id.includes("-h")) continue;
-
-      const rawColor = obj.sourceColor?.trim();
-      const key = rawColor ? normalizeSvgColor(rawColor) : "";
-      if (!key) continue;
-      const arr = byColor.get(key) ?? [];
-      arr.push(obj);
-      byColor.set(key, arr);
-    }
-
-    const allEntries: ColorEntry[] = Array.from(byColor.entries())
-      .map(([color, objects]) => ({ color, objects }))
-      .filter((e) => e.objects.length > 0)
-      .sort((a, b) => a.color.localeCompare(b.color));
-
-    if (allEntries.length === 0) return;
-
-    let saveDir: string | null = null;
-    if (prefs.saveLocally) {
-      saveDir = await window.terraForge.fs.chooseDirectory();
-      if (!saveDir) return;
-    }
-
-    const toColorFilenameBase = (color: string) => {
-      const normalized = normalizeSvgColor(color.trim());
-      const prefixed = normalized.startsWith("#")
-        ? `hex-${normalized.slice(1)}`
-        : normalized;
-      return (
-        prefixed
-          .replace(/\s+/g, "_")
-          .replace(/[^a-z0-9._-]/g, "_")
-          .replace(/^_+|_+$/g, "") || "uncolored"
-      );
-    };
-
-    setGenerating(true);
-
-    for (const entry of allEntries) {
-      const objects = entry.objects;
-      const taskId = uuid();
-      const safeName = toColorFilenameBase(entry.color);
-      const defaultFilename = prefs.optimise
-        ? `color_${safeName}_opt.gcode`
-        : `color_${safeName}.gcode`;
-
-      upsertTask({
-        id: taskId,
-        type: "gcode-generate",
-        label: formatGcodeProgressLabel(entry.color, "preparing"),
-        progress: 0,
-        status: "running",
-      });
-
-      const gcode = await new Promise<string | null>((resolve) => {
-        const worker = new Worker(
-          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e) => {
-          const msg = e.data;
-          if (msg.type === "progress") {
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: formatGcodeProgressLabel(entry.color, msg.stage),
-              progress: msg.percent,
-              status: "running",
-            });
-          } else if (msg.type === "complete") {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${entry.color} ready`,
-              progress: 100,
-              status: "completed",
-            });
-            resolve(msg.gcode as string);
-          } else {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `${entry.color} failed`,
-              progress: null,
-              status: "error",
-            });
-            resolve(null);
-          }
-        };
-        worker.postMessage({
-          type: "generate",
-          taskId,
-          objects,
-          config: cfg,
-          options,
-        });
-      });
-
-      if (!gcode) continue;
-
-      if (prefs.saveLocally && saveDir) {
-        const savePath = `${saveDir}/${defaultFilename}`;
-        await window.terraForge.fs.writeFile(savePath, gcode);
-      }
-
-      if (prefs.uploadToSd && useMachineStore.getState().connected) {
-        const uploadTaskId = uuid();
-        const remotePath = "/" + defaultFilename;
-        try {
-          await window.terraForge.fluidnc.uploadGcode(
-            uploadTaskId,
-            gcode,
-            remotePath,
-          );
-        } catch {
-          // Upload error surfaced via upload task toast
-        }
-      }
-    }
-
-    // Generate hatch-only files if enabled
-    if (prefs.exportPerHatch) {
-      await handleGenerateGcodePerHatch(prefs, cfg, saveDir);
-    }
-
-    setGenerating(false);
-  };
-
-  /**
-   * Generates separate hatch-only G-code files for each color.
-   * Only includes hatch lines, no outlines — useful for multi-pen plotting
-   * where hatches are applied with a separate tool/pen.
-   */
-  const handleGenerateGcodePerHatch = async (
-    prefs: GcodePrefs,
-    cfg: ReturnType<typeof activeConfig>,
-    saveDir: string | null,
-  ) => {
-    if (!cfg) return;
-    const options = await buildOptions(prefs);
-
-    // Group hatch objects by their fill color (sourceColor)
-    const allObjects = useCanvasStore.getState().toVectorObjects();
-    const hatchByColor = new Map<string, VectorObject[]>();
-
-    for (const obj of allObjects) {
-      // Only process hatch objects (identified by ID containing '-h')
-      if (!obj.id.includes("-h")) continue;
-
-      const rawColor = obj.sourceColor?.trim();
-      const key = rawColor ? normalizeSvgColor(rawColor) : "";
-      if (!key) continue;
-      const arr = hatchByColor.get(key) ?? [];
-      arr.push(obj);
-      hatchByColor.set(key, arr);
-    }
-
-    const toColorFilenameBase = (color: string) => {
-      const normalized = normalizeSvgColor(color.trim());
-      const prefixed = normalized.startsWith("#")
-        ? `hex-${normalized.slice(1)}`
-        : normalized;
-      return (
-        prefixed
-          .replace(/\s+/g, "_")
-          .replace(/[^a-z0-9._-]/g, "_")
-          .replace(/^_+|_+$/g, "") || "uncolored"
-      );
-    };
-
-    for (const [color, hatchObjects] of hatchByColor.entries()) {
-      const taskId = uuid();
-      const safeName = toColorFilenameBase(color);
-      const defaultFilename = prefs.optimise
-        ? `hatch_${safeName}_opt.gcode`
-        : `hatch_${safeName}.gcode`;
-
-      upsertTask({
-        id: taskId,
-        type: "gcode-generate",
-        label: formatGcodeProgressLabel(`hatch ${color}`, "preparing"),
-        progress: 0,
-        status: "running",
-      });
-
-      const gcode = await new Promise<string | null>((resolve) => {
-        const worker = new Worker(
-          new URL("../../../../../workers/svgWorker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e) => {
-          const msg = e.data;
-          if (msg.type === "progress") {
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: formatGcodeProgressLabel(`hatch ${color}`, msg.stage),
-              progress: msg.percent,
-              status: "running",
-            });
-          } else if (msg.type === "complete") {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `Hatch ${color} ready`,
-              progress: 100,
-              status: "completed",
-            });
-            resolve(msg.gcode as string);
-          } else {
-            worker.terminate();
-            upsertTask({
-              id: taskId,
-              type: "gcode-generate",
-              label: `Hatch ${color} failed`,
-              progress: null,
-              status: "error",
-            });
-            resolve(null);
-          }
-        };
-        worker.postMessage({
-          type: "generate",
-          taskId,
-          objects: hatchObjects,
-          config: cfg,
-          options,
-        });
-      });
-
-      if (!gcode) continue;
-
-      if (prefs.saveLocally && saveDir) {
-        const savePath = `${saveDir}/${defaultFilename}`;
-        await window.terraForge.fs.writeFile(savePath, gcode);
-      }
-
-      if (prefs.uploadToSd && useMachineStore.getState().connected) {
-        const uploadTaskId = uuid();
-        const remotePath = "/" + defaultFilename;
-        try {
-          await window.terraForge.fluidnc.uploadGcode(
-            uploadTaskId,
-            gcode,
-            remotePath,
-          );
-        } catch {
-          // Upload error surfaced via upload task toast
-        }
-      }
-    }
-  };
+  const handleGenerateGcodePerColor = (prefs: GcodePrefs, cfg: ReturnType<typeof activeConfig>) =>
+    generateSplit(
+      prefs,
+      cfg,
+      () => colorFiles(useCanvasStore.getState().toVectorObjects(), prefs.exportPerHatch, prefs.optimise),
+      async (saveDir) => {
+        if (!prefs.exportPerHatch || !cfg) return;
+        // Hatch-only files per colour, for hatching with a separate pen.
+        const options = await buildOptions(prefs);
+        const files = hatchFiles(useCanvasStore.getState().toVectorObjects(), prefs.optimise);
+        await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask });
+      },
+    );
 
   return {
     handleConnect,

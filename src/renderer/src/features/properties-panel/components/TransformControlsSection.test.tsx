@@ -1,11 +1,22 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ROT_STEPS } from "../utils/rotation";
 import { TransformControlsSection } from "./TransformControlsSection";
 
 const baseShortcuts = {
   fitScale: 1,
+  fitScaleX: 1,
+  fitScaleY: 1,
+  ratioLocked: true,
+  canScaleToTemplate: false,
+  templateScaleEnabled: false,
+  templateScaleTarget: "page" as const,
+  onFitHorizontal: vi.fn(),
+  onFitVertical: vi.fn(),
+  onTemplateScaleEnabledChange: vi.fn(),
+  onTemplateScaleTargetChange: vi.fn(),
   rotStep: 45 as const,
-  rotSteps: [5, 15, 30, 45, 90] as const,
+  rotSteps: ROT_STEPS,
   stepFlyoutOpen: false,
   showCentreMarker: false,
   snapPresetTitle: "snap",

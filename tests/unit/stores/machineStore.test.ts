@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { useMachineStore } from "../../../src/renderer/src/store/machineStore";
 import {
   createMachineConfig,

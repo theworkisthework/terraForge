@@ -9,7 +9,7 @@ export interface SelectedJobFile {
   name: string;
 }
 
-interface MachineState {
+export interface MachineState {
   configs: MachineConfig[];
   activeConfigId: string | null;
   status: MachineStatus | null;

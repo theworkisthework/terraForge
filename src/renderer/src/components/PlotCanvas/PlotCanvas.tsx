@@ -25,17 +25,7 @@ import {
   useViewport,
   useCanvasPanZoom,
 } from "../../features/canvas";
-import {
-  useSpaceKeyPan,
-  useObjectDrag,
-  useObjectScaleRotate,
-  useGroupOBB,
-  useCanvasKeyboardShortcuts,
-  useToolpathSelectionSync,
-  useCanvasGestureLifecycle,
-  useCanvasInteractionHandlers,
-} from "../../features/canvas";
-import { usePlotCanvasState, usePlotCanvasGeometry } from "./hooks";
+import { usePlotCanvasState, usePlotCanvasGeometry, usePlotCanvasInteraction } from "./hooks";
 import { PlotCanvasControls } from "./components";
 
 export function PlotCanvas() {
@@ -44,69 +34,21 @@ export function PlotCanvas() {
   const activeConfigId = useMachineStore((s) => s.activeConfigId);
   const prevConfigIdRef = useRef<string | null>(activeConfigId);
 
-  const {
-    canvas,
-    toolpath,
-    activeConfig,
-    theme,
-    selectedJobFile,
-    setSelectedJobFile,
-    machineStatus,
-    connected,
-    showInkServiceStationsOnCanvas,
-    respectSvgColorsOnCanvas,
-    inkServiceStations,
-    isJobActive,
-  } = usePlotCanvasState();
-  const {
-    imports,
-    selectedImportId,
-    allImportsSelected,
-    selectedGroupId,
-    selectGroup,
-    selectImport,
-    removeImport,
-    clearImports,
-    updateImport,
-    layerGroups,
-    pageTemplate,
-    pageSizes,
-  } = canvas;
-  const {
-    gcodeToolpath,
-    setGcodeToolpath,
-    gcodeSource,
-    toolpathSelected,
-    selectToolpath,
-    toolpathVisible,
-    toolpathColorized,
-    toolpathOpacity,
-    plotProgressCuts,
-    plotProgressRapids,
-  } = toolpath;
+  const state = usePlotCanvasState();
+  const { canvas, toolpath, theme, selectedJobFile, setSelectedJobFile, machineStatus, connected, isJobActive } = state;
+  const { showInkServiceStationsOnCanvas, respectSvgColorsOnCanvas, inkServiceStations } = state;
+  const { imports, selectedImportId, allImportsSelected, selectedGroupId, layerGroups, pageTemplate, pageSizes } = canvas;
+  const { selectGroup, selectImport, removeImport, clearImports } = canvas;
+  const { gcodeToolpath, setGcodeToolpath, toolpathSelected, selectToolpath } = toolpath;
+  const { toolpathVisible, toolpathColorized, toolpathOpacity, plotProgressCuts, plotProgressRapids } = toolpath;
 
   // Activate live plot-progress tracking whenever a toolpath is loaded
   // and the machine is running a job.
   usePlotProgress();
 
-  const config = activeConfig();
-  const {
-    bedW,
-    bedH,
-    origin,
-    isBottom,
-    isRight,
-    isCenter,
-    bedXMin,
-    bedXMax,
-    bedYMin,
-    bedYMax,
-    canvasW,
-    canvasH,
-    fitInsets,
-    getBedY,
-    getBedX,
-  } = usePlotCanvasGeometry(config);
+  const geometry = usePlotCanvasGeometry(state.activeConfig());
+  const { bedW, bedH, origin, isBottom, isRight, isCenter, getBedY, getBedX } = geometry;
+  const { bedXMin, bedXMax, bedYMin, bedYMax, canvasW, canvasH, fitInsets } = geometry;
 
   // ── Viewport (vp state, fit calculation, ResizeObserver) ────────────────────
   const { vp, vpRef, setVp, fitted, setFitted, fitToView, containerSize } =
@@ -115,133 +57,9 @@ export function PlotCanvas() {
   // ── Pan/Zoom (wheel event listener) ─────────────────────────────────────────
   const { zoomBy } = useCanvasPanZoom(containerRef, vpRef, setVp, setFitted);
 
-  // ── Pan state ─────────────────────────────────────────────────────────────────
-  // ── useSpaceKeyPan ─── space-key pan mode + pan gesture state machine ────────
-  const {
-    spaceDown,
-    spaceRef,
-    setSpacePressed,
-    isPanning,
-    panStartRef,
-    startPan,
-    updatePanMove,
-    endPan,
-  } = useSpaceKeyPan(vpRef, setVp, setFitted);
-
-  // ── useObjectDrag ─── single / group object drag state machine ───────────────
-  const {
-    dragging,
-    justDraggedRef,
-    onImportMouseDown,
-    onGroupMouseDown,
-    updateDragMove,
-    endDrag,
-  } = useObjectDrag(vpRef, spaceRef, selectImport, updateImport, origin);
-
-  // ── useObjectScaleRotate ─── scale / rotate handle state machines ────────────
-  const {
-    scaling,
-    rotating,
-    onHandleMouseDown,
-    onRotateHandleMouseDown,
-    updateScaleMove,
-    updateRotateMove,
-    endScale,
-    endRotate,
-  } = useObjectScaleRotate(containerRef, vpRef, updateImport);
-
-  // ── useGroupOBB ─── group scale / rotate + persistent OBB ───────────────────
-  const {
-    groupScaling,
-    groupRotating,
-    groupOBBAngle,
-    persistentGroupOBB,
-    onGroupHandleMouseDown,
-    onGroupRotateHandleMouseDown,
-    updateGroupScaleMove,
-    updateGroupRotateMove,
-    endGroupScaling,
-    endGroupRotating,
-    clearGroupOBB,
-  } = useGroupOBB(
-    containerRef,
-    vpRef,
-    updateImport,
-    isBottom,
-    canvasH,
-    allImportsSelected,
-    selectedGroupId,
-  );
-
-  // ── Toolpath selection ────────────────────────────────────────────────────────
-  // toolpathSelected and selectToolpath live in canvasStore so PropertiesPanel
-  // can react to canvas selection changes (and vice versa).
-
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────────
-  useCanvasKeyboardShortcuts({
-    selectedImportId,
-    allImportsSelected,
-    selectedGroupId,
-    toolpathSelected,
-    isJobActive,
-    selectGroup,
-    selectImport,
-    removeImport,
-    clearImports,
-    selectToolpath,
-    setGcodeToolpath,
-    zoomBy,
-    fitToView,
-    setSpacePressed,
-  });
-
-  useToolpathSelectionSync({
-    gcodeToolpath,
-    gcodeSource,
-    toolpathSelected,
-    setSelectedJobFile,
-  });
-
-  useCanvasGestureLifecycle({
-    dragging,
-    scaling,
-    rotating,
-    groupScaling,
-    groupRotating,
-    groupOBBAngle,
-    panStartRef,
-    justDraggedRef,
-    updatePanMove,
-    updateDragMove,
-    updateScaleMove,
-    updateRotateMove,
-    updateGroupScaleMove,
-    updateGroupRotateMove,
-    endDrag,
-    endScale,
-    endRotate,
-    endGroupRotating,
-    clearGroupOBB,
-    endGroupScaling,
-    endPan,
-  });
-
-  const {
-    onContainerMouseDown,
-    onContextMenu,
-    onZoomIn,
-    onZoomOut,
-    onFit,
-    cursor,
-  } = useCanvasInteractionHandlers({
-    startPan,
-    spaceRef,
-    zoomBy,
-    fitToView,
-    spaceDown,
-    isPanning,
-    rotating,
-  });
+  // ── Panning, dragging, scaling, rotating and keyboard shortcuts ─────────────
+  const interaction = usePlotCanvasInteraction({ containerRef, vpRef, setVp, setFitted, zoomBy, fitToView, state, geometry });
+  const { spaceDown, justDraggedRef, onImportMouseDown, onContainerMouseDown, onContextMenu, cursor } = interaction;
 
   // Switching machine configs can change bed geometry; refit immediately so
   // the new bed size/origin is visible without requiring a manual fit action.
@@ -291,6 +109,8 @@ export function PlotCanvas() {
         plotProgressRapids={plotProgressRapids ?? null}
         respectSvgColorsOnCanvas={respectSvgColorsOnCanvas}
         theme={theme}
+        pageTemplate={pageTemplate}
+        pageSizes={pageSizes}
       />
 
       {/* SVG scene — bed, grid, imports */}
@@ -339,14 +159,14 @@ export function PlotCanvas() {
         containerW={containerSize.w}
         containerH={containerSize.h}
         getBedY={getBedY}
-        groupObbAngle={groupOBBAngle}
-        groupRotating={groupRotating}
-        persistentGroupOBB={persistentGroupOBB}
-        onGroupMouseDown={onGroupMouseDown}
-        onHandleMouseDown={onHandleMouseDown}
-        onRotateHandleMouseDown={onRotateHandleMouseDown}
-        onGroupHandleMouseDown={onGroupHandleMouseDown}
-        onGroupRotateHandleMouseDown={onGroupRotateHandleMouseDown}
+        groupObbAngle={interaction.groupOBBAngle}
+        groupRotating={interaction.groupRotating}
+        persistentGroupOBB={interaction.persistentGroupOBB}
+        onGroupMouseDown={interaction.onGroupMouseDown}
+        onHandleMouseDown={interaction.onHandleMouseDown}
+        onRotateHandleMouseDown={interaction.onRotateHandleMouseDown}
+        onGroupHandleMouseDown={interaction.onGroupHandleMouseDown}
+        onGroupRotateHandleMouseDown={interaction.onGroupRotateHandleMouseDown}
         clearImports={clearImports}
         removeImport={removeImport}
         selectGroup={selectGroup}
@@ -387,9 +207,9 @@ export function PlotCanvas() {
         zoom={vp.zoom}
         spaceDown={spaceDown}
         rightInsetPx={16 + (isRight ? RULER_W : 0)}
-        onZoomIn={onZoomIn}
-        onZoomOut={onZoomOut}
-        onFit={onFit}
+        onZoomIn={interaction.onZoomIn}
+        onZoomOut={interaction.onZoomOut}
+        onFit={interaction.onFit}
       />
 
       {/* Ruler overlay — screen-space, always crisp */}

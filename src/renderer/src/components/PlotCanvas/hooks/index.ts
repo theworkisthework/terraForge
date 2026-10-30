@@ -1,2 +1,3 @@
-export { usePlotCanvasState } from "./usePlotCanvasState.ts";
-export { usePlotCanvasGeometry } from "./usePlotCanvasGeometry.ts";
+export { usePlotCanvasState } from "./usePlotCanvasState";
+export { usePlotCanvasGeometry } from "./usePlotCanvasGeometry";
+export { usePlotCanvasInteraction } from "./usePlotCanvasInteraction";

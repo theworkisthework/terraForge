@@ -83,6 +83,8 @@ const baseProps = {
   templateAlignTarget: "page" as const,
   templateScaleEnabled: false,
   templateScaleTarget: "page" as const,
+  onTemplateScaleEnabledChange: vi.fn(),
+  onTemplateScaleTargetChange: vi.fn(),
   ratioLocked: true,
   rotStep: 45 as const,
   stepFlyoutOpen: false,

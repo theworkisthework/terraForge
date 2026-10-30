@@ -107,6 +107,42 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.fluidnc.getStatus).toHaveBeenCalled();
   });
 
+  it("routes commands and file operations to the active transport, with each one's defaults", async () => {
+    const deps = buildDeps();
+    const call = (channel: string, ...args: unknown[]) => mocks.handlers.get(channel)?.({}, ...args);
+
+    deps.setCurrentType(null);
+    await expect(call("fluidnc:sendCommand", "$H")).rejects.toThrow("Not connected");
+
+    deps.setCurrentType("serial");
+    await call("fluidnc:sendCommand", "$H");
+    await call("fluidnc:listFiles", "/a");
+    await call("fluidnc:listSDFiles", "/b");
+    await call("fluidnc:fetchFileText", "/c.gcode", "sdcard");
+    await call("fluidnc:deleteFile", "/d.gcode");
+    await call("fluidnc:runFile", "/e.gcode");
+    expect(deps.serial.sendCommand).toHaveBeenCalledWith("$H");
+    expect(deps.serial.listFiles).toHaveBeenCalledWith("/a");
+    expect(deps.serial.listSDFiles).toHaveBeenCalledWith("/b");
+    expect(deps.serial.fetchFileText).toHaveBeenCalledWith("/c.gcode", "sdcard");
+    expect(deps.serial.deleteFile).toHaveBeenCalledWith("/d.gcode", "sd");
+    expect(deps.serial.runFile).toHaveBeenCalledWith("/e.gcode", "sd");
+
+    deps.setCurrentType("wifi");
+    await call("fluidnc:sendCommand", "$H");
+    await call("fluidnc:listFiles", "/a");
+    await call("fluidnc:listSDFiles", "/b");
+    await call("fluidnc:fetchFileText", "/c.gcode");
+    await call("fluidnc:deleteFile", "/d.gcode");
+    await call("fluidnc:runFile", "/e.gcode");
+    expect(deps.fluidnc.sendCommand).toHaveBeenCalledWith("$H");
+    expect(deps.fluidnc.listFiles).toHaveBeenCalledWith("/a");
+    expect(deps.fluidnc.listSDFiles).toHaveBeenCalledWith("/b");
+    expect(deps.fluidnc.fetchFileText).toHaveBeenCalledWith("/c.gcode", undefined);
+    expect(deps.fluidnc.deleteFile).toHaveBeenCalledWith("/d.gcode", "fs");
+    expect(deps.fluidnc.runFile).toHaveBeenCalledWith("/e.gcode", undefined);
+  });
+
   it("sends realtime controls over serial transport", async () => {
     const deps = buildDeps();
     deps.setCurrentType("serial");

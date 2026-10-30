@@ -3,9 +3,9 @@ import type {
   LayerGroup,
   PageSize,
   PageTemplate,
-  InkStation,
-} from "../../../../types";
-import type { ViewportState, ContainerSize } from "../../hooks/useViewport";
+  InkServiceStation,
+} from "../../../../../types";
+import type { Vp } from "../types";
 import { BedLayer } from "./BedLayer";
 import { GridLayer } from "./GridLayer";
 import { PageTemplateOverlay } from "./PageTemplateOverlay";
@@ -18,15 +18,15 @@ interface CanvasSvgContentProps {
   bedH: number;
   getBedY: (y: number) => number;
   getBedX: (x: number) => number;
-  vp: ViewportState;
-  containerSize: ContainerSize;
+  vp: Vp;
+  containerSize: { w: number; h: number };
   canvasW: number;
   canvasH: number;
   pageTemplate: PageTemplate | null;
   pageSizes: PageSize[];
-  inkServiceStations: InkStation[];
+  inkServiceStations: InkServiceStation[];
   showInkServiceStationsOnCanvas: boolean;
-  gcodeToolpathBounds: { x: number; y: number; w: number; h: number } | null;
+  gcodeToolpathBounds: React.ComponentProps<typeof ToolpathHitAreaOverlay>["bounds"];
   isCenter: boolean;
   isRight: boolean;
   isBottom: boolean;
@@ -37,7 +37,7 @@ interface CanvasSvgContentProps {
   layerGroups: LayerGroup[];
   selectImport: (id: string | null) => void;
   selectToolpath: (selected: boolean) => void;
-  onImportMouseDown: (e: React.MouseEvent, imp: SvgImport) => void;
+  onImportMouseDown: React.ComponentProps<typeof ImportLayer>["onImportMouseDown"];
   toolpathSelected: boolean;
   justDraggedRef: React.MutableRefObject<boolean>;
   svgRef: React.RefObject<SVGSVGElement | null>;

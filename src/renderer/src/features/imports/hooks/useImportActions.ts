@@ -4,86 +4,23 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectImportActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
-import {
-  findContainingLayerId,
-  getEffectiveFill,
-  getEffectiveStrokeColor,
-  getLayerName,
-  hasVisibleStroke,
-  isDisplayNone,
-  isLayerGroup,
-  normalizeSvgColor,
-  parseSvgStylesheet,
-  resolveSvgUserSpace,
-  shapeToPathD,
-} from "../services/svgImportHelpers";
-import {
-  getAccumulatedTransform,
-  applyMatrixToPathD,
-  computePathsBounds,
-} from "../../../utils/svgTransform";
-import { generateHatchPaths } from "../../../utils/hatchFill";
+import { useAppConfigStore } from "../../../store/appConfigStore";
+import { buildSvgImport } from "../services/svgFileImport";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { importPdf } from "../../../utils/pdfImport";
-import {
-  type SvgImport,
-  type SvgPath,
-  type SvgLayer,
-  DEFAULT_HATCH_SPACING_MM,
-  DEFAULT_HATCH_ANGLE_DEG,
-} from "../../../../../types";
-
-function computeRenderedPathBounds(pathDs: string[]) {
-  if (typeof document === "undefined" || pathDs.length === 0) return null;
-
-  const ns = "http://www.w3.org/2000/svg";
-  const probeSvg = document.createElementNS(ns, "svg");
-  probeSvg.setAttribute("width", "0");
-  probeSvg.setAttribute("height", "0");
-  probeSvg.style.position = "fixed";
-  probeSvg.style.left = "-10000px";
-  probeSvg.style.top = "-10000px";
-  probeSvg.style.pointerEvents = "none";
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  document.body.appendChild(probeSvg);
-  try {
-    for (const d of pathDs) {
-      if (!d) continue;
-      const p = document.createElementNS(ns, "path");
-      p.setAttribute("d", d);
-      probeSvg.appendChild(p);
-      try {
-        const b = p.getBBox();
-        if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-        if (b.x < minX) minX = b.x;
-        if (b.y < minY) minY = b.y;
-        if (b.x + b.width > maxX) maxX = b.x + b.width;
-        if (b.y + b.height > maxY) maxY = b.y + b.height;
-      } catch {
-        // Ignore invalid individual paths; parser fallback covers full import.
-      }
-      p.remove();
-    }
-  } finally {
-    probeSvg.remove();
-  }
-
-  if (!Number.isFinite(minX)) return null;
-  return { minX, minY, maxX, maxY };
-}
+import { bitmapMimeType, buildBitmapImport } from "../services/bitmapFileImport";
+import type { TaskStatus } from "../../../../../types";
 
 /** Orchestrates SVG, PDF, and G-code file imports into the canvas store. */
 export function useImportActions() {
-  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath } =
+  const { addImport, setGcodeToolpath, setGcodeSource, selectToolpath, pageTemplate, pageSizes } =
     useCanvasStore(useShallow(selectImportActionsCanvasState));
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const setSelectedJobFile = useMachineStore((s) => s.setSelectedJobFile);
   const activeMachineConfig = useMachineStore((s) => s.activeConfig());
+  const bitmapRendererEnabled = useAppConfigStore((s) => s.bitmapRendererEnabled);
+  const report = (id: string, label: string, progress: number | null, status: TaskStatus, error?: string) =>
+    upsertTask({ id, type: "svg-parse", label, progress, status, ...(error !== undefined ? { error } : {}) });
 
   /**
    * Imports a single SVG file — parses layers, shapes, fills, hatch lines, and
@@ -91,237 +28,30 @@ export function useImportActions() {
    */
   const handleImportSvgFile = async (filePath: string) => {
     const taskId = uuid();
-    upsertTask({
-      id: taskId,
-      type: "svg-parse",
-      label: "Parsing SVG…",
-      progress: null,
-      status: "running",
-    });
+    report(taskId, "Parsing SVG…", null, "running");
 
     try {
       const raw = await window.terraForge.fs.readFile(filePath);
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(raw, "image/svg+xml");
+      const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "import";
+      const { imp, skippedTextCount } = buildSvgImport(raw, name, activeMachineConfig);
 
-      const svgEl = doc.querySelector("svg");
-      const stylesheet = parseSvgStylesheet(doc);
-      const {
-        viewBoxX,
-        viewBoxY,
-        width: svgWidth,
-        height: svgHeight,
-        scale: initScale,
-      } = resolveSvgUserSpace(svgEl);
-
-      const name =
-        filePath
-          .split(/[\\/]/)
-          .pop()
-          ?.replace(/\.[^.]+$/, "") ?? "import";
-
-      // Detect logical layer groups (<g> elements with explicit display or Inkscape markers).
-      const layerGroupEls = Array.from(doc.querySelectorAll("g")).filter(
-        (g) => !g.closest("defs, clipPath, mask, symbol") && isLayerGroup(g),
-      );
-      const layers: SvgLayer[] = layerGroupEls.map((g, i) => ({
-        id: g.id || `layer_${i}`,
-        name: getLayerName(g, i),
-        visible: !isDisplayNone(g, stylesheet),
-      }));
-      layerGroupEls.forEach((g, i) => {
-        if (!g.id) g.id = `layer_${i}`;
-      });
-      const layerGroupIds = new Set(layers.map((l) => l.id));
-
-      const isIncludedByDisplayRules = (el: Element): boolean => {
-        let cur = el.parentElement;
-        while (cur && cur.tagName.toLowerCase() !== "svg") {
-          if (isDisplayNone(cur, stylesheet)) {
-            if (cur.id && layerGroupIds.has(cur.id)) {
-              cur = cur.parentElement;
-              continue;
-            }
-            return false;
-          }
-          cur = cur.parentElement;
-        }
-        return true;
-      };
-
-      const skippedTextCount = Array.from(doc.querySelectorAll("text")).filter(
-        (textEl) =>
-          !textEl.closest("defs, clipPath, mask, symbol") &&
-          isIncludedByDisplayRules(textEl),
-      ).length;
-
-      // Collect shape elements, skipping those inside hidden non-layer ancestors.
-      const els = Array.from(
-        doc.querySelectorAll(
-          "path, rect, circle, ellipse, line, polyline, polygon",
-        ),
-      ).filter((el) => isIncludedByDisplayRules(el));
-
-      const fillFlags: boolean[] = [];
-
-      const paths: SvgPath[] = els.flatMap((el): SvgPath[] => {
-        const rawD = shapeToPathD(el);
-        if (!rawD) return [];
-        const matrix = getAccumulatedTransform(el);
-        const d = applyMatrixToPathD(rawD, matrix);
-
-        // Avoid per-path viewBox culling here: complex Illustrator paths can
-        // yield conservative or noisy bounds during parsing and get dropped,
-        // resulting in partially imported artwork.
-
-        const effectiveFill = getEffectiveFill(el, stylesheet);
-        const hasFill = effectiveFill !== null;
-        fillFlags.push(hasFill);
-        const effectiveStroke = getEffectiveStrokeColor(el, stylesheet);
-        const normalizedFill = effectiveFill
-          ? normalizeSvgColor(effectiveFill)
-          : undefined;
-        const normalizedStroke = effectiveStroke
-          ? normalizeSvgColor(effectiveStroke)
-          : undefined;
-        const sourceOutlineVisible = hasVisibleStroke(el, stylesheet);
-        const tag = el.tagName.toLowerCase();
-        const pathIndex = fillFlags.length;
-        const pointTap =
-          tag === "circle"
-            ? (() => {
-                const cx = Number.parseFloat(el.getAttribute("cx") ?? "");
-                const cy = Number.parseFloat(el.getAttribute("cy") ?? "");
-                if (!Number.isFinite(cx) || !Number.isFinite(cy))
-                  return undefined;
-                const pt = matrix.transformPoint({ x: cx, y: cy, z: 0, w: 1 });
-                return { x: pt.x, y: pt.y };
-              })()
-            : undefined;
-
-        const inkLabel =
-          el.getAttribute("inkscape:label") ??
-          el.getAttributeNS(
-            "http://www.inkscape.org/namespaces/inkscape",
-            "label",
-          );
-        const titleText = el
-          .querySelector(":scope > title")
-          ?.textContent?.trim();
-        const ownId =
-          el.id && !/^[a-f0-9-]{36}$/.test(el.id) ? el.id : undefined;
-        const label =
-          inkLabel?.trim() || titleText || ownId || `${tag}_${pathIndex}`;
-
-        return [
-          {
-            id: uuid(),
-            d,
-            svgSource: el.outerHTML,
-            visible: true,
-            hasFill,
-            fillColor: normalizedFill,
-            strokeColor: normalizedStroke,
-            sourceColor: normalizedFill ?? normalizedStroke,
-            sourceOutlineVisible,
-            outlineVisible: sourceOutlineVisible,
-            strokeEnabled: true,
-            pointTap,
-            label,
-            layer: findContainingLayerId(el, layerGroupIds),
-          },
-        ];
-      });
-
-      if (paths.length === 0) {
+      if (!imp) {
         const textSkipSuffix =
           skippedTextCount > 0
             ? ` (${skippedTextCount} text element${skippedTextCount === 1 ? "" : "s"} skipped; convert text to outlines)`
             : "";
-        upsertTask({
-          id: taskId,
-          type: "svg-parse",
-          label: `No paths found in SVG${textSkipSuffix}`,
-          progress: null,
-          status: "error",
-        });
+        report(taskId, `No paths found in SVG${textSkipSuffix}`, null, "error");
         return;
       }
-
-      const pathDs = paths.map((p) => p.d);
-      const bounds =
-        computeRenderedPathBounds(pathDs) ?? computePathsBounds(pathDs);
-      const normX = bounds?.minX ?? viewBoxX;
-      const normY = bounds?.minY ?? viewBoxY;
-      const effW = bounds ? bounds.maxX - bounds.minX : svgWidth;
-      const effH = bounds ? bounds.maxY - bounds.minY : svgHeight;
-      const objW = effW * initScale;
-      const objH = effH * initScale;
-      const origin = activeMachineConfig?.origin ?? "bottom-left";
-      const bedW = activeMachineConfig?.bedWidth ?? 220;
-      const isRightOrigin = origin === "bottom-right" || origin === "top-right";
-      const isTopOrigin = origin === "top-left" || origin === "top-right";
-      const initialX = isRightOrigin ? bedW - objW : 0;
-      const initialY = isTopOrigin ? -objH : 0;
-
-      let finalPaths = paths;
-      if (initScale > 0) {
-        const spacingUnits = DEFAULT_HATCH_SPACING_MM / initScale;
-        finalPaths = paths.map((np, i) => {
-          if (!fillFlags[i]) return np;
-          const hatchLines = generateHatchPaths(
-            np.d,
-            spacingUnits,
-            DEFAULT_HATCH_ANGLE_DEG,
-          );
-          return hatchLines.length ? { ...np, hatchLines } : np;
-        });
-      }
-
-      const imp: SvgImport = {
-        id: uuid(),
-        name,
-        paths: finalPaths,
-        x: initialX,
-        y: initialY,
-        scale: initScale,
-        rotation: 0,
-        visible: true,
-        svgWidth: effW,
-        svgHeight: effH,
-        viewBoxX: normX,
-        viewBoxY: normY,
-        hatchEnabled: true,
-        hatchSpacingMM: DEFAULT_HATCH_SPACING_MM,
-        hatchAngleDeg: DEFAULT_HATCH_ANGLE_DEG,
-        strokeEnabled: true,
-        plotPointsEnabled: false,
-        generatedStrokeForNoStroke: false,
-        layers: layers.length > 0 ? layers : undefined,
-      };
 
       addImport(imp);
       const skippedTextMessage =
         skippedTextCount > 0
           ? `${skippedTextCount} text element${skippedTextCount === 1 ? "" : "s"} skipped; convert text to outlines`
           : undefined;
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "SVG imported",
-        progress: 100,
-        status: skippedTextCount > 0 ? "warning" : "completed",
-        error: skippedTextMessage,
-      });
+      report(taskId, "SVG imported", 100, skippedTextCount > 0 ? "warning" : "completed", skippedTextMessage);
     } catch (err) {
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "SVG import failed",
-        progress: null,
-        status: "error",
-        error: String(err),
-      });
+      report(taskId, "SVG import failed", null, "error", String(err));
     }
   };
 
@@ -334,26 +64,14 @@ export function useImportActions() {
         ?.replace(/\.[^.]+$/i, "") ?? "import";
 
     const taskId = uuid();
-    upsertTask({
-      id: taskId,
-      type: "svg-parse",
-      label: `Importing ${name}.pdf…`,
-      progress: null,
-      status: "running",
-    });
+    report(taskId, `Importing ${name}.pdf…`, null, "running");
 
     try {
       const data = await window.terraForge.fs.readFileBinary(filePath);
       const pdfImports = await importPdf(data, name);
 
       if (pdfImports.length === 0) {
-        upsertTask({
-          id: taskId,
-          type: "svg-parse",
-          label: "No vector paths found in PDF",
-          progress: null,
-          status: "error",
-        });
+        report(taskId, "No vector paths found in PDF", null, "error");
         return;
       }
 
@@ -361,25 +79,26 @@ export function useImportActions() {
         addImport(imp);
       }
 
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label:
-          pdfImports.length === 1
-            ? `PDF imported: ${pdfImports[0].name}`
-            : `PDF imported: ${pdfImports.length} pages`,
-        progress: 100,
-        status: "completed",
-      });
+      report(taskId, pdfImports.length === 1 ? `PDF imported: ${pdfImports[0].name}` : `PDF imported: ${pdfImports.length} pages`, 100, "completed");
     } catch (err) {
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "PDF import failed",
-        progress: null,
-        status: "error",
-        error: String(err),
-      });
+      report(taskId, "PDF import failed", null, "error", String(err));
+    }
+  };
+
+  const handleImportBitmapFile = async (filePath: string) => {
+    const taskId = uuid();
+    const mimeType = bitmapMimeType(filePath);
+    const name = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "bitmap";
+    report(taskId, `Importing ${name}…`, null, "running");
+    try {
+      const bytes = await window.terraForge.fs.readFileBinary(filePath);
+      const currentPage = useCanvasStore.getState().pageTemplate;
+      addImport(
+        await buildBitmapImport(bytes, name, mimeType, { machine: activeMachineConfig, pageTemplate, pageSizes, currentPage }),
+      );
+      report(taskId, `Bitmap imported: ${name}`, 100, "completed");
+    } catch (err) {
+      report(taskId, "Bitmap import failed", null, "error", String(err));
     }
   };
 
@@ -387,13 +106,7 @@ export function useImportActions() {
   const handleImportGcodeFile = async (filePath: string) => {
     const name = filePath.split(/[\\/]/).pop() ?? "import.gcode";
     const taskId = uuid();
-    upsertTask({
-      id: taskId,
-      type: "svg-parse",
-      label: `Importing ${name}…`,
-      progress: null,
-      status: "running",
-    });
+    report(taskId, `Importing ${name}…`, null, "running");
 
     try {
       const text = await window.terraForge.fs.readFile(filePath);
@@ -402,34 +115,30 @@ export function useImportActions() {
       setGcodeSource({ path: filePath, name, source: "local" });
       selectToolpath(true);
       setSelectedJobFile({ path: filePath, source: "local", name });
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: `G-code imported: ${name}`,
-        progress: 100,
-        status: "completed",
-      });
+      report(taskId, `G-code imported: ${name}`, 100, "completed");
     } catch (err) {
-      upsertTask({
-        id: taskId,
-        type: "svg-parse",
-        label: "G-code import failed",
-        progress: null,
-        status: "error",
-        error: String(err),
-      });
+      report(taskId, "G-code import failed", null, "error", String(err));
     }
   };
 
   /** Unified import entry point — opens the file dialog and routes by extension. */
   const handleImport = async () => {
-    const filePath = await window.terraForge.fs.openImportDialog();
+    const filePath = await window.terraForge.fs.openImportDialog({ allowBitmap: bitmapRendererEnabled });
     if (!filePath) return;
     const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
     if (ext === "svg") {
       await handleImportSvgFile(filePath);
     } else if (ext === "pdf") {
       await handleImportPdfFile(filePath);
+    } else if (["png", "jpg", "jpeg", "webp"].includes(ext)) {
+      // The dialog itself already hides bitmap extensions when the feature
+      // is off; this is defence in depth against an OS-level "All Files"
+      // fallback some platforms add regardless of the filters we pass.
+      if (!bitmapRendererEnabled) {
+        report(uuid(), "Bitmap import is an experimental feature — enable it in Application Configuration.", null, "error");
+        return;
+      }
+      await handleImportBitmapFile(filePath);
     } else {
       await handleImportGcodeFile(filePath);
     }
@@ -439,6 +148,7 @@ export function useImportActions() {
     handleImport,
     handleImportSvgFile,
     handleImportPdfFile,
+    handleImportBitmapFile,
     handleImportGcodeFile,
   };
 }

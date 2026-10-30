@@ -338,9 +338,21 @@ describe("FluidNCClient.uploadFile", () => {
     ]);
     vi.spyOn(client, "listFiles").mockResolvedValue([]);
 
-    await expect(
-      client.uploadFile("/local/test.gcode", "/sd/test.gcode"),
-    ).rejects.toThrow("expected 1024 bytes, got 512 bytes");
+    // Verification retries with growing delays (seconds in total) before
+    // giving up; fast-forward through them rather than wait them out — the
+    // real wait came close to the 5s test timeout under coverage in CI.
+    vi.useFakeTimers();
+    try {
+      const result = expect(
+        client.uploadFile("/local/test.gcode", "/sd/test.gcode"),
+      ).rejects.toThrow("expected 1024 bytes, got 512 bytes");
+      await vi.runAllTimersAsync();
+      await result;
+      // It retried rather than failing on the first mismatch.
+      expect(client.listSDFiles).toHaveBeenCalledTimes(6);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -32,7 +32,16 @@ export interface AppHandle {
  *
  * Callers should run `npm run build` (or `electron-vite build`) first.
  */
-export async function launchApp(): Promise<AppHandle> {
+export interface LaunchOptions {
+  /**
+   * Renderer plugins to install before the app starts, as
+   * `{ folderName: { fileName: contents } }`. Written into the fresh
+   * user-data directory, so the start-up scan discovers them.
+   */
+  plugins?: Record<string, Record<string, string>>;
+}
+
+export async function launchApp(options: LaunchOptions = {}): Promise<AppHandle> {
   const mainEntry = path.join(ROOT, "out", "main", "index.js");
   if (!fs.existsSync(mainEntry)) {
     throw new Error(
@@ -43,6 +52,14 @@ export async function launchApp(): Promise<AppHandle> {
   // Create a throw-away user-data directory so the app never reads or
   // writes the real user's machine-configs.json or any other persisted state.
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "terraforge-e2e-"));
+
+  for (const [folder, files] of Object.entries(options.plugins ?? {})) {
+    const dir = path.join(userDataDir, "renderer-plugins", folder);
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [name, contents] of Object.entries(files)) {
+      fs.writeFileSync(path.join(dir, name), contents, "utf-8");
+    }
+  }
 
   // On Linux CI runners the SUID sandbox helper is not configured, so we must
   // disable the sandbox.  --no-sandbox is safe in ephemeral CI environments.
@@ -162,10 +179,10 @@ export async function mockCancelDialog(
  * Mock window.confirm in the renderer to always return a given value.
  */
 export async function mockConfirm(
-  window: Page,
+  page: Page,
   returnValue: boolean,
 ): Promise<void> {
-  await window.evaluate((val) => {
+  await page.evaluate((val) => {
     (window as any).__originalConfirm =
       (window as any).__originalConfirm ?? window.confirm;
     window.confirm = () => val;
@@ -175,8 +192,8 @@ export async function mockConfirm(
 /**
  * Restore window.confirm after mocking.
  */
-export async function restoreConfirm(window: Page): Promise<void> {
-  await window.evaluate(() => {
+export async function restoreConfirm(page: Page): Promise<void> {
+  await page.evaluate(() => {
     if ((window as any).__originalConfirm) {
       window.confirm = (window as any).__originalConfirm;
     }

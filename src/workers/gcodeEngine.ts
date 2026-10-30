@@ -5,7 +5,6 @@
  * Bézier/arc flattening, nearest-neighbour optimiser, and G-code emission.
  */
 
-import type { VectorObject, MachineConfig } from "../types";
 import {
   tokenizePath,
   toAbsolute,
@@ -18,6 +17,7 @@ import {
   arcToBeziers,
   type Pt,
 } from "./gcodeEngine/stages/geometryFlattening";
+import { CURVE_GROUP_SIZE, flattenCurveGroup } from "./gcodeEngine/stages/curveFlattening";
 import {
   nearestNeighbourSort,
   joinSubpaths,
@@ -46,7 +46,7 @@ export { toAbsolute };
 
 // ── Coordinate transform + flattening ───────────────────────────────────────
 
-export { transformPt, cubicBezier, quadBezier, arcToBeziers };
+export { transformPt, cubicBezier, quadBezier, arcToBeziers, CURVE_GROUP_SIZE, flattenCurveGroup };
 
 // ── Nearest-neighbour path optimiser ──────────────────────────────────────────
 //

@@ -1,5 +1,5 @@
-import { ChevronDown } from "lucide-react";
 import type { GcodePrefs } from "../gcodePrefs";
+import { OptionSection } from "./optionControls";
 import { Badge } from "../../../components/Badge";
 
 interface PathsSectionProps {
@@ -21,8 +21,8 @@ export function PathsSection({
   onPathDirectionModeChange,
   onJoinToleranceChange,
 }: PathsSectionProps) {
-  const content = (
-    <div className="flex flex-col gap-4 mt-2 mb-1">
+  return (
+    <OptionSection title="Paths" open={open} showHeader={showHeader} onToggleOpen={onToggleOpen}>
       <label className="flex items-start gap-3 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -127,25 +127,6 @@ export function PathsSection({
           </div>
         </div>
       </div>
-    </div>
-  );
-
-  if (!showHeader) return <div>{content}</div>;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        className="flex items-center gap-1.5 text-xs font-semibold text-content-faint hover:text-content uppercase tracking-wider transition-colors select-none w-full text-left py-1"
-      >
-        <ChevronDown
-          size={13}
-          className={`transition-transform duration-150 flex-shrink-0 ${open ? "rotate-0" : "-rotate-90"}`}
-        />
-        Paths
-      </button>
-      {open && content}
-    </div>
+    </OptionSection>
   );
 }

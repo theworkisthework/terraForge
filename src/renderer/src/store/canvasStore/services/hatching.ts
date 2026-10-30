@@ -53,8 +53,10 @@ export function applyImportHatch(
 
   const effectiveScale = getEffectiveImportScale(imp);
   const spacingIsValid =
+    typeof safeSpacing === "number" &&
     Number.isFinite(safeSpacing) &&
     safeSpacing > 0 &&
+    typeof safeAngle === "number" &&
     Number.isFinite(safeAngle) &&
     effectiveScale > 0 &&
     Number.isFinite(effectiveScale) &&

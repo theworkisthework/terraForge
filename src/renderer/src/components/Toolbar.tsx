@@ -57,8 +57,6 @@ export function Toolbar({
   const { handleImport } = useImportActions();
   const {
     handleSaveLayout,
-    handleLoadLayout,
-    handleCloseLayout,
     doCloseLayout,
     saveLayoutRef,
     loadLayoutRef,
@@ -136,7 +134,6 @@ export function Toolbar({
         pageTemplate={pageTemplate}
         pageSizes={pageSizes}
         setPageTemplate={setPageTemplate}
-        setPageSizes={setPageSizes}
       />
 
       {/* Right side: status + theme + settings */}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { SvgImport } from "../../../../types";
+import type { SvgImport } from "../../../../../types";
 import { ImportHeaderRow } from "./ImportHeaderRow";
 
 function buildImport(patch: Partial<SvgImport> = {}): SvgImport {

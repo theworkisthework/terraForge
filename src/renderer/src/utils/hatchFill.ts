@@ -13,13 +13,7 @@
  *   generateHatchPaths(d, spacingUnits, angleDeg) → string[]
  */
 
-import {
-  tokenizePath,
-  toAbsolute,
-  cubicBezier,
-  quadBezier,
-  arcToBeziers,
-} from "../../../workers/gcodeEngine";
+import { tokenizePath, toAbsolute, CURVE_GROUP_SIZE, flattenCurveGroup } from "../../../workers/gcodeEngine";
 
 // ── Internal types ────────────────────────────────────────────────────────────
 
@@ -87,88 +81,19 @@ function flattenPathToSegments(d: string): Seg[] {
         lastCpX = cx;
         lastCpY = cy;
         break;
-      case "C":
-        for (let i = 0; i < a.length; i += 6) {
-          for (const p of cubicBezier(
-            cx,
-            cy,
-            a[i],
-            a[i + 1],
-            a[i + 2],
-            a[i + 3],
-            a[i + 4],
-            a[i + 5],
-          ))
-            addLine(p.x, p.y);
-          lastCpX = a[i + 2];
-          lastCpY = a[i + 3];
+      default: {
+        // Curves. After an arc, S/T reflect from the current point, not a
+        // stale control point — as flattenToSubpaths does.
+        const size = CURVE_GROUP_SIZE[cmd.type];
+        if (!size) break;
+        for (let i = 0; i < a.length; i += size) {
+          const curve = flattenCurveGroup(cmd.type, a, i, { x: cx, y: cy, cpX: lastCpX, cpY: lastCpY });
+          for (const p of curve.points) addLine(p.x, p.y);
+          lastCpX = curve.cpX ?? cx;
+          lastCpY = curve.cpY ?? cy;
         }
         break;
-      case "S":
-        for (let i = 0; i < a.length; i += 4) {
-          const c1x = 2 * cx - lastCpX,
-            c1y = 2 * cy - lastCpY;
-          for (const p of cubicBezier(
-            cx,
-            cy,
-            c1x,
-            c1y,
-            a[i],
-            a[i + 1],
-            a[i + 2],
-            a[i + 3],
-          ))
-            addLine(p.x, p.y);
-          lastCpX = a[i];
-          lastCpY = a[i + 1];
-        }
-        break;
-      case "Q":
-        for (let i = 0; i < a.length; i += 4) {
-          for (const p of quadBezier(
-            cx,
-            cy,
-            a[i],
-            a[i + 1],
-            a[i + 2],
-            a[i + 3],
-          ))
-            addLine(p.x, p.y);
-          lastCpX = a[i];
-          lastCpY = a[i + 1];
-        }
-        break;
-      case "T":
-        for (let i = 0; i < a.length; i += 2) {
-          const c1x = 2 * cx - lastCpX,
-            c1y = 2 * cy - lastCpY;
-          for (const p of quadBezier(cx, cy, c1x, c1y, a[i], a[i + 1]))
-            addLine(p.x, p.y);
-          lastCpX = c1x;
-          lastCpY = c1y;
-        }
-        break;
-      case "A":
-        for (let i = 0; i < a.length; i += 7) {
-          for (const p of arcToBeziers(
-            cx,
-            cy,
-            a[i],
-            a[i + 1],
-            a[i + 2],
-            a[i + 3],
-            a[i + 4],
-            a[i + 5],
-            a[i + 6],
-          ))
-            addLine(p.x, p.y);
-          // After an arc, smooth curve commands (S/T) should reflect from the
-          // current point, not from a stale control point. Mirror behavior of
-          // flattenToSubpaths in gcodeEngine by resetting last control point.
-          lastCpX = cx;
-          lastCpY = cy;
-        }
-        break;
+      }
     }
   }
   return segs;
