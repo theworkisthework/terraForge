@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SvgImport } from "../../../../../types";
+import { useCanvasStore } from "../../../store/canvasStore";
 import { useImportPropertiesFormModel } from "./useImportPropertiesFormModel";
 
 const imp: SvgImport = {
@@ -146,5 +147,63 @@ describe("useImportPropertiesFormModel", () => {
       scaleY: 4,
       y: -200,
     });
+  });
+
+  describe("undo (issue #138)", () => {
+    const setup = () => {
+      useCanvasStore.setState({
+        imports: [{ ...imp }],
+        undoStack: [],
+        redoStack: [],
+      });
+      const { result, rerender } = renderHook(
+        ({ current }: { current: SvgImport }) =>
+          useImportPropertiesFormModel({
+            imp: current,
+            bedW: 220,
+            bedH: 200,
+            origin: "bottom-left",
+            pageW: 220,
+            pageH: 200,
+            marginMM: 20,
+            canScaleToTemplate: false,
+            templateScaleEnabled: false,
+            templateScaleTarget: "page",
+            ratioLocked: true,
+            rotStep: 90,
+            stepFlyoutOpen: false,
+            showCentreMarker: false,
+            onUpdate: (c) => useCanvasStore.getState().updateImport(imp.id, c),
+            onRatioLockedChange: vi.fn(),
+            onTemplateScaleEnabledChange: vi.fn(),
+            onTemplateScaleTargetChange: vi.fn(),
+            onToggleStepFlyout: vi.fn(),
+            onCloseStepFlyout: vi.fn(),
+            onSelectRotStep: vi.fn(),
+            onToggleCentreMarker: vi.fn(),
+          }),
+        { initialProps: { current: imp } },
+      );
+      return { result, rerender };
+    };
+
+    it.each(["onRotateCcw", "onRotateCw"] as const)(
+      "%s is undoable and keeps the import",
+      (action) => {
+        const { result } = setup();
+        result.current.sharedTransformProps[action]();
+        const rotated = useCanvasStore.getState().imports[0].rotation;
+        expect(rotated).toBe(action === "onRotateCw" ? 90 : -90);
+
+        useCanvasStore.getState().undo();
+
+        const after = useCanvasStore.getState().imports;
+        expect(after).toHaveLength(1);
+        expect(after[0].rotation).toBe(0);
+
+        useCanvasStore.getState().redo();
+        expect(useCanvasStore.getState().imports[0].rotation).toBe(rotated);
+      },
+    );
   });
 });

@@ -1,4 +1,5 @@
 import type { SvgImport } from "../../../../../types";
+import { useCanvasStore } from "../../../store/canvasStore";
 import { ROT_PRESETS, ROT_STEPS, type RotStep } from "../utils/rotation";
 
 interface UseImportPropertiesFormModelArgs {
@@ -50,6 +51,15 @@ export function useImportPropertiesFormModel({
   onSelectRotStep,
   onToggleCentreMarker,
 }: UseImportPropertiesFormModelArgs) {
+  // Button-driven edits are single discrete steps, so each one records its own
+  // undo entry (typed fields fire per keystroke and are not recorded here).
+  const updateWithUndo = (changes: Partial<SvgImport>) => {
+    const { snapshotForGesture, commitGesture } = useCanvasStore.getState();
+    snapshotForGesture();
+    onUpdate(changes);
+    commitGesture();
+  };
+
   const normalizeCoord = (value: number): number => {
     const rounded = Math.round(value * 1e9) / 1e9;
     return Math.abs(rounded) < 1e-9 ? 0 : rounded;
@@ -125,7 +135,7 @@ export function useImportPropertiesFormModel({
       if (ratioLocked) {
         const nextObjW = (imp.svgWidth || 0) * fitScale;
         const nextObjH = (imp.svgHeight || 0) * fitScale;
-        onUpdate({
+        updateWithUndo({
           scale: fitScale,
           scaleX: undefined,
           scaleY: undefined,
@@ -144,7 +154,7 @@ export function useImportPropertiesFormModel({
       const nextObjW = (imp.svgWidth || 0) * nextScaleX;
       const nextObjH = (imp.svgHeight || 0) * nextScaleY;
 
-      onUpdate({
+      updateWithUndo({
         scaleX: nextScaleX,
         scaleY: nextScaleY,
         ...computeOriginAnchoredPosition(nextObjW, nextObjH),
@@ -154,7 +164,7 @@ export function useImportPropertiesFormModel({
       if (ratioLocked) return;
       const nextScaleX = Math.max(0.001, fitScaleX);
       const nextObjW = (imp.svgWidth || 0) * nextScaleX;
-      onUpdate({
+      updateWithUndo({
         scaleX: nextScaleX,
         ...(useTemplateBounds
           ? {}
@@ -167,7 +177,7 @@ export function useImportPropertiesFormModel({
       if (ratioLocked) return;
       const nextScaleY = Math.max(0.001, fitScaleY);
       const nextObjH = (imp.svgHeight || 0) * nextScaleY;
-      onUpdate({
+      updateWithUndo({
         scaleY: nextScaleY,
         ...(useTemplateBounds
           ? {}
@@ -178,10 +188,10 @@ export function useImportPropertiesFormModel({
     },
     onResetScale: () => {
       onRatioLockedChange(true);
-      onUpdate({ scale: 1, scaleX: undefined, scaleY: undefined });
+      updateWithUndo({ scale: 1, scaleX: undefined, scaleY: undefined });
     },
-    onRotateCcw: () => onUpdate({ rotation: imp.rotation - rotStep }),
-    onRotateCw: () => onUpdate({ rotation: imp.rotation + rotStep }),
+    onRotateCcw: () => updateWithUndo({ rotation: imp.rotation - rotStep }),
+    onRotateCw: () => updateWithUndo({ rotation: imp.rotation + rotStep }),
     onToggleStepFlyout,
     onCloseStepFlyout,
     onSelectRotStep,
@@ -190,14 +200,16 @@ export function useImportPropertiesFormModel({
       const norm = ((imp.rotation % 360) + 360) % 360;
       const idx = ROT_PRESETS.findIndex((p) => Math.abs(p - norm) < 1);
       const next = ROT_PRESETS[idx < 0 ? 0 : (idx + 1) % ROT_PRESETS.length];
-      onUpdate({ rotation: next });
+      updateWithUndo({ rotation: next });
     },
   };
 
   const onChangeX = (v: number) => onUpdate({ x: v });
   const onChangeY = (v: number) => onUpdate({ y: v });
-  const onAlignX = (x: number) => onUpdate({ x: Math.round(x * 1000) / 1000 });
-  const onAlignY = (y: number) => onUpdate({ y: Math.round(y * 1000) / 1000 });
+  const onAlignX = (x: number) =>
+    updateWithUndo({ x: Math.round(x * 1000) / 1000 });
+  const onAlignY = (y: number) =>
+    updateWithUndo({ y: Math.round(y * 1000) / 1000 });
   const onChangeScale = (v: number) => onUpdate({ scale: Math.max(0.001, v) });
   const onChangeRotation = (v: number) => onUpdate({ rotation: v });
 
