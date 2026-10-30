@@ -67,7 +67,7 @@
 ### G-code Preview
 
 - [x] Fetch and parse `.gcode`/`.nc` files from the file browser
-- [x] Toolpath overlay on canvas — rapids in grey dashed, cuts in blue
+- [x] Toolpath overlay on canvas — rapids in grey dashed, cuts in the source SVG colours recorded in the G-code's comments, or (palette toggle off) in one colour: blue, or the page's pen colour when a page template is shown
 - [x] Bounding box highlight when toolpath selected
 - [x] Delete toolpath with Delete key or × button
 - [x] Correct Y-axis flip (machine origin at bottom-left)
@@ -224,6 +224,19 @@
 - [x] Built-in page sizes: A2, A3, A4, A5, A6, Letter, Legal, Tabloid — loaded from `~/.config/terraForge/page-sizes.json` with built-in defaults
 - [x] Page template overlay on canvas — shows the selected paper boundary as a visual reference for print-size artwork; overlay is non-interactive and renders below imports
 - [x] "Open page sizes file" shortcut in menu opens the JSON config file for user customisation
+- [x] **Paper and pen colours** — a page template has a paper colour (default white; presets for cream, kraft, grey, black) filled beneath imports on the canvas, and a pen colour (default black) used to preview SVG paths, single-colour bitmaps and an uncoloured G-code toolpath; selection shown by shading the pen colour; colour separation unmixes inks against the paper colour
+- [x] **Pen-width preview** — SVG and bitmap strokes drawn at the pen's real width (the import's stroke width), so zoomed-out previews show true plot density
+
+### Bitmap Import (EXPERIMENTAL)
+
+- [x] **Bitmap import** — PNG, JPEG and WebP images, enabled in Application Configuration; images above 10 px/mm at their placed size are stored smaller at the same physical size
+- [x] **Renderers** — built in: spiral amplitude, circular tone rings, row & diagonal lines, concentric boxes, concentric polygons, radial burst, isometric grid, dot halftone; line renderers share waveform, light tooth, tone → frequency, amplitude, angle, origin, clip-to-image and peak-clip settings
+- [x] **Tone controls** — auto levels, contrast and smoothing applied to the image before any renderer, including plugins
+- [x] **Background rendering** — renders run off the UI thread, superseded renders are cancelled, and a status label shows Pending / Rendering / Ready / Failed; a drawing made by an older renderer version offers **Re-render** instead of changing silently
+- [x] **Rasterised previews** — dense drawings are previewed from images drawn off-thread, keeping pan, zoom and drag smooth
+- [x] **Colour separation** — RGB (light inks on dark paper), RGB (white paper), CMY, CMYK and custom palettes; custom palettes and RGB on white are solved by constrained least-squares ink unmixing against the paper colour (inks multiply on light paper, add light on dark paper); each ink's pattern can be offset from the others' like print screen angles
+- [x] **Multi-pen plotting** — each separated ink is a colour group: "Export one file per colour group" writes one G-code file per ink, and inks can be hidden to leave them out; halftone dots can be plotted as single pen taps (Plot points)
+- [x] **Renderer plugins** — sandboxed third-party renderers installed from a plugins folder, with example plugins and an [authoring guide](renderer-plugin-authoring.md)
 
 ### Architecture
 

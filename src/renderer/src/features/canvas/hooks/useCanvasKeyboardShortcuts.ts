@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useCanvasStore } from "../../../store/canvasStore";
 import { ZOOM_STEP } from "../constants";
-import type { GcodeToolpath } from "../../../../types";
+import type { GcodeToolpath } from "../../../utils/gcodeParser";
 
 interface UseCanvasKeyboardShortcutsOptions {
   selectedImportId: string | null;

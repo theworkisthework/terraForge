@@ -1,4 +1,5 @@
 import { type SvgImport } from "../../../../../types";
+import { BitmapPreviewRasterizer, isInkPathVisible } from "../bitmapPreview/previewRasterizer";
 import { MM_TO_PX, PAD } from "../constants";
 
 interface ImportLayerProps {
@@ -42,6 +43,72 @@ export function ImportLayer({
         onClick={(e) => e.stopPropagation()}
         style={{ cursor: "grab" }}
       >
+        {/* Where it can, the canvas overlay draws bitmap imports from
+            rasterised images (see previewRasterizer.ts) — stroking a dense
+            preview path here made every pan, zoom and drag re-rasterise it.
+            This SVG version remains for environments without that support. */}
+        {imp.kind === "bitmap" && imp.bitmapDataUrl && !BitmapPreviewRasterizer.isSupported() && (
+          <>
+            {imp.bitmapSourceVisible !== false && (
+              <image
+                href={imp.bitmapDataUrl}
+                x={vbX}
+                y={vbY}
+                width={imp.svgWidth}
+                height={imp.svgHeight}
+                opacity={imp.bitmapOpacity ?? 0.25}
+                preserveAspectRatio="none"
+              />
+            )}
+            {imp.bitmapPreviewVisible !== false && imp.paths.length > 0 && (
+              // Isolated so blending happens between ink channels (and the
+              // page beneath them), not the app's own dark canvas background
+              // outside this group.
+              //
+              // "darken" (component-wise min), not "multiply": these strokes
+              // use a constant on-screen width (vector-effect="non-scaling-
+              // stroke") against a fixed real-world turn spacing, so at low
+              // zoom or a small fit-to-template scale the turns visually
+              // merge and each channel's own coverage approaches ~100% solid
+              // colour. "multiply" has no floor — several ~100%-covering
+              // channels compound toward black regardless of the actual ink
+              // colours (accurate for real overprinted ink, useless as a
+              // preview). "darken" can never go below the darkest single ink
+              // actually present, so density alone can't blacken the whole
+              // preview, while still picking by colour value rather than
+              // draw order — which is what actually fixed the original
+              // last-one-wins complaint.
+              <g style={{ isolation: "isolate" }}>
+                {imp.paths
+                  .filter((path) => isInkPathVisible(imp, path))
+                  .map((path) => (
+                    <path
+                      key={path.id}
+                      d={path.d}
+                      fill="none"
+                      stroke={path.strokeColor ?? path.sourceColor ?? (selected ? "#60a0ff" : "#3a6aaa")}
+                      strokeWidth={(imp.strokeWidthMM ?? 0.5) * MM_TO_PX}
+                      opacity={imp.bitmapPreviewOpacity ?? 1}
+                      style={{ mixBlendMode: "darken" }}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ))}
+              </g>
+            )}
+            {imp.bitmapPreviewVisible !== false && imp.paths.length === 0 && imp.bitmapRendererPath && (
+              <path
+                d={imp.bitmapRendererPath}
+                fill="none"
+                stroke={selected ? "#60a0ff" : "#3a6aaa"}
+                strokeWidth={(imp.strokeWidthMM ?? 0.5) * MM_TO_PX}
+                opacity={imp.bitmapPreviewOpacity ?? 1}
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            )}
+          </>
+        )}
         <rect
           x={vbX}
           y={vbY}

@@ -15,15 +15,16 @@
 6. [Working on the Canvas](#6-working-on-the-canvas)
 7. [The Properties Panel](#7-the-properties-panel)
 8. [Layer Groups](#8-layer-groups)
-9. [Generating G-code](#9-generating-g-code)
-10. [The File Browser](#10-the-file-browser)
-11. [Running a Job](#11-running-a-job)
-12. [Jog Controls](#12-jog-controls)
-13. [Console & Alarm Handling](#13-console--alarm-handling)
-14. [Background Tasks](#14-background-tasks)
-15. [Layout Management & Page Templates](#15-layout-management--page-templates)
-16. [Keyboard Shortcuts](#16-keyboard-shortcuts)
-17. [Troubleshooting](#17-troubleshooting)
+9. [Bitmap Images (Experimental)](#9-bitmap-images-experimental)
+10. [Generating G-code](#10-generating-g-code)
+11. [The File Browser](#11-the-file-browser)
+12. [Running a Job](#12-running-a-job)
+13. [Jog Controls](#13-jog-controls)
+14. [Console & Alarm Handling](#14-console--alarm-handling)
+15. [Background Tasks](#15-background-tasks)
+16. [Layout Management & Page Templates](#16-layout-management--page-templates)
+17. [Keyboard Shortcuts](#17-keyboard-shortcuts)
+18. [Troubleshooting](#18-troubleshooting)
 
 ---
 
@@ -159,6 +160,8 @@ Current option:
 
 - **Enable per-path pass overrides in the Properties panel**
 - **Enable vinyl cutting features (Experimental)**
+- **Show imported SVG colours on canvas**
+- **Enable bitmap import (Experimental)** — see [§9 Bitmap Images](#9-bitmap-images-experimental)
 
 When **Enable per-path pass** is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
 
@@ -273,6 +276,10 @@ terraForge extracts vector paths from each page using the page’s PDF operator 
 
 Click **Import G-code** in the toolbar. A dialog opens filtered to all recognised G-code extensions (`.gcode`, `.nc`, `.g`, `.gc`, `.gco`, `.ngc`, `.ncc`, `.cnc`, `.tap`). The file is read from your local disk, parsed, and displayed as a toolpath overlay on the canvas. It is automatically queued as the job file (labelled 🖥 with “(local — will upload)”). When you click **Start job**, terraForge uploads it to the SD card root first, then runs it.
 
+### Importing Images (Experimental)
+
+When bitmap import is enabled, **Import** also accepts PNG, JPEG and WebP images, which a renderer turns into plottable lines or dots. See [§9 Bitmap Images](#9-bitmap-images-experimental).
+
 ---
 
 ## 6. Working on the Canvas
@@ -373,7 +380,9 @@ Pasted objects get names like `logo copy`, `logo copy (2)`, etc.
 When a G-code file is loaded for preview (from the File Browser or Import G-code):
 
 - **Grey dashed lines** = rapid moves (pen up)
-- **Blue solid lines** = cut moves (pen down)
+- **Solid lines** = cut moves (pen down)
+
+By default, cut moves are drawn in the colours of the original SVG paths, which terraForge records in comments when it generates G-code — useful for checking layer and colour ordering. G-code itself has no colour, though: a plotter draws a whole file with whichever pen is loaded. To see the toolpath as it will actually be drawn, turn off the palette button on the G-code row in the Properties panel. Cut moves are then drawn in one colour: blue, or the page's **pen colour** when a page template is shown (see [Paper and Pen Colours](#paper-and-pen-colours)).
 
 Click the toolpath to select it. A blue dashed bounding box appears. Press **Delete** or click the **✕** button on the toolpath to remove the preview.
 
@@ -608,7 +617,129 @@ When source SVG layers are present, you can also export one file per SVG layer. 
 
 ---
 
-## 9. Generating G-code
+## 9. Bitmap Images (Experimental)
+
+> **Note:** Bitmap import is experimental and subject to change. It is off by default.
+
+terraForge can turn a photo or other image into lines a plotter can draw. You import the image, choose a **renderer** (the drawing style — a spiral, rings, a halftone and so on), and terraForge draws the image in that style. The result is regular plottable geometry: it is previewed on the canvas and turned into G-code like any SVG.
+
+### Turning It On
+
+Open the Settings dialog, select **Application Configuration**, and tick **Enable bitmap import** in the **Bitmap Import** section. A **Renderer Plugins** section also appears there (see [Renderer Plugins](#renderer-plugins)).
+
+### Importing an Image
+
+Use **Import** as for any file and choose a **PNG**, **JPEG** or **WebP** image. The image is placed on the bed and rendered with the default renderer.
+
+A very high-resolution image is stored at no more than 10 pixels per millimetre of its size on the bed — finer detail than that cannot be drawn by a pen. Its physical size is unchanged.
+
+### The Renderer Panel
+
+Select the image to see its settings in the Properties panel.
+
+- **Renderer** — the drawing style. Each renderer has its own settings below the list.
+- **Status** — what the renderer is doing:
+
+| Status               | Meaning                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| **Pending**          | A setting changed; rendering starts once you pause                                          |
+| **Rendering**        | The image is being drawn                                                                    |
+| **Ready**            | The preview matches the settings                                                            |
+| **Failed**           | The renderer reported an error (shown below the status)                                     |
+| **Renderer updated** | The renderer has changed since this image was drawn. Click **Re-render** to use the new version; until then the existing drawing is kept and plotted as shown |
+
+Rendering runs in the background, so you can keep working while it does. Amber notes below the status (for example, that a render reached its point limit) tell you when the result is not exactly what the settings asked for.
+
+### Built-in Renderers
+
+| Renderer                  | Draws the image as…                                                     |
+| ------------------------- | ----------------------------------------------------------------------- |
+| **Spiral amplitude**      | One spiral whose wave gets taller where the image is dark                |
+| **Circular tone rings**   | Concentric rings, waved by tone                                          |
+| **Row & diagonal lines**  | Parallel lines, waved by tone                                            |
+| **Concentric boxes**      | Nested rectangles, waved by tone                                         |
+| **Concentric polygons**   | Nested polygons with a chosen number of **Sides**                        |
+| **Radial burst**          | Rays from a centre point, waved by tone                                  |
+| **Isometric grid**        | A triangular grid of lines, waved by tone                                |
+| **Dot halftone**          | Dots whose size follows tone, on a hexagonal grid                        |
+
+The line renderers (all but **Dot halftone**) share these settings:
+
+| Setting               | Effect                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| Spacing               | Distance between neighbouring lines, rings or turns (mm)                                 |
+| **Light tooth (mm)**  | Length of one wave cycle where the image is light                                        |
+| **Tone → frequency**  | How much faster the wave cycles in dark areas. 0 keeps the cycle length fixed            |
+| **Amplitude (mm)**    | How far the wave swings at full darkness                                                 |
+| **Waveform**          | Triangle, square, sawtooth or sine                                                       |
+| **Angle (°)**         | Rotates the pattern                                                                      |
+| **Origin X / Y (%)**  | Where the pattern is centred, as a percentage of the image                               |
+| **Clip to image**     | Stops lines at the image edge                                                            |
+| **Peak clip (%)**     | Flattens wave peaks above this percentage of the amplitude                               |
+
+**Dot halftone** has **Cell spacing (mm)** (distance between dot centres) and **Dot scale** (how large dots can grow).
+
+### Tone
+
+Every renderer has a **Tone** section that prepares the image before it is drawn:
+
+- **Auto levels** — stretches the image's tones so its darkest part becomes full black and its lightest full white.
+- **Contrast** — above 1 strengthens the difference between light and dark; below 1 softens it.
+- **Smoothing (mm)** — blurs away detail finer than this, so lines follow the image's shapes rather than its grain. 0 turns it off.
+
+### Show
+
+- **Source** — shows the original image beneath the drawing, with an opacity slider. Useful for lining things up; it is never plotted.
+- **Preview** — shows the drawing, with its own opacity slider.
+
+The preview is drawn at the pen's real width (the import's **Stroke Width**), so zoomed out it shows how dense the plot will really be. Set the stroke width to match your pen for the most faithful preview.
+
+### Colour Separation
+
+Colour separation splits a colour image into several **inks**, each drawn by its own pen. Each ink is rendered separately with the chosen renderer, and the preview shows the inks combined.
+
+Choose a mode under **Colour separation**:
+
+| Mode                               | Inks                                | Use for                                                       |
+| ---------------------------------- | ----------------------------------- | ------------------------------------------------------------- |
+| **None**                           | One pen                             | Single-colour drawings                                        |
+| **RGB (light inks on dark paper)** | Red, green, blue                    | Light, metallic or gel pens on black card                     |
+| **RGB (white paper)**              | Red, green, blue                    | Red, green and blue pens on white paper                       |
+| **CMY**                            | Cyan, magenta, yellow               | Colour on white paper with three pens                         |
+| **CMYK**                           | Cyan, magenta, yellow, black        | As CMY, with a black pen for darks and greys                  |
+| **Custom palette**                 | Your own colours                    | Whatever pens you own                                         |
+
+**Custom palette:** click **Add colour** to add a pen, then set its colour and name. Choose the colour to match the pen as closely as you can — terraForge works out how much of each pen to use so that, together, they look as much like the image as those pens can. Colours the pens cannot mix come out as the nearest mix they can make: blue and yellow pens give greens as olive, for example.
+
+**Offset each ink:** when on (the default), each ink's pattern is shifted from the others' — like the different screen angles used in colour printing — so the pens draw beside each other rather than over each other's lines. Turn it off to draw every ink on one shared pattern. The option only appears for renderers that support it.
+
+**Paper colour:** when a page template is shown, inks are worked out for its paper colour (see [Paper and Pen Colours](#paper-and-pen-colours)). On light paper, inks darken it, as transparent inks do. On dark paper, inks lighten it, as light gel or paint pens do on black card — so light pens are placed where the image is bright, and dark areas are left bare.
+
+### Plotting a Bitmap
+
+- **One file per pen:** in the G-code options, tick **Split output into separate files** and choose **Export one file per colour group** (see [Output section](#output-section)). Each ink becomes its own G-code file, named after the ink (for example `color_cyan.gcode`, or `color_fineliner_blue.gcode` for a custom swatch named "Fineliner blue"), ready to plot with that pen. Give each ink in a custom palette a distinct colour: inks with the same colour share a file.
+- **Leaving inks out:** expand the import in the Properties panel and choose **By Colour**. Each ink is listed with an eye toggle; hidden inks are left out of the G-code — useful for test-plotting one ink, or skipping one you have no pen for.
+- **Dots:** for **Dot halftone**, the **Plot points** switch plots each dot as a single pen tap at its centre instead of drawing its outline.
+- **Size and placement:** move, scale and rotate the image like any import. Millimetre settings (spacing, amplitude and so on) apply at the size the image had when it was imported; scaling it afterwards scales the drawing with it, so lines move further apart or closer together. For exact spacing, import at the size you want, or adjust the settings after scaling.
+
+### Renderer Plugins
+
+Extra renderers can be added as plugins. In **Application Configuration → Renderer Plugins**:
+
+- **Install examples** — copies the example plugins into your plugins folder (an example already installed is left alone).
+- **Open plugins folder** — opens the folder plugins are installed in.
+- **Rescan** — looks for new or changed plugins. A drawing made with a plugin that has since changed shows **Renderer updated**.
+
+Installed plugins appear in the **Renderer** list, and a plugin that could not be loaded is listed under **Rejected** with the reason. To write your own, see the [renderer plugin authoring guide](renderer-plugin-authoring.md).
+
+### Limitations
+
+- Bitmap import is experimental: settings, renderers and results may change between versions. A drawing made with an older version is not changed automatically — it shows **Renderer updated** and keeps its drawing until you re-render.
+- Very dense settings (fine spacing on a large image) produce a great many points and can take a while to render and to plot. A render that reaches its point limit says so.
+
+---
+
+## 10. Generating G-code
 
 ### The G-code Options Dialog
 
@@ -736,6 +867,7 @@ During G-code generation, whenever the plotter travels more than 15 mm (rapid), 
 - When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
 - The split-output modes are mutually exclusive radio choices under the **Split output into separate files** master checkbox.
 - **Export separate hatch files per colour** is only available when **Export one file per colour group** is selected.
+- Per-colour files are named after the colour: a separated bitmap ink's name (`color_cyan.gcode`), a basic colour's name (`color_red.gcode`), or otherwise its hex code (`color_hex-3a6aaa.gcode`). If two different colours would get the same name, each name has its hex code added.
 
 ### Persisted Preferences
 
@@ -784,7 +916,7 @@ While generation is running, a progress notification appears. Click the **✕** 
 
 ---
 
-## 10. The File Browser
+## 11. The File Browser
 
 The left panel contains two collapsible sections: **INTERNAL** (FluidNC internal flash) and **SDCARD** (SD card). Each section can be independently expanded or collapsed.
 
@@ -830,7 +962,7 @@ See [§5 Importing Files](#5-importing-files) for details on importing G-code fr
 
 ---
 
-## 11. Running a Job
+## 12. Running a Job
 
 The **Job** section lives at the right side of the bottom panel.
 
@@ -873,7 +1005,7 @@ The progress bar disappears. The machine returns to **Idle** state (visible in t
 
 ---
 
-## 12. Jog Controls
+## 13. Jog Controls
 
 Click **Jog** in the toolbar to open the jog panel. The panel floats as an overlay and can be **dragged anywhere on screen** by its grey drag handle at the top.
 
@@ -913,7 +1045,7 @@ Click the **✕** on the panel, or click **Jog** again in the toolbar.
 
 ---
 
-## 13. Console & Alarm Handling
+## 14. Console & Alarm Handling
 
 The console occupies the left portion of the bottom panel.
 
@@ -976,7 +1108,7 @@ Click **Clear** in the console header to wipe the output log.
 
 ---
 
-## 14. Background Tasks
+## 15. Background Tasks
 
 All long-running operations appear as **notifications** stacked in the top-right corner of the canvas.
 
@@ -1011,7 +1143,7 @@ All long-running operations appear as **notifications** stacked in the top-right
 
 ---
 
-## 15. Layout Management & Page Templates
+## 16. Layout Management & Page Templates
 
 ### Saving a Layout
 
@@ -1053,11 +1185,25 @@ Available options per template:
 
 **Page clip:** When a page template is active, G-code output can be clipped to the printable area (page minus margin) instead of the full machine bed.
 
+### Paper and Pen Colours
+
+When a page template is selected, two colour swatches appear beside the margin field:
+
+- **Paper colour** (default white) — the page is filled with this colour on the canvas. Presets are offered for white, cream, kraft, grey and black, or pick any colour.
+- **Pen colour** (default black) — SVG paths and single-colour bitmap drawings are previewed in this colour, as they will be plotted. A selected object is shown slightly lighter (or darker, for a light pen) so you can still tell it is selected.
+
+Together they give a more realistic preview of the finished plot. They also affect bitmap rendering:
+
+- Colour separation works out its inks for the paper colour (see [Colour Separation](#colour-separation)).
+- A single-colour bitmap drawn with a pen lighter than the paper — a white gel pen on black card, say — is drawn where the image is light rather than where it is dark.
+
+Paths that keep their own SVG colours (with **Show imported SVG colours on canvas** on) and separated bitmap inks keep their colours. With no page template, the canvas uses its usual blue preview colours.
+
 **Custom page sizes:** Edit `page-sizes.json` in the app config directory. Choose **File → Open page sizes file** to open it in your system editor.
 
 ---
 
-## 16. Keyboard Shortcuts
+## 17. Keyboard Shortcuts
 
 | Shortcut               | Action                                         |
 | ---------------------- | ---------------------------------------------- |
@@ -1083,7 +1229,7 @@ Available options per template:
 
 ---
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 ### Connection Issues
 
@@ -1122,6 +1268,27 @@ Available options per template:
 
 - The SVG may use `transform` attributes that aren't being resolved correctly.
 - Please report the file as a bug. terraForge resolves `translate`, `scale`, `rotate`, and `matrix` transforms on all ancestor elements.
+
+---
+
+### Bitmap Issues
+
+**The image draws nothing, or is nearly blank:**
+
+- Check the **Tone** section: a low **Contrast** or a large **Smoothing** value can flatten an image. Try **Auto levels** for a faint or low-contrast image.
+- With a dark paper colour, a dark pen draws nothing (it cannot be seen on the paper). Choose a lighter pen colour, or a lighter paper.
+
+**Status shows "Failed":**
+
+- The message beneath the status says why. For a plugin, check **Application Configuration → Renderer Plugins** for problems with the plugin itself.
+
+**Status shows "Renderer updated":**
+
+- The renderer has changed since the drawing was made. Click **Re-render** to redraw it with the new version, or leave it to keep the existing drawing.
+
+**Rendering is slow:**
+
+- Fine spacing over a large image produces a great many lines. Increase the spacing, or use **Smoothing** to remove detail the pen cannot draw.
 
 ---
 

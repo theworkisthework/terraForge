@@ -14,6 +14,91 @@ import {
   useFsPaneController,
   type FsPaneControllerProps,
 } from "../hooks/useFsPaneController";
+import type { RemoteFile } from "../../../../../types";
+
+/** Each pane's colours, written out in full so Tailwind finds them. */
+const ACCENTS = {
+  blue: {
+    bgAccent: "bg-[var(--tf-fs-blue-bg)]",
+    borderAccent: "border-[var(--tf-fs-blue-border)]",
+    labelColor: "text-[var(--tf-fs-blue-text)]",
+    btnColor: "text-[var(--tf-fs-blue-text)] hover:text-content",
+    uploadBg: "bg-[var(--tf-fs-blue-border)] hover:bg-[var(--tf-fs-blue-bg)]",
+  },
+  purple: {
+    bgAccent: "bg-[var(--tf-fs-purple-bg)]",
+    borderAccent: "border-[var(--tf-fs-purple-border)]",
+    labelColor: "text-[var(--tf-fs-purple-text)]",
+    btnColor: "text-[var(--tf-fs-purple-text)] hover:text-content",
+    uploadBg: "bg-[var(--tf-fs-purple-border)] hover:bg-[var(--tf-fs-purple-bg)]",
+  },
+} as const;
+
+/** The pane's confirmations: replacing the toolpath to run or preview a
+ * file, and deleting one. */
+function PaneDialogs({
+  pendingRunFile,
+  pendingPreviewFile,
+  deleteTarget,
+  onRun,
+  onPreview,
+  onDelete,
+  onCancelRun,
+  onCancelPreview,
+  onCancelDelete,
+}: {
+  pendingRunFile: RemoteFile | null;
+  pendingPreviewFile: RemoteFile | null;
+  deleteTarget: RemoteFile | null;
+  onRun: (file: RemoteFile) => void;
+  onPreview: (file: RemoteFile) => void;
+  onDelete: () => void;
+  onCancelRun: () => void;
+  onCancelPreview: () => void;
+  onCancelDelete: () => void;
+}) {
+  return (
+    <>
+      {pendingRunFile && (
+        <ConfirmDialog
+          title="Replace Toolpath & Run?"
+          message={`This will replace the current toolpath with "${pendingRunFile.name}" and start the job immediately.`}
+          confirmLabel="Run"
+          onConfirm={() => onRun(pendingRunFile)}
+          onCancel={onCancelRun}
+        />
+      )}
+      {pendingPreviewFile && (
+        <ConfirmDialog
+          title="Replace Toolpath?"
+          message={`Replace the current toolpath with a preview of "${pendingPreviewFile.name}"?`}
+          confirmLabel="Replace"
+          onConfirm={() => onPreview(pendingPreviewFile)}
+          onCancel={onCancelPreview}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete File"
+          message={`Delete ${deleteTarget.name}?`}
+          confirmLabel="Delete"
+          onConfirm={onDelete}
+          onCancel={onCancelDelete}
+        />
+      )}
+    </>
+  );
+}
+
+/** Why the listing shows nothing: offline, no SD card, an error, or empty. */
+function ListingMessage({ connected, error, empty }: { connected: boolean; error: string | null; empty: boolean }) {
+  if (!connected) return <p className="text-[10px] text-content-faint text-center py-4 px-3">Not connected.</p>;
+  if (error && /no sd card/i.test(error))
+    return <p className="text-[10px] text-content-faint text-center py-4 px-3">No SD card.</p>;
+  if (error) return <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">{error}</p>;
+  if (empty) return <p className="text-[10px] text-content-faint text-center py-4 px-3">Empty.</p>;
+  return null;
+}
 
 interface FsPaneProps extends FsPaneControllerProps {
   accentColor: "blue" | "purple";
@@ -73,54 +158,21 @@ export function FsPane({
   });
 
   const atRoot = path === "/";
-  const bgAccent =
-    accentColor === "blue"
-      ? "bg-[var(--tf-fs-blue-bg)]"
-      : "bg-[var(--tf-fs-purple-bg)]";
-  const borderAccent =
-    accentColor === "blue"
-      ? "border-[var(--tf-fs-blue-border)]"
-      : "border-[var(--tf-fs-purple-border)]";
-  const labelColor =
-    accentColor === "blue"
-      ? "text-[var(--tf-fs-blue-text)]"
-      : "text-[var(--tf-fs-purple-text)]";
-  const btnColor =
-    accentColor === "blue"
-      ? "text-[var(--tf-fs-blue-text)] hover:text-content"
-      : "text-[var(--tf-fs-purple-text)] hover:text-content";
+  const { bgAccent, borderAccent, labelColor, btnColor, uploadBg } = ACCENTS[accentColor];
 
   return (
     <div className={`flex flex-col h-full border-b ${borderAccent}`}>
-      {pendingRunFile && (
-        <ConfirmDialog
-          title="Replace Toolpath & Run?"
-          message={`This will replace the current toolpath with "${pendingRunFile.name}" and start the job immediately.`}
-          confirmLabel="Run"
-          onConfirm={() => void doRun(pendingRunFile)}
-          onCancel={() => setPendingRunFile(null)}
-        />
-      )}
-
-      {pendingPreviewFile && (
-        <ConfirmDialog
-          title="Replace Toolpath?"
-          message={`Replace the current toolpath with a preview of "${pendingPreviewFile.name}"?`}
-          confirmLabel="Replace"
-          onConfirm={() => void doPreview(pendingPreviewFile)}
-          onCancel={() => setPendingPreviewFile(null)}
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete File"
-          message={`Delete ${deleteTarget.name}?`}
-          confirmLabel="Delete"
-          onConfirm={() => void handleDeleteConfirm()}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
+      <PaneDialogs
+        pendingRunFile={pendingRunFile}
+        pendingPreviewFile={pendingPreviewFile}
+        deleteTarget={deleteTarget}
+        onRun={(file) => void doRun(file)}
+        onPreview={(file) => void doPreview(file)}
+        onDelete={() => void handleDeleteConfirm()}
+        onCancelRun={() => setPendingRunFile(null)}
+        onCancelPreview={() => setPendingPreviewFile(null)}
+        onCancelDelete={() => setDeleteTarget(null)}
+      />
 
       <div
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}
@@ -177,23 +229,7 @@ export function FsPane({
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {!connected ? (
-              <p className="text-[10px] text-content-faint text-center py-4 px-3">
-                Not connected.
-              </p>
-            ) : error && /no sd card/i.test(error) ? (
-              <p className="text-[10px] text-content-faint text-center py-4 px-3">
-                No SD card.
-              </p>
-            ) : error ? (
-              <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">
-                {error}
-              </p>
-            ) : files.length === 0 && !loading ? (
-              <p className="text-[10px] text-content-faint text-center py-4 px-3">
-                Empty.
-              </p>
-            ) : null}
+            <ListingMessage connected={connected} error={error} empty={files.length === 0 && !loading} />
 
             {connected && !atRoot && (
               <div
@@ -238,11 +274,7 @@ export function FsPane({
                     : undefined
               }
               aria-label="Upload file"
-              className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${
-                accentColor === "blue"
-                  ? "bg-[var(--tf-fs-blue-border)] hover:bg-[var(--tf-fs-blue-bg)]"
-                  : "bg-[var(--tf-fs-purple-border)] hover:bg-[var(--tf-fs-purple-bg)]"
-              } text-content`}
+              className={`w-full text-[10px] py-1 rounded disabled:opacity-40 transition-colors ${uploadBg} text-content`}
             >
               <Upload size={12} className="inline-block mr-1 align-text-bottom" /> Upload to {path}
             </button>

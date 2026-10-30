@@ -4,13 +4,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "paths": {
-      "@types/*": ["./app/types/*"]
-    }
+    "noEmit": true
   },
   "include": [
     "src/main/**/*.ts",

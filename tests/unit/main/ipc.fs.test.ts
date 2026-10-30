@@ -75,10 +75,34 @@ describe("registerFsIpcHandlers", () => {
       "chosen.file",
     );
 
-    expect(mocks.showOpenDialog.mock.calls[0][1].filters).toHaveLength(4);
+    expect(mocks.showOpenDialog.mock.calls[0][1].filters).toHaveLength(5);
     expect(mocks.showOpenDialog.mock.calls[1][1].filters[0].name).toBe(
       "G-code Files",
     );
+  });
+
+  it("strips bitmap extensions from every filter when bitmap import is disabled", async () => {
+    mocks.showOpenDialog.mockResolvedValue({
+      canceled: false,
+      filePaths: ["chosen.file"],
+    });
+
+    registerFsIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadConfigs: vi.fn().mockResolvedValue([]),
+      saveConfigs: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await mocks.handlers.get("fs:openImportDialog")?.({}, { allowBitmap: false });
+
+    const filters = mocks.showOpenDialog.mock.calls[0][1].filters;
+    expect(filters.find((f: { name: string }) => f.name === "Bitmap Files")).toBeUndefined();
+    const bitmapExtensions = ["png", "jpg", "jpeg", "webp"];
+    for (const filter of filters as { extensions: string[] }[]) {
+      for (const ext of bitmapExtensions) {
+        expect(filter.extensions).not.toContain(ext);
+      }
+    }
   });
 
   it("reads and writes text and binary files through IPC handlers", async () => {

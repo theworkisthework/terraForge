@@ -12,6 +12,79 @@ import {
 } from "lucide-react";
 import { Button } from "../../ui";
 
+/** Why downloading is unavailable, or "Download". */
+function downloadTitle(transferRunning: boolean, jobActive: boolean, serialMode: boolean): string {
+  if (transferRunning) return "Unavailable while a file transfer is running";
+  if (jobActive) return "Unavailable while a job is running";
+  if (serialMode) return "File download not available over serial";
+  return "Download";
+}
+
+/** Clicks on a row's buttons act on the button, not the row. */
+const only = (action: () => void) => (e: React.MouseEvent) => {
+  e.stopPropagation();
+  action();
+};
+
+/** A G-code file's job button: pause while it runs, resume while it is
+ * held, otherwise run — unless a transfer or another job is in the way. */
+function JobButton({
+  state,
+  onRun,
+  blockedBy,
+  loading,
+}: {
+  state: "running" | "held" | "idle";
+  onRun: () => void;
+  blockedBy: "transfer" | "job" | null;
+  loading: boolean;
+}) {
+  if (state === "running") {
+    return (
+      <Button
+        variant="primary"
+        size="xs"
+        onClick={only(() => window.terraForge.fluidnc.pauseJob())}
+        aria-label="Pause job"
+        title="Pause job"
+      >
+        <Pause size={12} />
+      </Button>
+    );
+  }
+  if (state === "held") {
+    return (
+      <Button
+        variant="primary"
+        size="xs"
+        onClick={only(() => window.terraForge.fluidnc.resumeJob())}
+        aria-label="Resume job"
+        title="Resume job"
+      >
+        <Play size={12} />
+      </Button>
+    );
+  }
+  return (
+    <Button
+      variant="primary"
+      size="xs"
+      onClick={only(onRun)}
+      aria-label="Run job now"
+      title={
+        blockedBy === "transfer"
+          ? "Unavailable while a file transfer is running"
+          : blockedBy === "job"
+            ? "A job is already running"
+            : "Run job now"
+      }
+      disabled={loading || blockedBy !== null}
+    >
+      <Play size={12} />
+    </Button>
+  );
+}
+
 interface FileRowProps {
   file: RemoteFile;
   isSelectedForJob: boolean;
@@ -100,53 +173,14 @@ export function FileRow({
             </Button>
           )}
 
-          {isGcode && isThisRunning ? (
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                window.terraForge.fluidnc.pauseJob();
-              }}
-                aria-label="Pause job"
-              title="Pause job"
-            >
-                <Pause size={12} />
-            </Button>
-          ) : isGcode && isThisHeld ? (
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                window.terraForge.fluidnc.resumeJob();
-              }}
-                aria-label="Resume job"
-              title="Resume job"
-            >
-                <Play size={12} />
-            </Button>
-          ) : isGcode ? (
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onRun(file);
-              }}
-                aria-label="Run job now"
-              title={
-                hasRunningTransfer
-                  ? "Unavailable while a file transfer is running"
-                  : anyJobActive
-                    ? "A job is already running"
-                    : "Run job now"
-              }
-              disabled={isLoadingThis || anyJobActive || hasRunningTransfer}
-            >
-              <Play size={12} />
-            </Button>
-          ) : null}
+          {isGcode && (
+            <JobButton
+              state={isThisRunning ? "running" : isThisHeld ? "held" : "idle"}
+              onRun={() => onRun(file)}
+              blockedBy={hasRunningTransfer ? "transfer" : anyJobActive ? "job" : null}
+              loading={isLoadingThis}
+            />
+          )}
 
           <Button
             variant="secondary"
@@ -157,15 +191,7 @@ export function FileRow({
             }}
             aria-label="Download file"
             disabled={serialMode || anyJobActive || hasRunningTransfer}
-            title={
-              hasRunningTransfer
-                ? "Unavailable while a file transfer is running"
-                : anyJobActive
-                  ? "Unavailable while a job is running"
-                  : serialMode
-                    ? "File download not available over serial"
-                    : "Download"
-            }
+            title={downloadTitle(hasRunningTransfer, anyJobActive, serialMode)}
           >
                   <ArrowDownToLine size={12} />
           </Button>

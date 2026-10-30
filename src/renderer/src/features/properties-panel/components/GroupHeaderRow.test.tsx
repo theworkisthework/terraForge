@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { LayerGroup } from "../../../../types";
+import type { LayerGroup } from "../../../../../types";
 import { GroupHeaderRow } from "./GroupHeaderRow";
 
 function buildGroup(patch: Partial<LayerGroup> = {}): LayerGroup {

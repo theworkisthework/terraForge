@@ -87,7 +87,7 @@ test("Jog button is visible", async () => {
 });
 
 test("settings gear button is present", async () => {
-  const btn = window.locator("button[title='Machine settings']");
+  const btn = window.locator("button[title='Machine and application settings']");
   await expect(btn).toBeVisible();
 });
 
@@ -111,7 +111,7 @@ test("properties panel is visible", async () => {
 });
 
 test("properties panel shows empty state message", async () => {
-  const msg = window.locator("text=No objects. Import an SVG.");
+  const msg = window.locator("text=No objects. Import a vector or bitmap.");
   await expect(msg).toBeVisible();
 });
 

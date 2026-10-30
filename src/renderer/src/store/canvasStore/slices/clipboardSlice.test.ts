@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createClipboardSlice } from "./clipboardSlice";
@@ -18,19 +19,19 @@ type ClipState = ReturnType<ReturnType<typeof createClipboardSlice>> & {
   selectedGroupId: string | null;
 };
 
-let pushUndo: ReturnType<typeof vi.fn>;
+let pushUndo: Mock<() => void>;
 
 function makeStore() {
-  pushUndo = vi.fn();
+  pushUndo = vi.fn<() => void>();
   return create<ClipState>()(
-    immer((set, get) => ({
+    immer((set, get, store) => ({
       imports: [],
       selectedImportId: null,
       selectedPathId: null,
       toolpathSelected: false,
       allImportsSelected: false,
       selectedGroupId: null,
-      ...createClipboardSlice(pushUndo)(set as any, get as any),
+      ...createClipboardSlice(pushUndo)(set as any, get as any, store as any),
     })),
   );
 }

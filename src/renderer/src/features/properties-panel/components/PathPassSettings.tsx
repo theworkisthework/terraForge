@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import type { PassMode } from "../../../../types";
+import type { PassMode } from "../../../../../types";
 
 interface PathPassSettingsProps {
   pathId: string;

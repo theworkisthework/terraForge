@@ -4,10 +4,9 @@
  * handle positioning, and color scaling.
  */
 
-import { MM_TO_PX, PAD, MIN_ZOOM, MAX_ZOOM } from "../constants";
-import type { Vp, HandlePos, CanvasOrigin } from "../types";
-import type { SvgImport } from "@types/index";
-import type { SvgImport } from "@types/index";
+import { MM_TO_PX, PAD, MIN_ZOOM } from "../constants";
+import type { Vp, HandlePos } from "../types";
+import type { SvgImport } from "../../../../../types";
 
 /**
  * Calculate a zoom level and pan offset to fit the bed within a container,

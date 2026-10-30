@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { PageSize } from "../../../../types";
 
 interface ToolbarEffectsParams {
   handleImport: () => void;
@@ -6,7 +7,7 @@ interface ToolbarEffectsParams {
   saveLayoutRef: React.RefObject<() => void>;
   closeLayoutRef: React.RefObject<() => void>;
   setShowAbout: (v: boolean) => void;
-  setPageSizes: (sizes: { label: string; w: number; h: number }[]) => void;
+  setPageSizes: (sizes: PageSize[]) => void;
   importsLength: number;
   selectedImportId: string | null;
 }

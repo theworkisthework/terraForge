@@ -110,167 +110,165 @@ export interface GcodeToolpath {
   feedrate: number;
 }
 
-export function parseGcode(gcode: string): GcodeToolpath {
-  let x = 0,
-    y = 0;
-  let isAbsolute = true;
-  let inMillimeters = true;
-  let motionMode = 0; // 0=G0, 1=G1, 2=G2, 3=G3
-  let activeColor: string | null = null;
-  let activeLayer: string | null = null;
-  let activeDip: string | null = null;
+/** One line of G-code: any terraForge metadata marker in its comment, and
+ * its letter/number words with comments and block-delete removed. */
+function readLine(rawLine: string): { marker: ToolpathMetadata | null; words: [string, number][] } {
+  const noParen = rawLine.replace(/^\//, "").replace(/\([^)]*\)/g, "");
+  const commentStart = noParen.indexOf(";");
+  const marker = commentStart >= 0 ? parseTfMarker(noParen.slice(commentStart + 1)) : null;
 
-  // Cut sub-paths: each number[] becomes one Float32Array in cutPaths.
-  // currentCutPath is the active (open) sub-path being built.
-  const cutSubPaths: number[][] = [];
-  const cutPathColors: Array<string | null> = [];
-  let currentCutPath: number[] | null = null;
+  const line = noParen.replace(/;.*$/, "").trim().toUpperCase();
+  const words: [string, number][] = [];
+  if (!line) return { marker, words };
+  const rx = /([A-Z])([-+]?\d*\.?\d+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(line)) !== null) words.push([m[1], parseFloat(m[2])]);
+  return { marker, words };
+}
 
-  // Rapid segments: flat [x_from, y_from, x_to, y_to, ...] buffer.
-  const rapidData: number[] = [];
-  const rapidColors: Array<string | null> = [];
+interface ModalState {
+  /** 0 = G0 (rapid), 1–3 = G1–G3 (cuts; arcs approximated as straight lines). */
+  motionMode: number;
+  inMillimeters: boolean;
+  isAbsolute: boolean;
+}
 
-  const segments: GcodeSegment[] = [];
+/** The modal state each G-code sets, rounded to one decimal (G20.1 etc.). */
+const MODAL_GCODES: Record<number, Partial<ModalState>> = {
+  0: { motionMode: 0 },
+  1: { motionMode: 1 },
+  2: { motionMode: 2 },
+  3: { motionMode: 3 },
+  20: { inMillimeters: false },
+  21: { inMillimeters: true },
+  90: { isAbsolute: true },
+  91: { isAbsolute: false },
+};
 
-  let minX = 0,
-    maxX = 0,
-    minY = 0,
-    maxY = 0;
-  let boundsInit = false;
-  let lineCount = 0;
-  let lastWasCut = false;
-  let feedrate = 0;
-  let totalCutDistance = 0;
-  let totalRapidDistance = 0;
+function applyModalGcodes(words: [string, number][], modal: ModalState): void {
+  for (const [letter, value] of words) {
+    if (letter !== "G") continue;
+    Object.assign(modal, MODAL_GCODES[Math.round(value * 10) / 10]);
+  }
+}
 
-  const updateBounds = (nx: number, ny: number) => {
-    if (!boundsInit) {
-      minX = maxX = nx;
-      minY = maxY = ny;
-      boundsInit = true;
-    } else {
-      if (nx < minX) minX = nx;
-      if (nx > maxX) maxX = nx;
-      if (ny < minY) minY = ny;
-      if (ny > maxY) maxY = ny;
+/** What the parser builds up line by line. */
+interface ParseState {
+  x: number;
+  y: number;
+  cutSubPaths: number[][];
+  cutPathColors: Array<string | null>;
+  /** The open cut sub-path; a rapid closes it. */
+  currentCutPath: number[] | null;
+  rapidData: number[];
+  rapidColors: Array<string | null>;
+  segments: GcodeSegment[];
+  bounds: { minX: number; maxX: number; minY: number; maxY: number } | null;
+  totalCutDistance: number;
+  totalRapidDistance: number;
+}
+
+/** Records a move from the current point to (nx, ny): as a rapid quad, or
+ * appended to the open cut sub-path (starting one if a rapid closed it). */
+function recordMove(state: ParseState, nx: number, ny: number, rapid: boolean, color: string | null): void {
+  const { x, y } = state;
+  const b = state.bounds;
+  if (!b) state.bounds = { minX: nx, maxX: nx, minY: ny, maxY: ny };
+  else {
+    if (nx < b.minX) b.minX = nx;
+    if (nx > b.maxX) b.maxX = nx;
+    if (ny < b.minY) b.minY = ny;
+    if (ny > b.maxY) b.maxY = ny;
+  }
+
+  const segDist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
+  if (rapid) {
+    state.totalRapidDistance += segDist;
+    state.rapidData.push(x, y, nx, ny);
+    state.rapidColors.push(color);
+    state.currentCutPath = null;
+  } else {
+    state.totalCutDistance += segDist;
+    if (state.currentCutPath === null) {
+      state.currentCutPath = [x, y];
+      state.cutSubPaths.push(state.currentCutPath);
+      state.cutPathColors.push(color);
     }
+    state.currentCutPath.push(nx, ny);
+  }
+  state.x = nx;
+  state.y = ny;
+}
+
+export function parseGcode(gcode: string): GcodeToolpath {
+  const modal: ModalState = { motionMode: 0, inMillimeters: true, isAbsolute: true };
+  const active: { color: string | null; layer: string | null; dip: string | null } = { color: null, layer: null, dip: null };
+  const state: ParseState = {
+    x: 0,
+    y: 0,
+    cutSubPaths: [],
+    cutPathColors: [],
+    currentCutPath: null,
+    rapidData: [],
+    rapidColors: [],
+    segments: [],
+    bounds: null,
+    totalCutDistance: 0,
+    totalRapidDistance: 0,
   };
+  let lineCount = 0;
+  let feedrate = 0;
 
   for (const rawLine of gcode.split("\n")) {
     lineCount++;
-
-    const blockDeleteStripped = rawLine.replace(/^\//, "");
-    const noParen = blockDeleteStripped.replace(/\([^)]*\)/g, "");
-    const commentStart = noParen.indexOf(";");
-    if (commentStart >= 0) {
-      const commentText = noParen.slice(commentStart + 1);
-      const marker = parseTfMarker(commentText);
-      if (marker) {
-        if (marker.color !== undefined) activeColor = marker.color;
-        if (marker.layer !== undefined) activeLayer = marker.layer;
-        if (marker.dip !== undefined) activeDip = marker.dip;
-      }
-    }
-
-    // Strip block-delete prefix, parenthesis comments, and semicolon comments
-    const line = noParen
-      .replace(/;.*$/, "")
-      .trim()
-      .toUpperCase();
-
-    if (!line) continue;
-
-    // Parse letter+number word pairs
-    const words: [string, number][] = [];
-    const rx = /([A-Z])([-+]?\d*\.?\d+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = rx.exec(line)) !== null) {
-      words.push([m[1], parseFloat(m[2])]);
-    }
+    const { marker, words } = readLine(rawLine);
+    if (marker?.color !== undefined) active.color = marker.color;
+    if (marker?.layer !== undefined) active.layer = marker.layer;
+    if (marker?.dip !== undefined) active.dip = marker.dip;
     if (!words.length) continue;
 
-    // Update modal state from G-codes on this line
-    for (const [l, v] of words) {
-      if (l !== "G") continue;
-      const g = Math.round(v * 10) / 10; // handle G0, G1, G20.1 etc
-      if (g === 0) motionMode = 0;
-      else if (g === 1) motionMode = 1;
-      else if (g === 2) motionMode = 2;
-      else if (g === 3) motionMode = 3;
-      else if (g === 20) inMillimeters = false;
-      else if (g === 21) inMillimeters = true;
-      else if (g === 90) isAbsolute = true;
-      else if (g === 91) isAbsolute = false;
-    }
-
-    const getW = (l: string) => words.find(([wl]) => wl === l)?.[1];
-    const xw = getW("X");
-    const yw = getW("Y");
-    const fw = getW("F");
-
+    applyModalGcodes(words, modal);
+    const word = (letter: string) => words.find(([l]) => l === letter)?.[1];
+    const xw = word("X");
+    const yw = word("Y");
     // Skip lines with no X/Y motion
     if (xw === undefined && yw === undefined) continue;
 
-    const scale = inMillimeters ? 1 : 25.4;
-    // Update feedrate if an F word is present (convert in/min → mm/min when G20)
+    // Inches (G20) are converted to millimetres, feedrate included.
+    const scale = modal.inMillimeters ? 1 : 25.4;
+    const fw = word("F");
     if (fw !== undefined) feedrate = fw * scale;
-    const nx =
-      xw !== undefined ? (isAbsolute ? xw * scale : x + xw * scale) : x;
-    const ny =
-      yw !== undefined ? (isAbsolute ? yw * scale : y + yw * scale) : y;
+    const along = (w: number | undefined, from: number) =>
+      w === undefined ? from : modal.isAbsolute ? w * scale : from + w * scale;
+    const nx = along(xw, state.x);
+    const ny = along(yw, state.y);
+    const rapid = modal.motionMode === 0;
 
-    updateBounds(nx, ny);
-
-    const segDist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
-
-    // Record the segment for live plot-progress tracking
-    segments.push({
-      from: { x, y },
+    // Recorded for live plot-progress tracking.
+    state.segments.push({
+      from: { x: state.x, y: state.y },
       to: { x: nx, y: ny },
-      type: motionMode === 0 ? "rapid" : "cut",
-      color: activeColor ?? undefined,
-      layer: activeLayer ?? undefined,
-      dip: activeDip ?? undefined,
+      type: rapid ? "rapid" : "cut",
+      color: active.color ?? undefined,
+      layer: active.layer ?? undefined,
+      dip: active.dip ?? undefined,
       lineNum: lineCount,
       feed: feedrate || undefined,
     });
-
-    if (motionMode === 0) {
-      // Rapid — record as a flat quad [x_from, y_from, x_to, y_to]
-      totalRapidDistance += segDist;
-      rapidData.push(x, y, nx, ny);
-      rapidColors.push(activeColor);
-      // A rapid lifts the pen, so the next cut must start a new sub-path.
-      currentCutPath = null;
-      lastWasCut = false;
-    } else {
-      // Feed (G1) or arc (G2/G3 approximated as straight line)
-      totalCutDistance += segDist;
-      if (!lastWasCut || currentCutPath === null) {
-        // Start a new cut sub-path beginning at the current position.
-        currentCutPath = [x, y];
-        cutSubPaths.push(currentCutPath);
-        cutPathColors.push(activeColor);
-      }
-      currentCutPath.push(nx, ny);
-      lastWasCut = true;
-    }
-
-    x = nx;
-    y = ny;
+    recordMove(state, nx, ny, rapid, active.color);
   }
 
   return {
-    cutPaths: cutSubPaths.map((pts) => new Float32Array(pts)),
-    cutPathColors,
-    rapidPaths: new Float32Array(rapidData),
-    rapidColors,
-    bounds: { minX, maxX, minY, maxY },
+    cutPaths: state.cutSubPaths.map((pts) => new Float32Array(pts)),
+    cutPathColors: state.cutPathColors,
+    rapidPaths: new Float32Array(state.rapidData),
+    rapidColors: state.rapidColors,
+    bounds: state.bounds ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 },
     lineCount,
-    segments,
+    segments: state.segments,
     fileSizeBytes: gcode.length,
-    totalCutDistance,
-    totalRapidDistance,
+    totalCutDistance: state.totalCutDistance,
+    totalRapidDistance: state.totalRapidDistance,
     feedrate,
   };
 }

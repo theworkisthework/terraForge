@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ROT_STEPS } from "../utils/rotation";
 import { RotationStepFlyout } from "./RotationStepFlyout";
 
 describe("RotationStepFlyout", () => {
@@ -11,7 +12,7 @@ describe("RotationStepFlyout", () => {
     const { container } = render(
       <RotationStepFlyout
         rotStep={45}
-        rotSteps={[1, 5, 15, 45, 90]}
+        rotSteps={ROT_STEPS}
         stepFlyoutOpen={true}
         onToggleStepFlyout={onToggleStepFlyout}
         onCloseStepFlyout={onCloseStepFlyout}
@@ -22,8 +23,8 @@ describe("RotationStepFlyout", () => {
     fireEvent.click(screen.getByTitle("Change rotation step"));
     expect(onToggleStepFlyout).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText("90°"));
-    expect(onSelectRotStep).toHaveBeenCalledWith(90);
+    fireEvent.click(screen.getByText("30°"));
+    expect(onSelectRotStep).toHaveBeenCalledWith(30);
 
     const backdrop = container.querySelector(".fixed.inset-0.z-10");
     if (!backdrop) throw new Error("expected flyout backdrop");
@@ -35,7 +36,7 @@ describe("RotationStepFlyout", () => {
     render(
       <RotationStepFlyout
         rotStep={45}
-        rotSteps={[1, 5, 15, 45, 90]}
+        rotSteps={ROT_STEPS}
         stepFlyoutOpen={false}
         onToggleStepFlyout={() => {}}
         onCloseStepFlyout={() => {}}
@@ -43,6 +44,6 @@ describe("RotationStepFlyout", () => {
       />,
     );
 
-    expect(screen.queryByText("90°")).toBeNull();
+    expect(screen.queryByText("30°")).toBeNull();
   });
 });

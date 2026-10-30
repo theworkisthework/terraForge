@@ -8,8 +8,8 @@ type PageTemplateState = ReturnType<typeof createPageTemplateSlice>;
 
 function makeStore() {
   return create<PageTemplateState>()(
-    immer((set, get) => ({
-      ...createPageTemplateSlice(set as any, get as any),
+    immer((set, get, store) => ({
+      ...createPageTemplateSlice(set as any, get as any, store as any),
     })),
   );
 }

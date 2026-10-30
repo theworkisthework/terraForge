@@ -1,5 +1,4 @@
 import { Button } from "../../ui";
-import type { ButtonProps } from "../../ui";
 
 interface GcodeOptionsDialogActionsProps {
   disabled: boolean;

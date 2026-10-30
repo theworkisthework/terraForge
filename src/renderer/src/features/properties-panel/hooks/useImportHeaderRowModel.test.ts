@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SvgImport } from "../../../../types";
+import type { SvgImport } from "../../../../../types";
 import { useImportHeaderRowModel } from "./useImportHeaderRowModel";
 
 const imp: SvgImport = {

@@ -1,14 +1,13 @@
 import { CircleSlash2, Pen, PenLine, ArrowDown, ArrowUp } from "lucide-react";
-import { isSolenoidPenType } from "../../../../types";
+import { isSolenoidPenType, type PenType } from "../../../../types";
 import { Tooltip } from "../Tooltip";
 import { Button } from "../ui";
 
 interface PenControlsProps {
   connected: boolean;
-  penType: string;
+  penType: PenType;
   penDown: string;
   penUp: string;
-  step: number;
   onMovePen: (action: "up" | "down") => Promise<void>;
   onZeroZ: () => Promise<void>;
 }
@@ -22,7 +21,6 @@ export function PenControls({
   penType,
   penDown,
   penUp,
-  step,
   onMovePen,
   onZeroZ,
 }: PenControlsProps) {

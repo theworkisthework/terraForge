@@ -1,5 +1,8 @@
-import type { SvgImport, LayerGroup } from "../../../../types";
+import type { SvgImport, LayerGroup } from "../../../../../types";
 import { GroupHandleOverlay, HandleOverlay } from "..";
+
+type GroupHandleProps = React.ComponentProps<typeof GroupHandleOverlay>;
+type HandleProps = React.ComponentProps<typeof HandleOverlay>;
 
 interface CanvasHandleOverlaysProps {
   imports: SvgImport[];
@@ -27,28 +30,12 @@ interface CanvasHandleOverlaysProps {
     gHH: number;
     angle: number;
   } | null;
-  onGroupMouseDown: (e: React.MouseEvent, impIds: string[]) => void;
-  onHandleMouseDown: (
-    e: React.MouseEvent,
-    imp: SvgImport,
-    handle: string,
-  ) => void;
-  onRotateHandleMouseDown: (e: React.MouseEvent, imp: SvgImport) => void;
-  onGroupHandleMouseDown: (
-    e: React.MouseEvent,
-    impIds: string[],
-    handle: string,
-    gCx: number,
-    gCy: number,
-    gHW: number,
-    gHH: number,
-  ) => void;
-  onGroupRotateHandleMouseDown: (
-    e: React.MouseEvent,
-    impIds: string[],
-    gCx: number,
-    gCy: number,
-  ) => void;
+  // Passed straight through, so typed by the overlays that call them.
+  onGroupMouseDown: GroupHandleProps["onGroupMouseDown"];
+  onHandleMouseDown: HandleProps["onHandleMouseDown"];
+  onRotateHandleMouseDown: HandleProps["onRotateHandleMouseDown"];
+  onGroupHandleMouseDown: GroupHandleProps["onGroupHandleMouseDown"];
+  onGroupRotateHandleMouseDown: GroupHandleProps["onGroupRotateHandleMouseDown"];
   clearImports: () => void;
   removeImport: (id: string) => void;
   selectGroup: (id: string | null) => void;

@@ -1,6 +1,6 @@
-import { ChevronDown } from "lucide-react";
 import type { GcodePrefs } from "../gcodePrefs";
 import { CustomGcodeSection } from "./CustomGcodeSection";
+import { CheckboxOption, OptionSection, OverrideField } from "./optionControls";
 
 interface OptionsSectionProps {
   open: boolean;
@@ -41,155 +41,59 @@ export function OptionsSection({
   onSetClipOffset,
   onSetTextField,
 }: OptionsSectionProps) {
-  const content = (
-    <div className="flex flex-col gap-4 mt-2 mb-1">
-      <label className="flex items-start gap-3 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          aria-label="Lift pen at end"
-          className="mt-0.5 accent-accent cursor-pointer"
-          checked={prefs.liftPenAtEnd}
-          onChange={() => onTogglePref("liftPenAtEnd")}
-        />
-        <div>
-          <div className="text-sm text-content font-medium">
-            Lift pen at end
-          </div>
-          <div className="text-xs text-content-muted mt-0.5">
-            Send the pen-up command after the last stroke. Recommended to avoid
-            leaving the pen pressed on the paper.
-          </div>
-        </div>
-      </label>
-
-      <label className="flex items-start gap-3 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          aria-label="Return to home (X0 Y0)"
-          className="mt-0.5 accent-accent cursor-pointer"
-          checked={prefs.returnToHome}
-          onChange={() => onTogglePref("returnToHome")}
-        />
-        <div>
-          <div className="text-sm text-content font-medium">
-            Return to home (X0 Y0)
-          </div>
-          <div className="text-xs text-content-muted mt-0.5">
-            Send the pen to the origin after the job finishes.
-          </div>
-        </div>
-      </label>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex items-start gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            aria-label="Override pen-down delay"
-            className="mt-0.5 accent-accent cursor-pointer"
-            checked={prefs.penDownDelayOverrideEnabled}
-            onChange={() => onTogglePref("penDownDelayOverrideEnabled")}
-          />
-          <div>
-            <div className="text-sm text-content font-medium">
-              Override pen-down delay
-            </div>
-            <div className="text-xs text-content-muted mt-0.5">
-              Add a dwell after pen-down before XY drawing starts.
-            </div>
-          </div>
-        </label>
-
-        <div className="flex items-center gap-2 pl-6">
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={prefs.penDownDelayMs}
-            onChange={(e) => onSetPenDownDelayMs(e.target.value)}
-            disabled={!prefs.penDownDelayOverrideEnabled}
-            aria-label="Pen-down delay override (ms)"
-            className="w-24 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <span className="text-xs text-content-muted">ms</span>
-          <span className="text-xs text-content-faint">
-            Machine default: {machinePenDownDelayMs} ms
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex items-start gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            aria-label="Override pen-up delay"
-            className="mt-0.5 accent-accent cursor-pointer"
-            checked={prefs.penUpDelayOverrideEnabled}
-            onChange={() => onTogglePref("penUpDelayOverrideEnabled")}
-          />
-          <div>
-            <div className="text-sm text-content font-medium">
-              Override pen-up delay
-            </div>
-            <div className="text-xs text-content-muted mt-0.5">
-              Add a dwell after pen-up before rapid travel begins.
-            </div>
-          </div>
-        </label>
-
-        <div className="flex items-center gap-2 pl-6">
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={prefs.penUpDelayMs}
-            onChange={(e) => onSetPenUpDelayMs(e.target.value)}
-            disabled={!prefs.penUpDelayOverrideEnabled}
-            aria-label="Pen-up delay override (ms)"
-            className="w-24 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <span className="text-xs text-content-muted">ms</span>
-          <span className="text-xs text-content-faint">
-            Machine default: {machinePenUpDelayMs} ms
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex items-start gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            aria-label="Override draw speed"
-            className="mt-0.5 accent-accent cursor-pointer"
-            checked={prefs.drawSpeedOverrideEnabled}
-            onChange={() => onTogglePref("drawSpeedOverrideEnabled")}
-          />
-          <div>
-            <div className="text-sm text-content font-medium">
-              Override draw speed
-            </div>
-            <div className="text-xs text-content-muted mt-0.5">
-              Set a custom drawing speed (feedrate) for this job only.
-            </div>
-          </div>
-        </label>
-
-        <div className="flex items-center gap-2 pl-6">
-          <input
-            type="number"
-            min="1"
-            step="100"
-            value={prefs.drawSpeedOverride}
-            onChange={(e) => onSetDrawSpeedOverride(e.target.value)}
-            disabled={!prefs.drawSpeedOverrideEnabled}
-            aria-label="Draw speed override (mm/min)"
-            className="w-24 px-2 py-0.5 text-xs rounded bg-secondary border border-secondary-hover text-content focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <span className="text-xs text-content-muted">mm/min</span>
-          <span className="text-xs text-content-faint">
-            Machine default: {machineDrawSpeed} mm/min
-          </span>
-        </div>
-      </div>
+  return (
+    <OptionSection title="Options" open={open} showHeader={showHeader} onToggleOpen={onToggleOpen}>
+      <CheckboxOption
+        label="Lift pen at end"
+        checked={prefs.liftPenAtEnd}
+        onChange={() => onTogglePref("liftPenAtEnd")}
+        description="Send the pen-up command after the last stroke. Recommended to avoid leaving the pen pressed on the paper."
+      />
+      <CheckboxOption
+        label="Return to home (X0 Y0)"
+        checked={prefs.returnToHome}
+        onChange={() => onTogglePref("returnToHome")}
+        description="Send the pen to the origin after the job finishes."
+      />
+      <OverrideField
+        label="Override pen-down delay"
+        checked={prefs.penDownDelayOverrideEnabled}
+        onToggle={() => onTogglePref("penDownDelayOverrideEnabled")}
+        description="Add a dwell after pen-down before XY drawing starts."
+        inputLabel="Pen-down delay override (ms)"
+        value={prefs.penDownDelayMs}
+        onChange={onSetPenDownDelayMs}
+        min="0"
+        step="1"
+        unit="ms"
+        machineDefault={machinePenDownDelayMs}
+      />
+      <OverrideField
+        label="Override pen-up delay"
+        checked={prefs.penUpDelayOverrideEnabled}
+        onToggle={() => onTogglePref("penUpDelayOverrideEnabled")}
+        description="Add a dwell after pen-up before rapid travel begins."
+        inputLabel="Pen-up delay override (ms)"
+        value={prefs.penUpDelayMs}
+        onChange={onSetPenUpDelayMs}
+        min="0"
+        step="1"
+        unit="ms"
+        machineDefault={machinePenUpDelayMs}
+      />
+      <OverrideField
+        label="Override draw speed"
+        checked={prefs.drawSpeedOverrideEnabled}
+        onToggle={() => onTogglePref("drawSpeedOverrideEnabled")}
+        description="Set a custom drawing speed (feedrate) for this job only."
+        inputLabel="Draw speed override (mm/min)"
+        value={prefs.drawSpeedOverride}
+        onChange={onSetDrawSpeedOverride}
+        min="1"
+        step="100"
+        unit="mm/min"
+        machineDefault={machineDrawSpeed}
+      />
 
       {hasPageTemplate && (
         <div className="flex flex-col gap-1.5 select-none">
@@ -254,25 +158,6 @@ export function OptionsSection({
         onCustomStartChange={onSetTextField("customStartGcode")}
         onCustomEndChange={onSetTextField("customEndGcode")}
       />
-    </div>
-  );
-
-  if (!showHeader) return <div>{content}</div>;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        className="flex items-center gap-1.5 text-xs font-semibold text-content-faint hover:text-content uppercase tracking-wider transition-colors select-none w-full text-left py-1"
-      >
-        <ChevronDown
-          size={13}
-          className={`transition-transform duration-150 flex-shrink-0 ${open ? "rotate-0" : "-rotate-90"}`}
-        />
-        Options
-      </button>
-      {open && content}
-    </div>
+    </OptionSection>
   );
 }

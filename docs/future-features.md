@@ -7,6 +7,7 @@ Things we may wish to explore in the future. Do not use this as part of the cont
 - [Vinyl/paper cutter/drag knife](#vinylpaper-cutterdrag-knife)
 - [Inkjet print head](#inkjet-print-head)
 - [3D print head](#3d-print-head)
+- [Renderer preview gallery script](#renderer-preview-gallery-script)
 
 ## Vinyl/paper cutter/drag knife
 
@@ -226,3 +227,36 @@ If you want, I can sketch the exact TypeScript shape for the new option object a
 ### Conclusion
 
 This is not a feature addition—it requires **building a new product** that happens to share the same UI framework. The plotter and 3D printer pipelines are fundamentally different: vector → pen strokes vs. model → volumetric extrusion. A 3D printer control app is a separate project that should build on an established printer controller (Marlin, Klipper) or a dedicated slicer framework, not on a pen plotter codebase.
+
+## Renderer preview gallery script
+
+**Status:** Idea only, not started. Raised while manually tuning the new
+tone-spine options (`clipToImage`, `peakClipPct`, `autoLevels`, `contrast`)
+across `spiralAmplitude.ts`/`circularRings.ts`/etc. — clicking through each
+renderer × option combination one at a time in the app, per sample image, is
+slow and easy to lose track of.
+
+### What it would do
+
+A script that takes a small set of sample images and a matrix of
+renderer/option combinations, runs each through the real in-tree renderers
+(not a reimplementation — reuse `bitmapRenderers` from `registry.ts` and the
+same `render()` functions the app calls), and writes a single static HTML
+page with every combination laid out for side-by-side visual review
+(e.g. one row per sample image, one column per renderer/option combo, each
+cell showing the rendered path over/next to the source thumbnail).
+
+### Things to work out when this gets picked up
+
+- Bitmap decoding (`decodeBitmapLuminance` in `bitmapImage.ts`) is built on
+  browser `Image`/`canvas` APIs, not available in plain Node — this likely
+  needs to run as a small dev-server/browser page (or vitest's
+  jsdom/canvas-backed environment) rather than a pure CLI script, or swap in
+  a Node-side decoder (e.g. `sharp`) for this tool specifically.
+- Needs a small curated settings matrix per renderer rather than every
+  possible combination (combinatorial blow-up) — likely start with just
+  toggling each of the four new options on/off against its default, per
+  renderer, per sample image.
+- A handful of representative sample images worth keeping alongside the
+  script (e.g. a high-contrast photo, a low-contrast/flat one, a
+  non-square one) so results are reproducible and comparable run to run.

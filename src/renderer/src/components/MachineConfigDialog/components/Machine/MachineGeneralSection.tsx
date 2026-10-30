@@ -1,5 +1,5 @@
 import React from "react";
-import type { OriginType, PenType } from "../../../../../types";
+import type { OriginType, PenType } from "../../../../../../types";
 import type { MachineConfigDialogController } from "../../hooks/useMachineConfigDialogController";
 import { Field } from "../Field";
 import { Section } from "../Section";

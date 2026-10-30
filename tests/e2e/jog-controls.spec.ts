@@ -19,7 +19,6 @@ import {
   launchApp,
   closeApp,
   mockIpcInvoke,
-  pushRendererEvent,
 } from "./helpers";
 import type { ElectronApplication, Page } from "playwright";
 

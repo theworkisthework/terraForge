@@ -73,7 +73,8 @@ describe("GridLayer", () => {
     );
     const lines = container.querySelectorAll('line[data-testid^="grid-h-"]');
     // getBedY should be called for each horizontal grid line
-    expect(getBedYMock.mock.calls.length).toBeGreaterThan(0);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(getBedYMock.mock.calls.length).toBeGreaterThanOrEqual(lines.length);
   });
 
   it("covers the full bed width with vertical lines", () => {

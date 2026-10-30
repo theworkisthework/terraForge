@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { JogStep } from "../../../../types";
 import { Button } from "../ui";
+import { Tooltip } from "../Tooltip";
 
 interface JogPadProps {
   step: JogStep;
@@ -94,7 +95,7 @@ function JogBtn({
   ariaLabel?: string;
   disabled?: boolean;
 }) {
-  return (
+  const button = (
     <Button
       variant="secondary"
       size="sm"
@@ -106,4 +107,7 @@ function JogBtn({
       {label}
     </Button>
   );
+  // Every jog button is given a description ("Move X +1 mm"); show it the
+  // same way the neighbouring pen controls show theirs.
+  return title ? <Tooltip text={title}>{button}</Tooltip> : button;
 }

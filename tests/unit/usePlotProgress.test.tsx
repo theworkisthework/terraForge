@@ -44,6 +44,7 @@ function makeToolpath(segments: GcodeSegment[]): GcodeToolpath {
     fileSizeBytes: 100,
     totalCutDistance: 10,
     totalRapidDistance: 5,
+    feedrate: 3000,
   };
 }
 
@@ -632,10 +633,11 @@ describe("usePlotProgress", () => {
     // seg[0]=cut (0→10), seg[1]=rapid (10→50) — coordinate tracking.
     // Machine at midpoint of seg[1] (x=30): frontier lands on the rapid.
     // setPlotProgress: seg[1] is "rapid" → "else displayRapids += part" (line 484).
-    const segs: GcodeSegment[] = [
+    // No line numbers: progress is tracked by coordinates.
+    const segs = [
       { from: { x: 0, y: 0 }, to: { x: 10, y: 0 }, type: "cut" as const },
       { from: { x: 10, y: 0 }, to: { x: 50, y: 0 }, type: "rapid" as const },
-    ];
+    ] as GcodeSegment[];
     segs.forEach((s) => {
       (s as any).lineNum = undefined;
     });
@@ -669,7 +671,8 @@ describe("usePlotProgress", () => {
     // After 6 stale ticks the hook starts the unbounded relocation search;
     // on the 7th stale tick it finds two consecutive hits → commits frontier to
     // seg[601], appending segs[0..600] (601 segs, >50) via the BULK path.
-    const segs: GcodeSegment[] = [
+    // No line numbers: progress is tracked by coordinates.
+    const segs = [
       { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, type: "cut" as const },
       ...Array.from({ length: 600 }, (_, i) => ({
         from: { x: i, y: 50 },
@@ -677,7 +680,7 @@ describe("usePlotProgress", () => {
         type: "cut" as const,
       })),
       { from: { x: 800, y: 0 }, to: { x: 810, y: 0 }, type: "cut" as const },
-    ];
+    ] as GcodeSegment[];
     segs.forEach((s) => {
       (s as any).lineNum = undefined;
     });

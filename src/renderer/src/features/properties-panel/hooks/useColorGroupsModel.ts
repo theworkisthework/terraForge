@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SvgImport, SvgPath } from "../../../types";
+import { SvgImport, SvgPath } from "../../../../../types";
 import {
   normalizeSvgColor,
   parseColorToRgb,
