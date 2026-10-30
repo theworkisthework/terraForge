@@ -170,7 +170,7 @@ describe("useImportPropertiesFormModel", () => {
             templateScaleEnabled: false,
             templateScaleTarget: "page",
             ratioLocked: true,
-            rotStep: 90,
+            rotStep: 45,
             stepFlyoutOpen: false,
             showCentreMarker: false,
             onUpdate: (c) => useCanvasStore.getState().updateImport(imp.id, c),
@@ -193,7 +193,7 @@ describe("useImportPropertiesFormModel", () => {
         const { result } = setup();
         result.current.sharedTransformProps[action]();
         const rotated = useCanvasStore.getState().imports[0].rotation;
-        expect(rotated).toBe(action === "onRotateCw" ? 90 : -90);
+        expect(rotated).toBe(action === "onRotateCw" ? 45 : -45);
 
         useCanvasStore.getState().undo();
 
