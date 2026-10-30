@@ -76,7 +76,12 @@ export function ConsolePanel({ collapsed = false }: ConsolePanelProps) {
           resetting={resetting}
           showRestartConfirm={showRestartConfirm}
           collapsed={collapsed}
-          onEmergencyStop={() => void window.terraForge.fluidnc.pauseJob()}
+          onEmergencyStop={() => {
+            // Nothing is moving when Idle; a Feed Hold would only park the
+            // machine in Hold, which the UI reads as a paused job.
+            if (status?.state === "Idle") return;
+            void window.terraForge.fluidnc.pauseJob();
+          }}
           onFirmwareReset={() => setShowRestartConfirm(true)}
           onClear={clear}
           onAlarmClear={() => window.terraForge.fluidnc.sendCommand("$X")}

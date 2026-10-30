@@ -188,6 +188,21 @@ describe("ConsolePanel", () => {
     expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalledTimes(1);
   });
 
+  it("does not send Feed Hold on e-stop when the machine is idle", async () => {
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        raw: "<Idle>",
+        state: "Idle",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+      },
+    });
+    render(<ConsolePanel />);
+    await userEvent.click(screen.getByRole("button", { name: /e-stop/i }));
+    expect(window.terraForge.fluidnc.pauseJob).not.toHaveBeenCalled();
+  });
+
   // ── Auto-scroll ─────────────────────────────────────────────────────────
 
   it("auto-scrolls when new lines are added", async () => {
