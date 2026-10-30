@@ -164,9 +164,9 @@ describe("useJobActions G-code generation", () => {
     await generate({ exportPerColor: true, exportPerHatch: true, optimise: false, saveLocally: true, uploadToSd: false });
 
     expect(written).toEqual([
-      ["/out/color_hex-3a6aaa.gcode", "G:a2"],
-      ["/out/color_red.gcode", "G:a1"],
-      ["/out/hatch_red.gcode", "G:a2-h0"],
+      ["/out/test-import_color_hex-3a6aaa.gcode", "G:a2"],
+      ["/out/test-import_color_red.gcode", "G:a1"],
+      ["/out/test-import_hatch_red.gcode", "G:a2-h0"],
     ]);
     expect(labels).toContain("running: Preparing hatch red…");
     expect(labels).toContain("completed: Hatch red ready");

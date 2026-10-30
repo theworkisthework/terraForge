@@ -238,6 +238,8 @@ export interface VectorObject {
   viewBoxY?: number;
   /** Layer / group name from source SVG */
   layer?: string;
+  /** Name of the import this object came from. Prefixes per-colour G-code files. */
+  importName?: string;
   /** Source fill color for color-based G-code batching (e.g. '#FF0000', 'black'). */
   sourceColor?: string;
   /**

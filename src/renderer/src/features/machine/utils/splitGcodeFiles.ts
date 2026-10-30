@@ -106,6 +106,15 @@ function byColor(objects: VectorObject[]): Map<string, VectorObject[]> {
 /** Hatch lines are objects with `-h` in their id. */
 const isHatch = (obj: VectorObject) => obj.id.includes("-h");
 
+/** `color_red` or `hatch_red`, prefixed with the source image's name
+ * ("photo_color_red") when the file's objects all come from one import. */
+function colorFileBase(kind: "color" | "hatch", displayName: string, objects: VectorObject[]): string {
+  const importNames = new Set(objects.map((o) => o.importName));
+  const [only] = importNames;
+  const stem = importNames.size === 1 && only ? safeFilenameBase(only.replace(/\.[^.]+$/, "")) : "";
+  return `${stem ? `${stem}_` : ""}${kind}_${toFilenameSafe(displayName)}`;
+}
+
 /** One file per source colour, named after it ("color_red.gcode"), sorted
  * by colour. With `withoutHatching`, hatch lines are left for hatchFiles. */
 export function colorFiles(objects: VectorObject[], withoutHatching: boolean, optimise: boolean): SplitFile[] {
@@ -116,7 +125,7 @@ export function colorFiles(objects: VectorObject[], withoutHatching: boolean, op
   const displayNames = colorDisplayNames(entries);
   return entries.map(({ color, objects: objs }) => {
     const displayName = displayNames.get(color) ?? color;
-    return { name: displayName, doneName: displayName, filename: gcodeFilename(`color_${toFilenameSafe(displayName)}`, optimise), objects: objs };
+    return { name: displayName, doneName: displayName, filename: gcodeFilename(colorFileBase("color", displayName, objs), optimise), objects: objs };
   });
 }
 
@@ -130,7 +139,7 @@ export function hatchFiles(objects: VectorObject[], optimise: boolean): SplitFil
     return {
       name: `hatch ${displayName}`,
       doneName: `Hatch ${displayName}`,
-      filename: gcodeFilename(`hatch_${toFilenameSafe(displayName)}`, optimise),
+      filename: gcodeFilename(colorFileBase("hatch", displayName, objs), optimise),
       objects: objs,
     };
   });

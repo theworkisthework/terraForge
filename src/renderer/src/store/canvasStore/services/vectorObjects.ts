@@ -35,6 +35,7 @@ function projectPathToVectorObjects(
     viewBoxX: imp.viewBoxX,
     viewBoxY: imp.viewBoxY,
     layer: path.layer,
+    importName: imp.name,
     // A bitmap's paths are its inks, labelled with the ink's name; an SVG
     // path's label is not a colour name.
     colorName: imp.kind === "bitmap" ? path.label : undefined,
@@ -117,6 +118,7 @@ export function vectorObjectsForImport(imp: SvgImport): VectorObject[] {
           rotation: imp.rotation, visible: true, originalWidth: imp.svgWidth,
           originalHeight: imp.svgHeight, viewBoxX: imp.viewBoxX, viewBoxY: imp.viewBoxY,
           layer: imp.name,
+          importName: imp.name,
         }]
       : [];
   }
