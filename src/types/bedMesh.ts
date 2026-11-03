@@ -1,4 +1,4 @@
-import type { BedMesh, BedMeshPoint } from "./types";
+import type { BedMesh, BedMeshPoint } from "./index";
 
 /** Returns the bilinearly interpolated Z offset, clamped to the calibrated bed. */
 export function interpolateBedMesh(mesh: BedMesh, x: number, y: number): number {

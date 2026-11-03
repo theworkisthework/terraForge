@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { createBedMeshPoints } from "../../../../../../bedMesh";
+import { createBedMeshPoints } from "../../../../../../types/bedMesh";
 import type { BedMesh, BedMeshPoint } from "../../../../../../types";
 import { useBedMeshStore } from "../../../../store/bedMeshStore";
 import { useMachineStore } from "../../../../store/machineStore";
 import { Button } from "../../../ui";
-import { Section } from "../../Section";
+import { Section } from "../Section";
 
 export function BedMeshSection() {
   const activeConfig = useMachineStore((s) => s.activeConfig());

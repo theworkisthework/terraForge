@@ -5,7 +5,7 @@
  */
 import type { MachineConfig } from "../../types";
 import { fmtCoord as fmt } from "../gcodeEngine";
-import { interpolateBedMesh } from "../../bedMesh";
+import { interpolateBedMesh } from "../../types/bedMesh";
 import type { GenerationSettings } from "./document";
 import {
   canServiceInMode,
@@ -133,7 +133,7 @@ export class JobWriter {
    * ink service; returns where the pen ends. */
   private drawTo(from: Point, target: Point, dip: string | undefined): Point {
     if (!this.canService) {
-      this.      lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
+      this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
       return target;
     }
     let start = from;
@@ -147,7 +147,7 @@ export class JobWriter {
         continue;
       }
       if (remaining + 1e-9 < toTrigger) {
-        this.        lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
+        this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
         this.travelSinceService += remaining;
         return target;
       }
@@ -159,12 +159,12 @@ export class JobWriter {
       start = split;
       this.service(dip);
     }
+  }
 
-    private zWord(x: number, y: number): string {
-      const offset = this.settings.bedMesh
-        ? interpolateBedMesh(this.settings.bedMesh, x, y)
-        : 0;
-      return this.settings.bedMesh ? ` Z${fmt(offset)}` : "";
-    }
+  private zWord(x: number, y: number): string {
+    const offset = this.settings.bedMesh
+      ? interpolateBedMesh(this.settings.bedMesh, x, y)
+      : 0;
+    return this.settings.bedMesh ? ` Z${fmt(offset)}` : "";
   }
 }

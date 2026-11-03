@@ -13,8 +13,8 @@ export interface GcodeOptionsContext {
   /** Drag-knife settings, or null when vinyl cutting is off for the app. */
   vinyl: { bladeOffsetMM: number; cornerAngleThresholdDeg: number; microJogMagnitudeMM: number } | null;
   inkServiceStations: InkServiceStation[];
-  bedMesh: BedMesh | null;
-  bedMeshEnabled: boolean;
+  bedMesh?: BedMesh | null;
+  bedMeshEnabled?: boolean;
 }
 
 /** Clipping to the page (less its margin) or to the page edge (less a
