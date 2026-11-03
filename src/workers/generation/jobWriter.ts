@@ -5,6 +5,7 @@
  */
 import type { MachineConfig } from "../../types";
 import { fmtCoord as fmt } from "../gcodeEngine";
+import { interpolateBedMesh } from "../../bedMesh";
 import type { GenerationSettings } from "./document";
 import {
   canServiceInMode,
@@ -58,7 +59,7 @@ export class JobWriter {
     const dip = this.beginItem(color, layer);
     const { lines, config, settings } = this;
     const first = points[0];
-    lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} ; Rapid travel`);
+    lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)}${this.zWord(first.x, first.y)} ; Rapid travel`);
     lines.push(`F${settings.drawSpeed}`);
     lines.push(config.penDownCommand + " ; Pen down");
     if (settings.penDownDelayMs > 0) lines.push(`G4 P${fmtSeconds(settings.penDownDelayMs / 1000)} ; Pen settle delay`);
@@ -132,7 +133,7 @@ export class JobWriter {
    * ink service; returns where the pen ends. */
   private drawTo(from: Point, target: Point, dip: string | undefined): Point {
     if (!this.canService) {
-      this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}`);
+      this.      lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
       return target;
     }
     let start = from;
@@ -146,17 +147,24 @@ export class JobWriter {
         continue;
       }
       if (remaining + 1e-9 < toTrigger) {
-        this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}`);
+        this.        lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}${this.zWord(target.x, target.y)}`);
         this.travelSinceService += remaining;
         return target;
       }
 
       const ratio = toTrigger / remaining;
       const split = { x: start.x + (target.x - start.x) * ratio, y: start.y + (target.y - start.y) * ratio };
-      this.lines.push(`G1 X${fmt(split.x)} Y${fmt(split.y)}`);
+      this.lines.push(`G1 X${fmt(split.x)} Y${fmt(split.y)}${this.zWord(split.x, split.y)}`);
       this.travelSinceService += toTrigger;
       start = split;
       this.service(dip);
+    }
+
+    private zWord(x: number, y: number): string {
+      const offset = this.settings.bedMesh
+        ? interpolateBedMesh(this.settings.bedMesh, x, y)
+        : 0;
+      return this.settings.bedMesh ? ` Z${fmt(offset)}` : "";
     }
   }
 }

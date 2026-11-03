@@ -2,7 +2,7 @@
  * The G-code worker's options, from the user's generation preferences and
  * what the app knows: versions, the page template, vinyl and ink settings.
  */
-import type { GcodeOptions, InkServiceStation, PageSize, PageTemplate } from "../../../../../types";
+import type { BedMesh, GcodeOptions, InkServiceStation, PageSize, PageTemplate } from "../../../../../types";
 import type { GcodePrefs } from "../../gcode-options/gcodePrefs";
 
 export interface GcodeOptionsContext {
@@ -13,6 +13,8 @@ export interface GcodeOptionsContext {
   /** Drag-knife settings, or null when vinyl cutting is off for the app. */
   vinyl: { bladeOffsetMM: number; cornerAngleThresholdDeg: number; microJogMagnitudeMM: number } | null;
   inkServiceStations: InkServiceStation[];
+  bedMesh: BedMesh | null;
+  bedMeshEnabled: boolean;
 }
 
 /** Clipping to the page (less its margin) or to the page edge (less a
@@ -59,5 +61,6 @@ export function buildGcodeOptions(prefs: GcodePrefs, ctx: GcodeOptionsContext): 
           layerDipStations: prefs.inkServiceLayerDipMap,
         }
       : undefined,
+    bedMesh: ctx.bedMeshEnabled ? (ctx.bedMesh ?? undefined) : undefined,
   };
 }

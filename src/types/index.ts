@@ -62,6 +62,23 @@ export interface AppConfig {
   showConsoleTimestamps: boolean;
 }
 
+export interface BedMeshPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface BedMesh {
+  version: 1;
+  name: string;
+  xPoints: number;
+  yPoints: number;
+  widthMM: number;
+  heightMM: number;
+  points: BedMeshPoint[];
+  createdAt: string;
+}
+
 export interface VinylCuttingSettings {
   enabled: boolean;
   bladeOffsetMM: number;
@@ -807,6 +824,8 @@ export interface GcodeOptions {
   vinylWeedBorder?: Omit<VinylWeedBorderSettings, "enabled">;
   /** Optional travel-triggered pen/brush service moves (prime/wipe or dip/wash). */
   inkService?: InkServiceSettings;
+  /** Optional bilinear bed mesh compensation, applied only when supplied. */
+  bedMesh?: BedMesh;
 }
 
 // ─── Background Tasks ─────────────────────────────────────────────────────────
@@ -942,6 +961,8 @@ export interface FsApi {
   saveFileDialog: (defaultName: string) => Promise<string | null>;
   saveLayoutDialog: (defaultName: string) => Promise<string | null>;
   openLayoutDialog: () => Promise<string | null>;
+  saveBedMeshDialog: (defaultName: string) => Promise<string | null>;
+  openBedMeshDialog: () => Promise<string | null>;
   /** Open a native folder picker. Returns the chosen directory path, or null if cancelled. */
   chooseDirectory: () => Promise<string | null>;
   /** Subscribe to native File-menu → layout action events. Returns an unsubscribe fn. */

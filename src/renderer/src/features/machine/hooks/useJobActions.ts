@@ -6,6 +6,7 @@ import { selectJobActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { useMachineStore } from "../../../store/machineStore";
 import { useAppConfigStore } from "../../../store/appConfigStore";
+import { useBedMeshStore } from "../../../store/bedMeshStore";
 import { parseGcode } from "../../../utils/gcodeParser";
 import { type GcodeOptions } from "../../../../../types";
 import type { GcodePrefs } from "../../../components/GcodeOptionsDialog";
@@ -32,6 +33,8 @@ export function useJobActions() {
   const vinylCornerAngleThresholdDeg = useAppConfigStore((s) => s.vinylCornerAngleThresholdDeg);
   const vinylMicroJogMagnitudeMM = useAppConfigStore((s) => s.vinylMicroJogMagnitudeMM);
   const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
+  const bedMesh = useBedMeshStore((s) => s.mesh);
+  const bedMeshEnabled = useBedMeshStore((s) => s.enabled);
 
   const {
     imports,
@@ -89,6 +92,8 @@ export function useJobActions() {
         ? { bladeOffsetMM: vinylBladeOffsetMM, cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg, microJogMagnitudeMM: vinylMicroJogMagnitudeMM }
         : null,
       inkServiceStations,
+      bedMesh,
+      bedMeshEnabled,
     });
   };
 

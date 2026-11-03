@@ -158,6 +158,29 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
       filters: [{ name: "terraForge Layout", extensions: ["tforge"] }],
       properties: ["openFile"],
     });
+
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle("fs:saveBedMeshDialog", async (_e, defaultName: string) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: "Save Bed Mesh Profile",
+      defaultPath: defaultName.endsWith(".json") ? defaultName : `${defaultName}.json`,
+      filters: [{ name: "Bed Mesh JSON", extensions: ["json"] }],
+    });
+    return result.canceled ? null : result.filePath;
+  });
+
+  ipcMain.handle("fs:openBedMeshDialog", async () => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: "Import Bed Mesh Profile",
+      filters: [{ name: "Bed Mesh JSON", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
     return result.canceled ? null : result.filePaths[0];
   });
 
