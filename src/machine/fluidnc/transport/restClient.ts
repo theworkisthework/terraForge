@@ -1,5 +1,29 @@
 export type FluidNCHttpMethod = "GET" | "POST" | "DELETE";
 
+/** The controller answered, but with a non-2xx status. */
+export class FluidNCHttpError extends Error {
+  constructor(
+    readonly status: number,
+    method: string,
+    url: string,
+  ) {
+    super(`HTTP ${status} ${method} ${url}`);
+    this.name = "FluidNCHttpError";
+  }
+}
+
+/** True when a request was abandoned by its timeout rather than refused. */
+export function isTimeoutError(error: unknown): boolean {
+  // AbortSignal.timeout() rejects with a DOMException, which is not an
+  // Error subclass in every runtime, so match on shape.
+  if (typeof error !== "object" || error === null) return false;
+  const { name, message } = error as { name?: unknown; message?: unknown };
+  return (
+    name === "TimeoutError" ||
+    (typeof message === "string" && /timed out/i.test(message))
+  );
+}
+
 export class FluidNCRestClient {
   private baseUrl = "";
 
@@ -49,8 +73,7 @@ export class FluidNCRestClient {
         signal.removeEventListener("abort", abortListener);
       }
     });
-    if (!response.ok)
-      throw new Error(`HTTP ${response.status} ${method} ${url}`);
+    if (!response.ok) throw new FluidNCHttpError(response.status, method, url);
     return response;
   }
 
@@ -62,7 +85,7 @@ export class FluidNCRestClient {
       body,
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status} POST ${url}`);
+    if (!response.ok) throw new FluidNCHttpError(response.status, "POST", url);
     return response;
   }
 }

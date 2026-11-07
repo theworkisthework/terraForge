@@ -120,6 +120,14 @@ describe("FluidNCClient", () => {
     );
   });
 
+  it("does not resend via plain query when commandText times out", async () => {
+    const timeout = new DOMException("The operation timed out", "TimeoutError");
+    mockFetch.mockRejectedValueOnce(timeout);
+
+    await expect(client.sendCommand("$H")).rejects.toBe(timeout);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   // ── listFiles ───────────────────────────────────────────────────────────
 
   it("parses file listing from /files endpoint", async () => {
@@ -176,6 +184,44 @@ describe("FluidNCClient", () => {
     await client.runFile("/job.gcode", "fs");
     const url = decodeURIComponent(mockFetch.mock.calls[0][0] as string);
     expect(url).toContain("$LocalFS/Run=/job.gcode");
+  });
+
+  it("sends Run over the WebSocket on 4.x when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    (client as any).fwMajor = 4;
+    await client.runFile("/job.gcode", "sd");
+    expect(mockWs.send).toHaveBeenCalledWith("$SD/Run=/job.gcode\n");
+    expect(mockFetch).not.toHaveBeenCalled();
+    (client as any).ws = null;
+  });
+
+  it("sends Run over HTTP on 3.x even when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    (client as any).fwMajor = 3;
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.runFile("/job.gcode", "sd");
+    expect(mockWs.send).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    (client as any).ws = null;
+  });
+
+  it("treats a timed-out HTTP Run as started without resending it", async () => {
+    mockFetch.mockRejectedValueOnce(
+      new DOMException("The operation timed out", "TimeoutError"),
+    );
+    await expect(client.runFile("/job.gcode", "sd")).resolves.toBeUndefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("still rejects a Run the controller refuses", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("", 500))
+      .mockResolvedValueOnce(mockResponse("", 500));
+    await expect(client.runFile("/job.gcode", "sd")).rejects.toThrow(
+      "HTTP 500",
+    );
   });
 
   // ── Error handling ──────────────────────────────────────────────────────
