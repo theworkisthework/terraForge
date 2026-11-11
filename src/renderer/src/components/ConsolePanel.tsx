@@ -4,6 +4,7 @@ import { useMachineStore } from "../store/machineStore";
 import { useAppConfigStore } from "../store/appConfigStore";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useStableMachineState } from "../hooks/useStableMachineState";
+import { sendJobControl } from "../features/machine/utils/jobControl";
 import { ConsoleToolbar } from "./ConsolePanel/ConsoleToolbar";
 import { ConsoleLog } from "./ConsolePanel/ConsoleLog";
 import { ConsoleInput } from "./ConsolePanel/ConsoleInput";
@@ -80,7 +81,7 @@ export function ConsolePanel({ collapsed = false }: ConsolePanelProps) {
             // Nothing is moving when Idle; a Feed Hold would only park the
             // machine in Hold, which the UI reads as a paused job.
             if (status?.state === "Idle") return;
-            void window.terraForge.fluidnc.pauseJob();
+            void sendJobControl("pause");
           }}
           onFirmwareReset={() => setShowRestartConfirm(true)}
           onClear={clear}

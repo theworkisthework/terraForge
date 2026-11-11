@@ -700,6 +700,33 @@ describe("FileBrowserPanel", () => {
     });
   });
 
+  it("a failed or cancelled download is left to its task toast", async () => {
+    (
+      window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      { name: "out.gcode", path: "/out.gcode", size: 100, isDirectory: false },
+    ]);
+    (
+      window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+    (
+      window.terraForge.fs.saveGcodeDialog as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("/local/out.gcode");
+    // downloadFile rejects on failure and on cancel. An uncaught rejection
+    // here would fail the test run.
+    (
+      window.terraForge.fluidnc.downloadFile as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("Transfer cancelled"));
+    useMachineStore.setState({ connected: true });
+    render(<FileBrowserPanel />);
+    await waitFor(() => expect(screen.getByText("out.gcode")).toBeInTheDocument());
+    await userEvent.hover(screen.getByTestId("file-row-out.gcode"));
+    await userEvent.click(screen.getByTitle("Download"));
+    await waitFor(() =>
+      expect(window.terraForge.fluidnc.downloadFile).toHaveBeenCalled(),
+    );
+  });
+
   it("download button cancelled when saveGcodeDialog returns null", async () => {
     (
       window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>

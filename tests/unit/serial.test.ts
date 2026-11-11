@@ -5,22 +5,26 @@ import { parseFluidNCStatus } from "../../src/machine/serial";
 // We'll test parseListLines indirectly through the class
 import { SerialClient } from "../../src/machine/serial";
 
-// Mock serialport so we don't need real hardware
-vi.mock("serialport", () => ({
-  SerialPort: class MockSerialPort {
-    static list = vi.fn().mockResolvedValue([]);
-    isOpen = true;
-    write = vi.fn((_data: string, cb?: (err?: Error) => void) => cb?.());
-    open = vi.fn((cb: (err?: Error) => void) => cb());
-    close = vi.fn((cb: (err?: Error) => void) => cb());
-    pipe = vi.fn().mockReturnValue({
-      on: vi.fn(),
-    });
-  },
-  ReadlineParser: class MockReadlineParser {
-    on = vi.fn();
-  },
-}));
+// Mock serialport so we don't need real hardware. The port is a real
+// EventEmitter so tests can fire its "close" and "error" events.
+vi.mock("serialport", async () => {
+  const { EventEmitter } = await import("events");
+  return {
+    SerialPort: class MockSerialPort extends EventEmitter {
+      static list = vi.fn().mockResolvedValue([]);
+      isOpen = true;
+      write = vi.fn((_data: string, cb?: (err?: Error) => void) => cb?.());
+      open = vi.fn((cb: (err?: Error) => void) => cb());
+      close = vi.fn((cb: (err?: Error) => void) => cb());
+      pipe = vi.fn().mockReturnValue({
+        on: vi.fn(),
+      });
+    },
+    ReadlineParser: class MockReadlineParser {
+      on = vi.fn();
+    },
+  };
+});
 
 describe("parseFluidNCStatus", () => {
   // ── State parsing ───────────────────────────────────────────────────────
@@ -225,19 +229,33 @@ describe("SerialClient.parseListLines", () => {
 // ── SerialClient high-level methods ───────────────────────────────────────────
 
 describe("SerialClient", () => {
-  it("sendRealtime writes a single character without newline", () => {
+  it("sendRealtime writes a single character without newline", async () => {
     const client = new SerialClient();
-    // Connect first to set up the port
-    (client as any).port = { isOpen: true, write: vi.fn() };
-    client.sendRealtime("!");
-    expect((client as any).port.write).toHaveBeenCalledWith("!");
+    const write = vi.fn((_d: string, cb?: (err?: Error) => void) => cb?.());
+    (client as any).port = { isOpen: true, write };
+    await client.sendRealtime("!");
+    expect(write).toHaveBeenCalledWith("!", expect.any(Function));
   });
 
-  it("sendRealtime does nothing when port is closed", () => {
+  it("sendRealtime rejects when the port is closed", async () => {
     const client = new SerialClient();
     (client as any).port = { isOpen: false, write: vi.fn() };
-    client.sendRealtime("?");
+    await expect(client.sendRealtime("!")).rejects.toThrow("Serial port not connected");
     expect((client as any).port.write).not.toHaveBeenCalled();
+  });
+
+  it("sendRealtime rejects when there is no port at all", async () => {
+    const client = new SerialClient();
+    await expect(client.sendRealtime("\x18")).rejects.toThrow("Serial port not connected");
+  });
+
+  it("sendRealtime rejects when the write fails", async () => {
+    const client = new SerialClient();
+    (client as any).port = {
+      isOpen: true,
+      write: vi.fn((_d: string, cb?: (err?: Error) => void) => cb?.(new Error("write fail"))),
+    };
+    await expect(client.sendRealtime("!")).rejects.toThrow("write fail");
   });
 });
 
@@ -546,6 +564,91 @@ describe("SerialClient connect and disconnect", () => {
     await client.connect("/dev/ttyUSB0", 115200);
     expect((client as any).port).not.toBeNull();
     expect((client as any).parser).not.toBeNull();
+  });
+});
+
+// ── SerialClient – losing the port ────────────────────────────────────────────
+
+describe("SerialClient when the port is lost", () => {
+  it("emits 'disconnected' with the reason when the port closes on its own", async () => {
+    const client = new SerialClient();
+    const onDisconnected = vi.fn();
+    client.on("disconnected", onDisconnected);
+    await client.connect("/dev/ttyUSB0", 115200);
+
+    (client as any).port.emit("close", new Error("device unplugged"));
+
+    expect(onDisconnected).toHaveBeenCalledWith("device unplugged");
+    expect((client as any).port).toBeNull();
+    expect((client as any).parser).toBeNull();
+  });
+
+  it("gives a reason even when the close event carries none", async () => {
+    const client = new SerialClient();
+    const onDisconnected = vi.fn();
+    client.on("disconnected", onDisconnected);
+    await client.connect("/dev/ttyUSB0", 115200);
+
+    (client as any).port.emit("close");
+
+    expect(onDisconnected).toHaveBeenCalledWith("port closed");
+  });
+
+  it("rejects the command in flight and stops polling", async () => {
+    const client = new SerialClient();
+    client.on("disconnected", () => {});
+    await client.connect("/dev/ttyUSB0", 115200);
+    client.startStatusPolling(500);
+    const inFlight = client.sendAndReceive("$SD/List");
+
+    (client as any).port.emit("close", new Error("device unplugged"));
+
+    await expect(inFlight).rejects.toThrow("disconnected");
+    expect((client as any).statusInterval).toBeNull();
+    await expect(client.sendRealtime("!")).rejects.toThrow("Serial port not connected");
+  });
+
+  it("does not emit 'disconnected' for a disconnect() that was asked for", async () => {
+    const client = new SerialClient();
+    const onDisconnected = vi.fn();
+    client.on("disconnected", onDisconnected);
+    await client.connect("/dev/ttyUSB0", 115200);
+    const port = (client as any).port;
+    // The real port fires "close" as it shuts.
+    port.close = vi.fn((cb: (err?: Error) => void) => {
+      port.emit("close");
+      cb();
+    });
+
+    await client.disconnect();
+
+    expect(port.close).toHaveBeenCalled();
+    expect(onDisconnected).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late close from a port that has been replaced", async () => {
+    const client = new SerialClient();
+    const onDisconnected = vi.fn();
+    client.on("disconnected", onDisconnected);
+    await client.connect("/dev/ttyUSB0", 115200);
+    const oldPort = (client as any).port;
+    await client.connect("/dev/ttyUSB1", 115200);
+
+    oldPort.emit("close", new Error("device unplugged"));
+
+    expect(onDisconnected).not.toHaveBeenCalled();
+    expect((client as any).port).not.toBeNull();
+  });
+
+  it("reports a port error to the console instead of throwing", async () => {
+    const client = new SerialClient();
+    const onData = vi.fn();
+    client.on("data", onData);
+    await client.connect("/dev/ttyUSB0", 115200);
+
+    expect(() => (client as any).port.emit("error", new Error("I/O fault"))).not.toThrow();
+
+    expect(onData).toHaveBeenCalledWith(expect.stringContaining("I/O fault"));
   });
 });
 

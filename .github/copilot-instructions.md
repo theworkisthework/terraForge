@@ -53,7 +53,7 @@ fluidnc.connectWebSocket(host, port, wsPort) | disconnectWebSocket()
 fluidnc.onStatusUpdate(cb) | onConsoleMessage(cb) | onFirmwareInfo(cb)
 
 // Serial
-serial.listPorts() | connect(path, baud) | disconnect() | send(data) | onData(cb)
+serial.listPorts() | connect(path, baud) | disconnect() | send(data) | onData(cb) | onDisconnected(cb)
 
 // File I/O
 fs.openSvgDialog() | openPdfDialog() | openFileDialog() | readFile() | writeFile() | saveGcodeDialog()

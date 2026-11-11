@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { v4 as uuid } from "uuid";
 import { useMachineStore } from "../store/machineStore";
 import { useRendererPluginStore } from "../store/rendererPluginStore";
 import { startBitmapRenderService } from "../features/bitmap-renderers/bitmapRenderService";
@@ -10,7 +11,7 @@ import { useThemeStore, applyTheme } from "../store/themeStore";
 /**
  * App start-up: loads machine configs, renderer plugins and app settings,
  * starts the bitmap render service, and subscribes to the main process's
- * status, console, task, ping and firmware updates. Also keeps the <html>
+ * status, console, task, ping, firmware and serial-loss updates. Also keeps the <html>
  * theme class in step with the theme store.
  */
 export function useAppBootstrap() {
@@ -19,6 +20,7 @@ export function useAppBootstrap() {
   const setStatus = useMachineStore((s) => s.setStatus);
   const setWsLive = useMachineStore((s) => s.setWsLive);
   const setFwInfo = useMachineStore((s) => s.setFwInfo);
+  const setConnected = useMachineStore((s) => s.setConnected);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const appendLine = useConsoleStore((s) => s.appendLine);
   const setDebugLoggingEnabled = useAppConfigStore((s) => s.setDebugLoggingEnabled);
@@ -50,6 +52,20 @@ export function useAppBootstrap() {
     // Serial data — route to console the same way WebSocket messages are
     const offSerialData = window.terraForge.serial.onData(appendLine);
 
+    // The USB port closed on its own (cable pulled, controller reset). Nothing
+    // reconnects it, so show the machine as disconnected and say why.
+    const offSerialLost = window.terraForge.serial.onDisconnected((reason) => {
+      setConnected(false);
+      upsertTask({
+        id: uuid(),
+        type: "ws-connect",
+        label: "Serial connection lost",
+        progress: null,
+        status: "error",
+        error: reason,
+      });
+    });
+
     // Subscribe to background task updates
     const offTask = window.terraForge.tasks.onTaskUpdate(upsertTask);
 
@@ -67,6 +83,7 @@ export function useAppBootstrap() {
       offStatus();
       offConsole();
       offSerialData();
+      offSerialLost();
       offTask();
       offPing();
       offFirmware();
@@ -79,6 +96,7 @@ export function useAppBootstrap() {
     setStatus,
     setWsLive,
     setFwInfo,
+    setConnected,
     upsertTask,
     appendLine,
     setDebugLoggingEnabled,

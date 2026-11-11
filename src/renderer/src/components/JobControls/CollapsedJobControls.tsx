@@ -1,6 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { Pause, Play, X } from "lucide-react";
 import { useJobStartHandler } from "./useJobStartHandler";
+import { sendJobControl } from "../../features/machine/utils/jobControl";
 import { useMachineStore } from "../../store/machineStore";
 import { useCanvasStore } from "../../store/canvasStore";
 import { selectJobControlsCanvasState } from "../../store/canvasSelectors";
@@ -126,11 +127,11 @@ export function CollapsedJobControls({ onAbort }: { onAbort: () => void }) {
   const handlePrimaryAction = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (isJobRunning) {
-      await window.terraForge.fluidnc.pauseJob();
+      await sendJobControl("pause");
       return;
     }
     if (isJobHeld) {
-      await window.terraForge.fluidnc.resumeJob();
+      await sendJobControl("resume");
       return;
     }
     if (effectiveJobFile && jobFileValid) {
