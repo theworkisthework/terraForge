@@ -14,7 +14,11 @@ import {
   type FirmwareProbeInfo,
 } from "./fluidnc/parsers/firmwareParser";
 import { parseMachineStatus } from "./fluidnc/parsers/statusParser";
-import { FluidNCRestClient } from "./fluidnc/transport/restClient";
+import {
+  FluidNCHttpError,
+  FluidNCRestClient,
+  isTimeoutError,
+} from "./fluidnc/transport/restClient";
 import {
   disconnectFluidNCWebSocket,
   killFluidNCWebSocket,
@@ -126,7 +130,9 @@ export class FluidNCClient extends EventEmitter {
     // 4.x / WebUI convention: GET /command?commandText=CMD
     //
     // Some builds still accept GET /command?plain=CMD, so for 4.x/unknown we
-    // try commandText first (matching WebUI) and fall back to plain.
+    // try commandText first (matching WebUI) and fall back to plain -- but only
+    // when the controller rejected the request. A timeout means it may already
+    // be executing the command, and resending it would run it twice.
     if (this.fwMajor !== null && this.fwMajor < 4) {
       this.emitDebugConsole(
         `[terraForge] CMD HTTP POST /command commandText=${logCmd}`,
@@ -158,6 +164,7 @@ export class FluidNCClient extends EventEmitter {
       );
       return body;
     } catch (error) {
+      if (!(error instanceof FluidNCHttpError)) throw error;
       this.emitDebugConsole(
         `[terraForge] CMD RETRY GET plain (commandText failed: ${
           error instanceof Error ? error.message : String(error)
@@ -189,8 +196,29 @@ export class FluidNCClient extends EventEmitter {
       filesystem === "sd"
         ? `$SD/Run=${remotePath}`
         : `$LocalFS/Run=${remotePath}`;
-    // Delegate to sendCommand which handles the 3.x / 4.x HTTP convention difference.
-    await this.sendCommand(cmd);
+    if (this.fwMajor !== null && this.fwMajor < 4) {
+      await this.sendCommand(cmd);
+      return;
+    }
+    // FluidNC 4.1 holds the HTTP response to a Run command open until the
+    // file finishes ("Job output channel webclient closed; the job continues"
+    // once the request is dropped), so on 4.x the command goes over the live
+    // WebSocket. Its "ok" or error arrives there like any other output.
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.emitDebugConsole(`[terraForge] CMD WS ${cmd}`);
+      this.ws.send(`${cmd}\n`);
+      return;
+    }
+    try {
+      await this.sendCommand(cmd);
+    } catch (error) {
+      if (!isTimeoutError(error)) throw error;
+      // The controller accepted the request and is still running the job.
+      this.emit(
+        "console",
+        "[terraForge] No reply to the Run command yet; assuming the job is running",
+      );
+    }
   }
 
   async pauseJob(): Promise<void> {
