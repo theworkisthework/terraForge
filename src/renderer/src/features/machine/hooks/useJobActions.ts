@@ -80,6 +80,7 @@ export function useJobActions() {
   const buildOptions = async (prefs: GcodePrefs): Promise<GcodeOptions> => {
     const terraForgeVersion = await window.terraForge.app.getVersion().catch(() => "unknown");
     const { connected, fwInfo } = useMachineStore.getState();
+    const config = activeConfig();
     return buildGcodeOptions(prefs, {
       terraForgeVersion,
       firmwareVersion: connected ? (fwInfo?.replace(/^FluidNC\s+v/i, "") ?? "Unknown") : "Not connected",
@@ -89,8 +90,8 @@ export function useJobActions() {
         ? { bladeOffsetMM: vinylBladeOffsetMM, cornerAngleThresholdDeg: vinylCornerAngleThresholdDeg, microJogMagnitudeMM: vinylMicroJogMagnitudeMM }
         : null,
       inkServiceStations,
-      bedMesh: cfg.bedMesh ?? null,
-      bedMeshEnabled: cfg.bedMeshEnabled ?? false,
+      bedMesh: config?.bedMesh ?? null,
+      bedMeshEnabled: config?.bedMeshEnabled ?? false,
     });
   };
 
