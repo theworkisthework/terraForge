@@ -158,7 +158,8 @@ export function useJobActions() {
         setSelectedJobFile({ path: remotePath, source: "sd", name: filename });
         setGcodeSource({ path: remotePath, name: filename, source: "sd" });
       } catch {
-        // Upload error is already surfaced via the upload task toast
+        // Failed or cancelled: the upload task toast already says so, and
+        // the file is not offered as the job.
       }
     }
 

@@ -210,7 +210,7 @@ export async function runSplitFiles(
       try {
         await window.terraForge.fluidnc.uploadGcode(uuid(), gcode, "/" + file.filename);
       } catch {
-        // Upload error surfaced via upload task toast
+        // Failed or cancelled: the upload task toast already says so
       }
     }
   }

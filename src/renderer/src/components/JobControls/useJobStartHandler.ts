@@ -61,21 +61,41 @@ async function startLocalFile(
     progress: 0,
     status: "running",
   });
-  try {
-    // Load toolpath before running so plot-progress/ETA tracking works from the start.
-    // Best-effort: the job still runs without live tracking if this fails.
-    if (ctx.gcodeSource?.path !== localPath || !ctx.gcodeToolpath) {
-      try {
-        const text = await window.terraForge.fs.readFile(localPath);
-        const toolpath = parseGcode(text);
-        ctx.setGcodeToolpath(toolpath);
-        ctx.setGcodeSource({ path: localPath, name, source: "local" });
-        ctx.selectToolpath(true);
-      } catch {
-        // ignore — preview/tracking is best-effort
-      }
+  // Load toolpath before running so plot-progress/ETA tracking works from the start.
+  // Best-effort: the job still runs without live tracking if this fails.
+  if (ctx.gcodeSource?.path !== localPath || !ctx.gcodeToolpath) {
+    try {
+      const text = await window.terraForge.fs.readFile(localPath);
+      const toolpath = parseGcode(text);
+      ctx.setGcodeToolpath(toolpath);
+      ctx.setGcodeSource({ path: localPath, name, source: "local" });
+      ctx.selectToolpath(true);
+    } catch {
+      // ignore — preview/tracking is best-effort
     }
+  }
+
+  // The upload rejects when it fails and when it is cancelled. Either way the
+  // file on the SD card is not the one just chosen — it may be an older file
+  // of the same name — so the job must not start.
+  try {
     await window.terraForge.fluidnc.uploadFile(taskId, localPath, remotePath);
+  } catch (err) {
+    // A cancelled upload already reads "cancelled"; leave that as it is.
+    if (useTaskStore.getState().tasks[taskId]?.status !== "cancelled") {
+      upsertTask({
+        id: taskId,
+        type: "file-upload",
+        label: `Upload failed: ${name}`,
+        progress: null,
+        status: "error",
+        error: String(err),
+      });
+    }
+    return;
+  }
+
+  try {
     await window.terraForge.fluidnc.runFile(remotePath, "sd");
     upsertTask({
       id: uuid(),
@@ -86,9 +106,9 @@ async function startLocalFile(
     });
   } catch (err) {
     upsertTask({
-      id: taskId,
-      type: "file-upload",
-      label: `Upload failed: ${name}`,
+      id: uuid(),
+      type: "job-start",
+      label: `Failed to start ${name}`,
       progress: null,
       status: "error",
       error: String(err),

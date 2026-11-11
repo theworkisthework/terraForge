@@ -112,8 +112,26 @@ describe("FluidNC WebSocket lifecycle", () => {
 
     expect(parseStatus).toHaveBeenCalledWith("<Idle|MPos:0.000,0.000,0.000>");
     expect(emitStatus).toHaveBeenCalledWith({ state: "Idle" });
-    expect(emitPing).toHaveBeenCalledTimes(1);
+    expect(emitPing).toHaveBeenCalledTimes(3);
     expect(emitConsole).not.toHaveBeenCalled();
+  });
+
+  it("treats a status report alone as liveness when no PING is sent", () => {
+    const state = createState();
+    const emitPing = vi.fn();
+
+    openFluidNCWebSocket(state, {
+      parseStatus: vi.fn().mockReturnValue({ state: "Idle" }),
+      emitConsole: vi.fn(),
+      emitStatus: vi.fn(),
+      emitPing,
+      scheduleReconnect: vi.fn(),
+      setWsPort: vi.fn(),
+    });
+
+    lastWs().emit("message", "<Idle|MPos:0.000,0.000,0.000>");
+
+    expect(emitPing).toHaveBeenCalledTimes(1);
   });
 
   it("switches to port 81 when the server answers HTTP instead of upgrading", () => {

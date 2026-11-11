@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { FluidNCClient } from "../../src/machine/fluidnc";
+import {
+  FluidNCClient,
+  ConnectSupersededError,
+  encodeRemotePath,
+} from "../../src/machine/fluidnc";
 
 // ── Mock WebSocket from "ws" ──────────────────────────────────────────────────
 // vi.hoisted creates a value accessible in vi.mock factories (they're both
@@ -27,7 +31,7 @@ vi.mock("ws", () => {
     static CONNECTING = 0;
     readyState = 0;
     url: string;
-    send = vi.fn();
+    send = vi.fn((_data: unknown, cb?: (err?: Error) => void) => cb?.());
     terminate = vi.fn();
     close = vi.fn();
     constructor(url: string) {
@@ -120,6 +124,14 @@ describe("FluidNCClient", () => {
     );
   });
 
+  it("does not resend via plain query when commandText times out", async () => {
+    const timeout = new DOMException("The operation timed out", "TimeoutError");
+    mockFetch.mockRejectedValueOnce(timeout);
+
+    await expect(client.sendCommand("$H")).rejects.toBe(timeout);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   // ── listFiles ───────────────────────────────────────────────────────────
 
   it("parses file listing from /files endpoint", async () => {
@@ -176,6 +188,44 @@ describe("FluidNCClient", () => {
     await client.runFile("/job.gcode", "fs");
     const url = decodeURIComponent(mockFetch.mock.calls[0][0] as string);
     expect(url).toContain("$LocalFS/Run=/job.gcode");
+  });
+
+  it("sends Run over the WebSocket on 4.x when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    (client as any).fwMajor = 4;
+    await client.runFile("/job.gcode", "sd");
+    expect(mockWs.send).toHaveBeenCalledWith("$SD/Run=/job.gcode\n");
+    expect(mockFetch).not.toHaveBeenCalled();
+    (client as any).ws = null;
+  });
+
+  it("sends Run over HTTP on 3.x even when WS is open", async () => {
+    const mockWs = { readyState: 1, send: vi.fn() };
+    (client as any).ws = mockWs;
+    (client as any).fwMajor = 3;
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.runFile("/job.gcode", "sd");
+    expect(mockWs.send).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    (client as any).ws = null;
+  });
+
+  it("treats a timed-out HTTP Run as started without resending it", async () => {
+    mockFetch.mockRejectedValueOnce(
+      new DOMException("The operation timed out", "TimeoutError"),
+    );
+    await expect(client.runFile("/job.gcode", "sd")).resolves.toBeUndefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("still rejects a Run the controller refuses", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("", 500))
+      .mockResolvedValueOnce(mockResponse("", 500));
+    await expect(client.runFile("/job.gcode", "sd")).rejects.toThrow(
+      "HTTP 500",
+    );
   });
 
   // ── Error handling ──────────────────────────────────────────────────────
@@ -333,6 +383,52 @@ describe("FluidNCClient", () => {
     mockFetch.mockResolvedValueOnce(mockResponse("ok"));
     await client.abortJob();
     expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it("pause, resume and abort reject when the HTTP fallback cannot reach the machine", async () => {
+    mockFetch.mockRejectedValue(new Error("fetch failed"));
+    await expect(client.pauseJob()).rejects.toThrow("fetch failed");
+    await expect(client.resumeJob()).rejects.toThrow("fetch failed");
+    await expect(client.abortJob()).rejects.toThrow("fetch failed");
+  });
+
+  // ── Remote path encoding ────────────────────────────────────────────────
+
+  it("encodeRemotePath encodes each segment but keeps the slashes", () => {
+    expect(encodeRemotePath("/plots/my job #2 50%?.gcode")).toBe(
+      "/plots/my%20job%20%232%2050%25%3F.gcode",
+    );
+    expect(encodeRemotePath("/plain.gcode")).toBe("/plain.gcode");
+    expect(encodeRemotePath("/")).toBe("/");
+  });
+
+  it("fetchFileText encodes characters that would otherwise cut the URL short", async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse("G0 X1"));
+    await client.fetchFileText("/plots/take #2.gcode", "sdcard");
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "http://192.168.1.100:80/sd/plots/take%20%232.gcode",
+    );
+  });
+
+  it("deleteFile on 4.x encodes the path it deletes", async () => {
+    (client as any).fwMajor = 4;
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.deleteFile("/50% done?.gcode", "sd");
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "http://192.168.1.100:80/sd/50%25%20done%3F.gcode",
+    );
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("downloadFile encodes the path it requests", async () => {
+    // The request is all this test needs; fail it once it has been made.
+    mockFetch.mockRejectedValueOnce(new Error("stop here"));
+    await expect(
+      client.downloadFile("/a#b.gcode", "/tmp/unused.gcode", "internal"),
+    ).rejects.toThrow("stop here");
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "http://192.168.1.100:80/localfs/a%23b.gcode",
+    );
   });
 
   // ── fetchFileText ───────────────────────────────────────────────────────
@@ -514,27 +610,40 @@ describe("FluidNCClient", () => {
 
   // ── sendRealtime via open WebSocket (line 196) ──────────────────────────
 
+  /** An open socket whose sends succeed, or fail with `sendError`. */
+  const openWs = (sendError?: Error) => ({
+    readyState: 1 /* OPEN */,
+    send: vi.fn((_data: string, cb?: (err?: Error) => void) => cb?.(sendError)),
+  });
+
   it("pauseJob sends '!' directly via WebSocket when WS is open", async () => {
-    const mockWs = { readyState: 1 /* OPEN */, send: vi.fn() };
+    const mockWs = openWs();
     (client as any).ws = mockWs;
     await client.pauseJob();
-    expect(mockWs.send).toHaveBeenCalledWith("!");
+    expect(mockWs.send).toHaveBeenCalledWith("!", expect.any(Function));
+    expect(mockFetch).not.toHaveBeenCalled();
     (client as any).ws = null;
   });
 
   it("resumeJob sends '~' directly via WebSocket when WS is open", async () => {
-    const mockWs = { readyState: 1, send: vi.fn() };
+    const mockWs = openWs();
     (client as any).ws = mockWs;
     await client.resumeJob();
-    expect(mockWs.send).toHaveBeenCalledWith("~");
+    expect(mockWs.send).toHaveBeenCalledWith("~", expect.any(Function));
     (client as any).ws = null;
   });
 
   it("abortJob sends 0x18 directly via WebSocket when WS is open", async () => {
-    const mockWs = { readyState: 1, send: vi.fn() };
+    const mockWs = openWs();
     (client as any).ws = mockWs;
     await client.abortJob();
-    expect(mockWs.send).toHaveBeenCalledWith("\x18");
+    expect(mockWs.send).toHaveBeenCalledWith("\x18", expect.any(Function));
+    (client as any).ws = null;
+  });
+
+  it("abortJob rejects when the WebSocket send fails", async () => {
+    (client as any).ws = openWs(new Error("socket hang up"));
+    await expect(client.abortJob()).rejects.toThrow("socket hang up");
     (client as any).ws = null;
   });
 
@@ -553,21 +662,115 @@ describe("FluidNCClient", () => {
 
   // ── connectWebSocket explicit wsPort override (lines 534-537) ──────────
 
-  it("connectWebSocket with wsPort override skips firmware probe", async () => {
+  it("connectWebSocket with wsPort override still probes, and only the port is overridden", async () => {
     const openWsSpy = vi
       .spyOn(client as any, "openWs")
       .mockImplementation(() => {});
     const probeSpy = vi
       .spyOn(client as any, "probeFirmwareVersion")
-      .mockResolvedValue(null);
+      .mockResolvedValue({ major: 3, version: "3.9.1", wsPort: 81 });
+    const fwEvents: (string | null)[] = [];
+    client.on("firmware", (info) => fwEvents.push(info));
 
     await client.connectWebSocket("192.168.1.10", 80, 8888);
 
-    expect(probeSpy).not.toHaveBeenCalled();
+    expect(probeSpy).toHaveBeenCalledWith("http://192.168.1.10:80");
     expect((client as any).wsPort).toBe(8888);
+    // The machine is still known to be 3.x, so commands use its conventions.
+    expect((client as any).fwMajor).toBe(3);
+    expect(fwEvents).toEqual(["FluidNC v3.9.1"]);
     expect(openWsSpy).toHaveBeenCalled();
+
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.sendCommand("$H");
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ method: "POST" });
+
     openWsSpy.mockRestore();
     probeSpy.mockRestore();
+  });
+
+  it("connectWebSocket with wsPort override resolves the hostname for HTTP", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    vi.spyOn(client as any, "resolveHost").mockResolvedValue("192.168.1.10");
+    vi.spyOn(client as any, "probeFirmwareVersion").mockResolvedValue(null);
+
+    await client.connectWebSocket("myplotter.local", 80, 81);
+
+    expect((client as any).wsPort).toBe(81);
+    mockFetch.mockResolvedValueOnce(mockResponse("ok"));
+    await client.sendCommand("$H");
+    expect(mockFetch.mock.calls[0][0]).toContain("http://192.168.1.10:80/command");
+
+    openWsSpy.mockRestore();
+  });
+
+  it("connectWebSocket forgets the previous machine's firmware when the probe fails", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    vi.spyOn(client as any, "probeFirmwareVersion").mockResolvedValue(null);
+    (client as any).fwMajor = 3;
+    (client as any).fwInfo = "FluidNC v3.9.1";
+    const fwEvents: (string | null)[] = [];
+    client.on("firmware", (info) => fwEvents.push(info));
+
+    await client.connectWebSocket("192.168.1.10", 80);
+
+    expect((client as any).fwMajor).toBeNull();
+    expect(fwEvents).toEqual([null]);
+    openWsSpy.mockRestore();
+  });
+
+  // ── disconnect / reconnect while a connect is still probing ─────────────
+
+  it("a disconnect during connect stops the connection from opening", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    let finishProbe!: (probe: unknown) => void;
+    const probeSpy = vi
+      .spyOn(client as any, "probeFirmwareVersion")
+      .mockReturnValue(new Promise((resolve) => (finishProbe = resolve)));
+
+    const connecting = client.connectWebSocket("192.168.1.10", 80);
+    const outcome = expect(connecting).rejects.toBeInstanceOf(ConnectSupersededError);
+    // Let the connect reach the probe before the user disconnects.
+    await vi.waitFor(() => expect(probeSpy).toHaveBeenCalled());
+    client.disconnectWebSocket();
+    finishProbe({ major: 4, version: "4.0.1", wsPort: 80 });
+
+    await outcome;
+    expect(openWsSpy).not.toHaveBeenCalled();
+    expect((client as any).wsEnabled).toBe(false);
+    expect((client as any).fwMajor).not.toBe(4);
+    openWsSpy.mockRestore();
+  });
+
+  it("a newer connect supersedes one that is still probing", async () => {
+    const openWsSpy = vi
+      .spyOn(client as any, "openWs")
+      .mockImplementation(() => {});
+    let finishFirstProbe!: (probe: unknown) => void;
+    const probeSpy = vi
+      .spyOn(client as any, "probeFirmwareVersion")
+      .mockReturnValueOnce(new Promise((resolve) => (finishFirstProbe = resolve)))
+      .mockResolvedValueOnce({ major: 4, version: "4.0.1", wsPort: 80 });
+
+    const first = client.connectWebSocket("192.168.1.10", 80);
+    const firstOutcome = expect(first).rejects.toBeInstanceOf(ConnectSupersededError);
+    await vi.waitFor(() => expect(probeSpy).toHaveBeenCalledTimes(1));
+    await client.connectWebSocket("192.168.1.20", 80);
+    finishFirstProbe({ major: 3, version: "3.9.1", wsPort: 81 });
+
+    await firstOutcome;
+    // The second machine's details stand; the first probe changed nothing.
+    expect((client as any).fwMajor).toBe(4);
+    expect((client as any).wsPort).toBe(80);
+    expect((client as any).wsHost).toBe("192.168.1.20");
+    expect(openWsSpy).toHaveBeenCalledTimes(1);
+    openWsSpy.mockRestore();
   });
 
   // ── connectWebSocket without wsPort, probe succeeds ────────────────────

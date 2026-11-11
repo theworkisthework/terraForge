@@ -843,6 +843,7 @@ export type TaskType =
   | "file-download"
   | "file-delete"
   | "job-start"
+  | "job-control"
   | "ws-connect";
 
 export type TaskStatus =
@@ -902,6 +903,12 @@ export interface FluidNCApi {
   sendCommand: (cmd: string) => Promise<string>;
   listFiles: (path?: string) => Promise<RemoteFile[]>;
   listSDFiles: (path?: string) => Promise<RemoteFile[]>;
+  /**
+   * The transfers below (`uploadFile`, `downloadFile`, `uploadGcode`) resolve
+   * only once the file has fully arrived. They reject when the transfer
+   * fails and also when its task is cancelled, so anything that follows the
+   * `await` (running the file, selecting it as the job) is safe to do.
+   */
   uploadFile: (
     taskId: string,
     localPath: string,
@@ -929,6 +936,7 @@ export interface FluidNCApi {
     content: string,
     remotePath: string,
   ) => Promise<void>;
+  /** Pause, resume and abort reject when the control could not be sent. */
   pauseJob: () => Promise<void>;
   resumeJob: () => Promise<void>;
   abortJob: () => Promise<void>;
@@ -950,6 +958,11 @@ export interface SerialApi {
   disconnect: () => Promise<void>;
   send: (data: string) => Promise<void>;
   onData: (cb: (data: string) => void) => () => void;
+  /**
+   * The serial port closed on its own (cable unplugged, device reset), with
+   * the reason. Not fired for a `disconnect()` the renderer asked for.
+   */
+  onDisconnected: (cb: (reason: string) => void) => () => void;
 }
 
 export interface FsApi {
