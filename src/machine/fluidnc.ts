@@ -14,7 +14,11 @@ import {
   type FirmwareProbeInfo,
 } from "./fluidnc/parsers/firmwareParser";
 import { parseMachineStatus } from "./fluidnc/parsers/statusParser";
-import { FluidNCRestClient } from "./fluidnc/transport/restClient";
+import {
+  FluidNCHttpError,
+  FluidNCRestClient,
+  isTimeoutError,
+} from "./fluidnc/transport/restClient";
 import {
   disconnectFluidNCWebSocket,
   killFluidNCWebSocket,
@@ -25,6 +29,27 @@ import {
 // FluidNC HTTP REST + WebSocket client.
 // All methods use the endpoints documented at:
 // http://wiki.fluidnc.com/en/support/interface/http-rest-api
+
+/**
+ * Percent-encodes a remote path for use in a URL, one segment at a time so
+ * the slashes survive: FluidNC 3.x (ESP3D HTTP stack) resets the connection
+ * if it sees %2F. Left unencoded, a "#" or "?" in a filename ends the path
+ * early and the request reaches a different file, or none.
+ */
+export function encodeRemotePath(remotePath: string): string {
+  return remotePath.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * Thrown by `connectWebSocket` when a disconnect, or a newer connect, arrived
+ * while it was still resolving and probing the controller.
+ */
+export class ConnectSupersededError extends Error {
+  constructor() {
+    super("Connection attempt cancelled");
+    this.name = "ConnectSupersededError";
+  }
+}
 
 export class FluidNCClient extends EventEmitter {
   private baseUrl = "";
@@ -47,6 +72,12 @@ export class FluidNCClient extends EventEmitter {
    * Emitted as a "firmware" event when first detected and cleared on disconnect.
    */
   private fwInfo: string | null = null;
+  /**
+   * Bumped by every connect and disconnect, so a connect that was awaiting
+   * the firmware probe can tell it has been overtaken and must not open a
+   * socket the user has since asked to close.
+   */
+  private connectAttempt = 0;
   private static readonly uploadVerifyMaxAttempts = 6;
   private static readonly uploadVerifyDelayMs = 300;
 
@@ -126,7 +157,9 @@ export class FluidNCClient extends EventEmitter {
     // 4.x / WebUI convention: GET /command?commandText=CMD
     //
     // Some builds still accept GET /command?plain=CMD, so for 4.x/unknown we
-    // try commandText first (matching WebUI) and fall back to plain.
+    // try commandText first (matching WebUI) and fall back to plain -- but only
+    // when the controller rejected the request. A timeout means it may already
+    // be executing the command, and resending it would run it twice.
     if (this.fwMajor !== null && this.fwMajor < 4) {
       this.emitDebugConsole(
         `[terraForge] CMD HTTP POST /command commandText=${logCmd}`,
@@ -158,6 +191,7 @@ export class FluidNCClient extends EventEmitter {
       );
       return body;
     } catch (error) {
+      if (!(error instanceof FluidNCHttpError)) throw error;
       this.emitDebugConsole(
         `[terraForge] CMD RETRY GET plain (commandText failed: ${
           error instanceof Error ? error.message : String(error)
@@ -189,43 +223,69 @@ export class FluidNCClient extends EventEmitter {
       filesystem === "sd"
         ? `$SD/Run=${remotePath}`
         : `$LocalFS/Run=${remotePath}`;
-    // Delegate to sendCommand which handles the 3.x / 4.x HTTP convention difference.
-    await this.sendCommand(cmd);
+    if (this.fwMajor !== null && this.fwMajor < 4) {
+      await this.sendCommand(cmd);
+      return;
+    }
+    // FluidNC 4.1 holds the HTTP response to a Run command open until the
+    // file finishes ("Job output channel webclient closed; the job continues"
+    // once the request is dropped), so on 4.x the command goes over the live
+    // WebSocket. Its "ok" or error arrives there like any other output.
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.emitDebugConsole(`[terraForge] CMD WS ${cmd}`);
+      this.ws.send(`${cmd}\n`);
+      return;
+    }
+    try {
+      await this.sendCommand(cmd);
+    } catch (error) {
+      if (!isTimeoutError(error)) throw error;
+      // The controller accepted the request and is still running the job.
+      this.emit(
+        "console",
+        "[terraForge] No reply to the Run command yet; assuming the job is running",
+      );
+    }
   }
 
   async pauseJob(): Promise<void> {
     // '!' is the Grbl/FluidNC realtime Feed Hold character — must be sent raw
-    this.sendRealtime("!");
+    await this.sendRealtime("!");
   }
 
   async resumeJob(): Promise<void> {
     // '~' is the Grbl/FluidNC realtime Cycle Start / Resume character — must be sent raw
-    this.sendRealtime("~");
+    await this.sendRealtime("~");
   }
 
   async abortJob(): Promise<void> {
     // 0x18 is the Grbl/FluidNC realtime Soft Reset character — must be sent raw
-    this.sendRealtime("\x18");
+    await this.sendRealtime("\x18");
   }
 
-  /** Send a realtime command byte directly over the WebSocket (bypasses HTTP). */
-  private sendRealtime(char: string): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(char);
-    } else {
-      // Fallback: send via HTTP command endpoint (may work depending on FW version)
-      this.sendCommand(char).catch(() => {});
+  /**
+   * Sends a realtime command byte: raw over the WebSocket when it is open,
+   * otherwise through the HTTP command endpoint (which may work, depending on
+   * the firmware version). Rejects when neither delivers it, so a Pause or an
+   * Abort that never left this machine is not reported as sent.
+   */
+  private async sendRealtime(char: string): Promise<void> {
+    const ws = this.ws;
+    if (ws?.readyState === WebSocket.OPEN) {
+      await new Promise<void>((resolve, reject) => {
+        ws.send(char, (err) => (err ? reject(err) : resolve()));
+      });
+      return;
     }
+    await this.sendCommand(char);
   }
 
   // ─── File Management ─────────────────────────────────────────────────────
 
   async listFiles(remotePath = "/"): Promise<RemoteFile[]> {
-    const encodedPath = remotePath
-      .split("/")
-      .map((seg) => (seg ? encodeURIComponent(seg) : seg))
-      .join("/");
-    const res = await this.restClient.get(`/files?path=${encodedPath}`);
+    const res = await this.restClient.get(
+      `/files?path=${encodeRemotePath(remotePath)}`,
+    );
     const json = (await res.json()) as {
       files: Array<{ name: string; size: number; dir?: boolean }>;
       path: string;
@@ -241,16 +301,10 @@ export class FluidNCClient extends EventEmitter {
     // Use a generous 30 s timeout — SD card initialisation can be slow on
     // first access in FluidNC 3.x.
     //
-    // Important: encode only individual path segments, NOT the slash separators.
-    // FluidNC 3.x (ESP3D HTTP stack) resets the connection if it sees %2F in
-    // the path query parameter. FluidNC 4.x accepts both forms, so this is
-    // safe for all versions.
-    const encodedPath = remotePath
-      .split("/")
-      .map((seg) => (seg ? encodeURIComponent(seg) : seg))
-      .join("/");
+    // Only the path's segments are encoded, never its slashes: 3.x resets the
+    // connection on %2F in this parameter, and 4.x accepts both forms.
     const res = await this.restClient.get(
-      `/upload?path=${encodedPath}`,
+      `/upload?path=${encodeRemotePath(remotePath)}`,
       30_000,
     );
 
@@ -284,7 +338,10 @@ export class FluidNCClient extends EventEmitter {
     const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
     // Pass 0 (no timeout) — large G-code files can take arbitrarily long to transfer.
-    const res = await this.restClient.get(`${prefix}${filePath}`, 0);
+    const res = await this.restClient.get(
+      `${prefix}${encodeRemotePath(filePath)}`,
+      0,
+    );
     return res.text();
   }
 
@@ -295,11 +352,12 @@ export class FluidNCClient extends EventEmitter {
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
     if (this.fwMajor === null || this.fwMajor >= 4) {
       // FluidNC 4.x: WebDAV DELETE — same pattern for both volumes
-      if (source === "sd") {
-        await this.restClient.get(`/sd${filePath}`, 10_000, "DELETE");
-      } else {
-        await this.restClient.get(`/localfs${filePath}`, 10_000, "DELETE");
-      }
+      const prefix = source === "sd" ? "/sd" : "/localfs";
+      await this.restClient.get(
+        `${prefix}${encodeRemotePath(filePath)}`,
+        10_000,
+        "DELETE",
+      );
     } else {
       // FluidNC 3.x
       if (source === "sd") {
@@ -501,7 +559,7 @@ export class FluidNCClient extends EventEmitter {
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
     // Large files can legitimately take much longer than the default HTTP timeout.
     const res = await this.restClient.get(
-      `${prefix}${filePath}`,
+      `${prefix}${encodeRemotePath(filePath)}`,
       0,
       "GET",
       signal,
@@ -674,60 +732,79 @@ export class FluidNCClient extends EventEmitter {
     return null;
   }
 
+  /**
+   * Resolves the host, probes the controller's firmware, then opens the
+   * WebSocket. `wsPort` overrides only the port the socket uses: the probe
+   * still runs, because the firmware version decides which command and file
+   * API the controller speaks, and the override is what a 3.x machine needs.
+   *
+   * Rejects with `ConnectSupersededError` if a disconnect or another connect
+   * arrives while it is still probing; nothing is opened in that case.
+   */
   async connectWebSocket(
     host: string,
     port: number,
     wsPort?: number,
   ): Promise<void> {
+    const attempt = ++this.connectAttempt;
+    const assertCurrent = () => {
+      if (attempt !== this.connectAttempt) throw new ConnectSupersededError();
+    };
+
     this.wsHost = host;
     this.setHost(host, port);
+
+    // Resolve the hostname to an IP first so that Node's fetch (undici) can
+    // reach it. undici has its own DNS resolver that does not use the system
+    // stub resolver and therefore cannot resolve mDNS .local names on Windows.
+    // Node's dns.lookup() goes through the OS resolver (Bonjour/mDNS aware).
+    const resolvedIp = await this.resolveHost(host);
+    assertCurrent();
+    const probeBaseUrl = `http://${resolvedIp}:${port}`;
+    if (resolvedIp !== host) {
+      this.emit("console", `[terraForge] Resolved ${host} → ${resolvedIp}`);
+      // Use the resolved IP for all subsequent HTTP calls — Node's fetch
+      // (undici) cannot resolve mDNS .local names on Windows.
+      this.baseUrl = probeBaseUrl;
+      this.restClient.setBaseUrl(probeBaseUrl);
+    }
+
+    // Auto-detect via [ESP800] using the resolved IP. The response carries
+    // the firmware version and "webcommunication: Sync: <port>", which is the
+    // authoritative WS port.
+    const probe = await this.probeFirmwareVersion(probeBaseUrl);
+    assertCurrent();
+    // A failed probe must not leave the previous machine's version behind.
+    this.fwMajor = probe ? probe.major : null;
+    this.fwInfo = probe ? `FluidNC v${probe.version}` : null;
+    this.emit("firmware", this.fwInfo);
 
     if (wsPort !== undefined) {
       // Explicit override from machine config — use as-is.
       this.wsPort = wsPort;
-      this.emit("console", `[terraForge] WS port override: ${wsPort}`);
+      this.emit(
+        "console",
+        probe
+          ? `[terraForge] Detected ${this.fwInfo} — WS port override: ${wsPort}`
+          : `[terraForge] Firmware probe failed — WS port override: ${wsPort}`,
+      );
+    } else if (probe) {
+      const detectedWsPort = probe.wsPort ?? (probe.major >= 4 ? port : 81);
+      this.wsPort = detectedWsPort;
+      const src =
+        probe.wsPort !== null ? "ESP800 response" : "version heuristic";
+      this.emit(
+        "console",
+        `[terraForge] Detected ${this.fwInfo} — WS port ${detectedWsPort} (from ${src})`,
+      );
     } else {
-      // Resolve the hostname to an IP first so that Node's fetch (undici) can
-      // reach it. undici has its own DNS resolver that does not use the system
-      // stub resolver and therefore cannot resolve mDNS .local names on Windows.
-      // Node's dns.lookup() goes through the OS resolver (Bonjour/mDNS aware).
-      const resolvedIp = await this.resolveHost(host);
-      const probeBaseUrl = `http://${resolvedIp}:${port}`;
-      if (resolvedIp !== host) {
-        this.emit("console", `[terraForge] Resolved ${host} → ${resolvedIp}`);
-        // Use the resolved IP for all subsequent HTTP calls — Node's fetch
-        // (undici) cannot resolve mDNS .local names on Windows.
-        this.baseUrl = probeBaseUrl;
-        this.restClient.setBaseUrl(probeBaseUrl);
-      }
-
-      // Auto-detect via [ESP800] using the resolved IP.
-      // The response contains "webcommunication: Sync: <port>" which is the
-      // authoritative WS port — parse and use it directly.
-      const probe = await this.probeFirmwareVersion(probeBaseUrl);
-      if (probe) {
-        this.fwMajor = probe.major;
-        this.fwInfo = `FluidNC v${probe.version}`;
-        this.emit("firmware", this.fwInfo);
-        const detectedWsPort = probe.wsPort ?? (probe.major >= 4 ? port : 81);
-        this.wsPort = detectedWsPort;
-        const src =
-          probe.wsPort !== null ? "ESP800 response" : "version heuristic";
-        this.emit(
-          "console",
-          `[terraForge] Detected ${this.fwInfo} — WS port ${detectedWsPort} (from ${src})`,
-        );
-      } else {
-        // Probe failed — default to same-port (FluidNC 4.x / modern behaviour).
-        // If on FluidNC 3.x, set a WS port override of 81 in the machine config.
-        this.wsPort = port;
-        this.fwInfo = null;
-        this.emit("firmware", null);
-        this.emit(
-          "console",
-          `[terraForge] Firmware probe failed — assuming WS on port ${port} (set WS port override to 81 for FluidNC 3.x)`,
-        );
-      }
+      // Probe failed — default to same-port (FluidNC 4.x / modern behaviour).
+      // If on FluidNC 3.x, set a WS port override of 81 in the machine config.
+      this.wsPort = port;
+      this.emit(
+        "console",
+        `[terraForge] Firmware probe failed — assuming WS on port ${port} (set WS port override to 81 for FluidNC 3.x)`,
+      );
     }
 
     // Tear down any existing connection & pending reconnect first
@@ -738,6 +815,8 @@ export class FluidNCClient extends EventEmitter {
   }
 
   disconnectWebSocket(): void {
+    // Overtakes a connect still waiting on its probe.
+    this.connectAttempt++;
     this.fwMajor = null;
     this.fwInfo = null;
     disconnectFluidNCWebSocket(this.getWsState(), {

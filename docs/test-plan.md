@@ -98,6 +98,7 @@ const noOpReturn = (..._: any[]) => Promise.resolve(undefined as any);
     disconnect: noOp,
     send: noOp,
     onData: () => () => {},
+    onDisconnected: () => () => {},
   },
   fs: {
     openSvgDialog: noOpReturn,

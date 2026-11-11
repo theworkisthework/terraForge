@@ -12,6 +12,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { useMachineStore } from "./store/machineStore";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
+import { sendJobControl } from "./features/machine/utils/jobControl";
 import { RULER_W } from "./features/canvas";
 import type { OriginType } from "../../types";
 
@@ -61,7 +62,7 @@ export default function App() {
           confirmLabel="Abort"
           onConfirm={async () => {
             setShowCollapsedAbortConfirm(false);
-            await window.terraForge.fluidnc.abortJob();
+            await sendJobControl("abort");
           }}
           onCancel={() => setShowCollapsedAbortConfirm(false)}
         />

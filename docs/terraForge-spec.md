@@ -110,7 +110,7 @@ runFile, pauseJob, resumeJob, abortJob,
 connectWebSocket, disconnectWebSocket,
 onStatusUpdate, onConsoleMessage, onPing, onFirmwareInfo
 },
-serial: { listPorts, connect, disconnect, send, onData },
+serial: { listPorts, connect, disconnect, send, onData, onDisconnected },
 fs: {
 openSvgDialog, openPdfDialog, openFileDialog, openGcodeDialog, openImportDialog,
 readFile, readFileBinary, writeFile,

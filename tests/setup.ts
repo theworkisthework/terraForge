@@ -154,6 +154,7 @@ if (typeof window !== "undefined") {
       disconnect: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue(undefined),
       onData: vi.fn().mockReturnValue(() => {}),
+      onDisconnected: vi.fn().mockReturnValue(() => {}),
     },
     fs: {
       openSvgDialog: vi.fn().mockResolvedValue(null),

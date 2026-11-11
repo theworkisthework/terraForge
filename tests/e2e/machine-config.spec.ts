@@ -45,11 +45,11 @@ async function openMachineConfigs(page: Page): Promise<void> {
   }
 
   await dlg
-    .locator("button:has-text('Machine Configurations')")
+    .locator("button:has-text('Machines')")
     .first()
     .click();
   await expect(
-    dlg.locator("button:has-text('Machine Configurations')").first(),
+    dlg.locator("button:has-text('Machines')").first(),
   ).toBeVisible({
     timeout: 5000,
   });

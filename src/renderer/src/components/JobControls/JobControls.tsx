@@ -9,6 +9,7 @@ import { useCanvasStore } from "../../store/canvasStore";
 import { selectJobControlsCanvasState } from "../../store/canvasSelectors";
 import { useStableMachineState } from "../../hooks/useStableMachineState";
 import { useJobStartHandler } from "./useJobStartHandler";
+import { sendJobControl } from "../../features/machine/utils/jobControl";
 import { useJobEta } from "./useJobEta";
 import { JobProgress } from "./JobProgress";
 import { JobFileIndicator } from "./JobFileIndicator";
@@ -144,7 +145,7 @@ export function JobControls() {
         btn(
           "Pause",
           async () => {
-            await window.terraForge.fluidnc.pauseJob();
+            await sendJobControl("pause");
           },
           "secondary",
           false,
@@ -157,7 +158,7 @@ export function JobControls() {
         btn(
           "Resume",
           async () => {
-            await window.terraForge.fluidnc.resumeJob();
+            await sendJobControl("resume");
           },
           "primary",
           false,
@@ -183,7 +184,7 @@ export function JobControls() {
           confirmLabel="Abort"
           onConfirm={async () => {
             setShowAbortConfirm(false);
-            await window.terraForge.fluidnc.abortJob();
+            await sendJobControl("abort");
           }}
           onCancel={() => setShowAbortConfirm(false)}
         />

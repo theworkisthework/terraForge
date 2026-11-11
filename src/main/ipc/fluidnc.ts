@@ -58,14 +58,12 @@ function registerMachineHandlers({ fluidnc, serial, getConnectionType, setConnec
     overSerial() ? serial.runFile(remotePath, filesystem ?? "sd") : fluidnc.runFile(remotePath, filesystem),
   );
 
-  // Over serial, pause/resume/abort are Grbl realtime characters.
-  const jobControl = (channel: string, realtime: string, overWifi: () => unknown) =>
+  // Over serial, pause/resume/abort are Grbl realtime characters. Each
+  // rejects when the control could not be sent, so the renderer can say so.
+  const jobControl = (channel: string, realtime: string, overWifi: () => Promise<void>) =>
     ipcMain.handle(channel, () => {
-      if (overSerial()) {
-        serial.sendRealtime(realtime);
-        return;
-      }
-      return overWifi();
+      if (getConnectionType() === null) return Promise.reject(new Error("Not connected"));
+      return overSerial() ? serial.sendRealtime(realtime) : overWifi();
     });
   jobControl("fluidnc:pauseJob", "!", () => fluidnc.pauseJob());
   jobControl("fluidnc:resumeJob", "~", () => fluidnc.resumeJob());
@@ -88,14 +86,14 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
 
   /**
    * Runs one transfer as a task: cancellable, with progress sent to the
-   * renderer, completed or failed at the end. With `reportOutcome` the final
-   * state is sent too, and a failure is rethrown to the caller.
+   * renderer, completed or failed at the end. Resolves only when the transfer
+   * finished. A failure is rethrown and a cancelled transfer rejects too, so
+   * a caller can never carry on (say, to run the file) as if it had arrived.
    */
   const trackTransfer = async (
     taskId: string,
     type: "file-upload" | "file-download",
     label: string,
-    reportOutcome: boolean,
     transfer: (onProgress: (progress: number) => void, signal: AbortSignal) => Promise<void>,
   ): Promise<void> => {
     const abortController = new AbortController();
@@ -108,20 +106,21 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
     };
     try {
       await transfer(onProgress, abortController.signal);
-      if (!taskManager.isCancelled(taskId)) taskManager.complete(taskId);
-      if (reportOutcome) safeSend("task:update", taskManager.get(taskId));
     } catch (err: unknown) {
       if (!taskManager.isCancelled(taskId)) {
         taskManager.fail(taskId, String(err));
-        if (reportOutcome) {
-          safeSend("task:update", taskManager.get(taskId));
-          throw err;
-        }
+        safeSend("task:update", taskManager.get(taskId));
+        throw err;
       }
     } finally {
       taskManager.clearCancelHandler(taskId);
       transferAbortControllers.delete(taskId);
     }
+    // Cancelled, whether the transfer stopped for it or finished regardless:
+    // the task already reads "cancelled", and the caller must not proceed.
+    if (taskManager.isCancelled(taskId)) throw new Error("Transfer cancelled");
+    taskManager.complete(taskId);
+    safeSend("task:update", taskManager.get(taskId));
   };
 
   ipcMain.handle("fluidnc:uploadGcode", async (_e, taskId: string, content: string, remotePath: string) => {
@@ -131,7 +130,7 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
     const remoteFilename = remotePath.split(/[\\/]/).pop()!;
     const tempPath = join(tmpdir(), `tf-${Date.now()}-${remoteFilename}`);
     try {
-      await trackTransfer(taskId, "file-upload", `Uploading ${remoteFilename}`, true, async (onProgress, signal) => {
+      await trackTransfer(taskId, "file-upload", `Uploading ${remoteFilename}`, async (onProgress, signal) => {
         await writeFile(tempPath, content, "utf-8");
         // The filename override makes the SD card get the right name.
         await fluidnc.uploadFile(tempPath, remotePath, onProgress, remoteFilename, signal);
@@ -142,7 +141,7 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
   });
 
   ipcMain.handle("fluidnc:uploadFile", (_e, taskId: string, localPath: string, remotePath: string) =>
-    trackTransfer(taskId, "file-upload", `Uploading ${remotePath}`, false, (onProgress, signal) =>
+    trackTransfer(taskId, "file-upload", `Uploading ${remotePath}`, (onProgress, signal) =>
       fluidnc.uploadFile(localPath, remotePath, onProgress, undefined, signal),
     ),
   );
@@ -150,7 +149,7 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
   ipcMain.handle(
     "fluidnc:downloadFile",
     (_e, taskId: string, remotePath: string, localPath: string, filesystem?: "internal" | "sdcard") =>
-      trackTransfer(taskId, "file-download", `Downloading ${remotePath}`, false, (onProgress, signal) =>
+      trackTransfer(taskId, "file-download", `Downloading ${remotePath}`, (onProgress, signal) =>
         fluidnc.downloadFile(remotePath, localPath, filesystem, onProgress, signal),
       ),
   );
@@ -160,8 +159,16 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
  * Serial connection. Status goes to the same channel as Wi-Fi status so the
  * renderer doesn't need to care which transport is active.
  */
-function registerSerialHandlers({ serial, setConnectionType, safeSend }: FluidNCIpcOptions): void {
+function registerSerialHandlers({ serial, getConnectionType, setConnectionType, safeSend }: FluidNCIpcOptions): void {
   ipcMain.handle("serial:listPorts", () => serial.listPorts());
+
+  // The port closed on its own: an unplugged cable or a device reset. Nothing
+  // reconnects a serial port, so the renderer is told the connection is gone.
+  serial.on("disconnected", (reason: string) => {
+    if (getConnectionType() === "serial") setConnectionType(null);
+    safeSend("serial:data", `[terraForge] Serial connection lost: ${reason}`);
+    safeSend("serial:disconnected", reason);
+  });
 
   ipcMain.handle("serial:connect", async (_e, path: string, baudRate?: number) => {
     await serial.connect(path, baudRate);

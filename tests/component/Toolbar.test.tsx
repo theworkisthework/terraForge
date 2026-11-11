@@ -314,7 +314,7 @@ describe("Toolbar", () => {
     useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
     render(<Toolbar />);
     await userEvent.click(screen.getByTitle("Machine and application settings"));
-    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+    expect(screen.getByText("Machines")).toBeInTheDocument();
   });
 
   // ── Machine selector changes active config ────────────────────────────
@@ -1971,7 +1971,7 @@ describe("Toolbar", () => {
     ).mockResolvedValue([cfg]);
     render(<Toolbar />);
     await userEvent.click(screen.getByTitle("Machine and application settings"));
-    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+    expect(screen.getByText("Machines")).toBeInTheDocument();
   });
 
   it("settings dialog Close button dismisses the dialog", async () => {
@@ -1982,12 +1982,12 @@ describe("Toolbar", () => {
     ).mockResolvedValue([cfg]);
     render(<Toolbar />);
     await userEvent.click(screen.getByTitle("Machine and application settings"));
-    expect(screen.getByText("Machine Configurations")).toBeInTheDocument();
+    expect(screen.getByText("Machines")).toBeInTheDocument();
 
     // Click the Close button inside MachineConfigDialog
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(
-      screen.queryByText("Machine Configurations"),
+      screen.queryByText("Machines"),
     ).not.toBeInTheDocument();
   });
 

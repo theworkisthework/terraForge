@@ -93,6 +93,13 @@ const serial: TerraForgeAPI["serial"] = {
     ipcRenderer.on("serial:data", listener);
     return () => ipcRenderer.off("serial:data", listener);
   },
+
+  onDisconnected: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, reason: string) =>
+      cb(reason);
+    ipcRenderer.on("serial:disconnected", listener);
+    return () => ipcRenderer.off("serial:disconnected", listener);
+  },
 };
 
 // ─── File-System API ─────────────────────────────────────────────────────────

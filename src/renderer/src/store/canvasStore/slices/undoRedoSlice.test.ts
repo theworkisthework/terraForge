@@ -58,7 +58,43 @@ describe("undoRedoSlice", () => {
     expect(store.getState().redoStack[0][0].id).toBe("current");
     expect(store.getState().selectedImportId).toBeNull();
     expect(store.getState().selectedPathId).toBeNull();
-    expect(store.getState().allImportsSelected).toBe(false);
+  });
+
+  it.each(["undo", "redo"] as const)(
+    "%s keeps the selection when the selected import still exists (#139)",
+    (action) => {
+      const store = makeStore();
+      const moved = { id: "i1", x: 10, y: 0, scale: 1, rotation: 0 };
+      const orig = { ...moved, x: 0 };
+      store.setState({
+        imports: (action === "undo" ? [moved] : [orig]) as any,
+        undoStack: action === "undo" ? [[orig] as any] : [],
+        redoStack: action === "redo" ? [[moved] as any] : [],
+        selectedImportId: "i1",
+        allImportsSelected: true,
+      });
+
+      store.getState()[action]();
+
+      expect(store.getState().imports[0].x).toBe(action === "undo" ? 0 : 10);
+      expect(store.getState().selectedImportId).toBe("i1");
+      expect(store.getState().allImportsSelected).toBe(true);
+    },
+  );
+
+  it("undo drops the selected path if it no longer exists", () => {
+    const store = makeStore();
+    store.setState({
+      imports: [{ id: "i1", paths: [{ id: "p2" }] }] as any,
+      undoStack: [[{ id: "i1", paths: [{ id: "p1" }] }] as any],
+      selectedImportId: "i1",
+      selectedPathId: "p2",
+    });
+
+    store.getState().undo();
+
+    expect(store.getState().selectedImportId).toBe("i1");
+    expect(store.getState().selectedPathId).toBeNull();
   });
 
   it("redo restores next snapshot and pushes current to undo", () => {

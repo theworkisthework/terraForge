@@ -76,8 +76,10 @@ interface PendingCommand {
  *  - Status polling via `?` at a configurable interval
  *
  * Emits:
- *  - "data"   — every non-status line (console output)
- *  - "status" — parsed MachineStatus from <…> lines
+ *  - "data"         — every non-status line (console output)
+ *  - "status"       — parsed MachineStatus from <…> lines
+ *  - "disconnected" — the port closed without `disconnect()` being called
+ *                     (cable unplugged, device reset), with the reason
  */
 export class SerialClient extends EventEmitter {
   private port: SerialPort | null = null;
@@ -98,15 +100,24 @@ export class SerialClient extends EventEmitter {
   async connect(path: string, baudRate = 115200): Promise<void> {
     await this.disconnect();
 
-    this.port = new SerialPort({ path, baudRate, autoOpen: false });
-    this.parser = this.port.pipe(new ReadlineParser({ delimiter: "\n" }));
+    const port = new SerialPort({ path, baudRate, autoOpen: false });
+    this.port = port;
+    this.parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
 
     this.parser.on("data", (line: string) =>
       this.handleLine(line.trimEnd().replace(/\r$/, "")),
     );
 
+    // A port fault with no "error" listener is an uncaught exception in the
+    // main process; report it to the console instead.
+    port.on("error", (err: Error) => {
+      this.emit("data", `[terraForge] Serial error: ${err.message}`);
+    });
+    // "close" also fires when the cable is pulled or the device resets.
+    port.on("close", (err?: Error | null) => this.handlePortClosed(port, err));
+
     await new Promise<void>((resolve, reject) => {
-      this.port!.open((err) => {
+      port.open((err) => {
         if (err) reject(err);
         else resolve();
       });
@@ -117,24 +128,42 @@ export class SerialClient extends EventEmitter {
 
   async disconnect(): Promise<void> {
     this.stopStatusPolling();
+    this.failPending();
 
+    // Let go of the port before closing it, so its "close" event is seen as
+    // the one asked for here and not as a lost connection.
+    const port = this.port;
+    this.port = null;
+    this.parser = null;
+
+    if (port?.isOpen) {
+      await new Promise<void>((resolve, reject) => {
+        port.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+  }
+
+  /** Rejects the in-flight command and drops those queued behind it. */
+  private failPending(): void {
     if (this.pending) {
       clearTimeout(this.pending.timer);
       this.pending.reject(new Error("Serial port disconnected"));
       this.pending = null;
     }
     this.queue = [];
+  }
 
-    if (this.port?.isOpen) {
-      await new Promise<void>((resolve, reject) => {
-        this.port!.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    }
+  /** The port closed underneath us: clean up and tell whoever is listening. */
+  private handlePortClosed(port: SerialPort, err?: Error | null): void {
+    if (this.port !== port) return; // closed by disconnect(), or superseded
+    this.stopStatusPolling();
+    this.failPending();
     this.port = null;
     this.parser = null;
+    this.emit("disconnected", err?.message ?? "port closed");
   }
 
   /** Send a line terminated with \n — does NOT wait for a response. */
@@ -148,9 +177,19 @@ export class SerialClient extends EventEmitter {
     });
   }
 
-  /** Send a single realtime character (!, ~, ?, \x18) — no newline, bypasses queue. */
-  sendRealtime(char: string): void {
-    if (this.port?.isOpen) this.port.write(char);
+  /**
+   * Send a single realtime character (!, ~, ?, \x18) — no newline, bypasses
+   * queue. Rejects when the port is closed or the write fails, so a Pause or
+   * an Abort that never left is not reported as sent.
+   */
+  sendRealtime(char: string): Promise<void> {
+    const port = this.port;
+    if (!port?.isOpen) {
+      return Promise.reject(new Error("Serial port not connected"));
+    }
+    return new Promise<void>((resolve, reject) => {
+      port.write(char, (err) => (err ? reject(err) : resolve()));
+    });
   }
 
   // ─── Request / response ───────────────────────────────────────────────────
