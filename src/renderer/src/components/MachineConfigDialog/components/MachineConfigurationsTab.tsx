@@ -4,6 +4,7 @@ import { MachineConfigsSidebar } from "./Machine/MachineConfigsSidebar";
 import { MachineGeneralSection } from "./Machine/MachineGeneralSection";
 import { MachinePenCommandsSection } from "./Machine/MachinePenCommandsSection";
 import { MachineConnectionSection } from "./Machine/MachineConnectionSection";
+import { BedMeshSection } from "./Machine/BedMeshSection";
 
 interface MachineConfigurationsTabProps {
   controller: MachineConfigDialogController;
@@ -38,6 +39,7 @@ export function MachineConfigurationsTab({
           <MachineGeneralSection controller={controller} />
           <MachinePenCommandsSection controller={controller} />
           <MachineConnectionSection controller={controller} />
+          <BedMeshSection controller={controller} />
         </fieldset>
       </div>
     </div>

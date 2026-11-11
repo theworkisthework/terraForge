@@ -5,7 +5,6 @@ import { VinylCuttingSection } from "./Application/VinylCuttingSection";
 import { InkServiceStationsSection } from "./Application/InkServiceStationsSection";
 import { BitmapImportSection } from "./Application/BitmapImportSection";
 import { RendererPluginsSection } from "./Application/RendererPluginsSection";
-import { BedMeshSection } from "./Application/BedMeshSection";
 
 interface ApplicationConfigurationTabProps {
   controller: MachineConfigDialogController;
@@ -17,7 +16,6 @@ export function ApplicationConfigurationTab({
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <AppTogglesSections controller={controller} />
-      <BedMeshSection />
       <VinylCuttingSection controller={controller} />
       <InkServiceStationsSection controller={controller} />
       <BitmapImportSection controller={controller} />

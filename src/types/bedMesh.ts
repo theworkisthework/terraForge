@@ -1,10 +1,26 @@
 import type { BedMesh, BedMeshPoint } from "./index";
 
 /** Returns the bilinearly interpolated Z offset, clamped to the calibrated bed. */
-export function interpolateBedMesh(mesh: BedMesh, x: number, y: number): number {
-  if (mesh.xPoints < 2 || mesh.yPoints < 2 || mesh.points.length !== mesh.xPoints * mesh.yPoints) return 0;
-  const tx = Math.max(0, Math.min(1, x / Math.max(mesh.widthMM, Number.EPSILON))) * (mesh.xPoints - 1);
-  const ty = Math.max(0, Math.min(1, y / Math.max(mesh.heightMM, Number.EPSILON))) * (mesh.yPoints - 1);
+export function isValidBedMesh(mesh: BedMesh | null | undefined): mesh is BedMesh {
+  return !!mesh &&
+    mesh.version === 1 &&
+    Number.isInteger(mesh.xPoints) &&
+    Number.isInteger(mesh.yPoints) &&
+    mesh.xPoints >= 2 &&
+    mesh.yPoints >= 2 &&
+    Number.isFinite(mesh.widthMM) &&
+    Number.isFinite(mesh.heightMM) &&
+    mesh.widthMM > 0 &&
+    mesh.heightMM > 0 &&
+    mesh.points.length === mesh.xPoints * mesh.yPoints &&
+    mesh.points.every((point) =>
+      Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z));
+}
+
+export function interpolateBedMesh(mesh: BedMesh, x: number, y: number): number | null {
+  if (!isValidBedMesh(mesh)) return null;
+  const tx = Math.max(0, Math.min(1, x / mesh.widthMM)) * (mesh.xPoints - 1);
+  const ty = Math.max(0, Math.min(1, y / mesh.heightMM)) * (mesh.yPoints - 1);
   const x0 = Math.min(mesh.xPoints - 2, Math.floor(tx));
   const y0 = Math.min(mesh.yPoints - 2, Math.floor(ty));
   const x1 = x0 + 1;

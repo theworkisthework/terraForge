@@ -53,6 +53,8 @@ export interface MachineConfig {
   /** Default drawing feedrate emitted in generated G-code (F word). mm/min. */
   drawSpeed: number;
   connection: MachineConnection;
+  bedMesh?: BedMesh;
+  bedMeshEnabled?: boolean;
 }
 
 export interface AppConfig {

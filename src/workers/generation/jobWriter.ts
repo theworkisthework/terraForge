@@ -164,7 +164,7 @@ export class JobWriter {
   private zWord(x: number, y: number): string {
     const offset = this.settings.bedMesh
       ? interpolateBedMesh(this.settings.bedMesh, x, y)
-      : 0;
-    return this.settings.bedMesh ? ` Z${fmt(offset)}` : "";
+      : null;
+    return offset === null ? "" : ` Z${fmt(offset)}`;
   }
 }
