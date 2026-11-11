@@ -264,6 +264,155 @@ describe("JobControls", () => {
     );
   });
 
+  it("does not run the job when the upload fails", async () => {
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "C:\\files\\art.gcode",
+        source: "local",
+        name: "art.gcode",
+      },
+    });
+    (
+      window.terraForge.fluidnc.uploadFile as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("HTTP 500"));
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("Start job"));
+
+    await waitFor(() => {
+      const tasks = Object.values(useTaskStore.getState().tasks);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        type: "file-upload",
+        status: "error",
+        label: "Upload failed: art.gcode",
+      });
+    });
+    // An older art.gcode may already be on the SD card; it must not be run.
+    expect(window.terraForge.fluidnc.runFile).not.toHaveBeenCalled();
+  });
+
+  it("does not run the job when the upload is cancelled", async () => {
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "C:\\files\\art.gcode",
+        source: "local",
+        name: "art.gcode",
+      },
+    });
+    // The main process marks the task cancelled, then rejects the upload.
+    (
+      window.terraForge.fluidnc.uploadFile as ReturnType<typeof vi.fn>
+    ).mockImplementationOnce(async (taskId: string) => {
+      useTaskStore.getState().upsertTask({
+        id: taskId,
+        type: "file-upload",
+        label: "Uploading /art.gcode",
+        progress: 40,
+        status: "cancelled",
+      });
+      throw new Error("Transfer cancelled");
+    });
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("Start job"));
+
+    await waitFor(() =>
+      expect(window.terraForge.fluidnc.uploadFile).toHaveBeenCalled(),
+    );
+    expect(window.terraForge.fluidnc.runFile).not.toHaveBeenCalled();
+    // The toast keeps saying "cancelled" rather than turning into an error.
+    const tasks = Object.values(useTaskStore.getState().tasks);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe("cancelled");
+  });
+
+  it("reports a job that uploaded but would not start as a start failure", async () => {
+    useMachineStore.setState({
+      connected: true,
+      selectedJobFile: {
+        path: "C:\\files\\art.gcode",
+        source: "local",
+        name: "art.gcode",
+      },
+    });
+    (
+      window.terraForge.fluidnc.runFile as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("machine busy"));
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("Start job"));
+
+    await waitFor(() => {
+      const failed = Object.values(useTaskStore.getState().tasks).find(
+        (t) => t.status === "error",
+      );
+      expect(failed).toMatchObject({
+        type: "job-start",
+        label: "Failed to start art.gcode",
+        error: expect.stringContaining("machine busy"),
+      });
+    });
+  });
+
+  // ── Job controls that could not be sent ─────────────────────────────────
+
+  it("shows an error when Pause could not be sent", async () => {
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+      },
+    });
+    (
+      window.terraForge.fluidnc.pauseJob as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("Not connected"));
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("Pause"));
+
+    await waitFor(() => {
+      const tasks = Object.values(useTaskStore.getState().tasks);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        type: "job-control",
+        status: "error",
+        label: expect.stringContaining("Pause was not sent"),
+        error: "Not connected",
+      });
+    });
+  });
+
+  it("shows an error when Abort could not be sent", async () => {
+    useMachineStore.setState({
+      connected: true,
+      status: {
+        state: "Run",
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: "<Run|MPos:0,0,0>",
+      },
+    });
+    (
+      window.terraForge.fluidnc.abortJob as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("fetch failed"));
+    render(<JobControls />);
+    await userEvent.click(screen.getByText("Abort"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Abort" }));
+
+    await waitFor(() => {
+      const tasks = Object.values(useTaskStore.getState().tasks);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        status: "error",
+        label: expect.stringContaining("Abort was not sent"),
+        error: "fetch failed",
+      });
+    });
+  });
+
   // ── Abort with confirm ──────────────────────────────────────────────────
 
   it("calls abortJob when Abort confirmed", async () => {

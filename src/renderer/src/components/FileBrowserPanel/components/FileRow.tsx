@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "../../ui";
+import { sendJobControl } from "../../../features/machine/utils/jobControl";
 
 /** Why downloading is unavailable, or "Download". */
 function downloadTitle(transferRunning: boolean, jobActive: boolean, serialMode: boolean): string {
@@ -44,7 +45,7 @@ function JobButton({
       <Button
         variant="primary"
         size="xs"
-        onClick={only(() => window.terraForge.fluidnc.pauseJob())}
+        onClick={only(() => void sendJobControl("pause"))}
         aria-label="Pause job"
         title="Pause job"
       >
@@ -57,7 +58,7 @@ function JobButton({
       <Button
         variant="primary"
         size="xs"
-        onClick={only(() => window.terraForge.fluidnc.resumeJob())}
+        onClick={only(() => void sendJobControl("resume"))}
         aria-label="Resume job"
         title="Resume job"
       >

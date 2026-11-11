@@ -42,7 +42,11 @@ describe("registerFluidncIpcHandlers", () => {
       downloadFile: vi.fn(),
     };
 
+    const serialListeners = new Map<string, (...args: any[]) => void>();
     const serial = {
+      on: vi.fn((event: string, fn: (...args: any[]) => void) => {
+        serialListeners.set(event, fn);
+      }),
       sendCommand: vi.fn(),
       listFiles: vi.fn(),
       listSDFiles: vi.fn(),
@@ -92,6 +96,8 @@ describe("registerFluidncIpcHandlers", () => {
       setCurrentType: (type: "wifi" | "serial" | null) => {
         connectionType = type;
       },
+      emitSerial: (event: string, ...args: unknown[]) =>
+        serialListeners.get(event)?.(...args),
     };
   }
 
@@ -171,6 +177,55 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.fluidnc.resumeJob).toHaveBeenCalledTimes(1);
     expect(deps.fluidnc.abortJob).toHaveBeenCalledTimes(1);
     expect(deps.serial.sendRealtime).not.toHaveBeenCalled();
+  });
+
+  it("rejects pause/resume/abort when nothing is connected", async () => {
+    const deps = buildDeps();
+    deps.setCurrentType(null);
+
+    for (const channel of ["fluidnc:pauseJob", "fluidnc:resumeJob", "fluidnc:abortJob"]) {
+      await expect(mocks.handlers.get(channel)?.()).rejects.toThrow("Not connected");
+    }
+
+    expect(deps.serial.sendRealtime).not.toHaveBeenCalled();
+    expect(deps.fluidnc.pauseJob).not.toHaveBeenCalled();
+    expect(deps.fluidnc.resumeJob).not.toHaveBeenCalled();
+    expect(deps.fluidnc.abortJob).not.toHaveBeenCalled();
+  });
+
+  it("passes on a job control that could not be sent", async () => {
+    const deps = buildDeps();
+
+    deps.setCurrentType("serial");
+    deps.serial.sendRealtime.mockRejectedValue(new Error("Serial port not connected"));
+    await expect(mocks.handlers.get("fluidnc:abortJob")?.()).rejects.toThrow("Serial port not connected");
+
+    deps.setCurrentType("wifi");
+    deps.fluidnc.pauseJob.mockRejectedValue(new Error("fetch failed"));
+    await expect(mocks.handlers.get("fluidnc:pauseJob")?.()).rejects.toThrow("fetch failed");
+  });
+
+  it("tells the renderer when the serial port is lost", async () => {
+    const deps = buildDeps();
+    await mocks.handlers.get("serial:connect")?.({}, "COM3", 115200);
+    deps.setConnectionType.mockClear();
+
+    deps.emitSerial("disconnected", "device unplugged");
+
+    expect(deps.setConnectionType).toHaveBeenCalledWith(null);
+    expect(deps.safeSend).toHaveBeenCalledWith("serial:disconnected", "device unplugged");
+    expect(deps.safeSend).toHaveBeenCalledWith("serial:data", expect.stringContaining("device unplugged"));
+    // With no transport left, a control is refused rather than dropped.
+    await expect(mocks.handlers.get("fluidnc:pauseJob")?.()).rejects.toThrow("Not connected");
+  });
+
+  it("leaves a Wi-Fi connection alone when a stale serial port closes", () => {
+    const deps = buildDeps();
+    deps.setCurrentType("wifi");
+
+    deps.emitSerial("disconnected", "port closed");
+
+    expect(deps.setConnectionType).not.toHaveBeenCalled();
   });
 
   it("updates connection state for websocket connect and disconnect", async () => {
@@ -305,5 +360,53 @@ describe("registerFluidncIpcHandlers", () => {
     });
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-3");
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-4");
+  });
+
+  it("rejects uploadFile and downloadFile when the transfer fails", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockRejectedValue(new Error("upload failed"));
+    deps.fluidnc.downloadFile.mockRejectedValue(new Error("download failed"));
+
+    await expect(
+      mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-5", "local.gcode", "/remote.gcode"),
+    ).rejects.toThrow("upload failed");
+    await expect(
+      mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-6", "/remote.gcode", "out.gcode", "sdcard"),
+    ).rejects.toThrow("download failed");
+
+    expect(deps.taskManager.fail).toHaveBeenCalledWith("task-5", "Error: upload failed");
+    expect(deps.taskManager.fail).toHaveBeenCalledWith("task-6", "Error: download failed");
+    expect(deps.taskManager.complete).not.toHaveBeenCalled();
+    expect(deps.taskManager.clearCancelHandler).toHaveBeenCalledWith("task-5");
+    expect(deps.taskManager.clearCancelHandler).toHaveBeenCalledWith("task-6");
+  });
+
+  it("rejects a cancelled transfer without marking it failed or completed", async () => {
+    const deps = buildDeps();
+    // Cancelling aborts the transfer, which then throws.
+    deps.taskManager.isCancelled.mockReturnValue(true);
+    deps.fluidnc.uploadFile.mockRejectedValue(new Error("aborted"));
+
+    await expect(
+      mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-7", "local.gcode", "/remote.gcode"),
+    ).rejects.toThrow("Transfer cancelled");
+    await expect(
+      mocks.handlers.get("fluidnc:uploadGcode")?.({}, "task-8", "G1 X10", "/job.gcode"),
+    ).rejects.toThrow("Transfer cancelled");
+
+    expect(deps.taskManager.fail).not.toHaveBeenCalled();
+    expect(deps.taskManager.complete).not.toHaveBeenCalled();
+  });
+
+  it("rejects a transfer cancelled too late to stop it", async () => {
+    const deps = buildDeps();
+    deps.taskManager.isCancelled.mockReturnValue(true);
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+
+    await expect(
+      mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-9", "local.gcode", "/remote.gcode"),
+    ).rejects.toThrow("Transfer cancelled");
+
+    expect(deps.taskManager.complete).not.toHaveBeenCalled();
   });
 });

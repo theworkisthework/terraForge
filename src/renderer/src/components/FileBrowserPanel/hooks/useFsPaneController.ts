@@ -255,7 +255,11 @@ function useFsTransfers({
       if (!localPath) return;
       const taskId = uuid();
       upsertTask({ id: taskId, type: "file-download", label: `Downloading ${file.name}`, progress: 0, status: "running" });
-      await window.terraForge.fluidnc.downloadFile(taskId, file.path, localPath, label === "sdcard" ? "sdcard" : "internal");
+      // Rejects when the download fails or is cancelled; the task toast
+      // already says which, so there is nothing more to report here.
+      await window.terraForge.fluidnc
+        .downloadFile(taskId, file.path, localPath, label === "sdcard" ? "sdcard" : "internal")
+        .catch(() => {});
     },
     [hasRunningTransfer, label, upsertTask],
   );
