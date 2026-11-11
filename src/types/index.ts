@@ -75,6 +75,9 @@ export interface BedMesh {
   name: string;
   xPoints: number;
   yPoints: number;
+  /** Minimum coordinate in the same work-coordinate frame as generated jobs. */
+  xMinMM?: number;
+  yMinMM?: number;
   widthMM: number;
   heightMM: number;
   points: BedMeshPoint[];

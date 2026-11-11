@@ -39,8 +39,8 @@ export function MachineConfigurationsTab({
           <MachineGeneralSection controller={controller} />
           <MachinePenCommandsSection controller={controller} />
           <MachineConnectionSection controller={controller} />
-          <BedMeshSection controller={controller} />
         </fieldset>
+        <BedMeshSection controller={controller} />
       </div>
     </div>
   );

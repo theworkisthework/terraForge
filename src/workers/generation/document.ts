@@ -81,7 +81,8 @@ export function emitHeader(
   lines.push(`; Joined   : ${settings.join ? `yes (tolerance ${settings.joinTolerance} mm)` : "no"}`);
   lines.push(`; Lift end : ${settings.liftPenAtEnd ? "yes" : "no"}`);
   lines.push(`; Ret home : ${settings.returnToHome ? "yes" : "no"}`);
-  lines.push(`; Bed mesh : ${settings.bedMesh ? `yes (${settings.bedMesh.name})` : "no"}`);
+  const meshName = settings.bedMesh?.name.replace(/[\r\n]+/g, " ");
+  lines.push(`; Bed mesh : ${settings.bedMesh ? `yes (${meshName})` : "no"}`);
   lines.push(`; Pen delay: ${settings.penDownDelayMs} ms`);
   lines.push(`; Pen up delay: ${settings.penUpDelayMs} ms`);
   const vinyl = options?.vinylCutting;
