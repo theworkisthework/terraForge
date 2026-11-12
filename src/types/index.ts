@@ -826,7 +826,9 @@ export type TaskType =
   | "file-delete"
   | "job-start"
   | "job-control"
-  | "ws-connect";
+  | "ws-connect"
+  /** Something failed that nothing was handling: see unexpectedErrors.ts. */
+  | "app-error";
 
 export type TaskStatus =
   | "running"

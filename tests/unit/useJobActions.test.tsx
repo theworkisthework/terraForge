@@ -17,36 +17,69 @@ import type { LayerGroup, VectorObject } from "../../src/types";
 
 /** Objects whose id contains this make the fake worker fail. */
 const FAIL_MARK = "fail";
+/** ...make it die without a word, as a worker whose script throws does. */
+const CRASH_MARK = "crash";
+/** ...make it never answer. */
+const HANG_MARK = "hang";
+
+let terminated: number;
+/** When set, constructing a worker throws this. */
+let workerConstructionError: Error | null;
 
 class FakeWorker {
   onmessage: ((e: { data: unknown }) => void) | null = null;
+  onerror: ((e: { message: string }) => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  constructor() {
+    if (workerConstructionError) throw workerConstructionError;
+  }
   postMessage(msg: { type: string; taskId: string; objects: VectorObject[] }) {
     if (msg.type !== "generate") return;
+    const has = (mark: string) => msg.objects.some((o) => o.id.includes(mark));
     const reply = (data: unknown) => queueMicrotask(() => this.onmessage?.({ data }));
     reply({ type: "progress", taskId: msg.taskId, percent: 50, stage: "emitting" });
-    if (msg.objects.some((o) => o.id.includes(FAIL_MARK))) reply({ type: "error", taskId: msg.taskId, error: "boom" });
+    if (has(HANG_MARK)) return;
+    if (has(CRASH_MARK)) queueMicrotask(() => this.onerror?.({ message: "worker blew up" }));
+    else if (has(FAIL_MARK)) reply({ type: "error", taskId: msg.taskId, error: "boom" });
     else reply({ type: "complete", taskId: msg.taskId, gcode: `G:${msg.objects.map((o) => o.id).join(",")}` });
   }
-  terminate() {}
+  terminate() {
+    terminated++;
+  }
 }
 
 let labels: string[];
+/** The error text of each error task, by label. */
+let errors: Record<string, string | undefined>;
 let written: [string, string][];
 let uploaded: [string, string][];
 let chosenDirectory: string | null;
+/** Paths containing this cannot be written. */
+let unwritable: string | null;
+/** Cancel callbacks of the tasks now running. */
+let cancels: Map<string, () => void>;
 
 beforeEach(() => {
   labels = [];
   written = [];
   uploaded = [];
   chosenDirectory = "/out";
+  errors = {};
+  unwritable = null;
+  cancels = new Map();
+  terminated = 0;
+  workerConstructionError = null;
   vi.stubGlobal("Worker", FakeWorker);
   vi.stubGlobal("terraForge", {
     app: { getVersion: () => Promise.resolve("1.0") },
     fs: {
       chooseDirectory: () => Promise.resolve(chosenDirectory),
       saveGcodeDialog: (name: string) => Promise.resolve(`/picked/${name}`),
-      writeFile: (path: string, content: string) => (written.push([path, content]), Promise.resolve()),
+      writeFile: (path: string, content: string) => {
+        if (unwritable && path.includes(unwritable)) return Promise.reject(new Error("EACCES: permission denied"));
+        written.push([path, content]);
+        return Promise.resolve();
+      },
     },
     fluidnc: {
       uploadGcode: (_task: string, content: string, path: string) => (uploaded.push([path, content]), Promise.resolve()),
@@ -54,9 +87,12 @@ beforeEach(() => {
   });
   useTaskStore.setState({
     tasks: {},
-    upsertTask: (task: { status: string; label: string }) => labels.push(`${task.status}: ${task.label}`),
-    registerCancelCallback: () => {},
-    unregisterCancelCallback: () => {},
+    upsertTask: (task: { status: string; label: string; error?: string }) => {
+      labels.push(`${task.status}: ${task.label}`);
+      if (task.status === "error") errors[task.label] = task.error;
+    },
+    registerCancelCallback: (id: string, cancel: () => void) => void cancels.set(id, cancel),
+    unregisterCancelCallback: (id: string) => void cancels.delete(id),
   } as never);
   const config = createMachineConfig({ id: "m1" });
   useMachineStore.setState({ configs: [config], activeConfigId: "m1", connected: true, fwInfo: "FluidNC v3.9" } as never);
@@ -194,5 +230,169 @@ describe("useJobActions G-code generation", () => {
     await generate({ exportPerColor: true, optimise: false, saveLocally: true, uploadToSd: true });
     expect(labels).toEqual([]);
     expect(uploaded).toEqual([]);
+  });
+
+  describe("when generation goes wrong", () => {
+    const twoGroups = (firstPathId: string) =>
+      useCanvasStore.setState({
+        imports: [createSvgImport({ id: "a", paths: [path("a1")] }), createSvgImport({ id: "b", paths: [path(firstPathId)] })],
+        layerGroups: [
+          { id: "g1", name: "First", color: "#000", importIds: ["b"] },
+          { id: "g2", name: "Second", color: "#000", importIds: ["a"] },
+        ],
+      });
+
+    it("reports a worker that dies, and is no longer generating", async () => {
+      useCanvasStore.setState({ imports: [createSvgImport({ id: "a", paths: [path(`a-${CRASH_MARK}`)] })] });
+      const result = await generate({ saveLocally: true, uploadToSd: true });
+
+      expect(labels.at(-1)).toBe("error: G-code failed");
+      expect(errors["G-code failed"]).toBe("worker blew up");
+      expect(result.current.generating).toBe(false);
+      expect(written).toEqual([]);
+      expect(uploaded).toEqual([]);
+      expect(terminated).toBe(1);
+      expect(cancels.size).toBe(0);
+    });
+
+    it("reports a worker that cannot be started", async () => {
+      workerConstructionError = new Error("no workers here");
+      useCanvasStore.setState({ imports: [createSvgImport({ id: "a", paths: [path("a1")] })] });
+      const result = await generate({ saveLocally: true });
+
+      expect(labels).toEqual(["running: Preparing G-code", "error: G-code failed"]);
+      expect(errors["G-code failed"]).toBe("no workers here");
+      expect(result.current.generating).toBe(false);
+    });
+
+    it("carries on with the other files when one file's worker dies", async () => {
+      twoGroups(`b-${CRASH_MARK}`);
+      await generate({ exportPerGroup: true, optimise: false, saveLocally: true, uploadToSd: false });
+
+      expect(labels).toContain("error: First failed");
+      expect(written).toEqual([["/out/Second.gcode", "G:a1"]]);
+    });
+
+    it("reports a failure before generation starts, and is no longer generating", async () => {
+      useCanvasStore.setState({
+        imports: [createSvgImport({ id: "a", paths: [path("a1", { strokeColor: "#ff0000", sourceColor: "#ff0000" })] })],
+      });
+      window.terraForge.fs.chooseDirectory = () => Promise.reject(new Error("dialog failed"));
+      const result = await generate({ exportPerColor: true, saveLocally: true });
+
+      expect(labels).toEqual(["error: G-code failed"]);
+      expect(errors["G-code failed"]).toBe("dialog failed");
+      expect(result.current.generating).toBe(false);
+    });
+
+    it("reports a whole-job file that cannot be saved", async () => {
+      unwritable = "/picked/";
+      useCanvasStore.setState({ imports: [createSvgImport({ id: "a", name: "logo", paths: [path("a1")] })] });
+      const result = await generate({ optimise: false, saveLocally: true, uploadToSd: false });
+
+      expect(labels.at(-1)).toBe("error: Could not save logo.gcode");
+      expect(errors["Could not save logo.gcode"]).toBe("EACCES: permission denied");
+      expect(result.current.generating).toBe(false);
+    });
+
+    it("reports a split file that cannot be saved, still uploads it, and carries on", async () => {
+      unwritable = "First";
+      twoGroups("b1");
+      await generate({ exportPerGroup: true, optimise: false, saveLocally: true, uploadToSd: true });
+
+      expect(errors["Could not save First.gcode"]).toBe("EACCES: permission denied");
+      expect(written).toEqual([["/out/Second.gcode", "G:a1"]]);
+      expect(uploaded.map(([p]) => p)).toEqual(["/First.gcode", "/Second.gcode"]);
+    });
+  });
+
+  describe("cancelling", () => {
+    /** Starts a job, and resolves once a worker is running and can be cancelled. */
+    async function start(prefs: Partial<GcodePrefs>) {
+      const { result } = renderHook(() => useJobActions());
+      let done!: Promise<void>;
+      await act(async () => {
+        done = result.current.handleGenerateGcode({ ...DEFAULT_GCODE_PREFS, ...prefs });
+        await vi.waitFor(() => expect(cancels.size).toBe(1));
+      });
+      const cancel = async () => {
+        await act(async () => {
+          [...cancels.values()][0]();
+          await done;
+        });
+      };
+      return { result, cancel };
+    }
+
+    it("stops a whole job whose worker is not answering", async () => {
+      useCanvasStore.setState({ imports: [createSvgImport({ id: "a", paths: [path(`a-${HANG_MARK}`)] })] });
+      const { result, cancel } = await start({ saveLocally: true, uploadToSd: true });
+      expect(result.current.generating).toBe(true);
+      await cancel();
+
+      expect(labels.at(-1)).toBe("cancelled: G-code cancelled");
+      expect(terminated).toBe(1);
+      expect(result.current.generating).toBe(false);
+      expect(written).toEqual([]);
+      expect(uploaded).toEqual([]);
+    });
+
+    it("stops the rest of a split job, saying that files were skipped", async () => {
+      useCanvasStore.setState({
+        imports: [createSvgImport({ id: "a", paths: [path("a1")] }), createSvgImport({ id: "b", paths: [path(`b-${HANG_MARK}`)] })],
+        layerGroups: [
+          { id: "g1", name: "First", color: "#000", importIds: ["b"] },
+          { id: "g2", name: "Second", color: "#000", importIds: ["a"] },
+        ],
+      });
+      const { result, cancel } = await start({ exportPerGroup: true, optimise: false, saveLocally: true, uploadToSd: true });
+      await cancel();
+
+      expect(labels.at(-1)).toBe("cancelled: Export cancelled — remaining files skipped");
+      expect(labels.some((l) => l.includes("Second"))).toBe(false);
+      expect(written).toEqual([]);
+      expect(uploaded).toEqual([]);
+      expect(result.current.generating).toBe(false);
+    });
+
+    it("names the file when the last file of a split job is cancelled", async () => {
+      useCanvasStore.setState({
+        imports: [createSvgImport({ id: "a", paths: [path("a1")] }), createSvgImport({ id: "b", paths: [path(`b-${HANG_MARK}`)] })],
+        layerGroups: [
+          { id: "g1", name: "Alpha", color: "#000", importIds: ["a"] },
+          { id: "g2", name: "Omega", color: "#000", importIds: ["b"] },
+        ],
+      });
+      const { cancel } = await start({ exportPerGroup: true, optimise: false, saveLocally: true, uploadToSd: false });
+      await cancel();
+
+      expect(written).toEqual([["/out/Alpha.gcode", "G:a1"]]);
+      expect(labels.at(-1)).toBe("cancelled: Omega cancelled");
+    });
+
+    it("skips the hatch files when a colour file is cancelled", async () => {
+      useCanvasStore.setState({
+        imports: [
+          createSvgImport({
+            id: "a",
+            paths: [
+              // Not "a-hang": "-h" in an id marks a hatch line.
+              path(`${HANG_MARK}1`, {
+                strokeColor: "#ff0000",
+                sourceColor: "#ff0000",
+                fillColor: "#ff0000",
+                hatchLines: ["M0 0 L5 5"],
+              }),
+            ],
+          }),
+        ],
+      });
+      const { cancel } = await start({ exportPerColor: true, exportPerHatch: true, optimise: false, saveLocally: true });
+      await cancel();
+
+      expect(labels.at(-1)).toBe("cancelled: Export cancelled — remaining files skipped");
+      expect(labels.some((l) => l.toLowerCase().includes("hatch"))).toBe(false);
+      expect(written).toEqual([]);
+    });
   });
 });

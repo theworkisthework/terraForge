@@ -166,45 +166,106 @@ export function hatchFiles(objects: VectorObject[], optimise: boolean): SplitFil
   });
 }
 
-/** Generates one file in a fresh worker, reporting progress as a task;
- * resolves to its G-code, or null if it failed. */
-function generateFile(
-  file: SplitFile,
-  config: MachineConfig,
-  options: GcodeOptions,
-  upsertTask: (task: BackgroundTask) => void,
-): Promise<string | null> {
+/** The task store's actions that a generation needs. */
+export interface GenerationTasks {
+  upsertTask: (task: BackgroundTask) => void;
+  registerCancelCallback: (taskId: string, cancel: () => void) => void;
+  unregisterCancelCallback: (taskId: string) => void;
+}
+
+/** How one generation ended: with its G-code, by being cancelled, or by failing. */
+export type GenerationResult = { gcode: string } | { gcode: null; cancelled: boolean };
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/**
+ * Runs one generation in a fresh worker, shown as a cancellable task.
+ * Always settles, and always ends its task: a worker that fails to start,
+ * throws, or is sent something it cannot receive is a failed generation,
+ * not one left "Preparing…" for good.
+ *
+ * `target` names the file while it generates ("" for a whole job); `labels`
+ * are what its task reads once it has ended.
+ */
+function generateInWorker({
+  target,
+  labels,
+  objects,
+  config,
+  options,
+  tasks,
+}: {
+  target: string;
+  labels: { ready: string; failed: string; cancelled: string };
+  objects: VectorObject[];
+  config: MachineConfig;
+  options: GcodeOptions;
+  tasks: GenerationTasks;
+}): Promise<GenerationResult> {
   const taskId = uuid();
-  const task = (label: string, progress: number | null, status: BackgroundTask["status"]) =>
-    upsertTask({ id: taskId, type: "gcode-generate", label, progress, status });
-  task(formatGcodeProgressLabel(file.name, "preparing"), 0, "running");
+  const task = (label: string, progress: number | null, status: BackgroundTask["status"], error?: string) =>
+    tasks.upsertTask({ id: taskId, type: "gcode-generate", label, progress, status, ...(error !== undefined ? { error } : {}) });
+  task(formatGcodeProgressLabel(target, "preparing"), 0, "running");
 
   return new Promise((resolve) => {
-    const worker = new Worker(new URL("../../../../../workers/svgWorker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (e) => {
-      const msg = e.data;
-      if (msg.type === "progress") {
-        task(formatGcodeProgressLabel(file.name, msg.stage), msg.percent, "running");
-        return;
-      }
-      worker.terminate();
-      if (msg.type === "complete") {
-        task(`${file.doneName} ready`, 100, "completed");
-        resolve(msg.gcode as string);
-      } else {
-        task(`${file.doneName} failed`, null, "error");
-        resolve(null);
-      }
+    let worker: Worker | null = null;
+    let settled = false;
+    const finish = (result: GenerationResult) => {
+      if (settled) return;
+      settled = true;
+      worker?.terminate();
+      tasks.unregisterCancelCallback(taskId);
+      resolve(result);
     };
-    worker.postMessage({ type: "generate", taskId, objects: file.objects, config, options });
+    const fail = (error: string) => {
+      if (settled) return;
+      task(labels.failed, null, "error", error);
+      finish({ gcode: null, cancelled: false });
+    };
+
+    try {
+      worker = new Worker(new URL("../../../../../workers/svgWorker.ts", import.meta.url), { type: "module" });
+      worker.onmessage = (e) => {
+        const msg = e.data;
+        if (settled) return;
+        if (msg.type === "progress") task(formatGcodeProgressLabel(target, msg.stage), msg.percent, "running");
+        else if (msg.type === "complete") {
+          task(labels.ready, 100, "completed");
+          finish({ gcode: msg.gcode as string });
+        } else if (msg.type === "cancelled") {
+          task(labels.cancelled, null, "cancelled");
+          finish({ gcode: null, cancelled: true });
+        } else if (msg.type === "error") fail(String(msg.error));
+      };
+      // The worker's script did not load, or threw outside its own handling.
+      worker.onerror = (e) => {
+        e.preventDefault?.();
+        fail(e.message || "The G-code worker stopped unexpectedly");
+      };
+      worker.onmessageerror = () => fail("The G-code worker sent a result that could not be read");
+      // Stopping the worker outright, rather than asking it to stop, also
+      // ends one that is too busy to listen.
+      tasks.registerCancelCallback(taskId, () => {
+        if (settled) return;
+        task(labels.cancelled, null, "cancelled");
+        finish({ gcode: null, cancelled: true });
+      });
+      worker.postMessage({ type: "generate", taskId, objects, config, options });
+    } catch (err) {
+      fail(errorText(err));
+    }
   });
 }
 
 /**
  * Generates each file in turn, then saves it into `saveDir` and/or uploads
  * it to the SD card root (when connected), as `prefs` ask. A file that
- * fails is reported and skipped; the rest still run. Files that would share
- * a filename are renamed apart first (see `uniqueFilenames`).
+ * fails to generate, or cannot be saved, is reported and skipped; the rest
+ * still run. Cancelling a file's task cancels the rest of the job with it.
+ * Files that would share a filename are renamed apart first (see
+ * `uniqueFilenames`).
+ *
+ * Resolves false if the job was cancelled, true otherwise.
  */
 export async function runSplitFiles(
   files: SplitFile[],
@@ -213,8 +274,9 @@ export async function runSplitFiles(
     options,
     saveDir,
     upload,
-    upsertTask,
+    tasks,
     usedFilenames,
+    moreFollow = false,
   }: {
     config: MachineConfig;
     options: GcodeOptions;
@@ -222,15 +284,47 @@ export async function runSplitFiles(
     saveDir: string | null;
     /** Whether to upload: checked per file, as the connection may drop. */
     upload: () => boolean;
-    upsertTask: (task: BackgroundTask) => void;
+    tasks: GenerationTasks;
     /** Filenames already written by an earlier run into the same folder. */
     usedFilenames?: Set<string>;
+    /** Another run follows this one in the same job (hatch files after colour files). */
+    moreFollow?: boolean;
   },
-): Promise<void> {
-  for (const file of uniqueFilenames(files, usedFilenames)) {
-    const gcode = await generateFile(file, config, options, upsertTask);
-    if (!gcode) continue;
-    if (saveDir) await window.terraForge.fs.writeFile(`${saveDir}/${file.filename}`, gcode);
+): Promise<boolean> {
+  const unique = uniqueFilenames(files, usedFilenames);
+  for (const [index, file] of unique.entries()) {
+    const isLast = index === unique.length - 1 && !moreFollow;
+    const result = await generateInWorker({
+      target: file.name,
+      labels: {
+        ready: `${file.doneName} ready`,
+        failed: `${file.doneName} failed`,
+        cancelled: isLast ? `${file.doneName} cancelled` : "Export cancelled — remaining files skipped",
+      },
+      objects: file.objects,
+      config,
+      options,
+      tasks,
+    });
+    if (result.gcode === null) {
+      if (result.cancelled) return false;
+      continue;
+    }
+    const { gcode } = result;
+    if (saveDir) {
+      try {
+        await window.terraForge.fs.writeFile(`${saveDir}/${file.filename}`, gcode);
+      } catch (err) {
+        tasks.upsertTask({
+          id: uuid(),
+          type: "gcode-generate",
+          label: `Could not save ${file.filename}`,
+          progress: null,
+          status: "error",
+          error: errorText(err),
+        });
+      }
+    }
     if (upload()) {
       try {
         await window.terraForge.fluidnc.uploadGcode(uuid(), gcode, "/" + file.filename);
@@ -239,6 +333,7 @@ export async function runSplitFiles(
       }
     }
   }
+  return true;
 }
 
 /**
@@ -246,48 +341,24 @@ export async function runSplitFiles(
  * the G-code once its task reads "G-code ready", or null if it was cancelled
  * or failed (the task says which).
  */
-export function generateWholeJob({
+export async function generateWholeJob({
   objects,
   config,
   options,
-  upsertTask,
-  registerCancelCallback,
-  unregisterCancelCallback,
+  tasks,
 }: {
   objects: VectorObject[];
   config: MachineConfig;
   options: GcodeOptions;
-  upsertTask: (task: BackgroundTask) => void;
-  registerCancelCallback: (taskId: string, cancel: () => void) => void;
-  unregisterCancelCallback: (taskId: string) => void;
+  tasks: GenerationTasks;
 }): Promise<string | null> {
-  const taskId = uuid();
-  const task = (label: string, progress: number | null, status: BackgroundTask["status"], error?: string) =>
-    upsertTask({ id: taskId, type: "gcode-generate", label, progress, status, ...(error !== undefined ? { error } : {}) });
-  const worker = new Worker(new URL("../../../../../workers/svgWorker.ts", import.meta.url), { type: "module" });
-  registerCancelCallback(taskId, () => worker.postMessage({ type: "cancel", taskId }));
-  task(formatGcodeProgressLabel("", "preparing"), 0, "running");
-
-  return new Promise((resolve) => {
-    const finish = (gcode: string | null) => {
-      worker.terminate();
-      unregisterCancelCallback(taskId);
-      resolve(gcode);
-    };
-    worker.onmessage = (e) => {
-      const msg = e.data;
-      if (msg.type === "progress") task(formatGcodeProgressLabel("", msg.stage), msg.percent, "running");
-      else if (msg.type === "complete") {
-        task("G-code ready", 100, "completed");
-        finish(msg.gcode as string);
-      } else if (msg.type === "cancelled") {
-        task("G-code cancelled", null, "cancelled");
-        finish(null);
-      } else if (msg.type === "error") {
-        task("G-code failed", null, "error", msg.error);
-        finish(null);
-      }
-    };
-    worker.postMessage({ type: "generate", taskId, objects, config, options });
+  const result = await generateInWorker({
+    target: "",
+    labels: { ready: "G-code ready", failed: "G-code failed", cancelled: "G-code cancelled" },
+    objects,
+    config,
+    options,
+    tasks,
   });
+  return result.gcode;
 }

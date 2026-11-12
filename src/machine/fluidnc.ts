@@ -1,7 +1,10 @@
 import { EventEmitter } from "events";
 import { WebSocket } from "ws";
 import { createWriteStream, createReadStream } from "fs";
-import { stat } from "fs/promises";
+import { rename, rm, stat } from "fs/promises";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
+import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { lookup } from "dns/promises";
 import FormData from "form-data";
 import type { MachineStatus, RemoteFile } from "../types";
@@ -80,6 +83,12 @@ export class FluidNCClient extends EventEmitter {
   private connectAttempt = 0;
   private static readonly uploadVerifyMaxAttempts = 6;
   private static readonly uploadVerifyDelayMs = 300;
+  /**
+   * How long an upload or download may go without a byte moving before it
+   * is given up as stalled. Generous: the controller can pause for seconds
+   * at a time while it writes to the SD card.
+   */
+  private static transferIdleTimeoutMs = 60_000;
 
   private getWsState() {
     return this as unknown as {
@@ -417,37 +426,49 @@ export class FluidNCClient extends EventEmitter {
     await new Promise<void>((resolve, reject) => {
       const url = `${this.baseUrl}/upload`;
       let settled = false;
-      const fail = (err: unknown) => {
+      let request: ReturnType<FormData["submit"]> | null = null;
+      /** Ends the upload once: successfully, or with what went wrong. */
+      const settle = (err?: unknown) => {
         if (settled) return;
         settled = true;
+        signal?.removeEventListener("abort", onAbort);
+        if (err === undefined) return resolve();
+        // Nothing more is to be read or sent.
+        stream.destroy();
+        request?.destroy();
         reject(err instanceof Error ? err : new Error(String(err)));
       };
-      const onAbort = () => {
-        const abortErr = new Error("Upload cancelled");
-        stream.destroy(abortErr);
-        request?.destroy?.(abortErr);
-        fail(abortErr);
-      };
+      const onAbort = () => settle(new Error("Upload cancelled"));
+      signal?.addEventListener("abort", onAbort, { once: true });
 
-      if (signal) {
-        signal.addEventListener("abort", onAbort, { once: true });
-      }
+      // The local file could not be read; form-data reports that on the form.
+      stream.on("error", settle);
+      form.on("error", settle);
 
-      const request = form.submit(url, (err, res) => {
-        if (signal) signal.removeEventListener("abort", onAbort);
-        if (err) return reject(err);
-        res.resume();
+      request = form.submit(url, (err, res) => {
+        if (err) return settle(err);
+        res.on("error", settle);
         res.on("end", () => {
-          if ((res.statusCode ?? 0) >= 400) {
-            fail(new Error(`Upload failed: HTTP ${res.statusCode}`));
-          } else {
-            if (!settled) {
-              settled = true;
-              resolve();
-            }
-          }
+          if ((res.statusCode ?? 0) >= 400) settle(new Error(`Upload failed: HTTP ${res.statusCode}`));
+          else settle();
         });
+        // Closed without having ended: the connection dropped mid-reply.
+        res.on("close", () => {
+          if (!res.complete) settle(new Error("Upload failed: the connection closed before the machine replied"));
+        });
+        res.resume();
       });
+      // form-data stops listening for request errors once the response has
+      // begun; one after that would otherwise be thrown, unhandled.
+      request.on("error", settle);
+      // Fires when the socket has been idle this long, in either direction.
+      request.setTimeout(FluidNCClient.transferIdleTimeoutMs, () =>
+        settle(
+          new Error(
+            `Upload stalled: no data moved for ${Math.round(FluidNCClient.transferIdleTimeoutMs / 1000)} s`,
+          ),
+        ),
+      );
     });
 
     await this.verifyUploadedFileSize(targetDir, targetFilename, total, signal);
@@ -547,6 +568,13 @@ export class FluidNCClient extends EventEmitter {
     );
   }
 
+  /**
+   * Downloads a file from the controller to `localPath`.
+   *
+   * The data is written to `<localPath>.part` and moved into place once it
+   * is all there, so a download that fails, stalls or is cancelled leaves
+   * neither half a file nor a damaged copy of one it was to replace.
+   */
   async downloadFile(
     remotePath: string,
     localPath: string,
@@ -557,96 +585,56 @@ export class FluidNCClient extends EventEmitter {
     if (signal?.aborted) throw new Error("Download cancelled");
     const prefix = filesystem === "sdcard" ? "/sd" : "/localfs";
     const filePath = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
-    // Large files can legitimately take much longer than the default HTTP timeout.
-    const res = await this.restClient.get(
-      `${prefix}${encodeRemotePath(filePath)}`,
-      0,
-      "GET",
-      signal,
-    );
-    const total = Number(res.headers.get("content-length") ?? 0);
-    let received = 0;
+    const partPath = `${localPath}.part`;
 
-    const writer = createWriteStream(localPath);
-    const writerWithEvents = writer as unknown as {
-      on?: (event: string, listener: (...args: unknown[]) => void) => void;
+    // Stops the request and the write: on the caller's cancel, or on a stall.
+    const stop = new AbortController();
+    const onCancel = () => stop.abort(new Error("Download cancelled"));
+    signal?.addEventListener("abort", onCancel, { once: true });
+    const idleMs = FluidNCClient.transferIdleTimeoutMs;
+    let idleTimer: NodeJS.Timeout | undefined;
+    const stillMoving = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(
+        () => stop.abort(new Error(`Download stalled: no data received for ${Math.round(idleMs / 1000)} s`)),
+        idleMs,
+      );
     };
-    const reader = res.body?.getReader();
-    const readerWithCancel = reader as { cancel?: () => Promise<unknown> };
-    if (!reader) throw new Error("No response body for download");
 
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
+    let wrotePart = false;
+    try {
+      stillMoving();
+      // No overall timeout: a large file can legitimately take minutes.
+      const res = await this.restClient.get(`${prefix}${encodeRemotePath(filePath)}`, 0, "GET", stop.signal);
+      if (!res.body) throw new Error("No response body for download");
+      const total = Number(res.headers.get("content-length") ?? 0);
+      let received = 0;
 
-      const fail = (err: unknown) => {
-        if (settled) return;
-        settled = true;
-        if (typeof readerWithCancel.cancel === "function") {
-          readerWithCancel.cancel().catch(() => {});
-        }
-        writer.destroy();
-        reject(err instanceof Error ? err : new Error(String(err)));
-      };
-
-      const canListen = typeof writerWithEvents.on === "function";
-      if (canListen) {
-        writerWithEvents.on!("error", fail);
-        writerWithEvents.on!("finish", () => {
-          if (settled) return;
-          settled = true;
-          onProgress?.(100);
-          resolve();
-        });
-      }
-
-      const pump = async () => {
-        try {
-          while (true) {
-            if (signal?.aborted) {
-              throw new Error("Download cancelled");
-            }
-            const { done, value } = await reader.read();
-            if (done) break;
-            await new Promise<void>((resolveWrite, rejectWrite) => {
-              let writeSettled = false;
-              const finishWrite = (err?: unknown) => {
-                if (writeSettled) return;
-                writeSettled = true;
-                if (err) rejectWrite(err);
-                else resolveWrite();
-              };
-
-              try {
-                writer.write(value, (err) => {
-                  finishWrite(err);
-                });
-
-                // Unit-test mocks may not call write callbacks at all.
-                if (!canListen) {
-                  queueMicrotask(() => finishWrite());
-                }
-              } catch (err) {
-                finishWrite(err);
-              }
-            });
-            received += value.length;
-            if (onProgress && total > 0) {
-              onProgress(Math.round((received / total) * 100));
-            }
+      wrotePart = true;
+      await pipeline(
+        Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>),
+        async function* (source: AsyncIterable<Uint8Array>) {
+          for await (const chunk of source) {
+            stillMoving();
+            received += chunk.length;
+            // 100 is for the finished file, in place.
+            if (onProgress && total > 0) onProgress(Math.min(99, Math.round((received / total) * 100)));
+            yield chunk;
           }
-          writer.end();
-          if (!canListen) {
-            if (settled) return;
-            settled = true;
-            onProgress?.(100);
-            resolve();
-          }
-        } catch (e) {
-          fail(e);
-        }
-      };
-      pump();
-    });
+        },
+        createWriteStream(partPath),
+        { signal: stop.signal },
+      );
+      await rename(partPath, localPath);
+      onProgress?.(100);
+    } catch (err) {
+      if (wrotePart) await rm(partPath, { force: true }).catch(() => {});
+      // Why it was stopped, rather than the "aborted" that stopping caused.
+      throw stop.signal.aborted ? stop.signal.reason : err;
+    } finally {
+      clearTimeout(idleTimer);
+      signal?.removeEventListener("abort", onCancel);
+    }
   }
 
   // ─── WebSocket ────────────────────────────────────────────────────────────

@@ -19,8 +19,8 @@ const mocks = vi.hoisted(() => {
     constructor(options: Record<string, unknown>) {
       this.options = options;
       this.show = vi.fn();
-      this.loadURL = vi.fn();
-      this.loadFile = vi.fn();
+      this.loadURL = vi.fn(() => mocks.loadResult());
+      this.loadFile = vi.fn(() => mocks.loadResult());
       this.isDestroyed = vi.fn(() => false);
       this.webContents = {
         isDestroyed: vi.fn(() => false),
@@ -48,6 +48,8 @@ const mocks = vi.hoisted(() => {
 
   return {
     instances,
+    /** What loading the window's page comes to. */
+    loadResult: vi.fn((): Promise<void> => Promise.resolve()),
     BrowserWindow: MockBrowserWindow,
     openExternal: vi.fn(),
   };
@@ -115,6 +117,13 @@ describe("main window bootstrap", () => {
     win.isDestroyed.mockReturnValue(true);
     safeSend("ignored");
     expect(win.webContents.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat a load cut short by a reload or a close as a failure", async () => {
+    // Left unhandled, this rejection would fail the test run.
+    mocks.loadResult.mockReturnValueOnce(Promise.reject(Object.assign(new Error("ERR_ABORTED (-3)"), { code: "ERR_ABORTED" })));
+    createMainWindow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("denies external window opens and clears mainWindow on close", () => {
