@@ -39,6 +39,27 @@ export interface SplitFile {
 /** `base.gcode`, or `base_opt.gcode` for an optimised job. */
 const gcodeFilename = (base: string, optimise: boolean) => (optimise ? `${base}_opt.gcode` : `${base}.gcode`);
 
+/**
+ * Gives every file a filename of its own. Two layer groups with one name, or
+ * two imports with the same name and layer, would otherwise be written to the
+ * same path and the later file would replace the earlier. A repeat gets a
+ * number before the extension: `pen.gcode`, `pen_2.gcode`; `pen_opt.gcode`,
+ * `pen_2_opt.gcode`.
+ *
+ * Names are compared without regard to case, as the SD card's FAT filesystem
+ * (and Windows and macOS) would. `taken` carries the names used across
+ * several calls that write into one folder.
+ */
+export function uniqueFilenames(files: SplitFile[], taken: Set<string> = new Set()): SplitFile[] {
+  return files.map((file) => {
+    const [, base, ext] = /^(.*?)((?:_opt)?\.gcode)$/i.exec(file.filename) ?? [null, file.filename, ""];
+    let filename = file.filename;
+    for (let n = 2; taken.has(filename.toLowerCase()); n++) filename = `${base}_${n}${ext}`;
+    taken.add(filename.toLowerCase());
+    return filename === file.filename ? file : { ...file, filename };
+  });
+}
+
 /** One file per layer group, plus one for imports in no group. */
 export function groupFiles(
   ungrouped: VectorObject[],
@@ -52,7 +73,7 @@ export function groupFiles(
   return entries.map(({ name, objects }) => ({
     name,
     doneName: name,
-    filename: gcodeFilename(name.replace(/[\\/:*?"<>|]/g, "_"), optimise),
+    filename: gcodeFilename(name.replace(/[\\/:*?"<>|]/g, "_").trim() || "group", optimise),
     objects,
   }));
 }
@@ -182,7 +203,8 @@ function generateFile(
 /**
  * Generates each file in turn, then saves it into `saveDir` and/or uploads
  * it to the SD card root (when connected), as `prefs` ask. A file that
- * fails is reported and skipped; the rest still run.
+ * fails is reported and skipped; the rest still run. Files that would share
+ * a filename are renamed apart first (see `uniqueFilenames`).
  */
 export async function runSplitFiles(
   files: SplitFile[],
@@ -192,6 +214,7 @@ export async function runSplitFiles(
     saveDir,
     upload,
     upsertTask,
+    usedFilenames,
   }: {
     config: MachineConfig;
     options: GcodeOptions;
@@ -200,9 +223,11 @@ export async function runSplitFiles(
     /** Whether to upload: checked per file, as the connection may drop. */
     upload: () => boolean;
     upsertTask: (task: BackgroundTask) => void;
+    /** Filenames already written by an earlier run into the same folder. */
+    usedFilenames?: Set<string>;
   },
 ): Promise<void> {
-  for (const file of files) {
+  for (const file of uniqueFilenames(files, usedFilenames)) {
     const gcode = await generateFile(file, config, options, upsertTask);
     if (!gcode) continue;
     if (saveDir) await window.terraForge.fs.writeFile(`${saveDir}/${file.filename}`, gcode);

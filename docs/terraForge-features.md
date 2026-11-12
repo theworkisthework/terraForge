@@ -102,6 +102,8 @@
 - [x] Five origin modes — bottom-left, top-left, bottom-right, top-right, **center**; all five are supported in the canvas coordinate system, G-code toolpath overlay, ruler, and origin marker; center origin places (0,0) at the centre of the bed with ± coordinates on both axes
 - [x] WebSocket port override (`wsPort`) — optional per-config field in the Machine Config dialog; auto-detects from `[ESP800]` firmware version query at connect time; FluidNC 4.x shares the HTTP port (leave blank); older ESP3D-based firmware uses port 81; explicit value overrides auto-detect
 - [x] Export / Import machine configs — "↑ Export" saves all configs to a user-chosen `.json` file; "↓ Import" reads a JSON file and merges configs, skipping duplicates by ID or name; import result reports added/skipped counts
+- [x] **Config files written safely** — `machine-configs.json`, `app-config.json` and `page-sizes.json` are written to a temporary file and renamed into place, one write at a time; a file that cannot be parsed is set aside as `<name>.<timestamp>.bak` rather than overwritten with defaults
+- [x] **Ink service stations per machine** — `MachineConfig.inkServiceStations` (defaults apply when absent); edited under Machine Configurations → Paint/Ink Stations, saveable while connected; the pre-existing app-wide list is copied into each machine config on first run
 - [x] Settings dialog tabbed sections — reusable tab header with **Machine Configurations** and **Application Configuration** sections
 - [x] App-level pass override toggle — **Application Configuration → G-code Pass Settings** includes "Enable per-path pass overrides in the Properties panel"; persisted in `terraforge-app-config`; default is off (layer/colour pass controls only)
 
@@ -212,12 +214,15 @@
 ### Undo / Redo
 
 - [x] 50-step undo/redo history in `canvasStore`; canvas gestures (drag, rotate, scale) call `snapshotForGesture()` at mousedown and `commitGesture()` on mouseup — trivial interactions that produce no change are discarded so the stack is never polluted; redo stack is cleared on any new edit
+- [x] Every change to the layout is undoable — imports, pastes, deletes, property edits (import and path), layer groups, page template — through `history.edit()`; changes made in one turn of the event loop are one step, and continuous edits of one property (typing, sliders) within 1 s coalesce into one step; render results applied in the background (`applyRenderResult`) are not steps
 
 ### Layout Management
 
 - [x] **Save layout** — saves all imports, layer groups, toolpath reference, and canvas settings to a user-chosen `.json` file via a native save dialog
 - [x] **Open layout** — restores a previously saved layout including imports, groups, and toolpath references via a native open dialog
 - [x] **Close layout** — `CloseLayoutDialog` confirmation prompt before discarding unsaved changes; accessible from the File menu
+- [x] **Unsaved-changes prompt** — the renderer reports `hasUnsavedChanges` to main (`app:setUnsavedChanges`); closing the window or quitting then asks "Close without saving / Cancel" (`src/main/bootstrap/unsavedChanges.ts`)
+- [x] **Layout validation** — `parseLayout` checks a `.tforge` file's structure before anything is loaded and refuses one saved by a newer layout format (`tfVersion` > `LAYOUT_VERSION`)
 
 ### Page Templates
 

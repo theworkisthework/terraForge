@@ -4,7 +4,7 @@ import type {
   InkServiceStation,
   InkServiceStationAction,
 } from "../../../../../../types";
-import { defaultStationActionForType } from "../../utils/stationDefaults";
+import { defaultStationActionForType } from "../../../../features/machine/utils/inkServiceStations";
 
 interface StationRowProps {
   station: InkServiceStation;

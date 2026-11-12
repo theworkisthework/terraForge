@@ -4,6 +4,13 @@ import { appWindows, isPluginHostWindow } from "../plugins/pluginHostWindows";
 interface AppLifecycleOptions {
   createMainWindow: () => void;
   onReady?: () => void;
+  /**
+   * Asked when the app is about to quit. Return null to let it, or a promise
+   * to hold the quit until it settles: the app then quits if it resolved
+   * true and stays open otherwise.
+   */
+  confirmQuit?: () => Promise<boolean> | null;
+  /** Runs once the app is really quitting — not for a quit that was held. */
   onBeforeQuit?: () => void;
   /**
    * Fired when the last window the user can see has closed. Bitmap plugin
@@ -17,6 +24,7 @@ interface AppLifecycleOptions {
 export function registerAppLifecycleHandlers({
   createMainWindow,
   onReady,
+  confirmQuit,
   onBeforeQuit,
   onAllAppWindowsClosed,
 }: AppLifecycleOptions): void {
@@ -46,7 +54,16 @@ export function registerAppLifecycleHandlers({
     }
   });
 
-  app.on("before-quit", () => {
+  app.on("before-quit", (event) => {
+    const answer = confirmQuit?.() ?? null;
+    if (answer) {
+      event.preventDefault();
+      // Quitting again asks again, and finds the answer already given.
+      void answer.then((quit) => {
+        if (quit) app.quit();
+      });
+      return;
+    }
     onBeforeQuit?.();
   });
 }

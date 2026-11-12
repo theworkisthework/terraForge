@@ -4,6 +4,7 @@ import { MachineConfigsSidebar } from "./Machine/MachineConfigsSidebar";
 import { MachineGeneralSection } from "./Machine/MachineGeneralSection";
 import { MachinePenCommandsSection } from "./Machine/MachinePenCommandsSection";
 import { MachineConnectionSection } from "./Machine/MachineConnectionSection";
+import { MachineInkStationsSection } from "./Machine/MachineInkStationsSection";
 
 interface MachineConfigurationsTabProps {
   controller: MachineConfigDialogController;
@@ -39,6 +40,9 @@ export function MachineConfigurationsTab({
           <MachinePenCommandsSection controller={controller} />
           <MachineConnectionSection controller={controller} />
         </fieldset>
+
+        {/* Outside the lock: stations are tuned with the machine connected. */}
+        <MachineInkStationsSection controller={controller} />
       </div>
     </div>
   );

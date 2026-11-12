@@ -35,9 +35,6 @@ export function useMachineConfigDialogStores() {
   const showInkServiceStationsOnCanvas = useAppConfigStore(
     (state) => state.showInkServiceStationsOnCanvas,
   );
-  const inkServiceStations = useAppConfigStore(
-    (state) => state.inkServiceStations,
-  );
   const setEnablePerPathPasses = useAppConfigStore(
     (state) => state.setEnablePerPathPasses,
   );
@@ -71,15 +68,6 @@ export function useMachineConfigDialogStores() {
   const setShowInkServiceStationsOnCanvas = useAppConfigStore(
     (state) => state.setShowInkServiceStationsOnCanvas,
   );
-  const updateInkServiceStation = useAppConfigStore(
-    (state) => state.updateInkServiceStation,
-  );
-  const addInkServiceStation = useAppConfigStore(
-    (state) => state.addInkServiceStation,
-  );
-  const removeInkServiceStation = useAppConfigStore(
-    (state) => state.removeInkServiceStation,
-  );
 
   const machineStore = useMachineStore();
 
@@ -96,7 +84,6 @@ export function useMachineConfigDialogStores() {
       vinylCornerAngleThresholdDeg,
       vinylMicroJogMagnitudeMM,
       showInkServiceStationsOnCanvas,
-      inkServiceStations,
       setEnablePerPathPasses,
       setDebugLoggingEnabled,
       setShowConsoleTimestamps,
@@ -108,9 +95,6 @@ export function useMachineConfigDialogStores() {
       setVinylCornerAngleThresholdDeg,
       setVinylMicroJogMagnitudeMM,
       setShowInkServiceStationsOnCanvas,
-      updateInkServiceStation,
-      addInkServiceStation,
-      removeInkServiceStation,
     },
     machineStore,
   };

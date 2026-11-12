@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { CanvasState } from "./canvasStore/types";
+import { createCanvasHistory } from "./canvasStore/history";
 import { generateCopyName } from "./canvasStore/services/clipboard";
 import { createPageTemplateSlice } from "./canvasStore/slices/pageTemplateSlice";
 import { createClipboardSlice } from "./canvasStore/slices/clipboardSlice";
@@ -14,25 +15,15 @@ export { generateCopyName };
 
 export const useCanvasStore = create<CanvasState>()(
   immer((set, get, store) => {
-    const pushUndo = () => {
-      // Not a copy: immer state is never changed in place (see undoRedoSlice).
-      const snap = get().imports;
-      set((state) => {
-        state.undoStack.push(snap);
-        if (state.undoStack.length > 50)
-          state.undoStack.splice(0, state.undoStack.length - 50);
-        // Any new edit invalidates the redo history.
-        state.redoStack = [];
-      });
-    };
+    const history = createCanvasHistory(set, get);
 
     return {
       ...createToolpathSlice(set, get, store),
-      ...createUndoRedoSlice(set, get, store),
-      ...createPageTemplateSlice(set, get, store),
-      ...createClipboardSlice(pushUndo)(set, get, store),
-      ...createImportSlice(pushUndo)(set, get, store),
-      ...createLayerGroupSlice(set, get, store),
+      ...createUndoRedoSlice(history)(set, get, store),
+      ...createPageTemplateSlice(history)(set, get, store),
+      ...createClipboardSlice(history)(set, get, store),
+      ...createImportSlice(history)(set, get, store),
+      ...createLayerGroupSlice(history)(set, get, store),
       ...createSelectionSlice(set, get, store),
     };
   }),

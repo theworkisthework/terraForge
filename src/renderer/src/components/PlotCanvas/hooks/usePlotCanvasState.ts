@@ -7,6 +7,7 @@ import {
   selectPlotCanvasToolpathState,
 } from "../../../store/canvasSelectors";
 import { useMachineStore } from "../../../store/machineStore";
+import { selectActiveInkServiceStations } from "../../../features/machine/utils/inkServiceStations";
 import { useStableMachineState } from "../../../hooks/useStableMachineState";
 
 export function usePlotCanvasState() {
@@ -26,7 +27,7 @@ export function usePlotCanvasState() {
   const respectSvgColorsOnCanvas = useAppConfigStore(
     (s) => s.respectSvgColorsOnCanvas,
   );
-  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
+  const inkServiceStations = useMachineStore(selectActiveInkServiceStations);
 
   const displayMachineState = useStableMachineState(machineStatus?.state);
   const isJobActive =

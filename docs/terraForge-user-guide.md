@@ -148,7 +148,19 @@ The Settings dialog has two tabs:
 - **↑ Export** — saves all profiles to a `.json` file for backup or sharing.
 - **↓ Import** — merges profiles from a `.json` file; duplicates (by ID or name) are skipped.
 
-> **Note:** You cannot edit the **active** profile while the machine is connected. A 🔒 banner appears and all fields become read-only. Non-active profiles can be edited at any time.
+> **Note:** You cannot edit the **active** profile while the machine is connected. A 🔒 banner appears and its fields become read-only, apart from its Paint/Ink Stations (below). Non-active profiles can be edited at any time.
+
+### Paint/Ink Stations (Experimental)
+
+Each profile has its own list of ink service stations — where that machine's pen is primed and wiped, or its brush dipped and washed — under **Paint/Ink Stations → Station List**, at the end of the profile. A station's position is in that machine's coordinates, in mm. A profile with no stations of its own uses a default set.
+
+- **Add** creates a dip station; **Remove** deletes one.
+- **Test** raises the pen and moves it to the station. It works only for the profile of the machine you are connected to.
+- Changes take effect when you click **Save Changes**. Stations can be edited and saved while the machine is connected, so you can move a station, test it and move it again.
+
+Stations are exported and imported with their profile. See [Ink/Brush Service](#inkbrush-service-section-experimental) for how they are used in a job.
+
+> **Upgrading:** earlier versions kept one station list for the whole application. The first time this version starts, that list is copied into every existing profile.
 
 ### Application Configuration
 
@@ -162,6 +174,7 @@ Current option:
 - **Enable vinyl cutting features (Experimental)**
 - **Show imported SVG colours on canvas**
 - **Enable bitmap import (Experimental)** — see [§9 Bitmap Images](#9-bitmap-images-experimental)
+- **Show station markers on plot canvas (Experimental)** — draws the active machine's ink service stations on the bed preview
 
 When **Enable per-path pass** is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
 
@@ -358,7 +371,9 @@ Press **Ctrl+A** to select all imports simultaneously. All objects show grouped 
 
 ### Undo and Redo
 
-terraForge maintains up to **50 undo steps** for canvas changes (move, scale, rotate, delete, paste). Each gesture that produces a real change is recorded as one step; trivial clicks are not.
+terraForge maintains up to **50 undo steps** for changes to the layout: importing, moving, scaling, rotating, deleting and pasting objects; editing an object's or a path's properties; changing layer groups; and changing the page template. Each action that produces a real change is recorded as one step; trivial clicks are not. A value typed or dragged in one go — a number entered digit by digit, a slider, a colour picker — is a single step.
+
+Redo is available until you make a new change.
 
 | Shortcut         | Action                  |
 | ---------------- | ----------------------- |
@@ -808,7 +823,8 @@ The Ink/Brush Service tab enables automated pen/brush maintenance moves during G
 | **Prime-wipe**                    | Prime (press) station followed by wipe station; triggered after travel threshold |
 | **Brush-dip**                     | Cyclic dip stations with optional wash cadence; triggered after travel threshold |
 | **Service trigger distance (mm)** | Travel distance threshold before visiting a service station                      |
-| **Add service station**           | Create a new station (prime, wipe, dip, or wash)                                 |
+
+The stations themselves belong to the machine: they are set per profile in **Settings → Machine Configurations → Paint/Ink Stations** (see [Paint/Ink Stations](#paintink-stations-experimental)), and a job uses the stations of the active machine.
 
 **Station configuration (available in both modes):**
 
@@ -867,6 +883,7 @@ During G-code generation, whenever the plotter travels more than 15 mm (rapid), 
 - When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
 - The split-output modes are mutually exclusive radio choices under the **Split output into separate files** master checkbox.
 - **Export separate hatch files per colour** is only available when **Export one file per colour group** is selected.
+- Every file of a split job gets a name of its own. If two would share one — two layer groups with the same name, say — the later file gets a number: `Black.gcode`, `Black_2.gcode` (`Black_opt.gcode`, `Black_2_opt.gcode` for optimised output).
 - Per-colour files are named after the colour: a separated bitmap ink's name (`color_cyan.gcode`), a basic colour's name (`color_red.gcode`), or otherwise its hex code (`color_hex-3a6aaa.gcode`). If two different colours would get the same name, each name has its hex code added.
 
 ### Persisted Preferences
@@ -1160,6 +1177,14 @@ Press **Ctrl+O** or choose **File → Open Layout**. Select a `.tforge` file. Th
 ### Closing a Layout
 
 Choose **File → Close Layout**. If you have imports on the canvas, a confirmation dialog appears before clearing.
+
+### Unsaved Changes
+
+If the layout has changed since it was last saved or opened, closing the window or quitting terraForge asks first: **Close without saving** discards the changes, **Cancel** keeps terraForge open so that you can save. **View → Reload** does not ask.
+
+### Layout File Checks
+
+A layout file is checked when it is opened. A file that is not a terraForge layout, is damaged, or was saved by a newer version of terraForge than the one you are running is refused with a message saying why, and the canvas is left as it was.
 
 ### Page Templates
 

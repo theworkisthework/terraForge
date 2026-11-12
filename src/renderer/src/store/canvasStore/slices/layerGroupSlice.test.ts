@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { createCanvasHistory } from "../history";
 import { createLayerGroupSlice } from "./layerGroupSlice";
+import { createUndoRedoSlice } from "./undoRedoSlice";
 
-type LayerGroupState = ReturnType<typeof createLayerGroupSlice> & {
+type LayerGroupState = ReturnType<ReturnType<typeof createLayerGroupSlice>> &
+  ReturnType<ReturnType<typeof createUndoRedoSlice>> & {
   imports: Array<{
     id: string;
     name: string;
@@ -26,17 +29,32 @@ type LayerGroupState = ReturnType<typeof createLayerGroupSlice> & {
     layers?: Array<{ id: string; name: string; visible: boolean }>;
   }>;
   selectedGroupId: string | null;
+  selectedImportId: string | null;
+  selectedPathId: string | null;
+  allImportsSelected: boolean;
+  pageTemplate: null;
 };
 
 function makeStore() {
   return create<LayerGroupState>()(
-    immer((set, get, store) => ({
-      imports: [],
-      selectedGroupId: null,
-      ...createLayerGroupSlice(set as any, get as any, store as any),
-    })),
+    immer((set, get, store) => {
+      const history = createCanvasHistory(set as any, get as any);
+      return {
+        imports: [],
+        selectedGroupId: null,
+        selectedImportId: null,
+        selectedPathId: null,
+        allImportsSelected: false,
+        pageTemplate: null,
+        ...createUndoRedoSlice(history)(set as any, get as any, store as any),
+        ...createLayerGroupSlice(history)(set as any, get as any, store as any),
+      };
+    }),
   );
 }
+
+/** Edits in one turn of the event loop are one undo step; this ends the turn. */
+const nextTurn = () => Promise.resolve();
 
 describe("layerGroupSlice", () => {
   it("starts with no groups", () => {
@@ -163,5 +181,52 @@ describe("layerGroupSlice", () => {
     const result = store.getState().toVectorObjectsUngrouped();
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("p2");
+  });
+});
+
+describe("layerGroupSlice undo", () => {
+  it("undoes adding, assigning to and removing a group, one step at a time", async () => {
+    const store = makeStore();
+    store.getState().addLayerGroup("Pen 1", "#111111");
+    const id = store.getState().layerGroups[0].id;
+    await nextTurn();
+    store.getState().assignImportToGroup("imp1", id);
+    await nextTurn();
+    store.getState().removeLayerGroup(id);
+    expect(store.getState().undoStack).toHaveLength(3);
+
+    store.getState().undo();
+    expect(store.getState().layerGroups[0].importIds).toEqual(["imp1"]);
+    store.getState().undo();
+    expect(store.getState().layerGroups[0].importIds).toEqual([]);
+    store.getState().undo();
+    expect(store.getState().layerGroups).toEqual([]);
+  });
+
+  it("records nothing for a change that changes nothing", () => {
+    const store = makeStore();
+    store.setState({ layerGroups: [{ id: "g1", name: "One", color: "#111", importIds: ["imp1"] }] });
+
+    store.getState().removeLayerGroup("missing");
+    store.getState().updateLayerGroup("g1", { name: "One" });
+    store.getState().assignImportToGroup("imp1", "g1");
+    store.getState().assignImportToGroup("imp2", null);
+
+    expect(store.getState().undoStack).toHaveLength(0);
+    expect(store.getState().revision).toBe(store.getState().savedRevision);
+  });
+
+  it("makes one undo step of a name typed letter by letter", async () => {
+    const store = makeStore();
+    store.setState({ layerGroups: [{ id: "g1", name: "", color: "#111", importIds: [] }] });
+
+    for (const name of ["B", "Bl", "Blu", "Blue"]) {
+      store.getState().updateLayerGroup("g1", { name });
+      await nextTurn();
+    }
+
+    expect(store.getState().undoStack).toHaveLength(1);
+    store.getState().undo();
+    expect(store.getState().layerGroups[0].name).toBe("");
   });
 });

@@ -127,7 +127,7 @@ exportConfigs, importConfigs,
 loadPageSizes, openPageSizesFile
 },
 tasks: { cancel, onTaskUpdate },
-app: { getVersion, openExternal, onMenuAbout },
+app: { getVersion, openExternal, setUnsavedChanges, onMenuAbout },
 edit: { onMenuCopy, onMenuCut, onMenuPaste, onMenuSelectAll, setHasSelection }
 }
 All methods must be explicitly typed.

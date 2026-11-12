@@ -5,25 +5,31 @@ import { useCanvasStore } from "../../../store/canvasStore";
 import { selectLayoutActionsCanvasState } from "../../../store/canvasSelectors";
 import { useTaskStore } from "../../../store/taskStore";
 import { type CanvasLayout } from "../../../../../types";
+import { LAYOUT_VERSION, parseLayout } from "../utils/parseLayout";
 
 /** Orchestrates save, load, and close operations for canvas layout files. */
 export function useLayoutActions() {
-  const { imports, layerGroups, pageTemplate, loadLayout, clearImports } =
-    useCanvasStore(useShallow(selectLayoutActionsCanvasState));
+  const { imports, loadLayout, clearImports } = useCanvasStore(
+    useShallow(selectLayoutActionsCanvasState),
+  );
   const upsertTask = useTaskStore((s) => s.upsertTask);
 
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [pendingLayout, setPendingLayout] = useState<CanvasLayout | null>(null);
 
-  /** Prompts for a save path and writes the current canvas layout to disk. */
-  const handleSaveLayout = async () => {
-    if (imports.length === 0) return;
+  /**
+   * Prompts for a save path and writes the current canvas layout to disk.
+   * Resolves to whether it was saved: false if the prompt was cancelled or
+   * the write failed.
+   */
+  const handleSaveLayout = async (): Promise<boolean> => {
+    if (imports.length === 0) return false;
     const taskId = uuid();
     const baseName = imports.length === 1 ? imports[0].name : "layout";
     const defaultFilename = `${baseName}.tforge`;
     const savePath =
       await window.terraForge.fs.saveLayoutDialog(defaultFilename);
-    if (!savePath) return;
+    if (!savePath) return false;
     upsertTask({
       id: taskId,
       type: "svg-parse",
@@ -32,17 +38,22 @@ export function useLayoutActions() {
       status: "running",
     });
     try {
+      // The document as it is now, with its revision: that revision, not
+      // whatever the canvas holds once the write has finished, is what the
+      // file contains.
+      const doc = useCanvasStore.getState();
       const layout: CanvasLayout = {
-        tfVersion: 1,
+        tfVersion: LAYOUT_VERSION,
         savedAt: new Date().toISOString(),
-        imports,
-        layerGroups,
-        pageTemplate,
+        imports: doc.imports,
+        layerGroups: doc.layerGroups,
+        pageTemplate: doc.pageTemplate,
       };
       await window.terraForge.fs.writeFile(
         savePath,
         JSON.stringify(layout, null, 2),
       );
+      doc.markSaved(doc.revision);
       upsertTask({
         id: taskId,
         type: "svg-parse",
@@ -50,6 +61,7 @@ export function useLayoutActions() {
         progress: 100,
         status: "completed",
       });
+      return true;
     } catch (err) {
       upsertTask({
         id: taskId,
@@ -59,6 +71,7 @@ export function useLayoutActions() {
         status: "error",
         error: String(err),
       });
+      return false;
     }
   };
 
@@ -75,16 +88,8 @@ export function useLayoutActions() {
       status: "running",
     });
     try {
-      const raw = await window.terraForge.fs.readFile(filePath);
-      let layout: CanvasLayout;
-      try {
-        layout = JSON.parse(raw) as CanvasLayout;
-      } catch {
-        throw new Error("Not a valid terraForge layout file.");
-      }
-      if (!Array.isArray(layout.imports)) {
-        throw new Error("Layout file does not contain a valid imports array.");
-      }
+      // Checked in full before anything on the canvas is replaced.
+      const layout = parseLayout(await window.terraForge.fs.readFile(filePath));
       upsertTask({
         id: taskId,
         type: "svg-parse",

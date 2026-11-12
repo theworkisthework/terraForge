@@ -201,6 +201,7 @@ if (typeof window !== "undefined") {
     app: {
       getVersion: vi.fn().mockResolvedValue("1.0.0"),
       openExternal: vi.fn().mockResolvedValue(undefined),
+      setUnsavedChanges: vi.fn(),
       onMenuAbout: vi.fn().mockReturnValue(() => {}),
     },
     rendererPlugins: {

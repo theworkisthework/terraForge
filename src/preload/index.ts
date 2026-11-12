@@ -194,6 +194,7 @@ const config: TerraForgeAPI["config"] = {
 const appApi: TerraForgeAPI["app"] = {
   getVersion: () => invoke<string>("app:getVersion"),
   openExternal: (url) => invoke<void>("app:openExternal", url),
+  setUnsavedChanges: (unsaved) => ipcRenderer.send("app:setUnsavedChanges", unsaved),
   onMenuAbout: (cb) => {
     const listener = () => cb();
     ipcRenderer.on("menu:about", listener);

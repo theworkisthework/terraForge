@@ -9,7 +9,29 @@ import {
 } from "../services/hatching";
 import { refitImportToPaths } from "../services/importBounds";
 import { vectorObjectsForImports } from "../services/vectorObjects";
-import type { CanvasStateCreator, ImportSlice } from "../types";
+import { coalesceKeyFor, type CanvasHistory } from "../history";
+import type { CanvasState, CanvasStateCreator, ImportSlice } from "../types";
+
+/** Takes an import that is going away out of whichever layer group holds it. */
+export function removeFromLayerGroups(state: CanvasState, importId: string) {
+  for (const group of state.layerGroups) {
+    if (group.importIds.includes(importId)) {
+      group.importIds = group.importIds.filter((id) => id !== importId);
+    }
+  }
+}
+
+function patchImport(state: CanvasState, id: string, patch: Partial<SvgImport>) {
+  const imp = state.imports.find((item) => item.id === id);
+  if (!imp) return;
+  Object.assign(imp, patch);
+  if (
+    imp.hatchEnabled &&
+    ("scale" in patch || "scaleX" in patch || "scaleY" in patch)
+  ) {
+    regenerateImportHatching(imp);
+  }
+}
 
 function withDefaultHatchSettings(imp: SvgImport): SvgImport {
   const normalizedPaths = imp.paths.map((path) => {
@@ -48,23 +70,22 @@ function withDefaultHatchSettings(imp: SvgImport): SvgImport {
 }
 
 export function createImportSlice(
-  pushUndo: () => void,
+  history: CanvasHistory,
 ): CanvasStateCreator<ImportSlice> {
+  const { edit } = history;
   return (set, get) => ({
     imports: [],
 
-    addImport: (imp) => {
-      pushUndo();
-      set((state) => {
+    addImport: (imp) =>
+      edit((state) => {
         state.imports.push(withDefaultHatchSettings(imp));
-      });
-    },
+      }),
 
     removeImport: (id) => {
       if (!get().imports.some((item) => item.id === id)) return;
-      pushUndo();
-      set((state) => {
+      edit((state) => {
         state.imports = state.imports.filter((item) => item.id !== id);
+        removeFromLayerGroups(state, id);
         if (state.selectedImportId === id) {
           state.selectedImportId = null;
           state.selectedPathId = null;
@@ -81,28 +102,20 @@ export function createImportSlice(
     },
 
     updateImport: (id, patch) =>
-      set((state) => {
-        const imp = state.imports.find((item) => item.id === id);
-        if (!imp) return;
-        Object.assign(imp, patch);
-        if (
-          imp.hatchEnabled &&
-          ("scale" in patch || "scaleX" in patch || "scaleY" in patch)
-        ) {
-          regenerateImportHatching(imp);
-        }
-      }),
+      edit((state) => patchImport(state, id, patch), coalesceKeyFor(`import:${id}`, patch)),
+
+    applyRenderResult: (id, patch) => set((state) => patchImport(state, id, patch)),
 
     updatePath: (importId, pathId, patch) =>
-      set((state) => {
+      edit((state) => {
         const imp = state.imports.find((item) => item.id === importId);
         if (!imp) return;
         const path = imp.paths.find((item) => item.id === pathId);
         if (path) Object.assign(path, patch);
-      }),
+      }, coalesceKeyFor(`path:${importId}:${pathId}`, patch)),
 
     updateImportLayer: (importId, layerId, visible) =>
-      set((state) => {
+      edit((state) => {
         const imp = state.imports.find((item) => item.id === importId);
         if (!imp?.layers) return;
         const layer = imp.layers.find((item) => item.id === layerId);
@@ -110,9 +123,9 @@ export function createImportSlice(
       }),
 
     removePath: (importId, pathId) =>
-      set((state) => {
+      edit((state) => {
         const imp = state.imports.find((item) => item.id === importId);
-        if (!imp) return;
+        if (!imp || !imp.paths.some((item) => item.id === pathId)) return;
         imp.paths = imp.paths.filter((item) => item.id !== pathId);
         refitImportToPaths(imp);
         if (state.selectedPathId === pathId) state.selectedPathId = null;
@@ -120,8 +133,7 @@ export function createImportSlice(
 
     clearImports: () => {
       if (get().imports.length === 0) return;
-      pushUndo();
-      set((state) => {
+      edit((state) => {
         state.imports = [];
         state.selectedImportId = null;
         state.selectedPathId = null;
@@ -132,8 +144,9 @@ export function createImportSlice(
     },
 
     loadLayout: (imports, layerGroups, pageTemplate) => {
-      pushUndo();
-      set((state) => {
+      // Not part of whatever edit came before it, even in the same turn.
+      history.interrupt();
+      edit((state) => {
         state.imports = imports.map(withDefaultHatchSettings);
         state.selectedImportId = null;
         state.selectedPathId = null;
@@ -142,6 +155,9 @@ export function createImportSlice(
         state.layerGroups = layerGroups ?? [];
         state.pageTemplate = pageTemplate ?? null;
       });
+      history.interrupt();
+      // What was just loaded is what the layout file holds.
+      get().markSaved();
     },
 
     selectedImport: () => {
@@ -151,11 +167,18 @@ export function createImportSlice(
 
     toVectorObjects: () => vectorObjectsForImports(get().imports),
 
-    applyHatch: (importId, spacingMM, angleDeg, enabled) =>
-      set((state) => {
-        const imp = state.imports.find((item) => item.id === importId);
-        if (!imp) return;
-        applyImportHatch(imp, spacingMM, angleDeg, enabled);
-      }),
+    applyHatch: (importId, spacingMM, angleDeg, enabled) => {
+      const current = get().imports.find((item) => item.id === importId);
+      edit(
+        (state) => {
+          const imp = state.imports.find((item) => item.id === importId);
+          if (!imp) return;
+          applyImportHatch(imp, spacingMM, angleDeg, enabled);
+        },
+        // Turning hatching on or off is a step of its own; dragging its
+        // spacing or angle is one step for the whole drag.
+        current && !!current.hatchEnabled === enabled ? `hatch:${importId}` : undefined,
+      );
+    },
   });
 }
