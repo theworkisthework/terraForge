@@ -154,18 +154,12 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     }
   };
 
-  const jogZ = async (delta: number) => {
-    if (!canCalibrate) return;
-    try {
-      await window.terraForge.fluidnc.sendCommand(`$J=G91 G21 Z${delta} F300`);
-      const status = await window.terraForge.fluidnc.getStatus();
-      if (datumZ !== null && Number.isFinite(status.wpos.z)) {
-        setZ(status.wpos.z - datumZ);
-      }
-    } catch (err) {
-      setError(`Z adjustment failed: ${String(err)}`);
-    }
-  };
+  const jogZ = (delta: number) =>
+    jogCalibrationZ(canCalibrate, delta, datumZ, setZ, setError);
+
+  const jogXY = (axis: "X" | "Y", delta: -1 | 1) =>
+    jogCalibrationXY(canCalibrate, axis, delta, setError);
+  const setXYZero = () => setCalibrationXYZero(canCalibrate, setError);
 
   const save = () => saveMeshProfile(form.bedMesh, profileName, persistMesh, setError);
   const load = () => loadMeshProfile(persistMesh, setError, setXPoints, setYPoints);
@@ -196,10 +190,60 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     next,
     cancelCalibration,
     jogZ,
+    jogXY,
+    setXYZero,
     save,
     load,
     persistMesh,
   };
+}
+
+async function jogCalibrationZ(
+  canCalibrate: boolean,
+  delta: number,
+  datumZ: number | null,
+  setZ: (z: number) => void,
+  setError: (error: string | null) => void,
+): Promise<void> {
+  if (!canCalibrate) return;
+  try {
+    await window.terraForge.fluidnc.sendCommand(`$J=G91 G21 Z${delta} F300`);
+    const status = await window.terraForge.fluidnc.getStatus();
+    if (datumZ !== null && Number.isFinite(status.wpos.z)) setZ(status.wpos.z - datumZ);
+  } catch (err) {
+    setError(`Z adjustment failed: ${String(err)}`);
+  }
+}
+
+async function jogCalibrationXY(
+  canCalibrate: boolean,
+  axis: "X" | "Y",
+  delta: -1 | 1,
+  setError: (error: string | null) => void,
+): Promise<void> {
+  if (!canCalibrate) return;
+  try {
+    const status = await window.terraForge.fluidnc.getStatus();
+    if (status.state !== "Idle") throw new Error("Wait for the machine to stop before jogging.");
+    await retractZ();
+    await window.terraForge.fluidnc.sendCommand(`$J=G91 G21 ${axis}${delta} F300`);
+  } catch (err) {
+    setError(`Position adjustment failed: ${String(err)}`);
+  }
+}
+
+async function setCalibrationXYZero(
+  canCalibrate: boolean,
+  setError: (error: string | null) => void,
+): Promise<void> {
+  if (!canCalibrate) return;
+  try {
+    const status = await window.terraForge.fluidnc.getStatus();
+    if (status.state !== "Idle") throw new Error("Wait for the machine to stop before setting XY zero.");
+    await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
+  } catch (err) {
+    setError(`XY zero could not be set: ${String(err)}`);
+  }
 }
 
 export function clampGridPoints(value: number): number {
