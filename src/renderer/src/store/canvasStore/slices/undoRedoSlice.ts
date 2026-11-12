@@ -1,26 +1,24 @@
-import type { SvgImport } from "../../../../../types";
-import type { CanvasState, CanvasStateCreator, UndoRedoSlice } from "../types";
+import { captureDocument, MAX_HISTORY, type CanvasHistory } from "../history";
+import type { CanvasState, CanvasStateCreator, HistoryEntry, UndoRedoSlice } from "../types";
 
-// Holds a snapshot captured at gesture-start (drag/scale/rotate mousedown).
-// Committed to undoStack on mouseup only if imports actually changed.
+// Undo restores the whole document — imports, layer groups and the page
+// template — so that undoing "clear" or "load layout" brings all of it back.
 //
-// Snapshots are the store's own `imports` arrays, not copies: immer never
-// changes state in place, so an old array stays as it was. Deep-copying
-// instead took about a second per drag on a dense render (a halftone is a
-// path per dot), both to copy and for immer to freeze the copy.
-let gestureSnapshot: SvgImport[] | null = null;
+// Entries are the store's own arrays, not copies: immer never changes state
+// in place, so an old array stays as it was. Deep-copying instead took about
+// a second per drag on a dense render (a halftone is a path per dot), both to
+// copy and for immer to freeze the copy.
 
-const gestureFingerprint = (imports: SvgImport[]) =>
-  imports
-    .map(
-      (item) =>
-        `${item.id}:${item.x},${item.y},${item.scale},${item.scaleX ?? ""},${item.scaleY ?? ""},${item.rotation ?? 0}`,
-    )
-    .join("|");
+const restore = (state: CanvasState, entry: HistoryEntry) => {
+  state.imports = entry.imports;
+  state.layerGroups = entry.layerGroups;
+  state.pageTemplate = entry.pageTemplate;
+  state.revision = entry.revision;
+};
 
-// Undo/redo swaps the imports array, so keep the selection where its target
-// still exists (a move/scale/rotate undo must not deselect) and drop it
-// where it does not (e.g. undoing an import).
+// Undo/redo swaps the document, so keep the selection where its target still
+// exists (a move/scale/rotate undo must not deselect) and drop it where it
+// does not (e.g. undoing an import).
 const reconcileSelection = (state: CanvasState) => {
   const imp = state.imports.find((i) => i.id === state.selectedImportId);
   if (!imp) {
@@ -33,62 +31,59 @@ const reconcileSelection = (state: CanvasState) => {
     state.selectedPathId = null;
   }
   if (state.imports.length === 0) state.allImportsSelected = false;
+  if (
+    state.selectedGroupId &&
+    !state.layerGroups.some((group) => group.id === state.selectedGroupId)
+  ) {
+    state.selectedGroupId = null;
+  }
 };
 
-export const createUndoRedoSlice: CanvasStateCreator<UndoRedoSlice> = (
-  set,
-  get,
-) => ({
-  undoStack: [],
-  redoStack: [],
+const pushCapped = (stack: HistoryEntry[], entry: HistoryEntry) => {
+  stack.push(entry);
+  if (stack.length > MAX_HISTORY) stack.splice(0, stack.length - MAX_HISTORY);
+};
 
-  snapshotForGesture: () => {
-    gestureSnapshot = get().imports;
-    set((state) => {
-      state.redoStack = [];
-    });
-  },
+export function createUndoRedoSlice(
+  history: CanvasHistory,
+): CanvasStateCreator<UndoRedoSlice> {
+  return (set, get) => {
+    /** Moves the document to the top entry of one stack, leaving where it
+     *  was on the other. */
+    const step = (from: "undoStack" | "redoStack", to: "undoStack" | "redoStack") => {
+      // A gesture cut short by undo is recorded first, so undo reverses it.
+      history.commitGesture();
+      history.interrupt();
+      const stack = get()[from];
+      if (stack.length === 0) return;
+      const target = stack[stack.length - 1];
+      const current = captureDocument(get());
+      set((state) => {
+        restore(state, target);
+        state[from].pop();
+        pushCapped(state[to], current);
+        reconcileSelection(state);
+      });
+    };
 
-  commitGesture: () => {
-    const before = gestureSnapshot;
-    gestureSnapshot = null;
-    if (!before) return;
-    const current = get().imports;
-    if (gestureFingerprint(before) === gestureFingerprint(current)) return;
-    set((state) => {
-      state.undoStack.push(before);
-      if (state.undoStack.length > 50)
-        state.undoStack.splice(0, state.undoStack.length - 50);
-    });
-  },
+    return {
+      undoStack: [],
+      redoStack: [],
+      revision: 0,
+      savedRevision: 0,
 
-  undo: () => {
-    const stack = get().undoStack;
-    if (stack.length === 0) return;
-    const prev = stack[stack.length - 1];
-    const currentSnap = get().imports;
-    set((state) => {
-      state.imports = prev;
-      state.undoStack.pop();
-      state.redoStack.push(currentSnap);
-      if (state.redoStack.length > 50)
-        state.redoStack.splice(0, state.redoStack.length - 50);
-      reconcileSelection(state);
-    });
-  },
+      // Starting a gesture leaves the redo history alone: a click that moves
+      // nothing is not an edit. Redo is dropped when a change is committed.
+      snapshotForGesture: () => history.beginGesture(),
+      commitGesture: () => history.commitGesture(),
 
-  redo: () => {
-    const stack = get().redoStack;
-    if (stack.length === 0) return;
-    const next = stack[stack.length - 1];
-    const currentSnap = get().imports;
-    set((state) => {
-      state.imports = next;
-      state.redoStack.pop();
-      state.undoStack.push(currentSnap);
-      if (state.undoStack.length > 50)
-        state.undoStack.splice(0, state.undoStack.length - 50);
-      reconcileSelection(state);
-    });
-  },
-});
+      undo: () => step("undoStack", "redoStack"),
+      redo: () => step("redoStack", "undoStack"),
+
+      markSaved: (revision) =>
+        set((state) => {
+          state.savedRevision = revision ?? state.revision;
+        }),
+    };
+  };
+}

@@ -148,7 +148,19 @@ The Settings dialog has two tabs:
 - **↑ Export** — saves all profiles to a `.json` file for backup or sharing.
 - **↓ Import** — merges profiles from a `.json` file; duplicates (by ID or name) are skipped.
 
-> **Note:** You cannot edit the **active** profile while the machine is connected. A 🔒 banner appears and all fields become read-only. Non-active profiles can be edited at any time.
+> **Note:** You cannot edit the **active** profile while the machine is connected. A 🔒 banner appears and its fields become read-only, apart from its Paint/Ink Stations (below). Non-active profiles can be edited at any time.
+
+### Paint/Ink Stations (Experimental)
+
+Each profile has its own list of ink service stations — where that machine's pen is primed and wiped, or its brush dipped and washed — under **Paint/Ink Stations → Station List**, at the end of the profile. A station's position is in that machine's coordinates, in mm. A profile with no stations of its own uses a default set.
+
+- **Add** creates a dip station; **Remove** deletes one.
+- **Test** raises the pen and moves it to the station. It works only for the profile of the machine you are connected to.
+- Changes take effect when you click **Save Changes**. Stations can be edited and saved while the machine is connected, so you can move a station, test it and move it again.
+
+Stations are exported and imported with their profile. See [Ink/Brush Service](#inkbrush-service-section-experimental) for how they are used in a job.
+
+> **Upgrading:** earlier versions kept one station list for the whole application. The first time this version starts, that list is copied into every existing profile.
 
 ### Application Configuration
 
@@ -162,6 +174,7 @@ Current option:
 - **Enable vinyl cutting features (Experimental)**
 - **Show imported SVG colours on canvas**
 - **Enable bitmap import (Experimental)** — see [§9 Bitmap Images](#9-bitmap-images-experimental)
+- **Show station markers on plot canvas (Experimental)** — draws the active machine's ink service stations on the bed preview
 
 When **Enable per-path pass** is **off** (default), pass settings are managed at the layer/colour level only. When **on**, individual path rows also expose per-path pass settings.
 
@@ -192,14 +205,24 @@ The connection status indicator (top-right of toolbar) shows:
 | 🟢 Green dot + "Connected"       | Connected, WebSocket live              |
 | 🟡 Amber pulsing + "Connecting…" | Connected but WebSocket not yet active |
 
-If connection fails, a red error notification appears with the error message.
+A notification follows the connection as it is made:
+
+| Notification                       | Meaning                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Connecting to _host_…**          | Looking for the machine on the network                                                                     |
+| **Waiting for _host_ to respond…** | The machine was found; waiting for its first message over the WebSocket                                    |
+| **Connected** (green ✓)            | The machine has answered. Only now is it really connected                                                  |
+| **Connection failed** (red !)      | The machine could not be found; the reason is on the second line                                           |
+| **No response from _host_** (red !) | The machine was found but said nothing for 20 seconds. terraForge keeps trying until you click Disconnect |
+
+Click the **✕** on the notification while it is still running to give up the attempt. Once the machine has been found, **Disconnect** in the toolbar does the same.
 
 ### USB Serial Connection
 
 1. Set the connection type to **USB** in the Machine Config dialog.
 2. Select the serial port from the dropdown (auto-populated from available ports), or type the path manually (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).
 3. The baud rate is fixed at **115200** (FluidNC standard).
-4. Click **Connect**.
+4. Click **Connect**. The notification reads **Connected** once the port is open.
 
 ### Disconnecting
 
@@ -358,7 +381,9 @@ Press **Ctrl+A** to select all imports simultaneously. All objects show grouped 
 
 ### Undo and Redo
 
-terraForge maintains up to **50 undo steps** for canvas changes (move, scale, rotate, delete, paste). Each gesture that produces a real change is recorded as one step; trivial clicks are not.
+terraForge maintains up to **50 undo steps** for changes to the layout: importing, moving, scaling, rotating, deleting and pasting objects; editing an object's or a path's properties; changing layer groups; and changing the page template. Each action that produces a real change is recorded as one step; trivial clicks are not. A value typed or dragged in one go — a number entered digit by digit, a slider, a colour picker — is a single step.
+
+Redo is available until you make a new change.
 
 | Shortcut         | Action                  |
 | ---------------- | ----------------------- |
@@ -808,7 +833,8 @@ The Ink/Brush Service tab enables automated pen/brush maintenance moves during G
 | **Prime-wipe**                    | Prime (press) station followed by wipe station; triggered after travel threshold |
 | **Brush-dip**                     | Cyclic dip stations with optional wash cadence; triggered after travel threshold |
 | **Service trigger distance (mm)** | Travel distance threshold before visiting a service station                      |
-| **Add service station**           | Create a new station (prime, wipe, dip, or wash)                                 |
+
+The stations themselves belong to the machine: they are set per profile in **Settings → Machine Configurations → Paint/Ink Stations** (see [Paint/Ink Stations](#paintink-stations-experimental)), and a job uses the stations of the active machine.
 
 **Station configuration (available in both modes):**
 
@@ -867,6 +893,7 @@ During G-code generation, whenever the plotter travels more than 15 mm (rapid), 
 - When not connected, the upload option shows _"(not connected — will be skipped)"_ but remains selectable to pre-configure your preference.
 - The split-output modes are mutually exclusive radio choices under the **Split output into separate files** master checkbox.
 - **Export separate hatch files per colour** is only available when **Export one file per colour group** is selected.
+- Every file of a split job gets a name of its own. If two would share one — two layer groups with the same name, say — the later file gets a number: `Black.gcode`, `Black_2.gcode` (`Black_opt.gcode`, `Black_2_opt.gcode` for optimised output).
 - Per-colour files are named after the colour: a separated bitmap ink's name (`color_cyan.gcode`), a basic colour's name (`color_red.gcode`), or otherwise its hex code (`color_hex-3a6aaa.gcode`). If two different colours would get the same name, each name has its hex code added.
 
 ### Persisted Preferences
@@ -914,6 +941,15 @@ Example header:
 
 While generation is running, a progress notification appears. Click the **✕** on the notification to cancel. The worker stops immediately.
 
+In a split job each file has a notification of its own. Cancelling one cancels the rest of the job: the files already written are kept, and the remaining ones — including any hatch files — are skipped.
+
+### When Generation Fails
+
+A failure is reported on the notification, and the **Generate** button becomes available again.
+
+- **G-code failed** — the reason is on the second line. In a split job the file that failed is skipped and the others are still generated.
+- **Could not save _filename_** — the file could not be written to your computer (the folder is read-only, or the disk is full). In a split job the remaining files are still written, and the file is still uploaded if **Upload to SD card** is selected.
+
 ---
 
 ## 11. The File Browser
@@ -948,11 +984,15 @@ For each file in the listing:
 - `.gcode` / `.nc` / `.g` / `.gc` / `.gco` / `.ngc` / `.ncc` / `.cnc` / `.tap` → filtered save dialog
 - All other file types → unfiltered save dialog
 
+A download is written to `<name>.part` beside the file you chose, and takes that name only once all of it has arrived. If the download fails or is cancelled, the partial file is removed; a file that was to be replaced is left as it was.
+
 ### Uploading Files
 
 Click the **↑ Upload** button in a section header to open a native file dialog (unrestricted file types). The file is uploaded to the current directory. The listing refreshes automatically after upload.
 
 Upload progress is shown in the notification stack. Uploads can be cancelled via the notification's ✕ button.
+
+An upload or download that stops moving for 60 seconds is given up, with a **stalled** error on its notification, instead of waiting for ever.
 
 **Auto-refresh:** The file listing refreshes automatically after an upload, and also whenever FluidNC emits a `[MSG:Files changed]` console message.
 
@@ -1135,11 +1175,24 @@ All long-running operations appear as **notifications** stacked in the top-right
 
 ### Cancellable Tasks
 
-| Task              | Cancel mechanism                       |
-| ----------------- | -------------------------------------- |
-| G-code generation | Direct message to Web Worker (instant) |
-| File upload       | IPC cancel via main process            |
-| File download     | IPC cancel via main process            |
+| Task              | Cancel mechanism                                              |
+| ----------------- | ------------------------------------------------------------- |
+| G-code generation | The Web Worker is stopped (instant); a split job stops there  |
+| File upload       | IPC cancel via main process                                   |
+| File download     | IPC cancel via main process; the partial file is removed      |
+| Wi-Fi connection  | Until the machine's first message arrives; disconnects        |
+
+### Unexpected Errors
+
+If something fails that terraForge was not expecting, an **Unexpected error — see console** notification appears and the full message is written to the console panel with a `[terraForge]` prefix. There is only ever one of these notifications; it shows the most recent error, and the console has them all.
+
+If part of the window fails to draw, that panel alone is replaced by a short message — "The file browser hit an error." — with a **Retry** button. The rest of the window, the job controls included, keeps working.
+
+If the whole window fails, a **terraForge hit an error** screen takes its place:
+
+- **Try again** redraws the app. Your layout is still in memory, so this is the way back to saving it.
+- **Reload window** starts afresh, and discards unsaved layout changes.
+- **Pause job** and **Abort job** are offered while a machine is connected. The machine does not stop because the window failed.
 
 ---
 
@@ -1160,6 +1213,14 @@ Press **Ctrl+O** or choose **File → Open Layout**. Select a `.tforge` file. Th
 ### Closing a Layout
 
 Choose **File → Close Layout**. If you have imports on the canvas, a confirmation dialog appears before clearing.
+
+### Unsaved Changes
+
+If the layout has changed since it was last saved or opened, closing the window or quitting terraForge asks first: **Close without saving** discards the changes, **Cancel** keeps terraForge open so that you can save. **View → Reload** does not ask.
+
+### Layout File Checks
+
+A layout file is checked when it is opened. A file that is not a terraForge layout, is damaged, or was saved by a newer version of terraForge than the one you are running is refused with a message saying why, and the canvas is left as it was.
 
 ### Page Templates
 
@@ -1238,6 +1299,12 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 - Check that the FluidNC controller is powered and on the same Wi-Fi network.
 - Try using the IP address instead of `fluidnc.local` (mDNS can be unreliable on some networks).
 - For USB: check the serial port path; on Windows check Device Manager.
+
+**"No response from _host_" notification:**
+
+- The machine answered over HTTP but has sent nothing over its WebSocket for 20 seconds.
+- terraForge keeps retrying; the notification changes to **Connected** if the machine answers. Click **Disconnect** to stop.
+- Check whether your FluidNC firmware needs an explicit WebSocket port (`81` for older ESP3D builds).
 
 **Amber pulsing dot after connecting:**
 
@@ -1328,6 +1395,11 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 - The SD card may be full or not inserted.
 - Check SD card status in the File Browser SDCARD section.
 
+**"Upload stalled" or "Download stalled":**
+
+- No data moved for 60 seconds, so the transfer was given up. The machine may have gone out of Wi-Fi range or be busy.
+- Check the connection indicator, then try again. A stalled download leaves no partial file behind.
+
 ---
 
 ### Console Issues
@@ -1341,6 +1413,20 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 
 - Ensure the machine is not in **Alarm** state.
 - Try clearing the alarm with `$X`, then resend.
+
+---
+
+### Application Errors
+
+**A panel shows "… hit an error." with a Retry button:**
+
+- That panel failed to draw; the rest of the window still works. Click **Retry**.
+- If it fails again, save your layout (**Ctrl+S**) and restart terraForge. The message is also in the console panel — include it in a bug report.
+
+**"terraForge hit an error" fills the window:**
+
+- Click **Try again** first: it keeps your layout. Use **Reload window** only if the error returns.
+- If a job is running, **Pause job** and **Abort job** on that screen still reach the machine.
 
 ---
 

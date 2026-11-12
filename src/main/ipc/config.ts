@@ -1,75 +1,13 @@
 import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { readFile, writeFile } from "fs/promises";
-import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
-
-function normalizePenType(penType: unknown): PenType {
-  switch (penType) {
-    case "solenoid":
-    case "solenoid-hardware":
-      return "solenoid-hardware";
-    case "solenoid-software":
-    case "servo":
-    case "stepper":
-      return penType;
-    default:
-      return "solenoid-hardware";
-  }
-}
-
-function defaultPenDownDelayMs(penType: PenType): number {
-  switch (penType) {
-    case "solenoid-hardware":
-    case "solenoid-software":
-      return 50;
-    case "servo":
-    case "stepper":
-      return 0;
-    default:
-      return 0;
-  }
-}
-
-function defaultPenUpDelayMs(_penType: PenType): number {
-  return 0;
-}
-
-function normalizeConfig(config: MachineConfig): MachineConfig {
-  // Migrate legacy single-feedrate configs written before the jog/draw split.
-  const legacy = (config as unknown as Record<string, unknown>).feedrate as
-    | number
-    | undefined;
-  const legacySpeed = typeof legacy === "number" && legacy >= 1 ? legacy : 3000;
-  const penType = normalizePenType(config.penType);
-  return {
-    ...config,
-    penType,
-    penDownDelayMs:
-      typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
-        ? config.penDownDelayMs
-        : defaultPenDownDelayMs(penType),
-    penUpDelayMs:
-      typeof config.penUpDelayMs === "number" && config.penUpDelayMs >= 0
-        ? config.penUpDelayMs
-        : defaultPenUpDelayMs(penType),
-    jogSpeed:
-      typeof config.jogSpeed === "number" && config.jogSpeed >= 1
-        ? config.jogSpeed
-        : legacySpeed,
-    drawSpeed:
-      typeof config.drawSpeed === "number" && config.drawSpeed >= 1
-        ? config.drawSpeed
-        : legacySpeed,
-    invertZJogControls:
-      typeof config.invertZJogControls === "boolean"
-        ? config.invertZJogControls
-        : false,
-  };
-}
+import type { AppConfig, MachineConfig, PageSize } from "../../types";
+import type { MainPersistence } from "../config/persistence";
+import { normalizeMachineConfig } from "../config/persistence";
 
 interface ConfigIpcOptions {
   getMainWindow: () => BrowserWindow | null;
   loadConfigs: () => Promise<MachineConfig[]>;
-  saveConfigs: (configs: MachineConfig[]) => Promise<void>;
+  updateConfigs: MainPersistence["updateConfigs"];
   loadPageSizes: () => Promise<PageSize[]>;
   loadAppConfig: () => Promise<AppConfig>;
   saveAppConfig: (config: AppConfig) => Promise<void>;
@@ -81,7 +19,7 @@ interface ConfigIpcOptions {
 export function registerConfigIpcHandlers({
   getMainWindow,
   loadConfigs,
-  saveConfigs,
+  updateConfigs,
   loadPageSizes,
   loadAppConfig,
   saveAppConfig,
@@ -93,20 +31,19 @@ export function registerConfigIpcHandlers({
 
   ipcMain.handle(
     "config:saveMachineConfig",
-    async (_e, config: MachineConfig) => {
-      const configs = await loadConfigs();
-      const normalized = normalizeConfig(config);
-      const idx = configs.findIndex((item) => item.id === normalized.id);
-      if (idx >= 0) configs[idx] = normalized;
-      else configs.push(normalized);
-      await saveConfigs(configs);
-    },
+    (_e, config: MachineConfig) =>
+      updateConfigs((configs) => {
+        const normalized = normalizeMachineConfig(config);
+        const idx = configs.findIndex((item) => item.id === normalized.id);
+        if (idx >= 0) configs[idx] = normalized;
+        else configs.push(normalized);
+        return configs;
+      }),
   );
 
-  ipcMain.handle("config:deleteMachineConfig", async (_e, id: string) => {
-    const configs = await loadConfigs();
-    await saveConfigs(configs.filter((config) => config.id !== id));
-  });
+  ipcMain.handle("config:deleteMachineConfig", (_e, id: string) =>
+    updateConfigs((configs) => configs.filter((config) => config.id !== id)),
+  );
 
   ipcMain.handle("config:getAppConfig", () => loadAppConfig());
 
@@ -192,30 +129,32 @@ export function registerConfigIpcHandlers({
       }
     }
 
-    const existing = await loadConfigs();
-    const existingIds = new Set(existing.map((config) => config.id));
-    const existingNames = new Set(
-      existing.map((config) => config.name.toLowerCase().trim()),
-    );
-    const toAdd: MachineConfig[] = [];
+    let added = 0;
     let skipped = 0;
 
-    for (const config of incoming) {
-      const nameKey = (config.name ?? "").toLowerCase().trim();
-      if (existingIds.has(config.id) || existingNames.has(nameKey)) {
-        skipped++;
-      } else {
-        toAdd.push(normalizeConfig(config));
-        existingIds.add(config.id);
-        existingNames.add(nameKey);
+    await updateConfigs((existing) => {
+      const existingIds = new Set(existing.map((config) => config.id));
+      const existingNames = new Set(
+        existing.map((config) => config.name.toLowerCase().trim()),
+      );
+      const toAdd: MachineConfig[] = [];
+
+      for (const config of incoming) {
+        const nameKey = (config.name ?? "").toLowerCase().trim();
+        if (existingIds.has(config.id) || existingNames.has(nameKey)) {
+          skipped++;
+        } else {
+          toAdd.push(normalizeMachineConfig(config));
+          existingIds.add(config.id);
+          existingNames.add(nameKey);
+        }
       }
-    }
 
-    if (toAdd.length > 0) {
-      await saveConfigs([...existing, ...toAdd]);
-    }
+      added = toAdd.length;
+      return toAdd.length > 0 ? [...existing, ...toAdd] : null;
+    });
 
-    return { added: toAdd.length, skipped };
+    return { added, skipped };
   });
 
   ipcMain.handle("config:loadPageSizes", () => loadPageSizes());

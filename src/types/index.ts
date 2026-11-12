@@ -55,6 +55,12 @@ export interface MachineConfig {
   connection: MachineConnection;
   bedMesh?: BedMesh;
   bedMeshEnabled?: boolean;
+  /**
+   * Where this machine's pen is primed and wiped, or its brush dipped and
+   * washed, in machine coordinates. Absent until first edited: the defaults
+   * (DEFAULT_INK_SERVICE_STATIONS) then apply.
+   */
+  inkServiceStations?: InkServiceStation[];
 }
 
 export interface AppConfig {
@@ -844,7 +850,9 @@ export type TaskType =
   | "file-delete"
   | "job-start"
   | "job-control"
-  | "ws-connect";
+  | "ws-connect"
+  /** Something failed that nothing was handling: see unexpectedErrors.ts. */
+  | "app-error";
 
 export type TaskStatus =
   | "running"
@@ -1077,6 +1085,11 @@ export interface AppApi {
   getVersion: () => Promise<string>;
   /** Open a URL in the system default browser. */
   openExternal: (url: string) => Promise<void>;
+  /**
+   * Tell the main process whether the canvas has changes that are not in a
+   * saved layout. While it does, closing the window or quitting asks first.
+   */
+  setUnsavedChanges: (unsaved: boolean) => void;
   /** Subscribe to the native Help → About menu item. Returns an unsubscribe function. */
   onMenuAbout: (cb: () => void) => () => void;
 }

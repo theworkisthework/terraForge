@@ -122,6 +122,9 @@ test.beforeAll(async () => {
 
   // Click Connect — the mocked handler resolves immediately.
   await window.locator("button:has-text('Connect')").click();
+  // The real main-process client emits a ping when the WebSocket is live.
+  // The mocked connect IPC only resolves, so simulate that liveness event.
+  await pushRendererEvent(electronApp, "fluidnc:ping", undefined);
 
   // Wait for the toolbar to show "Connected" / the SD card pane to refresh.
   await expect(window.locator("text=Connected").first()).toBeVisible({

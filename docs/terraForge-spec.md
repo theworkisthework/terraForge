@@ -127,7 +127,7 @@ exportConfigs, importConfigs,
 loadPageSizes, openPageSizesFile
 },
 tasks: { cancel, onTaskUpdate },
-app: { getVersion, openExternal, onMenuAbout },
+app: { getVersion, openExternal, setUnsavedChanges, onMenuAbout },
 edit: { onMenuCopy, onMenuCut, onMenuPaste, onMenuSelectAll, setHasSelection }
 }
 All methods must be explicitly typed.
@@ -283,10 +283,10 @@ All methods must be explicitly typed.
    Code
    {
    id: string
-   type: "svg-parse" | "gcode-generate" | "gcode-preview" | "file-upload" | "file-download" | "file-delete" | "job-start" | "ws-connect"
+   type: "svg-parse" | "gcode-generate" | "gcode-preview" | "file-upload" | "file-download" | "file-delete" | "job-start" | "job-control" | "ws-connect" | "app-error"
    label: string // human-readable description shown in the toast
    progress: number | null // 0–100 or null for indeterminate
-   status: "running" | "completed" | "cancelled" | "error"
+   status: "running" | "completed" | "cancelled" | "warning" | "error"
    error?: string
    }
 5. SVG Handling Rules
@@ -478,6 +478,10 @@ streaming G‑code
 Background Task Requirements
 File uploads/downloads must be cancellable
 
+File uploads/downloads must not wait for ever: a transfer with no data moving for 60 s fails
+
+A failed or cancelled download must leave no partial file, and must not damage a file it was to replace
+
 UI must show progress when available (upload size, download size)
 
 8. UI Requirements
@@ -596,6 +600,8 @@ update the UI immediately when cancelled
 cleanly terminate the worker or task
 
 Toast stack -- fixed 280 px wide; auto-dismiss completed/cancelled after 8 s; errors persist until manually dismissed; error toasts show the error message as a second line
+
+Error containment -- a render error must not blank the window: each panel has its own error boundary (message + Retry, in the panel's own space), with a top-level crash screen behind them that still offers Pause/Abort for a connected machine. Unhandled promise rejections and uncaught errors, in the renderer and in the main process, are reported in the console panel and as a toast (task type "app-error")
 
 Theme
 Dark and light themes -- Moon/Sun toggle button in toolbar; persists to localStorage under terraforge-theme

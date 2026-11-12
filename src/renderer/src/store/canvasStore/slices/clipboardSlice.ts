@@ -1,11 +1,14 @@
 import { v4 as uuid } from "uuid";
 import type { SvgImport } from "../../../../../types";
 import { generateCopyName } from "../services/clipboard";
+import type { CanvasHistory } from "../history";
 import type { CanvasStateCreator, ClipboardSlice } from "../types";
+import { removeFromLayerGroups } from "./importSlice";
 
 export function createClipboardSlice(
-  pushUndo: () => void,
+  history: CanvasHistory,
 ): CanvasStateCreator<ClipboardSlice> {
+  const { edit } = history;
   return (set, get) => ({
     clipboardImport: null,
 
@@ -21,11 +24,11 @@ export function createClipboardSlice(
     cutImport: (id) => {
       const imp = get().imports.find((item) => item.id === id);
       if (!imp) return;
-      pushUndo();
       const snap = structuredClone(imp);
-      set((state) => {
+      edit((state) => {
         state.clipboardImport = snap;
         state.imports = state.imports.filter((item) => item.id !== id);
+        removeFromLayerGroups(state, id);
         if (state.selectedImportId === id) {
           state.selectedImportId = null;
           state.selectedPathId = null;
@@ -36,7 +39,6 @@ export function createClipboardSlice(
     pasteImport: () => {
       const clipboard = get().clipboardImport;
       if (!clipboard) return;
-      pushUndo();
       const existingNames = get().imports.map((item) => item.name);
       const newName = generateCopyName(clipboard.name, existingNames);
       const newId = uuid();
@@ -48,7 +50,7 @@ export function createClipboardSlice(
         x: clipboard.x + 5,
         y: clipboard.y + 5,
       };
-      set((state) => {
+      edit((state) => {
         state.imports.push(pasted);
         state.selectedImportId = newId;
         state.selectedPathId = null;

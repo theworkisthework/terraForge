@@ -9,11 +9,28 @@ import type {
 } from "../../../../types";
 import type { GcodeToolpath } from "../../utils/gcodeParser";
 
+/** The part of the canvas that a layout file stores and undo restores. */
+export interface CanvasDocument {
+  imports: SvgImport[];
+  layerGroups: LayerGroup[];
+  pageTemplate: PageTemplate | null;
+}
+
+/** A document as it stood at one revision, kept for undo or redo. */
+export interface HistoryEntry extends CanvasDocument {
+  revision: number;
+}
+
 export interface ImportSlice {
   imports: SvgImport[];
   addImport: (imp: SvgImport) => void;
   removeImport: (id: string) => void;
   updateImport: (id: string, patch: Partial<SvgImport>) => void;
+  /**
+   * Stores a finished render. Unlike `updateImport` this is output the user
+   * did not edit: it is not an undo step and not an unsaved change.
+   */
+  applyRenderResult: (id: string, patch: Partial<SvgImport>) => void;
   updatePath: (
     importId: string,
     pathId: string,
@@ -61,13 +78,31 @@ export interface ClipboardSlice {
 }
 
 export interface UndoRedoSlice {
-  undoStack: SvgImport[][];
-  redoStack: SvgImport[][];
+  undoStack: HistoryEntry[];
+  redoStack: HistoryEntry[];
+  /**
+   * Identifies the document's current contents: every edit moves it to a new
+   * number, and undo and redo move it back to the number of the state they
+   * restore.
+   */
+  revision: number;
+  /** The revision last saved to, or loaded from, a layout file. */
+  savedRevision: number;
   undo: () => void;
   redo: () => void;
+  /** Starts a gesture (a drag, say): its edits are recorded as one undo step
+   *  by `commitGesture`, and not at all if nothing changed. */
   snapshotForGesture: () => void;
   commitGesture: () => void;
+  /** Records that a layout file holds the document: as it stands, or as it
+   *  was at `revision` if it may have changed while the file was written. */
+  markSaved: (revision?: number) => void;
 }
+
+/** Whether the canvas holds work that no layout file has. An empty canvas
+ *  never does: there is nothing on it to lose. */
+export const hasUnsavedChanges = (state: CanvasState): boolean =>
+  state.revision !== state.savedRevision && state.imports.length > 0;
 
 export interface ToolpathSlice {
   gcodeToolpath: GcodeToolpath | null;

@@ -1,71 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  DEFAULT_INK_SERVICE_STATIONS,
-  type InkServiceStationAction,
-  type InkServiceStationType,
-  type InkServiceStation,
-} from "../../../types";
-
-function defaultActionForType(
-  type: InkServiceStationType,
-): InkServiceStationAction | undefined {
-  if (type === "prime") {
-    return {
-      kind: "prime-press",
-      zDepthMM: 1,
-      pressCount: 3,
-    };
-  }
-  if (type === "dip" || type === "wash") {
-    return {
-      kind: "brush-motion",
-      zDepthMM: 2,
-      pattern: type === "wash" ? "circular" : "back-forth",
-      repetitions: 3,
-      distanceMM: 2,
-    };
-  }
-  return undefined;
-}
-
-function normalizeStation(station: InkServiceStation): InkServiceStation {
-  const dwellMs = Math.max(0, Number(station.dwellMs) || 0);
-  const baseAction = defaultActionForType(station.type);
-  let action = station.action;
-
-  if (station.type === "prime") {
-    if (!action || action.kind !== "prime-press") {
-      action = baseAction;
-    } else {
-      action = {
-        kind: "prime-press",
-        zDepthMM: Math.max(0, Number(action.zDepthMM) || 0),
-        pressCount: Math.max(1, Math.round(Number(action.pressCount) || 1)),
-      };
-    }
-  } else if (station.type === "dip" || station.type === "wash") {
-    if (!action || action.kind !== "brush-motion") {
-      action = baseAction;
-    } else {
-      action = {
-        kind: "brush-motion",
-        zDepthMM: Math.max(0, Number(action.zDepthMM) || 0),
-        pattern: action.pattern,
-        repetitions: Math.max(1, Math.round(Number(action.repetitions) || 1)),
-        distanceMM: Math.max(0, Number(action.distanceMM) || 0),
-      };
-    }
-  } else {
-    action = undefined;
-  }
-
-  return {
-    ...station,
-    dwellMs,
-    action,
-  };
-}
+import { setAsideLegacyInkServiceStations } from "../features/machine/utils/legacyInkServiceStations";
 
 interface AppConfigState {
   enablePerPathPasses: boolean;
@@ -79,7 +14,6 @@ interface AppConfigState {
   vinylCornerAngleThresholdDeg: number;
   vinylMicroJogMagnitudeMM: number;
   showInkServiceStationsOnCanvas: boolean;
-  inkServiceStations: InkServiceStation[];
   setEnablePerPathPasses: (enabled: boolean) => void;
   setDebugLoggingEnabled: (enabled: boolean) => void;
   setShowConsoleTimestamps: (enabled: boolean) => void;
@@ -91,13 +25,6 @@ interface AppConfigState {
   setVinylCornerAngleThresholdDeg: (value: number) => void;
   setVinylMicroJogMagnitudeMM: (value: number) => void;
   setShowInkServiceStationsOnCanvas: (enabled: boolean) => void;
-  setInkServiceStations: (stations: InkServiceStation[]) => void;
-  updateInkServiceStation: (
-    id: string,
-    patch: Partial<InkServiceStation>,
-  ) => void;
-  addInkServiceStation: () => void;
-  removeInkServiceStation: (id: string) => void;
 }
 
 export const useAppConfigStore = create<AppConfigState>()(
@@ -114,7 +41,6 @@ export const useAppConfigStore = create<AppConfigState>()(
       vinylCornerAngleThresholdDeg: 10,
       vinylMicroJogMagnitudeMM: 0.02,
       showInkServiceStationsOnCanvas: false,
-      inkServiceStations: structuredClone(DEFAULT_INK_SERVICE_STATIONS),
       setEnablePerPathPasses: (enabled) =>
         set({ enablePerPathPasses: enabled }),
       setDebugLoggingEnabled: (enabled) =>
@@ -137,51 +63,32 @@ export const useAppConfigStore = create<AppConfigState>()(
         set({ vinylMicroJogMagnitudeMM: Math.max(0, value) }),
       setShowInkServiceStationsOnCanvas: (enabled) =>
         set({ showInkServiceStationsOnCanvas: enabled }),
-      setInkServiceStations: (stations) =>
-        set({
-          inkServiceStations: stations.map(normalizeStation),
-        }),
-      updateInkServiceStation: (id, patch) =>
-        set((state) => ({
-          inkServiceStations: state.inkServiceStations.map((station) =>
-            station.id === id
-              ? normalizeStation({ ...station, ...patch })
-              : station,
-          ),
-        })),
-      addInkServiceStation: () =>
-        set((state) => {
-          const nextIndex =
-            state.inkServiceStations.filter((s) => s.type === "dip").length + 1;
-          return {
-            inkServiceStations: [
-              ...state.inkServiceStations,
-              {
-                id: `dip-${Date.now()}`,
-                name: `Dip ${nextIndex}`,
-                type: "dip",
-                x: 0,
-                y: 0,
-                dwellMs: 500,
-                action: {
-                  kind: "brush-motion",
-                  zDepthMM: 2,
-                  pattern: "back-forth",
-                  repetitions: 3,
-                  distanceMM: 2,
-                },
-                enabled: true,
-              },
-            ],
-          };
-        }),
-      removeInkServiceStation: (id) =>
-        set((state) => ({
-          inkServiceStations: state.inkServiceStations.filter(
-            (station) => station.id !== id,
-          ),
-        })),
     }),
-    { name: "terraforge-app-config" },
+    {
+      name: "terraforge-app-config",
+      version: 1,
+      // debugLoggingEnabled and showConsoleTimestamps are kept in
+      // app-config.json by the main process, which also acts on them; the
+      // app loads them from there at start-up (see useAppBootstrap). A
+      // second copy here could only disagree with it.
+      partialize: ({
+        debugLoggingEnabled: _debug,
+        showConsoleTimestamps: _timestamps,
+        ...rest
+      }): Partial<AppConfigState> => rest,
+      migrate: (persisted, version) => {
+        const state = { ...(persisted as Record<string, unknown>) };
+        if (version < 1) {
+          // Version 0 held one app-wide list of ink service stations. They
+          // belong to each machine config now: set the list aside for the
+          // configs to adopt once they have loaded.
+          if ("inkServiceStations" in state) setAsideLegacyInkServiceStations(state.inkServiceStations);
+          delete state.inkServiceStations;
+          delete state.debugLoggingEnabled;
+          delete state.showConsoleTimestamps;
+        }
+        return state as Partial<AppConfigState>;
+      },
+    },
   ),
 );

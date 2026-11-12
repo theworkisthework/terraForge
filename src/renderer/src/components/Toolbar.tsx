@@ -160,8 +160,9 @@ export function Toolbar({
         onAboutClose={() => setShowAbout(false)}
         onCloseLayoutSave={async () => {
           setShowCloseDialog(false);
-          await handleSaveLayout();
-          clearImports();
+          // Cancelling the save prompt, or a failed write, keeps the canvas:
+          // "save and exit" must not exit without having saved.
+          if (await handleSaveLayout()) clearImports();
         }}
         onCloseLayoutDiscard={doCloseLayout}
         onCloseLayoutCancel={() => setShowCloseDialog(false)}

@@ -5,6 +5,7 @@ import { MachineGeneralSection } from "./Machine/MachineGeneralSection";
 import { MachinePenCommandsSection } from "./Machine/MachinePenCommandsSection";
 import { MachineConnectionSection } from "./Machine/MachineConnectionSection";
 import { BedMeshSection } from "./Machine/BedMeshSection";
+import { MachineInkStationsSection } from "./Machine/MachineInkStationsSection";
 
 interface MachineConfigurationsTabProps {
   controller: MachineConfigDialogController;
@@ -41,6 +42,9 @@ export function MachineConfigurationsTab({
           <MachineConnectionSection controller={controller} />
         </fieldset>
         <BedMeshSection controller={controller} />
+
+        {/* Outside the lock: stations are tuned with the machine connected. */}
+        <MachineInkStationsSection controller={controller} />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
 import { useMachineStore } from "../../store/machineStore";
+import { selectActiveInkServiceStations } from "../../features/machine/utils/inkServiceStations";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useAppConfigStore } from "../../store/appConfigStore";
 import { selectGcodeOptionsDialogCanvasState } from "../../store/canvasSelectors";
@@ -23,9 +24,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
   const vinylCuttingEnabled = useAppConfigStore(
     (state) => state.vinylCuttingEnabled,
   );
-  const inkServiceStations = useAppConfigStore(
-    (state) => state.inkServiceStations,
-  );
+  const inkServiceStations = useMachineStore(selectActiveInkServiceStations);
   const { layerGroupCount, sourceLayerCount, colorGroupCount, pageTemplate } =
     useCanvasStore(useShallow(selectGcodeOptionsDialogCanvasState));
   const {

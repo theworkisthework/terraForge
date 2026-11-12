@@ -92,7 +92,9 @@ export function MachineConfigDialog({ onClose }: Props) {
                   variant="primary"
                   size="lg"
                   onClick={controller.handleSave}
-                  disabled={!controller.isDirty || controller.isLocked}
+                  // A connected machine's settings are locked, all but its
+                  // ink stations — which is then all there is to save.
+                  disabled={!controller.isDirty}
                 >
                   {controller.isDirty ? "Save Changes" : "Saved"}
                 </Button>

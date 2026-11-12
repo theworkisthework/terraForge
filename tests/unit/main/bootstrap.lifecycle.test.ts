@@ -144,6 +144,53 @@ describe("registerAppLifecycleHandlers", () => {
     expect(onBeforeQuit).toHaveBeenCalledTimes(1);
   });
 
+  it("holds a quit that needs confirming, and quits only on a yes", async () => {
+    const onBeforeQuit = vi.fn();
+    let answer!: (quit: boolean) => void;
+    const confirmQuit = vi.fn((): Promise<boolean> | null => new Promise((resolve) => (answer = resolve)));
+    registerAppLifecycleHandlers({ createMainWindow: vi.fn(), confirmQuit, onBeforeQuit });
+    await Promise.resolve();
+
+    const event = { preventDefault: vi.fn() };
+    mocks.handlers.get("before-quit")?.(event);
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    // The machine connection must survive a quit the user may yet cancel.
+    expect(onBeforeQuit).not.toHaveBeenCalled();
+    expect(mocks.quit).not.toHaveBeenCalled();
+
+    answer(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mocks.quit).toHaveBeenCalledTimes(1);
+
+    // The quit that follows finds nothing left to confirm.
+    confirmQuit.mockReturnValue(null);
+    const second = { preventDefault: vi.fn() };
+    mocks.handlers.get("before-quit")?.(second);
+    expect(second.preventDefault).not.toHaveBeenCalled();
+    expect(onBeforeQuit).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays open when a held quit is refused", async () => {
+    const onBeforeQuit = vi.fn();
+    registerAppLifecycleHandlers({
+      createMainWindow: vi.fn(),
+      confirmQuit: () => Promise.resolve(false),
+      onBeforeQuit,
+    });
+    await Promise.resolve();
+
+    const event = { preventDefault: vi.fn() };
+    mocks.handlers.get("before-quit")?.(event);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(mocks.quit).not.toHaveBeenCalled();
+    expect(onBeforeQuit).not.toHaveBeenCalled();
+  });
+
   it("does not quit on window-all-closed on macOS", async () => {
     setPlatform("darwin");
 
