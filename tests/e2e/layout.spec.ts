@@ -23,7 +23,7 @@ import {
   closeApp,
   fixturePath,
   mockOpenDialog,
-  mockIpcInvoke,
+  mockSaveDialog,
   pushRendererEvent,
 } from "./helpers";
 import type { ElectronApplication, Page } from "playwright";
@@ -78,7 +78,7 @@ async function triggerMenu(app: ElectronApplication, channel: string) {
 
 test("save layout writes a JSON file at the chosen path", async () => {
   // Mock the save dialog to return our temp path.
-  await mockIpcInvoke(electronApp, "fs:saveLayoutDialog", layoutTempPath);
+  await mockSaveDialog(electronApp, layoutTempPath);
 
   // Trigger the save operation via menu event.
   await triggerMenu(electronApp, "menu:saveLayout");
@@ -134,7 +134,7 @@ test("opening a layout on an empty canvas loads its imports directly", async () 
   });
 
   // Mock open layout dialog to return the previously saved layout file.
-  await mockIpcInvoke(electronApp, "fs:openLayoutDialog", layoutTempPath);
+  await mockOpenDialog(electronApp, layoutTempPath);
   await triggerMenu(electronApp, "menu:openLayout");
 
   // The layout should load and display the "sample" import.
@@ -153,7 +153,7 @@ test("open layout shows 'Layout ready' in the task bar", async () => {
 test("opening a second layout with existing canvas content shows confirm dialog", async () => {
   // Canvas already has "sample" from the previous load.
   // Trigger open again — this time the app should ask before overwriting.
-  await mockIpcInvoke(electronApp, "fs:openLayoutDialog", layoutTempPath);
+  await mockOpenDialog(electronApp, layoutTempPath);
   await triggerMenu(electronApp, "menu:openLayout");
 
   // A ConfirmDialog (or CloseLayoutDialog) must appear.

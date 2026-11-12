@@ -188,6 +188,13 @@
 - [x] **Crash screen** — a top-level boundary in `App` shows `AppCrashScreen` instead of a blank window: **Try again** (stores keep the layout), **Reload window**, and **Pause job** / **Abort job** while a machine is connected
 - [x] **Unhandled errors are reported** — renderer `unhandledrejection` / `error` (`utils/unexpectedErrors.ts`) and main-process `unhandledRejection` / `uncaughtException` (`main/bootstrap/unexpectedErrors.ts`) write a `[terraForge] Unexpected error: …` console line and raise one replaceable error toast; main falls back to an error box when no window can show it
 
+### Security Hardening
+
+- [x] **Sandboxed main window** — `sandbox: true` alongside `contextIsolation` and no Node integration; the preload uses only `contextBridge` and `ipcRenderer` (`main/bootstrap/window.ts`)
+- [x] **No navigation away from the app** — `will-navigate` is cancelled for anything but a reload of the app's own page, so a link or a file dropped on the window cannot replace the app; `window.open` is always denied
+- [x] **External links limited to `https:` and `mailto:`** — both the window's link handling and the `app:openExternal` IPC go through `main/security/externalLinks.ts`; any other scheme (`file:`, `http:`, custom protocol handlers) is refused
+- [x] **File access limited to what the user picked** — `fs:readFile`, `fs:readFileBinary`, `fs:writeFile`, `fluidnc:uploadFile` and `fluidnc:downloadFile` reject any local path that did not come from a native file dialog in the current run (`main/security/pathGrants.ts`): open dialogs grant read, save dialogs grant write and read-back, the split-export folder grants writing files directly inside it
+
 ### Properties Panel
 
 - [x] Import name editing — double-click the import name in the Properties panel to rename it inline; confirms on Enter or blur; cancels on Escape; name feeds the G-code save dialog default filename
