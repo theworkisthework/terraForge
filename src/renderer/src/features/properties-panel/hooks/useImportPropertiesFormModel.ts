@@ -52,7 +52,7 @@ export function useImportPropertiesFormModel({
   onToggleCentreMarker,
 }: UseImportPropertiesFormModelArgs) {
   // Button-driven edits are single discrete steps, so each one records its own
-  // undo entry (typed fields fire per keystroke and are not recorded here).
+  // undo entry (the store would otherwise merge two quick presses, as it does keystrokes).
   const updateWithUndo = (changes: Partial<SvgImport>) => {
     const { snapshotForGesture, commitGesture } = useCanvasStore.getState();
     snapshotForGesture();

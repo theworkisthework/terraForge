@@ -1,7 +1,15 @@
+import { randomUUID } from "crypto";
 import { existsSync } from "fs";
-import { readFile, writeFile } from "fs/promises";
+import {
+  copyFile,
+  open,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "fs/promises";
 import { join } from "path";
-import type { AppConfig, MachineConfig, PageSize, PenType } from "../../types";
+import type { AppConfig, InkServiceStation, MachineConfig, PageSize, PenType } from "../../types";
 
 function normalizePenType(penType: unknown): PenType {
   switch (penType) {
@@ -17,12 +25,33 @@ function normalizePenType(penType: unknown): PenType {
   }
 }
 
+/** A settings file that could not be parsed and was set aside. */
+export interface CorruptFileReport {
+  /** The file that could not be read; defaults are in use in its place. */
+  path: string;
+  /** Where the unreadable file was moved, or null if it could not be kept. */
+  backupPath: string | null;
+}
+
+export interface PersistenceOptions {
+  /** Called once for each settings file found corrupt. */
+  onCorruptFile?: (report: CorruptFileReport) => void;
+}
+
 export interface MainPersistence {
   configPath: string;
   pageSizesPath: string;
   appConfigPath: string;
   loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
+  /**
+   * Reads the machine configs, applies `change` and saves the result as one
+   * step, so two updates arriving together cannot overwrite each other.
+   * Returning null leaves the file untouched.
+   */
+  updateConfigs: (
+    change: (configs: MachineConfig[]) => MachineConfig[] | null,
+  ) => Promise<void>;
   loadPageSizes: () => Promise<PageSize[]>;
   loadAppConfig: () => Promise<AppConfig>;
   saveAppConfig: (config: AppConfig) => Promise<void>;
@@ -91,15 +120,38 @@ function defaultPenUpDelayMs(_penType: PenType): number {
   return 0;
 }
 
-function normalizeConfig(config: MachineConfig): MachineConfig {
+/**
+ * A config's ink service stations as read from disk or an imported file:
+ * the entries that are usable, or undefined (the defaults then apply) if
+ * the field is missing or is not a list.
+ */
+function normalizeInkServiceStations(value: unknown): InkServiceStation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter(
+    (station): station is InkServiceStation =>
+      typeof station === "object" &&
+      station !== null &&
+      typeof station.id === "string" &&
+      typeof station.name === "string" &&
+      typeof station.type === "string" &&
+      Number.isFinite(station.x) &&
+      Number.isFinite(station.y),
+  );
+}
+
+export function normalizeMachineConfig(config: MachineConfig): MachineConfig {
   // Migrate legacy single-feedrate configs written before the jog/draw split.
   const legacy = (config as unknown as Record<string, unknown>).feedrate as
     | number
     | undefined;
   const legacySpeed = typeof legacy === "number" && legacy >= 1 ? legacy : 3000;
   const penType = normalizePenType(config.penType);
+  const { inkServiceStations: _stations, ...rest } = config;
+  const inkServiceStations = normalizeInkServiceStations(config.inkServiceStations);
   return {
-    ...config,
+    ...rest,
+    // Left out, not written as undefined or empty, when there are none to keep.
+    ...(inkServiceStations && inkServiceStations.length > 0 ? { inkServiceStations } : {}),
     penType,
     penDownDelayMs:
       typeof config.penDownDelayMs === "number" && config.penDownDelayMs >= 0
@@ -125,33 +177,139 @@ function normalizeConfig(config: MachineConfig): MachineConfig {
 }
 
 function normalizeConfigs(configs: MachineConfig[]): MachineConfig[] {
-  return configs.map(normalizeConfig);
+  return configs.map(normalizeMachineConfig);
 }
+
+/**
+ * Writes through a temporary file in the same folder, then renames it over
+ * the target. A crash or power cut mid-write leaves the previous file whole
+ * instead of a truncated one.
+ */
+export async function writeFileAtomic(
+  path: string,
+  content: string,
+): Promise<void> {
+  const tempPath = `${path}.${randomUUID().slice(0, 8)}.tmp`;
+  try {
+    const handle = await open(tempPath, "w");
+    try {
+      await handle.writeFile(content, "utf-8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await rename(tempPath, path);
+  } catch (err) {
+    await unlink(tempPath).catch(() => {});
+    throw err;
+  }
+}
+
+/** `machine-configs.json.20260131T093000.bak`, beside the original. */
+function backupPathFor(path: string): string {
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\..*$/, "");
+  return `${path}.${stamp}.bak`;
+}
+
+/**
+ * Moves an unreadable settings file aside so that the next save cannot
+ * overwrite it, and whoever needs to can still recover values from it by
+ * hand. Resolves to where it went, or null if it could not be kept.
+ */
+async function setAsideCorruptFile(path: string): Promise<string | null> {
+  const backupPath = backupPathFor(path);
+  try {
+    await rename(path, backupPath);
+    return backupPath;
+  } catch {
+    // Could not move it (locked, say): a copy still preserves the contents.
+    try {
+      await copyFile(path, backupPath);
+      return backupPath;
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** Thrown by a parser to mark a file's contents as unusable. */
+class CorruptFileError extends Error {}
 
 function clonePageSizes(pageSizes: PageSize[]): PageSize[] {
   return pageSizes.map((pageSize) => ({ ...pageSize }));
 }
 
-export function createPersistence(userDataPath: string): MainPersistence {
+export function createPersistence(
+  userDataPath: string,
+  { onCorruptFile }: PersistenceOptions = {},
+): MainPersistence {
   const configPath = join(userDataPath, "machine-configs.json");
   const pageSizesPath = join(userDataPath, "page-sizes.json");
   const appConfigPath = join(userDataPath, "app-config.json");
 
-  async function loadConfigs(): Promise<MachineConfig[]> {
-    if (!existsSync(configPath))
-      return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
+  // Every read and write of the settings files runs through this queue, one
+  // at a time, so a save can never interleave with another save or with the
+  // read half of an update.
+  let queue: Promise<unknown> = Promise.resolve();
+  function enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = queue.then(task);
+    queue = run.catch(() => {});
+    return run;
+  }
+
+  /**
+   * Reads and parses a settings file. A missing file gives `fallback()`. So
+   * does a file that cannot be parsed — but that one is first moved aside
+   * and reported, rather than left for the next save to overwrite.
+   */
+  async function readSettings<T>(
+    path: string,
+    parse: (json: unknown) => T,
+    fallback: () => T,
+  ): Promise<T> {
+    let raw: string;
     try {
-      const raw = await readFile(configPath, "utf-8");
-      const parsed = JSON.parse(raw) as MachineConfig[];
-      return normalizeConfigs(parsed);
+      raw = await readFile(path, "utf-8");
     } catch {
-      return cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS);
+      // Missing, or unreadable for now (permissions, a locked file). Nothing
+      // is known to be wrong with its contents, so it is left where it is.
+      return fallback();
+    }
+    try {
+      return parse(JSON.parse(raw));
+    } catch {
+      const backupPath = await setAsideCorruptFile(path);
+      onCorruptFile?.({ path, backupPath });
+      return fallback();
     }
   }
 
-  async function saveConfigs(configs: MachineConfig[]): Promise<void> {
-    await writeFile(configPath, JSON.stringify(configs, null, 2), "utf-8");
-  }
+  const readConfigs = () =>
+    readSettings(
+      configPath,
+      (json) => {
+        if (!Array.isArray(json)) throw new CorruptFileError();
+        return normalizeConfigs(json as MachineConfig[]);
+      },
+      () => cloneMachineConfigs(DEFAULT_MACHINE_CONFIGS),
+    );
+
+  const writeConfigs = (configs: MachineConfig[]) =>
+    writeFileAtomic(configPath, JSON.stringify(configs, null, 2));
+
+  const loadConfigs = () => enqueue(readConfigs);
+
+  const saveConfigs = (configs: MachineConfig[]) =>
+    enqueue(() => writeConfigs(configs));
+
+  const updateConfigs: MainPersistence["updateConfigs"] = (change) =>
+    enqueue(async () => {
+      const next = change(await readConfigs());
+      if (next) await writeConfigs(next);
+    });
 
   async function loadPageSizes(): Promise<PageSize[]> {
     // Users can customise page sizes by editing page-sizes.json in userData.
@@ -175,29 +333,33 @@ export function createPersistence(userDataPath: string): MainPersistence {
     }
   }
 
-  async function loadAppConfig(): Promise<AppConfig> {
-    if (!existsSync(appConfigPath)) return { ...DEFAULT_APP_CONFIG };
-    try {
-      const raw = await readFile(appConfigPath, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<AppConfig>;
-      return {
-        debugLoggingEnabled:
-          typeof parsed.debugLoggingEnabled === "boolean"
-            ? parsed.debugLoggingEnabled
-            : DEFAULT_APP_CONFIG.debugLoggingEnabled,
-        showConsoleTimestamps:
-          typeof parsed.showConsoleTimestamps === "boolean"
-            ? parsed.showConsoleTimestamps
-            : DEFAULT_APP_CONFIG.showConsoleTimestamps,
-      };
-    } catch {
-      return { ...DEFAULT_APP_CONFIG };
-    }
-  }
+  const loadAppConfig = () =>
+    enqueue(() =>
+      readSettings<AppConfig>(
+        appConfigPath,
+        (json) => {
+          if (!json || typeof json !== "object" || Array.isArray(json))
+            throw new CorruptFileError();
+          const parsed = json as Partial<AppConfig>;
+          return {
+            debugLoggingEnabled:
+              typeof parsed.debugLoggingEnabled === "boolean"
+                ? parsed.debugLoggingEnabled
+                : DEFAULT_APP_CONFIG.debugLoggingEnabled,
+            showConsoleTimestamps:
+              typeof parsed.showConsoleTimestamps === "boolean"
+                ? parsed.showConsoleTimestamps
+                : DEFAULT_APP_CONFIG.showConsoleTimestamps,
+          };
+        },
+        () => ({ ...DEFAULT_APP_CONFIG }),
+      ),
+    );
 
-  async function saveAppConfig(config: AppConfig): Promise<void> {
-    await writeFile(appConfigPath, JSON.stringify(config, null, 2), "utf-8");
-  }
+  const saveAppConfig = (config: AppConfig) =>
+    enqueue(() =>
+      writeFileAtomic(appConfigPath, JSON.stringify(config, null, 2)),
+    );
 
   return {
     configPath,
@@ -205,6 +367,7 @@ export function createPersistence(userDataPath: string): MainPersistence {
     appConfigPath,
     loadConfigs,
     saveConfigs,
+    updateConfigs,
     loadPageSizes,
     loadAppConfig,
     saveAppConfig,

@@ -16,7 +16,12 @@ import {
   hasMachineCoordinatePrefix,
   removeMachineCoordinatePrefix,
 } from "../utils/machineCoordinate";
-import { defaultStationActionForType } from "../utils/stationDefaults";
+import {
+  defaultStationActionForType,
+  inkServiceStationsOf,
+  newDipStation,
+  normalizeStation,
+} from "../../../features/machine/utils/inkServiceStations";
 
 export const inputCls =
   "w-full px-3 py-1.5 text-sm bg-panel border border-border-ui rounded-lg text-content " +
@@ -47,7 +52,9 @@ export function useMachineConfigDialogController() {
   const [isNew, setIsNew] = useState(false);
   const [pendingPenType, setPendingPenType] = useState<PenType | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showStationList, setShowStationList] = useState(true);
+  // Closed to begin with: the stations are an experimental extra at the end
+  // of every machine's settings, and most machines never use them.
+  const [showStationList, setShowStationList] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{
     title: string;
     message: string;
@@ -97,7 +104,9 @@ export function useMachineConfigDialogController() {
       setSelectedId(id);
       setIsNew(false);
     } else if (selectedId) {
-      await updateConfig(selectedId, form);
+      // While the machine is connected only its ink stations can be edited,
+      // so only they are written.
+      await updateConfig(selectedId, isLocked ? { inkServiceStations: form.inkServiceStations } : form);
     }
     setIsDirty(false);
   };
@@ -156,11 +165,11 @@ export function useMachineConfigDialogController() {
 
   const { handleExport, handleImport } = configFileActions({ setConfigs, setSelectedId, setIsNew, setAlertInfo });
   const { handleDebugLoggingChange, handleShowConsoleTimestampsChange } = appPreferenceActions(appConfig);
-  const { updateStationField, updateStationActionField, handleTestStationLocation } = inkStationActions({
-    appConfig,
-    connected,
-    configs,
-    activeConfigId,
+  const inkStations = inkStationActions({
+    stations: inkServiceStationsOf(form),
+    setStations: (inkServiceStations) => change({ inkServiceStations }),
+    // The pen can only be sent to a station of the machine it belongs to.
+    machine: connected && !isNew && selectedId === activeConfigId ? form : null,
     setAlertInfo,
   });
 
@@ -213,9 +222,7 @@ export function useMachineConfigDialogController() {
     handleActivate,
     handleDebugLoggingChange,
     handleShowConsoleTimestampsChange,
-    updateStationField,
-    updateStationActionField,
-    handleTestStationLocation,
+    inkStations,
     handleDisconnectForEdit,
     inputCls,
   };
@@ -302,59 +309,73 @@ function appPreferenceActions(appConfig: Stores["appConfig"]) {
   };
 }
 
-/** Editing ink service stations, and moving the pen to one to check where
- * it is (which needs a connected, active machine). */
+/**
+ * Editing a machine's ink service stations, and moving the pen to one to
+ * check where it is — which needs `machine`, the connected machine the
+ * stations belong to (null when they are another machine's, or none is
+ * connected).
+ */
 export function inkStationActions({
-  appConfig,
-  connected,
-  configs,
-  activeConfigId,
+  stations,
+  setStations,
+  machine,
   setAlertInfo,
 }: {
-  appConfig: Stores["appConfig"];
-  connected: boolean;
-  configs: MachineConfig[];
-  activeConfigId: string | null;
+  stations: InkServiceStation[];
+  setStations: (stations: InkServiceStation[]) => void;
+  machine: Pick<MachineConfig, "penUpCommand"> | null;
   setAlertInfo: (info: AlertInfo) => void;
 }) {
+  const updateStation = (stationId: string, patch: Partial<InkServiceStation>) =>
+    setStations(
+      stations.map((station) => (station.id === stationId ? normalizeStation({ ...station, ...patch }) : station)),
+    );
+
   const updateStationField = <K extends keyof InkServiceStation>(
     stationId: string,
     key: K,
     value: InkServiceStation[K],
   ) => {
-    appConfig.updateInkServiceStation(stationId, { [key]: value } as Partial<InkServiceStation>);
+    updateStation(stationId, { [key]: value } as Partial<InkServiceStation>);
   };
 
   const updateStationActionField = (station: InkServiceStation, patch: Partial<InkServiceStationAction>) => {
     const baseAction = station.action ?? defaultStationActionForType(station.type);
     if (!baseAction) return;
-    appConfig.updateInkServiceStation(station.id, {
+    updateStation(station.id, {
       action: { ...baseAction, ...patch } as InkServiceStationAction,
     });
   };
 
+  const addStation = () => setStations([...stations, newDipStation(stations)]);
+
+  const removeStation = (stationId: string) => setStations(stations.filter((station) => station.id !== stationId));
+
   const handleTestStationLocation = async (station: InkServiceStation) => {
-    if (!connected) {
-      setAlertInfo({ title: "Machine Offline", message: "Connect to your machine before testing station locations." });
-      return;
-    }
-    const cfg = activeConfigId ? configs.find((c) => c.id === activeConfigId) : null;
-    if (!cfg) {
+    if (!machine) {
       setAlertInfo({
-        title: "No Active Machine",
-        message: "Set an active machine profile before testing station locations.",
+        title: "Machine Offline",
+        message: "Connect to this machine before testing its station locations.",
       });
       return;
     }
     try {
-      await window.terraForge.fluidnc.sendCommand(cfg.penUpCommand);
+      await window.terraForge.fluidnc.sendCommand(machine.penUpCommand);
       await window.terraForge.fluidnc.sendCommand(`G0 X${station.x.toFixed(3)} Y${station.y.toFixed(3)}`);
     } catch (err) {
       setAlertInfo({ title: "Station Test Failed", message: err instanceof Error ? err.message : String(err) });
     }
   };
 
-  return { updateStationField, updateStationActionField, handleTestStationLocation };
+  return {
+    stations,
+    updateStation,
+    updateStationField,
+    updateStationActionField,
+    addStation,
+    removeStation,
+    handleTestStationLocation,
+  };
 }
 
 /**

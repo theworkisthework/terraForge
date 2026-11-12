@@ -10,6 +10,8 @@ import { render, act } from "@testing-library/react";
 import { useAppBootstrap } from "@renderer/hooks/useAppBootstrap";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { useTaskStore } from "@renderer/store/taskStore";
+import { useCanvasStore } from "@renderer/store/canvasStore";
+import { createSvgImport } from "../helpers/factories";
 
 function BootstrapHost() {
   useAppBootstrap();
@@ -57,5 +59,37 @@ describe("useAppBootstrap — serial connection lost", () => {
     const { unsubscribe, view } = mountAndCaptureLossHandler();
     view.unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useAppBootstrap — unsaved changes", () => {
+  const reported = () =>
+    (window.terraForge.app.setUnsavedChanges as ReturnType<typeof vi.fn>).mock.calls.map(([unsaved]) => unsaved);
+
+  beforeEach(() => {
+    useCanvasStore.getState().commitGesture();
+    useCanvasStore.setState({ imports: [], layerGroups: [], undoStack: [], redoStack: [], revision: 0, savedRevision: 0 });
+  });
+
+  it("tells the main process when the layout changes and when it is saved", () => {
+    render(<BootstrapHost />);
+    expect(reported()).toEqual([false]);
+
+    act(() => useCanvasStore.getState().addImport(createSvgImport()));
+    expect(reported()).toEqual([false, true]);
+
+    // Further edits are no news.
+    act(() => useCanvasStore.getState().updateImport(useCanvasStore.getState().imports[0].id, { x: 40 }));
+    expect(reported()).toEqual([false, true]);
+
+    act(() => useCanvasStore.getState().markSaved());
+    expect(reported()).toEqual([false, true, false]);
+  });
+
+  it("reports nothing to lose once the canvas is cleared", () => {
+    render(<BootstrapHost />);
+    act(() => useCanvasStore.getState().addImport(createSvgImport()));
+    act(() => useCanvasStore.getState().clearImports());
+    expect(reported()).toEqual([false, true, false]);
   });
 });

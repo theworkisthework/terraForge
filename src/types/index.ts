@@ -53,6 +53,12 @@ export interface MachineConfig {
   /** Default drawing feedrate emitted in generated G-code (F word). mm/min. */
   drawSpeed: number;
   connection: MachineConnection;
+  /**
+   * Where this machine's pen is primed and wiped, or its brush dipped and
+   * washed, in machine coordinates. Absent until first edited: the defaults
+   * (DEFAULT_INK_SERVICE_STATIONS) then apply.
+   */
+  inkServiceStations?: InkServiceStation[];
 }
 
 export interface AppConfig {
@@ -1051,6 +1057,11 @@ export interface AppApi {
   getVersion: () => Promise<string>;
   /** Open a URL in the system default browser. */
   openExternal: (url: string) => Promise<void>;
+  /**
+   * Tell the main process whether the canvas has changes that are not in a
+   * saved layout. While it does, closing the window or quitting asks first.
+   */
+  setUnsavedChanges: (unsaved: boolean) => void;
   /** Subscribe to the native Help → About menu item. Returns an unsubscribe function. */
   onMenuAbout: (cb: () => void) => () => void;
 }

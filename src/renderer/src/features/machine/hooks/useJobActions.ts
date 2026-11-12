@@ -20,6 +20,7 @@ import {
   type SplitFile,
 } from "../utils/splitGcodeFiles";
 import { buildGcodeOptions } from "../utils/buildGcodeOptions";
+import { selectActiveInkServiceStations } from "../utils/inkServiceStations";
 import { connectMachine, disconnectMachine } from "../utils/machineConnection";
 
 /** Orchestrates machine connection, disconnection, and G-code generation. */
@@ -31,7 +32,7 @@ export function useJobActions() {
   const vinylBladeOffsetMM = useAppConfigStore((s) => s.vinylBladeOffsetMM);
   const vinylCornerAngleThresholdDeg = useAppConfigStore((s) => s.vinylCornerAngleThresholdDeg);
   const vinylMicroJogMagnitudeMM = useAppConfigStore((s) => s.vinylMicroJogMagnitudeMM);
-  const inkServiceStations = useAppConfigStore((s) => s.inkServiceStations);
+  const inkServiceStations = useMachineStore(selectActiveInkServiceStations);
 
   const {
     imports,
@@ -188,7 +189,7 @@ export function useJobActions() {
     prefs: GcodePrefs,
     cfg: ReturnType<typeof activeConfig>,
     buildFiles: () => SplitFile[],
-    after?: (saveDir: string | null) => Promise<void>,
+    after?: (saveDir: string | null, usedFilenames: Set<string>) => Promise<void>,
   ) => {
     if (!cfg) return;
     const options = await buildOptions(prefs);
@@ -202,8 +203,10 @@ export function useJobActions() {
     }
 
     setGenerating(true);
-    await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask });
-    await after?.(saveDir);
+    // Shared with `after`, whose files land in the same folder and SD root.
+    const usedFilenames = new Set<string>();
+    await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask, usedFilenames });
+    await after?.(saveDir, usedFilenames);
     setGenerating(false);
   };
 
@@ -226,12 +229,12 @@ export function useJobActions() {
       prefs,
       cfg,
       () => colorFiles(useCanvasStore.getState().toVectorObjects(), prefs.exportPerHatch, prefs.optimise),
-      async (saveDir) => {
+      async (saveDir, usedFilenames) => {
         if (!prefs.exportPerHatch || !cfg) return;
         // Hatch-only files per colour, for hatching with a separate pen.
         const options = await buildOptions(prefs);
         const files = hatchFiles(useCanvasStore.getState().toVectorObjects(), prefs.optimise);
-        await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask });
+        await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), upsertTask, usedFilenames });
       },
     );
 

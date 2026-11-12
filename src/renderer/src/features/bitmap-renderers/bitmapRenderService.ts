@@ -174,7 +174,7 @@ async function run(importId: string, job: RenderJob): Promise<void> {
   }
   if (!current()) return;
 
-  useCanvasStore.getState().updateImport(importId, {
+  useCanvasStore.getState().applyRenderResult(importId, {
     bitmapRendererPath: result.bitmapRendererPath,
     paths: result.paths,
     bitmapRenderSignature: job.signature,

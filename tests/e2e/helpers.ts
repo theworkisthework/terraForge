@@ -114,6 +114,16 @@ export async function closeApp(
   app: ElectronApplication,
   userDataDir?: string,
 ): Promise<void> {
+  // A canvas with unsaved work makes the app ask before it closes, with a
+  // native dialog that no test can answer. Withdraw the renderer's report
+  // of unsaved changes so that the close goes straight through.
+  await app
+    .evaluate(({ ipcMain }) => {
+      ipcMain.emit("app:setUnsavedChanges", {}, false);
+    })
+    .catch(() => {
+      /* already closing or closed */
+    });
   await app.close();
   if (userDataDir) {
     try {

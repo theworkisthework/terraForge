@@ -45,6 +45,17 @@ describe("registerConfigIpcHandlers", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  /** The persistence layer's read-change-save step, over a pair of mocks. */
+  const updateConfigsWith =
+    (
+      loadConfigs: () => Promise<any[]>,
+      saveConfigs: (configs: any[]) => Promise<void>,
+    ) =>
+    async (change: (configs: any[]) => any[] | null) => {
+      const next = change(await loadConfigs());
+      if (next) await saveConfigs(next);
+    };
+
   function makeConfig(id: string, name: string) {
     return {
       id,
@@ -71,7 +82,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs,
-      saveConfigs,
+      updateConfigs: updateConfigsWith(loadConfigs, saveConfigs),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -95,7 +106,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs,
-      saveConfigs,
+      updateConfigs: updateConfigsWith(loadConfigs, saveConfigs),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -120,7 +131,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs,
-      saveConfigs,
+      updateConfigs: updateConfigsWith(loadConfigs, saveConfigs),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -159,7 +170,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs,
-      saveConfigs,
+      updateConfigs: updateConfigsWith(loadConfigs, saveConfigs),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -178,6 +189,35 @@ describe("registerConfigIpcHandlers", () => {
     ]);
   });
 
+  it("leaves the configs untouched when an import adds nothing", async () => {
+    const existing = makeConfig("existing-id", "Alpha Plotter");
+    const importFilePath = join(tempDir, "import.json");
+    await writeFile(importFilePath, JSON.stringify([existing]), "utf-8");
+
+    const loadConfigs = vi.fn().mockResolvedValue([existing]);
+    const saveConfigs = vi.fn().mockResolvedValue(undefined);
+    mocks.showOpenDialog.mockResolvedValue({
+      canceled: false,
+      filePaths: [importFilePath],
+    });
+
+    registerConfigIpcHandlers({
+      getMainWindow: () => ({}) as any,
+      loadAppConfig: vi.fn(),
+      saveAppConfig: vi.fn(),
+      loadConfigs,
+      updateConfigs: updateConfigsWith(loadConfigs, saveConfigs),
+      loadPageSizes: vi.fn().mockResolvedValue([]),
+      pageSizesPath: join(tempDir, "page-sizes.json"),
+      builtInPageSizes: [],
+    });
+
+    const result = await mocks.handlers.get("config:importConfigs")?.();
+
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    expect(saveConfigs).not.toHaveBeenCalled();
+  });
+
   it("exports configs to the selected file", async () => {
     const exportedPath = join(tempDir, "export.json");
     const loadConfigs = vi
@@ -193,7 +233,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs,
-      saveConfigs: vi.fn().mockResolvedValue(undefined),
+      updateConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -220,7 +260,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs: vi.fn().mockResolvedValue([]),
-      saveConfigs: vi.fn().mockResolvedValue(undefined),
+      updateConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath: join(tempDir, "page-sizes.json"),
       builtInPageSizes: [],
@@ -242,7 +282,7 @@ describe("registerConfigIpcHandlers", () => {
       loadAppConfig: vi.fn(),
       saveAppConfig: vi.fn(),
       loadConfigs: vi.fn().mockResolvedValue([]),
-      saveConfigs: vi.fn().mockResolvedValue(undefined),
+      updateConfigs: vi.fn().mockResolvedValue(undefined),
       loadPageSizes: vi.fn().mockResolvedValue([]),
       pageSizesPath,
       builtInPageSizes,

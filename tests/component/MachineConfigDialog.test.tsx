@@ -5,6 +5,7 @@ import { useMachineStore } from "@renderer/store/machineStore";
 import { MachineConfigDialog } from "@renderer/components/MachineConfigDialog";
 import { useAppConfigStore } from "@renderer/store/appConfigStore";
 import { createMachineConfig } from "../helpers/factories";
+import { DEFAULT_INK_SERVICE_STATIONS } from "../../src/types";
 
 beforeEach(() => {
   const cfg = createMachineConfig({
@@ -370,6 +371,104 @@ describe("MachineConfigDialog", () => {
     expect(window.terraForge.config.saveMachineConfig).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Renamed" }),
     );
+  });
+
+  // ── Ink service stations ────────────────────────────────────────────────
+
+  describe("ink service stations", () => {
+    const tray = { id: "tray", name: "Paint Tray", type: "dip" as const, x: 150, y: 20, dwellMs: 300 };
+    const rag = { id: "rag", name: "Rag", type: "wipe" as const, x: 170, y: 20, dwellMs: 100 };
+    const saveMachineConfig = () => window.terraForge.config.saveMachineConfig as ReturnType<typeof vi.fn>;
+
+    /** Gives the machine under test stations of its own. */
+    function withStations() {
+      const [cfg] = useMachineStore.getState().configs;
+      useMachineStore.setState({ configs: [{ ...cfg, inkServiceStations: [tray, rag] }] });
+    }
+
+    async function openStationList() {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByRole("button", { name: /Station List/ }));
+    }
+
+    it("are listed with the machine, not with the application settings", async () => {
+      withStations();
+      await openStationList();
+      expect(screen.getByDisplayValue("Paint Tray")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Rag")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByText("Application"));
+      expect(screen.queryByDisplayValue("Paint Tray")).not.toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: /Show station markers on plot canvas/ })).toBeInTheDocument();
+    });
+
+    it("are the default stations for a machine that has none of its own", async () => {
+      await openStationList();
+      expect(screen.getByDisplayValue("Dip Black")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Test" })).toHaveLength(DEFAULT_INK_SERVICE_STATIONS.length);
+    });
+
+    it("are saved with the machine when Save Changes is clicked", async () => {
+      withStations();
+      await openStationList();
+      expect(screen.getByText("Saved")).toBeDisabled();
+
+      const name = screen.getByDisplayValue("Paint Tray");
+      await userEvent.clear(name);
+      await userEvent.type(name, "Blue");
+
+      // Nothing is written until the machine is saved.
+      expect(saveMachineConfig()).not.toHaveBeenCalled();
+      expect(useMachineStore.getState().configs[0].inkServiceStations?.[0].name).toBe("Paint Tray");
+
+      await userEvent.click(screen.getByText("Save Changes"));
+
+      expect(saveMachineConfig()).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Test Plotter",
+          inkServiceStations: [expect.objectContaining({ id: "tray", name: "Blue", x: 150 }), expect.objectContaining({ id: "rag" })],
+        }),
+      );
+      expect(useMachineStore.getState().configs[0].inkServiceStations?.[0].name).toBe("Blue");
+    });
+
+    it("can be added to and removed from", async () => {
+      withStations();
+      await openStationList();
+
+      await userEvent.click(screen.getByRole("button", { name: "Add Dip Station" }));
+      expect(screen.getByDisplayValue("Dip 2")).toBeInTheDocument();
+
+      await userEvent.click(screen.getAllByRole("button", { name: /^(Del|Remove|Delete)/ }).at(-1)!);
+      expect(screen.queryByDisplayValue("Dip 2")).not.toBeInTheDocument();
+    });
+
+    it("stay editable while the machine is connected, and saving then writes only the stations", async () => {
+      withStations();
+      useMachineStore.setState({ connected: true });
+      await openStationList();
+
+      // The rest of the machine's settings are locked.
+      expect(screen.getByDisplayValue("Test Plotter")).toBeDisabled();
+      const name = screen.getByDisplayValue("Rag");
+      expect(name).not.toBeDisabled();
+
+      await userEvent.clear(name);
+      await userEvent.type(name, "Sponge");
+      await userEvent.click(screen.getByText("Save Changes"));
+
+      const [saved] = saveMachineConfig().mock.calls.at(-1)!;
+      expect(saved.inkServiceStations[1]).toMatchObject({ id: "rag", name: "Sponge" });
+      expect(saved).toMatchObject({ name: "Test Plotter", bedWidth: 300, penDownCommand: "M3S1" });
+    });
+
+    it("cannot be tested on a machine that is not connected", async () => {
+      withStations();
+      await openStationList();
+      await userEvent.click(screen.getAllByRole("button", { name: "Test" })[0]);
+      expect(screen.getByText("Machine Offline")).toBeInTheDocument();
+      expect(window.terraForge.fluidnc.sendCommand).not.toHaveBeenCalled();
+    });
   });
 
   // ── Pen type change auto-populates commands ────────────────────────────

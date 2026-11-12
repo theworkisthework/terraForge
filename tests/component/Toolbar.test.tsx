@@ -7,6 +7,9 @@ import { useTaskStore } from "@renderer/store/taskStore";
 import { Toolbar } from "@renderer/components/Toolbar";
 import { createMachineConfig, createSvgImport } from "../helpers/factories";
 import { importPdf } from "@renderer/utils/pdfImport";
+import { hasUnsavedChanges } from "@renderer/store/canvasStore/types";
+
+const mockFn = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 // Mock importPdf so component tests can control PDF-parsing outcomes without
 // running the real pdfjs renderer.
@@ -1958,6 +1961,65 @@ describe("Toolbar", () => {
       await waitFor(() => {
         expect(useCanvasStore.getState().imports).toHaveLength(0);
       });
+    });
+
+    it.each([
+      ["the save prompt is cancelled", () => mockFn(window.terraForge.fs.saveLayoutDialog).mockResolvedValueOnce(null)],
+      [
+        "the file cannot be written",
+        () => {
+          mockFn(window.terraForge.fs.saveLayoutDialog).mockResolvedValue("/out.tforge");
+          mockFn(window.terraForge.fs.writeFile).mockRejectedValueOnce(new Error("disk full"));
+        },
+      ],
+    ])("Close Layout Save and Exit keeps the canvas when %s", async (_case, arrange) => {
+      useCanvasStore.setState({ imports: [createSvgImport({ name: "drawing" })] });
+      arrange();
+
+      render(<Toolbar />);
+      const onMenuClose = mockFn(window.terraForge.fs.onMenuCloseLayout).mock.calls[0]?.[0] as (() => void) | undefined;
+      await act(async () => {
+        onMenuClose?.();
+      });
+      await userEvent.click(screen.getByRole("button", { name: "Save and Exit" }));
+
+      await waitFor(() => expect(window.terraForge.fs.saveLayoutDialog).toHaveBeenCalled());
+      await act(async () => {});
+      expect(useCanvasStore.getState().imports).toHaveLength(1);
+    });
+
+    it("a saved layout no longer counts as unsaved changes, until it is edited again", async () => {
+      useCanvasStore.getState().addImport(createSvgImport({ name: "drawing" }));
+      expect(hasUnsavedChanges(useCanvasStore.getState())).toBe(true);
+      mockFn(window.terraForge.fs.saveLayoutDialog).mockResolvedValue("/out.tforge");
+      mockFn(window.terraForge.fs.writeFile).mockResolvedValue(undefined);
+
+      render(<Toolbar />);
+      const onMenuSaveLayout = mockFn(window.terraForge.fs.onMenuSaveLayout).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuSaveLayout?.();
+
+      await waitFor(() => expect(hasUnsavedChanges(useCanvasStore.getState())).toBe(false));
+
+      await act(async () => {});
+      act(() => useCanvasStore.getState().updateImport(useCanvasStore.getState().imports[0].id, { x: 99 }));
+      expect(hasUnsavedChanges(useCanvasStore.getState())).toBe(true);
+    });
+
+    it("an edit made while the layout file is being written is still unsaved", async () => {
+      useCanvasStore.getState().addImport(createSvgImport({ name: "drawing" }));
+      mockFn(window.terraForge.fs.saveLayoutDialog).mockResolvedValue("/out.tforge");
+      let finishWrite!: () => void;
+      mockFn(window.terraForge.fs.writeFile).mockReturnValueOnce(new Promise<void>((resolve) => (finishWrite = resolve)));
+
+      render(<Toolbar />);
+      const onMenuSaveLayout = mockFn(window.terraForge.fs.onMenuSaveLayout).mock.calls[0]?.[0] as (() => void) | undefined;
+      onMenuSaveLayout?.();
+      await waitFor(() => expect(window.terraForge.fs.writeFile).toHaveBeenCalled());
+
+      act(() => useCanvasStore.getState().updateImport(useCanvasStore.getState().imports[0].id, { x: 99 }));
+      await act(async () => finishWrite());
+
+      expect(hasUnsavedChanges(useCanvasStore.getState())).toBe(true);
     });
   });
 

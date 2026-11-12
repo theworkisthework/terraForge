@@ -7,12 +7,16 @@ import { useTaskStore } from "../store/taskStore";
 import { useConsoleStore } from "../store/consoleStore";
 import { useAppConfigStore } from "../store/appConfigStore";
 import { useThemeStore, applyTheme } from "../store/themeStore";
+import { useCanvasStore } from "../store/canvasStore";
+import { hasUnsavedChanges } from "../store/canvasStore/types";
+import { adoptLegacyInkServiceStations } from "../features/machine/utils/legacyInkServiceStations";
 
 /**
  * App start-up: loads machine configs, renderer plugins and app settings,
  * starts the bitmap render service, and subscribes to the main process's
  * status, console, task, ping, firmware and serial-loss updates. Also keeps the <html>
- * theme class in step with the theme store.
+ * theme class in step with the theme store, and tells the main process when
+ * the layout has unsaved changes so that it can ask before closing.
  */
 export function useAppBootstrap() {
   const loadRendererPlugins = useRendererPluginStore((s) => s.loadRendererPlugins);
@@ -26,6 +30,7 @@ export function useAppBootstrap() {
   const setDebugLoggingEnabled = useAppConfigStore((s) => s.setDebugLoggingEnabled);
   const setShowConsoleTimestamps = useAppConfigStore((s) => s.setShowConsoleTimestamps);
   const theme = useThemeStore((s) => s.theme);
+  const unsavedChanges = useCanvasStore(hasUnsavedChanges);
 
   // Keep <html> class in sync with theme store
   useEffect(() => {
@@ -33,8 +38,13 @@ export function useAppBootstrap() {
   }, [theme]);
 
   useEffect(() => {
-    // Load machine configs
-    window.terraForge.config.getMachineConfigs().then(setConfigs);
+    window.terraForge.app.setUnsavedChanges(unsavedChanges);
+  }, [unsavedChanges]);
+
+  useEffect(() => {
+    // Load machine configs, handing them the ink service stations that an
+    // earlier version kept app-wide.
+    window.terraForge.config.getMachineConfigs().then(adoptLegacyInkServiceStations).then(setConfigs);
     void loadRendererPlugins();
     const stopBitmapRenderService = startBitmapRenderService();
     window.terraForge.config
