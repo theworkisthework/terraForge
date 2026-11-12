@@ -43,11 +43,14 @@ export function createMainWindow(): BrowserWindow {
     return { action: "deny" };
   });
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-  } else {
-    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-  }
+  const loaded = process.env.ELECTRON_RENDERER_URL
+    ? mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+    : mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+  // A load cut short — by a reload, or by the window closing — is not a
+  // failure. Anything else is left unhandled, to be reported as one.
+  void loaded.catch((err: { code?: string } | undefined) => {
+    if (err?.code !== "ERR_ABORTED") throw err;
+  });
 
   return mainWindow;
 }

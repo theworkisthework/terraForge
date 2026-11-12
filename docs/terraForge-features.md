@@ -48,7 +48,8 @@
 - [x] G90 absolute mode, G21 mm units
 - [x] G0 rapid travel (pen up), G1 linear draw (pen down)
 - [x] Per-object progress reporting → task bar progress
-- [x] Cancellation support (cancel message to worker)
+- [x] Cancellation support — the cancel button terminates the worker; split-file jobs are cancellable too, and cancelling one file skips the rest of the job (hatch files included)
+- [x] **Generation cannot get stuck** — worker `onerror` / `onmessageerror` and a worker that fails to start end the task with an error; `setGenerating(false)` runs in a `finally`; a failed `fs.writeFile` is reported as "Could not save _file_" and a split job carries on
 - [x] G-code header with machine name, bed size, origin, optimisation flag, timestamp
 - [x] **G-code generation options dialog** — clicking "Generate G-code" opens a tabbed modal with **Paths**, **Options**, **Output**, and (when enabled) **Vinyl** tabs; supports optimisation, join tolerance, output destination selection, page clipping, custom start/end G-code, and split-output modes for per-SVG-layer, per-layer-group, and per-colour-group export; the split-output modes are controlled by a master checkbox with mutually exclusive radio choices, and hatch-only colour exports are nested under colour-group mode; at least one output destination must be selected (Generate button is disabled otherwise)
 - [x] **Persisted generation preferences** — dialog settings are stored in `localStorage` under `terraforge.gcodePrefs` and restored on the next session, including join tolerance, delay/speed overrides, split-output mode, hatch export choice, output choices, and vinyl options (weed border enable + margin)
@@ -120,6 +121,8 @@
 - [x] Click file row to select it as the queued job file (highlighted in blue); clicking again deselects
 - [x] G-code preview button on `.gcode`/`.nc` files — loads toolpath overlay on canvas
 - [x] Upload/download progress tracked in task bar
+- [x] **Transfers cannot hang** — an upload settles on a request, form, read-stream or response error and on a connection that closes before the machine replies; uploads and downloads are given up after 60 s with no data moving ("Upload stalled" / "Download stalled")
+- [x] **No partial downloads** — a download is piped (`stream/promises.pipeline`) to `<name>.part` and renamed into place when complete; on failure or cancel the partial is deleted and an existing destination file is left untouched
 - [x] Auto-refresh listing after upload
 - [ ] Internal file browser condensed by default
 - [ ] Don't try to fetch file contents until we have a sucessful connection to avoid unfriendly errors
@@ -176,7 +179,14 @@
 - [x] G-code generation cancellation: cancel button posts a `cancel` message directly to the Web Worker via a callback registered in `taskStore`; worker emits a distinct `cancelled` message type (not re-used as `error`)
 - [x] Cancel callbacks stored in a plain module-level `Map` outside of immer state to avoid immer's freeze/proxy cycle breaking function values
 - [x] IPC fallback for main-process tasks (file upload/download) that have no renderer-side callback
-- [x] Task types: `svg-parse`, `gcode-generate`, `file-upload`, `file-download`, `file-delete`, `job-start`, `ws-connect`
+- [x] Task types: `svg-parse`, `gcode-generate`, `gcode-preview`, `file-upload`, `file-download`, `file-delete`, `job-start`, `job-control`, `ws-connect`, `app-error`
+- [x] **Connection task waits for the machine** — a Wi-Fi connection reads "Waiting for _host_ to respond…" until the first WebSocket frame (`wsLive`) and only then "Connected"; cancellable until then; "No response from _host_" after 20 s (`machineConnection.ts`)
+
+### Error Containment
+
+- [x] **Panel error boundaries** — the toolbar, file browser, job controls, canvas, notifications, console, properties panel and jog controls each sit in a `PanelBoundary`; a render error replaces that panel with a message and a **Retry** button in the same space, and is written to the console panel
+- [x] **Crash screen** — a top-level boundary in `App` shows `AppCrashScreen` instead of a blank window: **Try again** (stores keep the layout), **Reload window**, and **Pause job** / **Abort job** while a machine is connected
+- [x] **Unhandled errors are reported** — renderer `unhandledrejection` / `error` (`utils/unexpectedErrors.ts`) and main-process `unhandledRejection` / `uncaughtException` (`main/bootstrap/unexpectedErrors.ts`) write a `[terraForge] Unexpected error: …` console line and raise one replaceable error toast; main falls back to an error box when no window can show it
 
 ### Properties Panel
 

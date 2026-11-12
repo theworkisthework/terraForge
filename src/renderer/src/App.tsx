@@ -9,6 +9,9 @@ import { TaskBar } from "./components/TaskBar";
 import { JogControls } from "./components/JogControls";
 import { useJogPanelPosition } from "./components/JogControls/useJogPanelPosition";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PanelBoundary } from "./components/PanelBoundary";
+import { AppCrashScreen } from "./components/AppCrashScreen";
 import { useMachineStore } from "./store/machineStore";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
@@ -16,7 +19,57 @@ import { sendJobControl } from "./features/machine/utils/jobControl";
 import { RULER_W } from "./features/canvas";
 import type { OriginType } from "../../types";
 
+/**
+ * The app, inside the boundary of last resort. Each panel below has a
+ * boundary of its own, so that one failing leaves the rest — the job
+ * controls above all — working; this one catches whatever gets past those,
+ * and shows a way back instead of a blank window.
+ */
 export default function App() {
+  return (
+    <ErrorBoundary fallback={(error, reset) => <AppCrashScreen error={error} onRetry={reset} />}>
+      <AppShell />
+    </ErrorBoundary>
+  );
+}
+
+/** The file browser folded down to a strip: click to open, with the job controls still at its foot. */
+function CollapsedFileBrowser({ onShow, onAbort }: { onShow: () => void; onAbort: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onShow}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onShow();
+        }
+      }}
+      aria-label="Show file browser panel"
+      title="Show file browser"
+      className="h-full w-full flex flex-col items-stretch text-content-muted hover:text-content transition-colors"
+    >
+      <span className="h-8 w-full flex items-center justify-center hover:bg-secondary border-b border-border-ui">
+        <span aria-hidden="true" className="text-xs font-semibold">
+          &gt;
+        </span>
+      </span>
+      <span className="flex-1" />
+
+      {/* Collapsed job zone keeps same visual split as expanded file/job layout */}
+      <PanelBoundary
+        name="job controls"
+        shape="icon"
+        className="h-40 border-t border-border-ui shrink-0 flex flex-col items-end justify-end pr-1.5 pb-2"
+      >
+        <CollapsedJobControls onAbort={onAbort} />
+      </PanelBoundary>
+    </div>
+  );
+}
+
+function AppShell() {
   useAppBootstrap();
   const activeConfigId = useMachineStore((s) => s.activeConfigId);
   const machineConfigs = useMachineStore((s) => s.configs);
@@ -53,7 +106,9 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen bg-app text-content overflow-hidden">
       {/* Top toolbar */}
-      <Toolbar showJog={showJog} onToggleJog={() => setShowJog((v) => !v)} />
+      <PanelBoundary name="toolbar" shape="row" className="px-4 py-2 bg-panel border-b border-border-ui shrink-0">
+        <Toolbar showJog={showJog} onToggleJog={() => setShowJog((v) => !v)} />
+      </PanelBoundary>
 
       {showCollapsedAbortConfirm && (
         <ConfirmDialog
@@ -77,46 +132,38 @@ export default function App() {
           {showFileBrowser ? (
             <div className="h-full flex flex-col">
               <div className="flex-1 min-h-0">
-                <FileBrowserPanel onHide={() => setShowFileBrowser(false)} />
+                <PanelBoundary name="file browser">
+                  <FileBrowserPanel onHide={() => setShowFileBrowser(false)} />
+                </PanelBoundary>
               </div>
               <div className="h-40 border-t border-border-ui shrink-0">
-                <JobControls />
+                <PanelBoundary name="job controls">
+                  <JobControls />
+                </PanelBoundary>
               </div>
             </div>
           ) : (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setShowFileBrowser(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setShowFileBrowser(true);
-                }
-              }}
-              aria-label="Show file browser panel"
-              title="Show file browser"
-              className="h-full w-full flex flex-col items-stretch text-content-muted hover:text-content transition-colors"
-            >
-              <span className="h-8 w-full flex items-center justify-center hover:bg-secondary border-b border-border-ui">
-                <span aria-hidden="true" className="text-xs font-semibold">
-                  &gt;
-                </span>
-              </span>
-              <span className="flex-1" />
-
-              {/* Collapsed job zone keeps same visual split as expanded file/job layout */}
-              <CollapsedJobControls onAbort={() => setShowCollapsedAbortConfirm(true)} />
-            </div>
+            <CollapsedFileBrowser
+              onShow={() => setShowFileBrowser(true)}
+              onAbort={() => setShowCollapsedAbortConfirm(true)}
+            />
           )}
         </aside>
 
         {/* Centre column — canvas + bottom console/job row */}
         <div ref={centerRef} className="flex-1 flex flex-col overflow-hidden">
           <main className="flex-1 overflow-visible relative">
-            <PlotCanvas />
+            <PanelBoundary name="canvas">
+              <PlotCanvas />
+            </PanelBoundary>
             {/* Toast stack — absolute within canvas area, clear of side panels */}
-            <TaskBar />
+            <PanelBoundary
+              name="notifications"
+              shape="row"
+              className="absolute top-4 right-4 z-60 w-[280px] bg-panel border border-accent/50 rounded-lg px-3 py-2 shadow-xl"
+            >
+              <TaskBar />
+            </PanelBoundary>
           </main>
 
           {/* Bottom — console */}
@@ -132,7 +179,9 @@ export default function App() {
               className="h-2 w-full -mt-1 cursor-row-resize select-none z-10"
             />
             <div className="flex-1 min-h-0 overflow-hidden">
-              <ConsolePanel collapsed={isConsoleCollapsed} />
+              <PanelBoundary name="console" shape="row" className="h-full px-3">
+                <ConsolePanel collapsed={isConsoleCollapsed} />
+              </PanelBoundary>
             </div>
           </div>
         </div>
@@ -142,7 +191,9 @@ export default function App() {
           className={`${showProperties ? "w-64" : "w-9"} bg-panel border-l border-border-ui overflow-hidden shrink-0 transition-[width] duration-200 ease-in-out`}
         >
           {showProperties ? (
-            <PropertiesPanel onHide={() => setShowProperties(false)} />
+            <PanelBoundary name="properties panel">
+              <PropertiesPanel onHide={() => setShowProperties(false)} />
+            </PanelBoundary>
           ) : (
             <button
               type="button"
@@ -182,7 +233,9 @@ export default function App() {
             onPointerDown={startJogDrag}
           />
           <div className="p-4">
-            <JogControls onClose={() => setShowJog(false)} />
+            <PanelBoundary name="jog controls" className="w-56">
+              <JogControls onClose={() => setShowJog(false)} />
+            </PanelBoundary>
           </div>
         </div>
       )}

@@ -133,6 +133,9 @@ test.beforeAll(async () => {
     .locator("select[aria-label='Machine selector']")
     .selectOption({ label: TEST_CONFIG.name });
   await window.locator("button:has-text('Connect')").click();
+  // The real main-process client emits a ping when the WebSocket is live.
+  // The mocked connect IPC only resolves, so simulate that liveness event.
+  await pushRendererEvent(electronApp, "fluidnc:ping", undefined);
   await expect(window.locator("text=Connected").first()).toBeVisible({
     timeout: 10_000,
   });

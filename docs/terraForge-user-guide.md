@@ -205,14 +205,24 @@ The connection status indicator (top-right of toolbar) shows:
 | 🟢 Green dot + "Connected"       | Connected, WebSocket live              |
 | 🟡 Amber pulsing + "Connecting…" | Connected but WebSocket not yet active |
 
-If connection fails, a red error notification appears with the error message.
+A notification follows the connection as it is made:
+
+| Notification                       | Meaning                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Connecting to _host_…**          | Looking for the machine on the network                                                                     |
+| **Waiting for _host_ to respond…** | The machine was found; waiting for its first message over the WebSocket                                    |
+| **Connected** (green ✓)            | The machine has answered. Only now is it really connected                                                  |
+| **Connection failed** (red !)      | The machine could not be found; the reason is on the second line                                           |
+| **No response from _host_** (red !) | The machine was found but said nothing for 20 seconds. terraForge keeps trying until you click Disconnect |
+
+Click the **✕** on the notification while it is still running to give up the attempt. Once the machine has been found, **Disconnect** in the toolbar does the same.
 
 ### USB Serial Connection
 
 1. Set the connection type to **USB** in the Machine Config dialog.
 2. Select the serial port from the dropdown (auto-populated from available ports), or type the path manually (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).
 3. The baud rate is fixed at **115200** (FluidNC standard).
-4. Click **Connect**.
+4. Click **Connect**. The notification reads **Connected** once the port is open.
 
 ### Disconnecting
 
@@ -931,6 +941,15 @@ Example header:
 
 While generation is running, a progress notification appears. Click the **✕** on the notification to cancel. The worker stops immediately.
 
+In a split job each file has a notification of its own. Cancelling one cancels the rest of the job: the files already written are kept, and the remaining ones — including any hatch files — are skipped.
+
+### When Generation Fails
+
+A failure is reported on the notification, and the **Generate** button becomes available again.
+
+- **G-code failed** — the reason is on the second line. In a split job the file that failed is skipped and the others are still generated.
+- **Could not save _filename_** — the file could not be written to your computer (the folder is read-only, or the disk is full). In a split job the remaining files are still written, and the file is still uploaded if **Upload to SD card** is selected.
+
 ---
 
 ## 11. The File Browser
@@ -965,11 +984,15 @@ For each file in the listing:
 - `.gcode` / `.nc` / `.g` / `.gc` / `.gco` / `.ngc` / `.ncc` / `.cnc` / `.tap` → filtered save dialog
 - All other file types → unfiltered save dialog
 
+A download is written to `<name>.part` beside the file you chose, and takes that name only once all of it has arrived. If the download fails or is cancelled, the partial file is removed; a file that was to be replaced is left as it was.
+
 ### Uploading Files
 
 Click the **↑ Upload** button in a section header to open a native file dialog (unrestricted file types). The file is uploaded to the current directory. The listing refreshes automatically after upload.
 
 Upload progress is shown in the notification stack. Uploads can be cancelled via the notification's ✕ button.
+
+An upload or download that stops moving for 60 seconds is given up, with a **stalled** error on its notification, instead of waiting for ever.
 
 **Auto-refresh:** The file listing refreshes automatically after an upload, and also whenever FluidNC emits a `[MSG:Files changed]` console message.
 
@@ -1152,11 +1175,24 @@ All long-running operations appear as **notifications** stacked in the top-right
 
 ### Cancellable Tasks
 
-| Task              | Cancel mechanism                       |
-| ----------------- | -------------------------------------- |
-| G-code generation | Direct message to Web Worker (instant) |
-| File upload       | IPC cancel via main process            |
-| File download     | IPC cancel via main process            |
+| Task              | Cancel mechanism                                              |
+| ----------------- | ------------------------------------------------------------- |
+| G-code generation | The Web Worker is stopped (instant); a split job stops there  |
+| File upload       | IPC cancel via main process                                   |
+| File download     | IPC cancel via main process; the partial file is removed      |
+| Wi-Fi connection  | Until the machine's first message arrives; disconnects        |
+
+### Unexpected Errors
+
+If something fails that terraForge was not expecting, an **Unexpected error — see console** notification appears and the full message is written to the console panel with a `[terraForge]` prefix. There is only ever one of these notifications; it shows the most recent error, and the console has them all.
+
+If part of the window fails to draw, that panel alone is replaced by a short message — "The file browser hit an error." — with a **Retry** button. The rest of the window, the job controls included, keeps working.
+
+If the whole window fails, a **terraForge hit an error** screen takes its place:
+
+- **Try again** redraws the app. Your layout is still in memory, so this is the way back to saving it.
+- **Reload window** starts afresh, and discards unsaved layout changes.
+- **Pause job** and **Abort job** are offered while a machine is connected. The machine does not stop because the window failed.
 
 ---
 
@@ -1264,6 +1300,12 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 - Try using the IP address instead of `fluidnc.local` (mDNS can be unreliable on some networks).
 - For USB: check the serial port path; on Windows check Device Manager.
 
+**"No response from _host_" notification:**
+
+- The machine answered over HTTP but has sent nothing over its WebSocket for 20 seconds.
+- terraForge keeps retrying; the notification changes to **Connected** if the machine answers. Click **Disconnect** to stop.
+- Check whether your FluidNC firmware needs an explicit WebSocket port (`81` for older ESP3D builds).
+
 **Amber pulsing dot after connecting:**
 
 - The HTTP connection succeeded but the WebSocket is not yet active.
@@ -1353,6 +1395,11 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 - The SD card may be full or not inserted.
 - Check SD card status in the File Browser SDCARD section.
 
+**"Upload stalled" or "Download stalled":**
+
+- No data moved for 60 seconds, so the transfer was given up. The machine may have gone out of Wi-Fi range or be busy.
+- Check the connection indicator, then try again. A stalled download leaves no partial file behind.
+
 ---
 
 ### Console Issues
@@ -1366,6 +1413,20 @@ Paths that keep their own SVG colours (with **Show imported SVG colours on canva
 
 - Ensure the machine is not in **Alarm** state.
 - Try clearing the alarm with `$X`, then resend.
+
+---
+
+### Application Errors
+
+**A panel shows "… hit an error." with a Retry button:**
+
+- That panel failed to draw; the rest of the window still works. Click **Retry**.
+- If it fails again, save your layout (**Ctrl+S**) and restart terraForge. The message is also in the console panel — include it in a bug report.
+
+**"terraForge hit an error" fills the window:**
+
+- Click **Try again** first: it keeps your layout. Use **Reload window** only if the error returns.
+- If a job is running, **Pause job** and **Abort job** on that screen still reach the machine.
 
 ---
 

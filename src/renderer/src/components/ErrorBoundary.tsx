@@ -2,8 +2,11 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  /** Rendered in place of the children once a render below has thrown. */
-  fallback: (error: Error) => ReactNode;
+  /**
+   * Rendered in place of the children once a render below has thrown.
+   * `reset` renders the children again — for a "Retry" button.
+   */
+  fallback: (error: Error, reset: () => void) => ReactNode;
   /** Called on capture — for logging; the boundary already handles display. */
   onError?: (error: Error, info: ErrorInfo) => void;
 }
@@ -22,9 +25,9 @@ interface ErrorBoundaryState {
  * but validation and rendering are separate code paths and only one of them
  * is allowed to be wrong in a way the user can recover from.
  *
- * A boundary keeps showing its fallback until it is remounted, so give it a
- * `key` tied to whatever the user would change to recover (for a plugin, its
- * renderer id).
+ * A boundary keeps showing its fallback until it is reset or remounted: have
+ * the fallback offer `reset`, or give the boundary a `key` tied to whatever
+ * the user would change to recover (for a plugin, its renderer id).
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
@@ -38,8 +41,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error("Render error contained by ErrorBoundary:", error, info.componentStack);
   }
 
+  /** Renders the children again. If they throw again, so be it. */
+  private reset = (): void => this.setState({ error: null });
+
   render(): ReactNode {
     const { error } = this.state;
-    return error ? this.props.fallback(error) : this.props.children;
+    return error ? this.props.fallback(error, this.reset) : this.props.children;
   }
 }

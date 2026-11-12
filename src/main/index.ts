@@ -3,6 +3,7 @@ import { basename, join } from "path";
 import { registerAppLifecycleHandlers } from "./bootstrap/lifecycle";
 import { createMainWindow, getMainWindow, safeSend } from "./bootstrap/window";
 import { confirmQuit, guardWindowClose, registerUnsavedChangesHandlers } from "./bootstrap/unsavedChanges";
+import { registerUnexpectedErrorHandlers } from "./bootstrap/unexpectedErrors";
 import {
   buildApplicationMenu,
   registerMenuStateHandlers,
@@ -25,6 +26,16 @@ import { resolveRendererPluginsDir, resolveBundledExamplesDir } from "./plugins/
 import { RendererPluginRegistry } from "./plugins/pluginRegistry";
 import { PluginHostManager } from "./plugins/pluginHostManager";
 import { registerPluginScheme } from "./plugins/pluginSandbox";
+
+// First, so that a failure in anything below is reported.
+registerUnexpectedErrorHandlers({
+  safeSend,
+  windowCanShow: () => {
+    const win = getMainWindow();
+    // A window still loading has nothing listening yet.
+    return !!win && !win.isDestroyed() && !win.webContents.isDestroyed() && !win.webContents.isLoading();
+  },
+});
 
 // Must run before the app's `ready` event: Electron only accepts privileged
 // scheme registration that early, and the sandboxed plugin host pages are
