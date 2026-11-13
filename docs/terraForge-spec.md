@@ -104,30 +104,29 @@ UI feedback (spinner or progress bar)
 Code
 window.terraForge = {
 fluidnc: {
-getStatus, sendCommand,
+sendCommand,
 listFiles, listSDFiles, uploadFile, uploadGcode, downloadFile, fetchFileText, deleteFile,
 runFile, pauseJob, resumeJob, abortJob,
 connectWebSocket, disconnectWebSocket,
 onStatusUpdate, onConsoleMessage, onPing, onFirmwareInfo
 },
-serial: { listPorts, connect, disconnect, send, onData, onDisconnected },
+serial: { listPorts, connect, disconnect, onData, onDisconnected },
 fs: {
-openSvgDialog, openPdfDialog, openFileDialog, openGcodeDialog, openImportDialog,
+openFileDialog, openImportDialog,
 readFile, readFileBinary, writeFile,
 saveGcodeDialog, saveFileDialog, saveLayoutDialog, openLayoutDialog,
 chooseDirectory,
 onMenuImport, onMenuOpenLayout, onMenuSaveLayout, onMenuCloseLayout,
 setLayoutMenuState,
-loadConfigs, saveConfigs
+saveConfigs
 },
-jobs: { generateGcode },
 config: {
 getMachineConfigs, saveMachineConfig, deleteMachineConfig,
 exportConfigs, importConfigs,
 loadPageSizes, openPageSizesFile
 },
 tasks: { cancel, onTaskUpdate },
-app: { getVersion, openExternal, setUnsavedChanges, onMenuAbout },
+app: { getVersion, setUnsavedChanges, onMenuAbout },
 edit: { onMenuCopy, onMenuCut, onMenuPaste, onMenuSelectAll, setHasSelection }
 }
 All methods must be explicitly typed.
@@ -136,7 +135,7 @@ Paths and URLs from the renderer are not trusted:
 
 fs.readFile, fs.readFileBinary, fs.writeFile, fluidnc.uploadFile and fluidnc.downloadFile only accept a local path the user picked in a native file dialog during the current run (src/main/security/pathGrants.ts). A file picked in an open dialog may be read; a file named in a save dialog may be written and read back; files directly inside a folder from chooseDirectory may be written. Anything else is rejected. A new IPC method that takes a local path must apply the same check, and a new dialog must record what it returns.
 
-app.openExternal, and any link the window tries to open, only reaches the operating system for https: and mailto: URLs (src/main/security/externalLinks.ts).
+Any link the window tries to open only reaches the operating system for https: and mailto: URLs (src/main/security/externalLinks.ts). There is no IPC for opening a URL; the renderer uses an ordinary link and the main window hands it on.
 
 4. Data Models (Mandatory)
    MachineConfig

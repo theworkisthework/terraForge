@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => {
   return {
     handlers,
     getVersion: vi.fn(() => "1.2.3"),
-    openExternal: vi.fn(),
   };
 });
 
@@ -18,9 +17,6 @@ vi.mock("electron", () => ({
       mocks.handlers.set(channel, handler);
     }),
   },
-  shell: {
-    openExternal: mocks.openExternal,
-  },
 }));
 
 import { registerAppIpcHandlers } from "../../../src/main/ipc/app";
@@ -29,26 +25,17 @@ describe("registerAppIpcHandlers", () => {
   beforeEach(() => {
     mocks.handlers.clear();
     mocks.getVersion.mockClear();
-    mocks.openExternal.mockReset();
   });
 
-  it("registers version and external-open handlers", async () => {
+  it("answers the app's version", async () => {
     registerAppIpcHandlers();
 
     expect(await mocks.handlers.get("app:getVersion")?.()).toBe("1.2.3");
-    await mocks.handlers.get("app:openExternal")?.({}, "https://example.com/docs");
-
     expect(mocks.getVersion).toHaveBeenCalledTimes(1);
-    expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com/docs");
   });
 
-  it.each(["file:///etc/passwd", "http://example.com", "javascript:alert(1)", "smb://server/share", "not a url", "", undefined])(
-    "refuses to open %j",
-    async (url) => {
-      registerAppIpcHandlers();
-
-      await expect(mocks.handlers.get("app:openExternal")?.({}, url)).rejects.toThrow(/only https and mailto links/);
-      expect(mocks.openExternal).not.toHaveBeenCalled();
-    },
-  );
+  it("registers nothing else", () => {
+    registerAppIpcHandlers();
+    expect([...mocks.handlers.keys()]).toEqual(["app:getVersion"]);
+  });
 });

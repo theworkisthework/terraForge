@@ -32,7 +32,6 @@ export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
 function registerMachineHandlers({ fluidnc, serial, getConnectionType, setConnectionType }: FluidNCIpcOptions): void {
   const overSerial = () => getConnectionType() === "serial";
 
-  ipcMain.handle("fluidnc:getStatus", () => (overSerial() ? serial.sendCommand("?") : fluidnc.getStatus()));
 
   ipcMain.handle("fluidnc:sendCommand", (_e, cmd: string) => {
     const connType = getConnectionType();
@@ -84,12 +83,13 @@ function registerMachineHandlers({ fluidnc, serial, getConnectionType, setConnec
 }
 
 /** Uploads and downloads, each tracked as a cancellable background task. */
-function registerTransferHandlers({ fluidnc, safeSend, taskManager, pathGrants }: FluidNCIpcOptions): void {
+function registerTransferHandlers({ fluidnc, taskManager, pathGrants }: FluidNCIpcOptions): void {
   const transferAbortControllers = new Map<string, AbortController>();
 
   /**
    * Runs one transfer as a task: cancellable, with progress sent to the
-   * renderer, completed or failed at the end. Resolves only when the transfer
+   * renderer (the TaskManager's updates are forwarded as `task:update`),
+   * completed or failed at the end. Resolves only when the transfer
    * finished. A failure is rethrown and a cancelled transfer rejects too, so
    * a caller can never carry on (say, to run the file) as if it had arrived.
    */
@@ -103,16 +103,12 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager, pathGrants }
     transferAbortControllers.set(taskId, abortController);
     taskManager.registerCancelHandler(taskId, () => abortController.abort());
     taskManager.create(taskId, type, label);
-    const onProgress = (progress: number) => {
-      taskManager.update(taskId, { progress });
-      safeSend("task:update", taskManager.get(taskId));
-    };
+    const onProgress = (progress: number) => taskManager.update(taskId, { progress });
     try {
       await transfer(onProgress, abortController.signal);
     } catch (err: unknown) {
       if (!taskManager.isCancelled(taskId)) {
         taskManager.fail(taskId, String(err));
-        safeSend("task:update", taskManager.get(taskId));
         throw err;
       }
     } finally {
@@ -123,7 +119,6 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager, pathGrants }
     // the task already reads "cancelled", and the caller must not proceed.
     if (taskManager.isCancelled(taskId)) throw new Error("Transfer cancelled");
     taskManager.complete(taskId);
-    safeSend("task:update", taskManager.get(taskId));
   };
 
   ipcMain.handle("fluidnc:uploadGcode", async (_e, taskId: string, content: string, remotePath: string) => {
@@ -193,5 +188,4 @@ function registerSerialHandlers({ serial, getConnectionType, setConnectionType, 
     await serial.disconnect();
   });
 
-  ipcMain.handle("serial:send", (_e, data: string) => serial.send(data));
 }
