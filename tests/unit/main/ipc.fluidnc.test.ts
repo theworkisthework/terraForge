@@ -15,7 +15,9 @@ vi.mock("electron", () => ({
   },
 }));
 
+import { resolve } from "path";
 import { registerFluidncIpcHandlers } from "../../../src/main/ipc/fluidnc";
+import { createPathGrants } from "../../../src/main/security/pathGrants";
 
 describe("registerFluidncIpcHandlers", () => {
   beforeEach(() => {
@@ -73,6 +75,12 @@ describe("registerFluidncIpcHandlers", () => {
       clearCancelHandler: vi.fn(),
     };
 
+    // As if the user had picked these in the file dialogs.
+    const pathGrants = createPathGrants();
+    pathGrants.grantRead("local.gcode");
+    pathGrants.grantWrite("downloaded.gcode");
+    pathGrants.grantWrite("out.gcode");
+
     const safeSend = vi.fn();
     const setConnectionType = vi.fn((type: "wifi" | "serial" | null) => {
       connectionType = type;
@@ -85,9 +93,11 @@ describe("registerFluidncIpcHandlers", () => {
       setConnectionType,
       safeSend,
       taskManager: taskManager as any,
+      pathGrants,
     });
 
     return {
+      pathGrants,
       fluidnc,
       serial,
       taskManager,
@@ -360,6 +370,43 @@ describe("registerFluidncIpcHandlers", () => {
     });
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-3");
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-4");
+  });
+
+  it("hands the transfer the full path of the file the user picked", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+    deps.fluidnc.downloadFile.mockResolvedValue(undefined);
+
+    await mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-3", "local.gcode", "/remote.gcode");
+    await mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-4", "/remote.gcode", "downloaded.gcode", "sdcard");
+
+    expect(deps.fluidnc.uploadFile.mock.calls[0][0]).toBe(resolve("local.gcode"));
+    expect(deps.fluidnc.downloadFile.mock.calls[0][1]).toBe(resolve("downloaded.gcode"));
+  });
+
+  it("refuses to upload a file the user did not pick, without starting a task", async () => {
+    const deps = buildDeps();
+
+    await expect(
+      mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-3", "/etc/passwd", "/remote.gcode"),
+    ).rejects.toThrow(/not chosen in a file dialog/);
+
+    expect(deps.fluidnc.uploadFile).not.toHaveBeenCalled();
+    expect(deps.taskManager.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses to download over a file the user did not pick, or one picked only for opening", async () => {
+    const deps = buildDeps();
+
+    await expect(
+      mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-4", "/remote.gcode", "elsewhere.gcode", "sdcard"),
+    ).rejects.toThrow(/not chosen in a file dialog/);
+    await expect(
+      mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-5", "/remote.gcode", "local.gcode", "sdcard"),
+    ).rejects.toThrow(/not chosen in a file dialog/);
+
+    expect(deps.fluidnc.downloadFile).not.toHaveBeenCalled();
+    expect(deps.taskManager.create).not.toHaveBeenCalled();
   });
 
   it("rejects uploadFile and downloadFile when the transfer fails", async () => {

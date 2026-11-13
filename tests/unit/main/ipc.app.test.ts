@@ -36,9 +36,19 @@ describe("registerAppIpcHandlers", () => {
     registerAppIpcHandlers();
 
     expect(await mocks.handlers.get("app:getVersion")?.()).toBe("1.2.3");
-    await mocks.handlers.get("app:openExternal")?.({}, "https://example.com");
+    await mocks.handlers.get("app:openExternal")?.({}, "https://example.com/docs");
 
     expect(mocks.getVersion).toHaveBeenCalledTimes(1);
-    expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com");
+    expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com/docs");
   });
+
+  it.each(["file:///etc/passwd", "http://example.com", "javascript:alert(1)", "smb://server/share", "not a url", "", undefined])(
+    "refuses to open %j",
+    async (url) => {
+      registerAppIpcHandlers();
+
+      await expect(mocks.handlers.get("app:openExternal")?.({}, url)).rejects.toThrow(/only https and mailto links/);
+      expect(mocks.openExternal).not.toHaveBeenCalled();
+    },
+  );
 });

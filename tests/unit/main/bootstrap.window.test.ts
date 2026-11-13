@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type WindowOpenHandler = (details: { url: string }) => { action: string };
+type NavigateHandler = (event: { url: string; preventDefault: () => void }) => void;
 
 const mocks = vi.hoisted(() => {
   const instances: any[] = [];
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => {
     onceHandlers = new Map<string, () => void>();
     onHandlers = new Map<string, () => void>();
     openHandler: WindowOpenHandler | null = null;
+    navigateHandler: NavigateHandler | null = null;
     webContents: any;
     show: ReturnType<typeof vi.fn>;
     loadURL: ReturnType<typeof vi.fn>;
@@ -28,6 +30,10 @@ const mocks = vi.hoisted(() => {
         setWindowOpenHandler: vi.fn((handler: WindowOpenHandler) => {
           this.openHandler = handler;
         }),
+        on: vi.fn((event: string, handler: NavigateHandler) => {
+          if (event === "will-navigate") this.navigateHandler = handler;
+        }),
+        getURL: vi.fn(() => mocks.currentUrl),
       };
       instances.push(this);
     }
@@ -50,8 +56,10 @@ const mocks = vi.hoisted(() => {
     instances,
     /** What loading the window's page comes to. */
     loadResult: vi.fn((): Promise<void> => Promise.resolve()),
+    /** The page the window has loaded. */
+    currentUrl: "file:///opt/terraForge/out/renderer/index.html",
     BrowserWindow: MockBrowserWindow,
-    openExternal: vi.fn(),
+    openExternal: vi.fn((_url: string): Promise<void> => Promise.resolve()),
   };
 });
 
@@ -74,6 +82,8 @@ describe("main window bootstrap", () => {
   beforeEach(() => {
     mocks.instances.length = 0;
     mocks.openExternal.mockReset();
+    mocks.openExternal.mockResolvedValue(undefined);
+    mocks.currentUrl = "file:///opt/terraForge/out/renderer/index.html";
     delete process.env.ELECTRON_RENDERER_URL;
   });
 
@@ -126,14 +136,113 @@ describe("main window bootstrap", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-  it("denies external window opens and clears mainWindow on close", () => {
+  it("runs the window sandboxed, isolated and without Node", () => {
     const win = createMainWindow() as any;
 
-    const result = win.openHandler?.({ url: "https://example.com" });
-    expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com");
+    expect(win.options.webPreferences).toMatchObject({
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+    });
+  });
+
+  it("opens a link in the browser instead of a new window, and clears mainWindow on close", () => {
+    const win = createMainWindow() as any;
+
+    const result = win.openHandler?.({ url: "https://example.com/docs" });
+    expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com/docs");
     expect(result).toEqual({ action: "deny" });
 
     win.trigger("closed");
     expect(getMainWindow()).toBeNull();
+  });
+
+  it.each(["file:///etc/passwd", "http://example.com", "javascript:alert(1)", "smb://server/share", "about:blank"])(
+    "opens neither a window nor the browser for %s",
+    (url) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const win = createMainWindow() as any;
+
+      expect(win.openHandler?.({ url })).toEqual({ action: "deny" });
+      expect(mocks.openExternal).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(url));
+      warn.mockRestore();
+    },
+  );
+
+  it("does not let a link that fails to open become an unhandled rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Left unhandled, this rejection would fail the test run.
+    mocks.openExternal.mockRejectedValueOnce(new Error("no browser"));
+    const win = createMainWindow() as any;
+
+    win.openHandler?.({ url: "https://example.com/" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("https://example.com/"), expect.any(Error));
+    warn.mockRestore();
+  });
+
+  describe("navigation", () => {
+    const navigate = (win: any, url: string) => {
+      const event = { url, preventDefault: vi.fn() };
+      win.navigateHandler?.(event);
+      return event;
+    };
+
+    it("lets the window reload its own page", () => {
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, mocks.currentUrl).preventDefault).not.toHaveBeenCalled();
+      expect(navigate(win, `${mocks.currentUrl}#section`).preventDefault).not.toHaveBeenCalled();
+      expect(mocks.openExternal).not.toHaveBeenCalled();
+    });
+
+    it("lets the dev server's page reload", () => {
+      mocks.currentUrl = "http://localhost:5173/";
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, "http://localhost:5173/").preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("keeps the window on the app when a file is dropped on it", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, "file:///home/user/drawing.svg").preventDefault).toHaveBeenCalledTimes(1);
+      expect(mocks.openExternal).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it("keeps the window on the app and sends a web link to the browser", () => {
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, "https://example.com/docs").preventDefault).toHaveBeenCalledTimes(1);
+      expect(mocks.openExternal).toHaveBeenCalledWith("https://example.com/docs");
+    });
+
+    it.each([
+      "file:///opt/terraForge/out/renderer/other.html",
+      "file:///opt/terraForge/out/renderer/index.html?x=1",
+      "http://localhost:5173/",
+      "javascript:alert(1)",
+      "not a url",
+    ])("blocks %s", (url) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, url).preventDefault).toHaveBeenCalledTimes(1);
+      expect(mocks.openExternal).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it("blocks everything before a page has loaded", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mocks.currentUrl = "";
+      const win = createMainWindow() as any;
+
+      expect(navigate(win, "file:///opt/terraForge/out/renderer/index.html").preventDefault).toHaveBeenCalledTimes(1);
+      warn.mockRestore();
+    });
   });
 });

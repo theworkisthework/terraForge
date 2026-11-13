@@ -26,6 +26,7 @@ import { resolveRendererPluginsDir, resolveBundledExamplesDir } from "./plugins/
 import { RendererPluginRegistry } from "./plugins/pluginRegistry";
 import { PluginHostManager } from "./plugins/pluginHostManager";
 import { registerPluginScheme } from "./plugins/pluginSandbox";
+import { createPathGrants } from "./security/pathGrants";
 
 // First, so that a failure in anything below is reported.
 registerUnexpectedErrorHandlers({
@@ -90,6 +91,10 @@ const rendererPluginHostManager = new PluginHostManager(
   rendererPluginRegistry,
 );
 
+// The files the user has picked in a file dialog this run: the only ones the
+// window may have read, written, uploaded or downloaded to.
+const pathGrants = createPathGrants();
+
 // Tracks which transport is currently active so IPC handlers can route correctly.
 const connectionState = { type: null as "wifi" | "serial" | null };
 
@@ -135,12 +140,14 @@ registerFluidncIpcHandlers({
   },
   safeSend,
   taskManager,
+  pathGrants,
 });
 
 registerFsIpcHandlers({
   getMainWindow,
   loadConfigs: persistence.loadConfigs,
   saveConfigs: persistence.saveConfigs,
+  pathGrants,
 });
 
 // ─── IPC Handlers — Tasks ─────────────────────────────────────────────────────
