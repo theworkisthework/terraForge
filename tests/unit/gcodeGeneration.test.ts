@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { approximateObjectSubpaths, collectGeometry, remapLayerMetadata } from "../../src/workers/generation/collect";
-import { resolveGenerationSettings } from "../../src/workers/generation/document";
+import { emitHeader, resolveGenerationSettings } from "../../src/workers/generation/document";
 import { createGcodeOptions, createMachineConfig, createVectorObject } from "../helpers/factories";
 
 const config = createMachineConfig({ origin: "bottom-left", bedWidth: 200, bedHeight: 200 });
@@ -104,5 +104,32 @@ describe("resolveGenerationSettings pen delays", () => {
   it("draws at the job's speed override when set", () => {
     expect(resolveGenerationSettings(config, createGcodeOptions({ drawSpeedOverride: 1234 })).drawSpeed).toBe(1234);
     expect(resolveGenerationSettings(config, undefined).drawSpeed).toBe(config.drawSpeed);
+  });
+});
+
+describe("bed mesh G-code metadata", () => {
+  it("keeps imported mesh names on a single safe comment line", () => {
+    const mesh = {
+      version: 1 as const,
+      name: "mesh\r\nG0 Z-100\n;",
+      xPoints: 2,
+      yPoints: 2,
+      widthMM: 10,
+      heightMM: 10,
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 10, y: 0, z: 0 },
+        { x: 0, y: 10, z: 0 },
+        { x: 10, y: 10, z: 0 },
+      ],
+      createdAt: "",
+    };
+    const settings = resolveGenerationSettings(config, createGcodeOptions({ bedMesh: mesh }));
+    const lines: string[] = [];
+
+    emitHeader(lines, config, createGcodeOptions(), settings);
+
+    expect(lines).toContain("; Bed mesh : yes (mesh G0 Z-100 ;)");
+    expect(lines.some((line) => line === "G0 Z-100")).toBe(false);
   });
 });

@@ -251,6 +251,43 @@ describe("MachineConfigDialog", () => {
     expect(screen.getByText("usb")).toBeInTheDocument();
   });
 
+  describe("bed mesh calibration", () => {
+    async function openBedMesh() {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByRole("button", { name: "Bed Mesh Compensation" }));
+    }
+
+    it("explains how to create a mesh while disconnected and leaves profile loading available", async () => {
+      await openBedMesh();
+
+      expect(screen.getByText(/connect the active machine/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Calibrate grid" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Load mesh JSON" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Bed Mesh Compensation" })).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("offers positioning controls in the calibration setup wizard and keeps dialogs in the viewport", async () => {
+      useMachineStore.setState({ connected: true });
+      await openBedMesh();
+      await userEvent.click(screen.getByRole("button", { name: "Calibrate grid" }));
+
+      expect(screen.getByText("Position the machine")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Jog X negative 1 mm" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Set XY zero" })).toBeEnabled();
+
+      await userEvent.click(screen.getByRole("button", { name: "Use current position" }));
+      const startModal = screen.getByText("Start bed mesh calibration?").parentElement;
+      expect(startModal).toHaveClass("max-h-[calc(100dvh-2rem)]", "overflow-y-auto");
+      expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
+    });
+
+    it("uses aligned two-column fields for grid dimensions", async () => {
+      await openBedMesh();
+      expect(screen.getByLabelText("X grid points").closest("label")).toHaveClass("flex", "flex-col", "gap-1");
+      expect(screen.getByLabelText("Y grid points").closest("label")).toHaveClass("flex", "flex-col", "gap-1");
+    });
+  });
+
   // ── Add new config ──────────────────────────────────────────────────────
 
   it("clicking + New shows 'New Machine' in sidebar", async () => {

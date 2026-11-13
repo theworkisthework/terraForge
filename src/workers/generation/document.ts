@@ -2,7 +2,7 @@
  * The parts of a G-code job around the drawing itself: the settings it is
  * generated with, the header that records them, and the job's start and end.
  */
-import type { GcodeOptions, InkServiceSettings, MachineConfig } from "../../types";
+import type { BedMesh, GcodeOptions, InkServiceSettings, MachineConfig } from "../../types";
 import { isSolenoidPenType } from "../../types";
 
 export interface GenerationSettings {
@@ -20,6 +20,7 @@ export interface GenerationSettings {
   penUpDelayMs: number;
   /** Feedrate for drawing moves, mm/min. */
   drawSpeed: number;
+  bedMesh: BedMesh | undefined;
 }
 
 /** A pen settle or lift delay: the job's override if set, else the
@@ -48,6 +49,7 @@ export function resolveGenerationSettings(config: MachineConfig, options: GcodeO
     penDownDelayMs: penDelayMs(options?.penDownDelayMsOverride, config.penDownDelayMs, config),
     penUpDelayMs: penDelayMs(options?.penUpDelayMsOverride, config.penUpDelayMs, config),
     drawSpeed: typeof options?.drawSpeedOverride === "number" ? options.drawSpeedOverride : config.drawSpeed,
+    bedMesh: options?.bedMesh,
   };
 }
 
@@ -79,6 +81,8 @@ export function emitHeader(
   lines.push(`; Joined   : ${settings.join ? `yes (tolerance ${settings.joinTolerance} mm)` : "no"}`);
   lines.push(`; Lift end : ${settings.liftPenAtEnd ? "yes" : "no"}`);
   lines.push(`; Ret home : ${settings.returnToHome ? "yes" : "no"}`);
+  const meshName = settings.bedMesh?.name.replace(/[\r\n]+/g, " ");
+  lines.push(`; Bed mesh : ${settings.bedMesh ? `yes (${meshName})` : "no"}`);
   lines.push(`; Pen delay: ${settings.penDownDelayMs} ms`);
   lines.push(`; Pen up delay: ${settings.penUpDelayMs} ms`);
   const vinyl = options?.vinylCutting;

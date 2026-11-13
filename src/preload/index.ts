@@ -123,6 +123,9 @@ const fs: TerraForgeAPI["fs"] = {
   saveLayoutDialog: (defaultName) =>
     invoke<string | null>("fs:saveLayoutDialog", defaultName),
   openLayoutDialog: () => invoke<string | null>("fs:openLayoutDialog"),
+  saveBedMeshDialog: (defaultName) =>
+    invoke<string | null>("fs:saveBedMeshDialog", defaultName),
+  openBedMeshDialog: () => invoke<string | null>("fs:openBedMeshDialog"),
   chooseDirectory: () => invoke<string | null>("fs:chooseDirectory"),
 
   onMenuImport: (cb) => {

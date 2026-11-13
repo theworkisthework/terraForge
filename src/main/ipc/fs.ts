@@ -184,6 +184,28 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     return picked(result);
   });
 
+  ipcMain.handle("fs:saveBedMeshDialog", async (_e, defaultName: string) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: "Save Bed Mesh Profile",
+      defaultPath: defaultName.endsWith(".json") ? defaultName : `${defaultName}.json`,
+      filters: [{ name: "Bed Mesh JSON", extensions: ["json"] }],
+    });
+    return pickedForSaving(result);
+  });
+
+  ipcMain.handle("fs:openBedMeshDialog", async () => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: "Import Bed Mesh Profile",
+      filters: [{ name: "Bed Mesh JSON", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    return picked(result);
+  });
+
   ipcMain.handle("fs:chooseDirectory", async () => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
