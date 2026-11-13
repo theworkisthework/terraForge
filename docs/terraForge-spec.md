@@ -132,6 +132,12 @@ edit: { onMenuCopy, onMenuCut, onMenuPaste, onMenuSelectAll, setHasSelection }
 }
 All methods must be explicitly typed.
 
+Paths and URLs from the renderer are not trusted:
+
+fs.readFile, fs.readFileBinary, fs.writeFile, fluidnc.uploadFile and fluidnc.downloadFile only accept a local path the user picked in a native file dialog during the current run (src/main/security/pathGrants.ts). A file picked in an open dialog may be read; a file named in a save dialog may be written and read back; files directly inside a folder from chooseDirectory may be written. Anything else is rejected. A new IPC method that takes a local path must apply the same check, and a new dialog must record what it returns.
+
+app.openExternal, and any link the window tries to open, only reaches the operating system for https: and mailto: URLs (src/main/security/externalLinks.ts).
+
 4. Data Models (Mandatory)
    MachineConfig
    Code
@@ -624,6 +630,12 @@ Never invent FluidNC endpoints
 Never block the renderer
 
 Never mix Node APIs into the renderer
+
+The main window runs sandboxed (sandbox: true, contextIsolation: true, nodeIntegration: false); its preload may only use contextBridge and ipcRenderer
+
+The main window never navigates away from the app and never opens a second window: will-navigate is cancelled for anything but a reload, and window.open is denied (an https: or mailto: link is handed to the browser instead)
+
+Never read, write or open something on the renderer's say-so alone: local paths must come from a file dialog, URLs must be https: or mailto:
 
 Always provide complete file examples when generating code
 

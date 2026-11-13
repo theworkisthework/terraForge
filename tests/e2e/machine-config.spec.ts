@@ -210,16 +210,21 @@ test("changing pen type updates pen command defaults", async () => {
   const penSelects = formArea(window).locator("select");
   // Origin is the first select, pen type is the second
   const penTypeSelect = penSelects.nth(1);
+  // Customise the pen-up command first, so that the app always asks before
+  // loading the new type's defaults. Without this the question depends on
+  // what the machine happened to be configured with.
+  await formArea(window).locator("input.font-mono").first().fill("M3S123");
   await penTypeSelect.selectOption("servo");
 
-  // The app may show a custom ConfirmDialog (not window.confirm) if commands were customised.
-  // Accept it if it appears, otherwise proceed.
-  const confirmResetBtn = window.locator(
-    '[role="dialog"] button:has-text("Reset")',
-  );
-  if (await confirmResetBtn.isVisible({ timeout: 800 })) {
-    await confirmResetBtn.click();
-  }
+  // The commands were customised, so the app asks before loading the new
+  // type's defaults, in a ConfirmDialog (not window.confirm). Only its own
+  // "Reset" button is meant: the form has a "↺ Reset to defaults" button
+  // too, and a looser match finds both.
+  const confirmReset = window
+    .getByRole("dialog", { name: "Reset Pen Commands?" })
+    .getByRole("button", { name: "Reset", exact: true });
+  await confirmReset.waitFor({ state: "visible", timeout: 5000 });
+  await confirmReset.click();
 
   // Wait for re-render
   await window.waitForTimeout(500);

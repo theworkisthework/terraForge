@@ -5,6 +5,7 @@ import { writeFile, unlink } from "fs/promises";
 import { FluidNCClient } from "../../machine/fluidnc";
 import { SerialClient } from "../../machine/serial";
 import { TaskManager } from "../../tasks/taskManager";
+import type { PathGrants } from "../security/pathGrants";
 
 export interface FluidNCIpcOptions {
   fluidnc: FluidNCClient;
@@ -13,6 +14,8 @@ export interface FluidNCIpcOptions {
   setConnectionType: (type: "wifi" | "serial" | null) => void;
   safeSend: (channel: string, ...args: unknown[]) => void;
   taskManager: TaskManager;
+  /** The local files the window may upload from and download to. */
+  pathGrants: PathGrants;
 }
 
 export function registerFluidncIpcHandlers(options: FluidNCIpcOptions): void {
@@ -81,7 +84,7 @@ function registerMachineHandlers({ fluidnc, serial, getConnectionType, setConnec
 }
 
 /** Uploads and downloads, each tracked as a cancellable background task. */
-function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpcOptions): void {
+function registerTransferHandlers({ fluidnc, safeSend, taskManager, pathGrants }: FluidNCIpcOptions): void {
   const transferAbortControllers = new Map<string, AbortController>();
 
   /**
@@ -140,18 +143,24 @@ function registerTransferHandlers({ fluidnc, safeSend, taskManager }: FluidNCIpc
     }
   });
 
-  ipcMain.handle("fluidnc:uploadFile", (_e, taskId: string, localPath: string, remotePath: string) =>
-    trackTransfer(taskId, "file-upload", `Uploading ${remotePath}`, (onProgress, signal) =>
-      fluidnc.uploadFile(localPath, remotePath, onProgress, undefined, signal),
-    ),
-  );
+  // The local end of a transfer is a path from the window, held to the same
+  // rule as `fs:readFile` and `fs:writeFile`: the user picked it in a dialog.
+  // Checked before the task starts, so a refusal is not reported as a transfer.
+  ipcMain.handle("fluidnc:uploadFile", async (_e, taskId: string, localPath: unknown, remotePath: string) => {
+    const source = pathGrants.check(localPath, "read");
+    await trackTransfer(taskId, "file-upload", `Uploading ${remotePath}`, (onProgress, signal) =>
+      fluidnc.uploadFile(source, remotePath, onProgress, undefined, signal),
+    );
+  });
 
   ipcMain.handle(
     "fluidnc:downloadFile",
-    (_e, taskId: string, remotePath: string, localPath: string, filesystem?: "internal" | "sdcard") =>
-      trackTransfer(taskId, "file-download", `Downloading ${remotePath}`, (onProgress, signal) =>
-        fluidnc.downloadFile(remotePath, localPath, filesystem, onProgress, signal),
-      ),
+    async (_e, taskId: string, remotePath: string, localPath: unknown, filesystem?: "internal" | "sdcard") => {
+      const destination = pathGrants.check(localPath, "write");
+      await trackTransfer(taskId, "file-download", `Downloading ${remotePath}`, (onProgress, signal) =>
+        fluidnc.downloadFile(remotePath, destination, filesystem, onProgress, signal),
+      );
+    },
   );
 }
 

@@ -1,5 +1,6 @@
-import { BrowserWindow, shell } from "electron";
+import { BrowserWindow } from "electron";
 import { join } from "path";
+import { isAllowedExternalUrl, openExternalUrl } from "../security/externalLinks";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -12,6 +13,28 @@ function resolveWindowIconPath(): string {
         ? "../../build/icon.icns"
         : "../../build/icon.png",
   );
+}
+
+/** Opens a link in the browser if it is a kind that may be; never throws. */
+function openLink(url: string): void {
+  if (!isAllowedExternalUrl(url)) {
+    console.warn(`Blocked a link the app does not open: ${url}`);
+    return;
+  }
+  void openExternalUrl(url).catch((err) => console.warn(`Could not open ${url}:`, err));
+}
+
+/** Whether `url` is the page already loaded — a reload, not a move elsewhere. */
+function isSamePage(url: string, current: string): boolean {
+  try {
+    const target = new URL(url);
+    const loaded = new URL(current);
+    target.hash = "";
+    loaded.hash = "";
+    return target.href === loaded.href;
+  } catch {
+    return false;
+  }
 }
 
 export function createMainWindow(): BrowserWindow {
@@ -28,7 +51,9 @@ export function createMainWindow(): BrowserWindow {
     titleBarStyle: "default",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
+      // The preload only uses `contextBridge` and `ipcRenderer`, which a
+      // sandboxed preload may; everything else goes through the main process.
+      sandbox: true,
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -38,9 +63,20 @@ export function createMainWindow(): BrowserWindow {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+  // The window only ever shows the app. A link that would open a new window
+  // goes to the browser instead, and nothing may take this window elsewhere:
+  // a page from anywhere else would be handed the preload's API. A file
+  // dropped on the window is the everyday case — Chromium would navigate to
+  // it. Reloading the app itself is still allowed.
+  const { webContents } = mainWindow;
+  webContents.setWindowOpenHandler(({ url }) => {
+    openLink(url);
     return { action: "deny" };
+  });
+  webContents.on("will-navigate", (event) => {
+    if (isSamePage(event.url, webContents.getURL())) return;
+    event.preventDefault();
+    openLink(event.url);
   });
 
   const loaded = process.env.ELECTRON_RENDERER_URL
