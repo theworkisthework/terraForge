@@ -100,6 +100,12 @@ npm run test:e2e     # Playwright E2E (builds first)
 npm run typecheck    # TypeScript strict check
 ```
 
+### Dependency cooldown
+
+[.npmrc](.npmrc) sets `min-release-age=7`: when npm chooses versions (`npm install <pkg>`, `npm update`), it ignores releases published less than 7 days ago, which leaves time for a bad release to be noticed and pulled. `npm ci` installs exactly what `package-lock.json` says and is not affected, so CI and releases do not depend on it. It takes a recent npm (the setting arrived in the npm 11 line, around 11.10); an older npm will not apply it, so run `npm config get min-release-age` to check that yours does.
+
+To take a fresh release deliberately, such as a security fix, exempt that package in `.npmrc` (`min-release-age-exclude[]=<package>`) or run the install once with `--min-release-age=0`.
+
 ### Distributable packages
 
 ```sh
