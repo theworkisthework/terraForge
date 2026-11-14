@@ -883,7 +883,6 @@ export interface MachineStatus {
 // ─── IPC / Preload API Contract ───────────────────────────────────────────────
 
 export interface FluidNCApi {
-  getStatus: () => Promise<MachineStatus>;
   sendCommand: (cmd: string) => Promise<string>;
   listFiles: (path?: string) => Promise<RemoteFile[]>;
   listSDFiles: (path?: string) => Promise<RemoteFile[]>;
@@ -940,7 +939,6 @@ export interface SerialApi {
   listPorts: () => Promise<string[]>;
   connect: (path: string, baudRate?: number) => Promise<void>;
   disconnect: () => Promise<void>;
-  send: (data: string) => Promise<void>;
   onData: (cb: (data: string) => void) => () => void;
   /**
    * The serial port closed on its own (cable unplugged, device reset), with
@@ -950,10 +948,7 @@ export interface SerialApi {
 }
 
 export interface FsApi {
-  openSvgDialog: () => Promise<string | null>;
-  openPdfDialog: () => Promise<string | null>;
   openFileDialog: () => Promise<string | null>;
-  openGcodeDialog: () => Promise<string | null>;
   openImportDialog: (opts?: { allowBitmap?: boolean }) => Promise<string | null>;
   readFile: (filePath: string) => Promise<string>;
   /** Read a file as raw bytes — required for binary formats such as PDF. */
@@ -972,22 +967,12 @@ export interface FsApi {
   onMenuCloseLayout: (cb: () => void) => () => void;
   /** Notify the main process whether the Save/Close Layout menu items should be enabled. */
   setLayoutMenuState: (hasImports: boolean) => void;
-  loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }
 
 export interface TasksApi {
   cancel: (taskId: string) => Promise<void>;
   onTaskUpdate: (cb: (task: BackgroundTask) => void) => () => void;
-}
-
-export interface JobsApi {
-  generateGcode: (
-    taskId: string,
-    objects: VectorObject[],
-    config: MachineConfig,
-    options: GcodeOptions,
-  ) => Promise<string>;
 }
 
 export interface ConfigApi {
@@ -1057,8 +1042,6 @@ export interface RendererPluginsApi {
 export interface AppApi {
   /** Returns the version string from package.json (via app.getVersion()). */
   getVersion: () => Promise<string>;
-  /** Open a URL in the system default browser. */
-  openExternal: (url: string) => Promise<void>;
   /**
    * Tell the main process whether the canvas has changes that are not in a
    * saved layout. While it does, closing the window or quitting asks first.
@@ -1089,7 +1072,6 @@ export interface TerraForgeAPI {
   serial: SerialApi;
   fs: FsApi;
   tasks: TasksApi;
-  jobs: JobsApi;
   config: ConfigApi;
   app: AppApi;
   edit: EditApi;

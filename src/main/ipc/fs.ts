@@ -45,7 +45,6 @@ function buildImportFilters(allowBitmap: boolean): typeof IMPORT_FILTERS {
 
 export interface FsIpcOptions {
   getMainWindow: () => BrowserWindow | null;
-  loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
   /**
    * The files the window may read and write. A dialog here adds what the
@@ -55,7 +54,7 @@ export interface FsIpcOptions {
 }
 
 export function registerFsIpcHandlers(options: FsIpcOptions): void {
-  const { getMainWindow, loadConfigs, saveConfigs, pathGrants } = options;
+  const { getMainWindow, saveConfigs, pathGrants } = options;
 
   /** The file picked in an open dialog, now readable. */
   const picked = (result: Electron.OpenDialogReturnValue): string | null | undefined => {
@@ -71,28 +70,6 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     if (result.filePath) pathGrants.grantWrite(result.filePath);
     return result.filePath;
   };
-
-  ipcMain.handle("fs:openSvgDialog", async () => {
-    const mainWindow = getMainWindow();
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: "Import SVG",
-      filters: [{ name: "SVG Files", extensions: ["svg"] }],
-      properties: ["openFile"],
-    });
-    return picked(result);
-  });
-
-  ipcMain.handle("fs:openPdfDialog", async () => {
-    const mainWindow = getMainWindow();
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: "Import PDF",
-      filters: [{ name: "PDF Files", extensions: ["pdf"] }],
-      properties: ["openFile"],
-    });
-    return picked(result);
-  });
 
   ipcMain.handle("fs:openFileDialog", async () => {
     const mainWindow = getMainWindow();
@@ -110,17 +87,6 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Import File",
       filters: buildImportFilters(opts?.allowBitmap ?? true),
-      properties: ["openFile"],
-    });
-    return picked(result);
-  });
-
-  ipcMain.handle("fs:openGcodeDialog", async () => {
-    const mainWindow = getMainWindow();
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: "Import G-code",
-      filters: [{ name: "G-code Files", extensions: GCODE_EXTENSIONS }],
       properties: ["openFile"],
     });
     return picked(result);
@@ -196,7 +162,6 @@ export function registerFsIpcHandlers(options: FsIpcOptions): void {
     return directory;
   });
 
-  ipcMain.handle("fs:loadConfigs", () => loadConfigs());
   ipcMain.handle("fs:saveConfigs", (_e, configs: MachineConfig[]) =>
     saveConfigs(configs),
   );

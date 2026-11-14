@@ -192,7 +192,7 @@
 
 - [x] **Sandboxed main window** — `sandbox: true` alongside `contextIsolation` and no Node integration; the preload uses only `contextBridge` and `ipcRenderer` (`main/bootstrap/window.ts`)
 - [x] **No navigation away from the app** — `will-navigate` is cancelled for anything but a reload of the app's own page, so a link or a file dropped on the window cannot replace the app; `window.open` is always denied
-- [x] **External links limited to `https:` and `mailto:`** — both the window's link handling and the `app:openExternal` IPC go through `main/security/externalLinks.ts`; any other scheme (`file:`, `http:`, custom protocol handlers) is refused
+- [x] **External links limited to `https:` and `mailto:`** — a link the window opens goes through `main/security/externalLinks.ts`; any other scheme (`file:`, `http:`, custom protocol handlers) is refused. The renderer has no IPC for opening a URL
 - [x] **File access limited to what the user picked** — `fs:readFile`, `fs:readFileBinary`, `fs:writeFile`, `fluidnc:uploadFile` and `fluidnc:downloadFile` reject any local path that did not come from a native file dialog in the current run (`main/security/pathGrants.ts`): open dialogs grant read, save dialogs grant write and read-back, the split-export folder grants writing files directly inside it
 
 ### Properties Panel
