@@ -28,7 +28,6 @@ describe("registerFluidncIpcHandlers", () => {
     let connectionType: "wifi" | "serial" | null = null;
 
     const fluidnc = {
-      getStatus: vi.fn(),
       sendCommand: vi.fn(),
       listFiles: vi.fn(),
       listSDFiles: vi.fn(),
@@ -110,18 +109,6 @@ describe("registerFluidncIpcHandlers", () => {
         serialListeners.get(event)?.(...args),
     };
   }
-
-  it("routes getStatus to serial when connection is serial, otherwise to fluidnc", async () => {
-    const deps = buildDeps();
-
-    deps.setCurrentType("serial");
-    await mocks.handlers.get("fluidnc:getStatus")?.();
-    expect(deps.serial.sendCommand).toHaveBeenCalledWith("?");
-
-    deps.setCurrentType("wifi");
-    await mocks.handlers.get("fluidnc:getStatus")?.();
-    expect(deps.fluidnc.getStatus).toHaveBeenCalled();
-  });
 
   it("routes commands and file operations to the active transport, with each one's defaults", async () => {
     const deps = buildDeps();
@@ -303,7 +290,21 @@ describe("registerFluidncIpcHandlers", () => {
       progress: 50,
     });
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-1");
-    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-1" });
+  });
+
+  it("leaves task:update to the TaskManager's forwarder, so each update is sent once", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+    deps.fluidnc.downloadFile.mockRejectedValue(new Error("download failed"));
+
+    await mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-1", "local.gcode", "/remote.gcode");
+    await expect(
+      mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-2", "/remote.gcode", "downloaded.gcode", "sdcard"),
+    ).rejects.toThrow("download failed");
+
+    expect(deps.taskManager.complete).toHaveBeenCalledWith("task-1");
+    expect(deps.taskManager.fail).toHaveBeenCalledWith("task-2", "Error: download failed");
+    expect(deps.safeSend.mock.calls.filter(([channel]) => channel === "task:update")).toEqual([]);
   });
 
   it("marks uploadGcode failures and rethrows the error", async () => {
@@ -323,7 +324,6 @@ describe("registerFluidncIpcHandlers", () => {
       "task-2",
       "Error: upload failed",
     );
-    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-2" });
   });
 
   it("tracks uploadFile and downloadFile task progress paths", async () => {

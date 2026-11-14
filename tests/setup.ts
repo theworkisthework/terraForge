@@ -128,7 +128,6 @@ if (typeof window !== "undefined") {
 if (typeof window !== "undefined") {
   const mockApi = {
     fluidnc: {
-      getStatus: vi.fn().mockResolvedValue(undefined),
       sendCommand: vi.fn().mockResolvedValue(undefined),
       listFiles: vi.fn().mockResolvedValue([]),
       listSDFiles: vi.fn().mockResolvedValue([]),
@@ -152,15 +151,11 @@ if (typeof window !== "undefined") {
       listPorts: vi.fn().mockResolvedValue([]),
       connect: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn().mockResolvedValue(undefined),
-      send: vi.fn().mockResolvedValue(undefined),
       onData: vi.fn().mockReturnValue(() => {}),
       onDisconnected: vi.fn().mockReturnValue(() => {}),
     },
     fs: {
-      openSvgDialog: vi.fn().mockResolvedValue(null),
-      openPdfDialog: vi.fn().mockResolvedValue(null),
       openFileDialog: vi.fn().mockResolvedValue(null),
-      openGcodeDialog: vi.fn().mockResolvedValue(null),
       openImportDialog: vi.fn().mockResolvedValue(null),
       readFile: vi.fn().mockResolvedValue(""),
       readFileBinary: vi.fn().mockResolvedValue(new Uint8Array()),
@@ -174,15 +169,11 @@ if (typeof window !== "undefined") {
       onMenuCloseLayout: vi.fn().mockReturnValue(() => {}),
       onMenuImport: vi.fn().mockReturnValue(() => {}),
       setLayoutMenuState: vi.fn(),
-      loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
     },
     tasks: {
       cancel: vi.fn().mockResolvedValue(undefined),
       onTaskUpdate: vi.fn().mockReturnValue(() => {}),
-    },
-    jobs: {
-      generateGcode: vi.fn().mockResolvedValue(""),
     },
     config: {
       getMachineConfigs: vi.fn().mockResolvedValue([]),
@@ -200,7 +191,6 @@ if (typeof window !== "undefined") {
     },
     app: {
       getVersion: vi.fn().mockResolvedValue("1.0.0"),
-      openExternal: vi.fn().mockResolvedValue(undefined),
       setUnsavedChanges: vi.fn(),
       onMenuAbout: vi.fn().mockReturnValue(() => {}),
     },

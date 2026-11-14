@@ -32,10 +32,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: npm run lint
 
+      # One run of the suite per OS. Coverage is collected on Linux only; the
+      # other two run the same tests without it.
       - name: Run unit & component tests
+        if: matrix.os != 'ubuntu-latest'
         run: npm test
 
-      - name: Run tests with coverage
+      - name: Run unit & component tests with coverage
+        if: matrix.os == 'ubuntu-latest'
         run: npm run test:coverage
 
       - name: Upload coverage report

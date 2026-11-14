@@ -44,13 +44,12 @@ describe("registerFsIpcHandlers", () => {
   it("returns null for open dialogs when no main window exists", async () => {
     registerFsIpcHandlers({
       getMainWindow: () => null,
-      loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       pathGrants: createPathGrants(),
     });
 
     await expect(
-      mocks.handlers.get("fs:openSvgDialog")?.(),
+      mocks.handlers.get("fs:openFileDialog")?.(),
     ).resolves.toBeNull();
     await expect(
       mocks.handlers.get("fs:openImportDialog")?.(),
@@ -58,7 +57,7 @@ describe("registerFsIpcHandlers", () => {
     expect(mocks.showOpenDialog).not.toHaveBeenCalled();
   });
 
-  it("passes expected import/gcode filters to open dialogs", async () => {
+  it("offers every supported import format, each with its own filter", async () => {
     mocks.showOpenDialog.mockResolvedValue({
       canceled: false,
       filePaths: ["chosen.file"],
@@ -66,7 +65,6 @@ describe("registerFsIpcHandlers", () => {
 
     registerFsIpcHandlers({
       getMainWindow: () => ({}) as any,
-      loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       pathGrants: createPathGrants(),
     });
@@ -74,14 +72,17 @@ describe("registerFsIpcHandlers", () => {
     await expect(mocks.handlers.get("fs:openImportDialog")?.()).resolves.toBe(
       "chosen.file",
     );
-    await expect(mocks.handlers.get("fs:openGcodeDialog")?.()).resolves.toBe(
-      "chosen.file",
-    );
 
-    expect(mocks.showOpenDialog.mock.calls[0][1].filters).toHaveLength(5);
-    expect(mocks.showOpenDialog.mock.calls[1][1].filters[0].name).toBe(
+    const filters = mocks.showOpenDialog.mock.calls[0][1].filters;
+    expect(filters).toHaveLength(5);
+    expect(filters.map((f: { name: string }) => f.name)).toEqual([
+      "Supported Files",
+      "SVG Files",
+      "PDF Files",
+      "Bitmap Files",
       "G-code Files",
-    );
+    ]);
+    expect(filters[4].extensions).toContain("gcode");
   });
 
   it("strips bitmap extensions from every filter when bitmap import is disabled", async () => {
@@ -92,7 +93,6 @@ describe("registerFsIpcHandlers", () => {
 
     registerFsIpcHandlers({
       getMainWindow: () => ({}) as any,
-      loadConfigs: vi.fn().mockResolvedValue([]),
       saveConfigs: vi.fn().mockResolvedValue(undefined),
       pathGrants: createPathGrants(),
     });
@@ -115,7 +115,6 @@ describe("registerFsIpcHandlers", () => {
     beforeEach(() => {
       registerFsIpcHandlers({
         getMainWindow: () => ({}) as any,
-        loadConfigs: vi.fn().mockResolvedValue([]),
         saveConfigs: vi.fn().mockResolvedValue(undefined),
         pathGrants: createPathGrants(),
       });
@@ -147,7 +146,7 @@ describe("registerFsIpcHandlers", () => {
       await expect(readFile(filePath, "utf-8")).resolves.toBe("saved");
     });
 
-    it.each(["fs:openSvgDialog", "fs:openPdfDialog", "fs:openFileDialog", "fs:openImportDialog", "fs:openGcodeDialog", "fs:openLayoutDialog"])(
+    it.each(["fs:openFileDialog", "fs:openImportDialog", "fs:openLayoutDialog"])(
       "%s makes its file readable",
       async (channel) => {
         const filePath = join(tempDir, "picked.in");
@@ -233,8 +232,7 @@ describe("registerFsIpcHandlers", () => {
     });
   });
 
-  it("delegates load/save configs and save dialog results", async () => {
-    const loadConfigs = vi.fn().mockResolvedValue([{ id: "cfg" }]);
+  it("delegates save configs and save dialog results", async () => {
     const saveConfigs = vi.fn().mockResolvedValue(undefined);
     mocks.showSaveDialog.mockResolvedValue({
       canceled: false,
@@ -243,7 +241,6 @@ describe("registerFsIpcHandlers", () => {
 
     registerFsIpcHandlers({
       getMainWindow: () => ({}) as any,
-      loadConfigs,
       saveConfigs,
       pathGrants: createPathGrants(),
     });
@@ -251,12 +248,8 @@ describe("registerFsIpcHandlers", () => {
     await expect(
       mocks.handlers.get("fs:saveGcodeDialog")?.({}, "job.gcode"),
     ).resolves.toBe("out.gcode");
-    await expect(mocks.handlers.get("fs:loadConfigs")?.()).resolves.toEqual([
-      { id: "cfg" },
-    ]);
     await mocks.handlers.get("fs:saveConfigs")?.({}, [{ id: "saved" }]);
 
-    expect(loadConfigs).toHaveBeenCalledTimes(1);
     expect(saveConfigs).toHaveBeenCalledWith([{ id: "saved" }]);
   });
 });

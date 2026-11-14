@@ -13,7 +13,6 @@ import { registerPushEventForwarders } from "./events";
 import {
   registerAppIpcHandlers,
   registerConfigIpcHandlers,
-  registerJobIpcHandlers,
   registerTaskIpcHandlers,
   registerFluidncIpcHandlers,
   registerFsIpcHandlers,
@@ -145,7 +144,6 @@ registerFluidncIpcHandlers({
 
 registerFsIpcHandlers({
   getMainWindow,
-  loadConfigs: persistence.loadConfigs,
   saveConfigs: persistence.saveConfigs,
   pathGrants,
 });
@@ -153,8 +151,6 @@ registerFsIpcHandlers({
 // ─── IPC Handlers — Tasks ─────────────────────────────────────────────────────
 
 registerTaskIpcHandlers(taskManager);
-
-registerJobIpcHandlers(taskManager, safeSend);
 
 // ─── IPC Handlers — Renderer plugins ───────────────────────────────────
 
