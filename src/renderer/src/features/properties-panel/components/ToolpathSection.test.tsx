@@ -112,4 +112,34 @@ describe("ToolpathSection", () => {
     );
     expect(onSetColorized).toHaveBeenCalledWith(false);
   });
+
+  it("opens the G-code preview from the file icon without toggling the row", () => {
+    const onToggleSelected = vi.fn();
+    (window as unknown as { terraForge: unknown }).terraForge = {
+      fs: { readFile: vi.fn().mockResolvedValue("G0 X1") },
+    };
+
+    render(
+      <ToolpathSection
+        toolpath={buildToolpath()}
+        fileName="sample.gcode"
+        source={{ path: "/sample.gcode", name: "sample.gcode", source: "local" }}
+        selected={false}
+        visible
+        colorized
+        opacity={1}
+        isJobActive={false}
+        fallbackFeedrate={300}
+        onToggleSelected={onToggleSelected}
+        onSetVisible={() => {}}
+        onSetColorized={() => {}}
+        onSetOpacity={() => {}}
+        onClear={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview G-code text" }));
+    expect(onToggleSelected).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
 });

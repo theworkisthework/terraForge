@@ -146,6 +146,7 @@ export function LayersPanelContent() {
               <ToolpathSection
                 toolpath={gcodeToolpath}
                 fileName={derived.toolpathFileName}
+                source={store.gcodeSource}
                 selected={toolpathSelected}
                 visible={store.toolpathVisible}
                 colorized={store.toolpathColorized}
