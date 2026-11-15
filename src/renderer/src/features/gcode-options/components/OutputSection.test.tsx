@@ -63,4 +63,37 @@ describe("OutputSection", () => {
     ).toBeChecked();
     expect(screen.getByText(/No source layers detected/i)).toBeInTheDocument();
   });
+
+  it("offers the SD folder option only while uploading split files", () => {
+    const onTogglePref = vi.fn();
+    const renderWith = (prefs: Partial<typeof DEFAULT_GCODE_PREFS>) =>
+      render(
+        <OutputSection
+          open
+          connected
+          sourceLayerCount={1}
+          layerGroupCount={1}
+          colorGroupCount={1}
+          prefs={{ ...DEFAULT_GCODE_PREFS, ...prefs }}
+          onToggleOpen={vi.fn()}
+          onTogglePref={onTogglePref}
+        />,
+      );
+    const name = "Create folder for split files";
+
+    const first = renderWith({ uploadToSd: true, exportPerColor: true });
+    const box = screen.getByRole("checkbox", { name });
+    expect(box).toBeEnabled();
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    expect(onTogglePref).toHaveBeenCalledWith("uploadSplitToFolder");
+    first.unmount();
+
+    const noSplit = renderWith({ uploadToSd: true });
+    expect(screen.getByRole("checkbox", { name })).toBeDisabled();
+    noSplit.unmount();
+
+    renderWith({ uploadToSd: false, exportPerColor: true });
+    expect(screen.getByRole("checkbox", { name })).toBeDisabled();
+  });
 });

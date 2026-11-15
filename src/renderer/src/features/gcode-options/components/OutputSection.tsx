@@ -26,6 +26,7 @@ export function OutputSection({
 }: OutputSectionProps) {
   const splitOutputEnabled =
     prefs.exportPerLayer || prefs.exportPerGroup || prefs.exportPerColor;
+  const uploadToFolderEnabled = prefs.uploadToSd && splitOutputEnabled;
   const activeSplitKey: "exportPerLayer" | "exportPerGroup" | "exportPerColor" =
     prefs.exportPerLayer
       ? "exportPerLayer"
@@ -35,29 +36,28 @@ export function OutputSection({
 
   return (
     <OptionSection title="Output" open={open} showHeader={showHeader} onToggleOpen={onToggleOpen}>
-      <label className="flex items-start gap-3 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          aria-label="Upload to SD card"
-          className="mt-0.5 accent-accent cursor-pointer"
-          checked={prefs.uploadToSd}
-          onChange={() => onTogglePref("uploadToSd")}
+      <CheckboxOption
+        label="Upload to SD card"
+        checked={prefs.uploadToSd}
+        onChange={() => onTogglePref("uploadToSd")}
+        description="Upload the generated file directly to the machine SD card. Auto-selects it as the queued job."
+        labelAside={
+          !connected && (
+            <span className="text-xs text-amber-400 font-normal">(not connected — will be skipped)</span>
+          )
+        }
+      />
+
+      <div className="ml-6 -mt-2">
+        <CheckboxOption
+          compact
+          label="Create folder for split files"
+          checked={prefs.uploadSplitToFolder}
+          onChange={() => onTogglePref("uploadSplitToFolder")}
+          disabled={!uploadToFolderEnabled}
+          description="Split files will be uploaded to a folder named after the job"
         />
-        <div className="min-w-0">
-          <div className="text-sm text-content font-medium flex items-center flex-wrap gap-x-1.5">
-            Upload to SD card
-            {!connected && (
-              <span className="text-xs text-amber-400 font-normal">
-                (not connected — will be skipped)
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-content-muted mt-0.5">
-            Upload the generated file directly to the machine SD card root.
-            Auto-selects it as the queued job.
-          </div>
-        </div>
-      </label>
+      </div>
 
       <CheckboxOption
         label="Save to computer"
@@ -185,30 +185,22 @@ function SplitOutputChoices({
         </div>
       </div>
 
-      <label className="flex items-start gap-2 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          aria-label="Export separate hatch files per colour"
-          className="mt-0.5 accent-accent cursor-pointer"
-          disabled={!prefs.exportPerColor}
-          checked={prefs.exportPerHatch}
-          onChange={() => onTogglePref("exportPerHatch")}
-        />
-        <div>
-          <div className="text-xs text-content font-medium">
-            Export separate hatch files per colour
+      <CheckboxOption
+        compact
+        label="Export separate hatch files per colour"
+        checked={prefs.exportPerHatch}
+        onChange={() => onTogglePref("exportPerHatch")}
+        disabled={!prefs.exportPerColor}
+        // This block already greys everything when output is not split.
+        dimmed={splitOutputEnabled && !prefs.exportPerColor}
+        description="Generate additional hatch-only files for each color group, allowing you to apply hatches with a separate tool/pen."
+      >
+        {prefs.exportPerHatch && !prefs.exportPerColor && (
+          <div className="text-xs text-amber-400 mt-1">
+            Enable "Export one file per colour group" to use this option.
           </div>
-          <div className="text-[11px] text-content-muted mt-0.5">
-            Generate additional hatch-only files for each color group,
-            allowing you to apply hatches with a separate tool/pen.
-          </div>
-          {prefs.exportPerHatch && !prefs.exportPerColor && (
-            <div className="text-xs text-amber-400 mt-1">
-              Enable "Export one file per colour group" to use this option.
-            </div>
-          )}
-        </div>
-      </label>
+        )}
+      </CheckboxOption>
     </div>
   );
 }

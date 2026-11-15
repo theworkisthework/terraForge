@@ -40,6 +40,7 @@ describe("registerFluidncIpcHandlers", () => {
       connectWebSocket: vi.fn(),
       disconnectWebSocket: vi.fn(),
       uploadFile: vi.fn(),
+      ensureSdDirectory: vi.fn().mockResolvedValue(undefined),
       downloadFile: vi.fn(),
     };
 
@@ -253,6 +254,18 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.serial.stopStatusPolling).toHaveBeenCalled();
     expect(deps.setConnectionType).toHaveBeenCalledWith(null);
     expect(deps.serial.disconnect).toHaveBeenCalled();
+  });
+
+  it("creates the folder first when uploadGcode targets one", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+
+    await mocks.handlers.get("fluidnc:uploadGcode")?.({}, "task-1", "G1 X10", "/drawing/red.gcode");
+    expect(deps.fluidnc.ensureSdDirectory).toHaveBeenCalledWith("/drawing");
+
+    deps.fluidnc.ensureSdDirectory.mockClear();
+    await mocks.handlers.get("fluidnc:uploadGcode")?.({}, "task-2", "G1 X10", "/root.gcode");
+    expect(deps.fluidnc.ensureSdDirectory).not.toHaveBeenCalled();
   });
 
   it("reports task progress and completion for uploadGcode", async () => {

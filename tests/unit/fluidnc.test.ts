@@ -322,6 +322,61 @@ describe("FluidNCClient", () => {
     );
   });
 
+  // ── ensureSdDirectory ───────────────────────────────────────────────────
+
+  it("creates a missing SD folder, with slashes left unencoded in path", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse({ files: [], path: "/" }))
+      .mockResolvedValueOnce(mockResponse("ok"));
+    await client.ensureSdDirectory("/my job");
+    const url = String(mockFetch.mock.calls[1][0]);
+    expect(url).toContain("/upload?path=/&action=createdir&filename=my%20job");
+    expect(url).not.toContain("%2F");
+  });
+
+  it("leaves an SD folder that is already listed alone", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse({ files: [{ name: "job", size: "-1" }], path: "/" }),
+    );
+    await client.ensureSdDirectory("/job");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates each missing level of a nested SD folder, parent first", async () => {
+    const listing = (path: string) => mockResponse({ files: [], path });
+    mockFetch.mockImplementation(async (url: string) =>
+      String(url).includes("action=createdir") ? mockResponse("ok") : listing(decodeURIComponent(new URL(String(url)).searchParams.get("path") ?? "/")),
+    );
+    await client.ensureSdDirectory("/a/b");
+    const urls = mockFetch.mock.calls.map(([u]) => String(u));
+    const creates = urls.filter((u) => u.includes("action=createdir"));
+    expect(creates).toHaveLength(2);
+    expect(creates[0]).toContain("path=/&action=createdir&filename=a");
+    expect(creates[1]).toContain("path=/a&action=createdir&filename=b");
+    expect(urls.some((u) => u.includes("%2F"))).toBe(false);
+  });
+
+  it("does not create a folder it could not check for, and does not throw", async () => {
+    mockFetch.mockRejectedValue(new Error("SD card: No SD card"));
+    await expect(client.ensureSdDirectory("/job")).resolves.toBeUndefined();
+    expect(mockFetch.mock.calls.some(([u]) => String(u).includes("action=createdir"))).toBe(false);
+  });
+
+  it("carries on to the next level when a folder cannot be created", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes("action=createdir")) return mockResponse("nope", 500);
+      return mockResponse({ files: [], path: "/" });
+    });
+    await expect(client.ensureSdDirectory("/a/b")).resolves.toBeUndefined();
+    const creates = mockFetch.mock.calls.filter(([u]) => String(u).includes("action=createdir"));
+    expect(creates).toHaveLength(2);
+  });
+
+  it("makes nothing for the root", async () => {
+    await client.ensureSdDirectory("/");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   // ── deleteFile ──────────────────────────────────────────────────────────
 
   it("sends WebDAV DELETE to /sd/ for SD delete (4.x)", async () => {

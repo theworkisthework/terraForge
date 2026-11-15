@@ -44,30 +44,54 @@ export function OptionSection({
   );
 }
 
-/** A checkbox titled `label`, with a line describing what it does. */
+/** A checkbox titled `label`, with a line describing what it does.
+ * `compact` uses the smaller type of an option nested under another (the
+ * caller indents it); `disabled` greys it out in place rather than hiding
+ * it, unless `dimmed` says otherwise (for an option inside a block that
+ * already greys it). `labelAside` sits beside the label, `children` under
+ * the description. */
 export function CheckboxOption({
   label,
   checked,
   onChange,
   description,
+  disabled = false,
+  dimmed = disabled,
+  compact = false,
+  labelAside,
+  children,
 }: {
   label: string;
   checked: boolean;
   onChange: () => void;
   description: ReactNode;
+  disabled?: boolean;
+  dimmed?: boolean;
+  compact?: boolean;
+  labelAside?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
-    <label className="flex items-start gap-3 cursor-pointer select-none">
+    <label
+      className={`flex items-start select-none ${compact ? "gap-2" : "gap-3"} ${dimmed ? "opacity-40" : ""} ${disabled ? "" : "cursor-pointer"}`}
+    >
       <input
         type="checkbox"
         aria-label={label}
         className="mt-0.5 accent-accent cursor-pointer"
         checked={checked}
         onChange={onChange}
+        disabled={disabled}
       />
-      <div>
-        <div className="text-sm text-content font-medium">{label}</div>
-        <div className="text-xs text-content-muted mt-0.5">{description}</div>
+      <div className="min-w-0">
+        <div
+          className={`text-content flex items-center flex-wrap gap-x-1.5 ${compact ? "text-xs" : "text-sm font-medium"}`}
+        >
+          {label}
+          {labelAside}
+        </div>
+        <div className={`text-content-muted ${compact ? "text-[11px]" : "text-xs mt-0.5"}`}>{description}</div>
+        {children}
       </div>
     </label>
   );
