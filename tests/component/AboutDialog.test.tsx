@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AboutDialog } from "@renderer/components/AboutDialog";
 
@@ -59,6 +59,21 @@ describe("AboutDialog", () => {
     const onClose = vi.fn();
     render(<AboutDialog onClose={onClose} />);
     await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("focuses Close on open so Enter dismisses it", async () => {
+    const onClose = vi.fn();
+    render(<AboutDialog onClose={onClose} />);
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("closes on Enter even when focus is on the dialog itself", () => {
+    const onClose = vi.fn();
+    render(<AboutDialog onClose={onClose} />);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Enter" });
     expect(onClose).toHaveBeenCalledOnce();
   });
 

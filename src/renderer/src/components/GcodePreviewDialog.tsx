@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
 import { Button } from "./ui";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 export interface GcodePreviewFile {
   path: string;
@@ -58,13 +59,9 @@ export function GcodePreviewDialog({ file, onClose }: Props) {
     };
   }, [file]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onClose,
+  });
 
   const handleDownload = async () => {
     if (text == null) return;
@@ -80,6 +77,7 @@ export function GcodePreviewDialog({ file, onClose }: Props) {
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-modal="true"
       aria-labelledby="gcode-preview-title"
@@ -87,6 +85,8 @@ export function GcodePreviewDialog({ file, onClose }: Props) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={onKeyDown}
+      tabIndex={-1}
     >
       <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[720px] max-w-[90vw] h-[70vh] flex flex-col overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border-ui">
@@ -111,6 +111,7 @@ export function GcodePreviewDialog({ file, onClose }: Props) {
             variant="ghost-hover"
             size="icon-sm"
             onClick={onClose}
+            data-autofocus
             title="Close"
             aria-label="Close"
           >

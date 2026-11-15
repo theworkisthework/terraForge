@@ -18,6 +18,7 @@
 import React from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "./ui";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 interface Props {
   title?: string;
@@ -40,13 +41,14 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") (onCancel ?? onConfirm)();
-    if (e.key === "Enter") onConfirm();
-  };
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onCancel ?? onConfirm,
+    onEnter: onConfirm,
+  });
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
@@ -54,7 +56,7 @@ export function ConfirmDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) (onCancel ?? onConfirm)();
       }}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
       tabIndex={-1}
     >
       <div
@@ -88,7 +90,8 @@ export function ConfirmDialog({
                 {cancelLabel}
               </Button>
             )}
-            <Button variant="primary" onClick={onConfirm}>
+            {/* Focused on open so Enter confirms and Escape cancels straight away. */}
+            <Button variant="primary" onClick={onConfirm} data-autofocus>
               {confirmLabel}
             </Button>
           </div>

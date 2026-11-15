@@ -24,7 +24,12 @@ export function GcodeOptionsDialogActions({
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onConfirm} disabled={disabled}>
+        <Button
+          variant="primary"
+          onClick={onConfirm}
+          disabled={disabled}
+          data-autofocus
+        >
           Generate
         </Button>
       </div>
