@@ -272,13 +272,49 @@ describe("MachineConfigDialog", () => {
       await userEvent.click(screen.getByRole("button", { name: "Calibrate grid" }));
 
       expect(screen.getByText("Position the machine")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Jog X negative 1 mm" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Jog X-" })).toBeEnabled();
       expect(screen.getByRole("button", { name: "Set XY zero" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "100" })).toBeInTheDocument();
+      expect(screen.getByText("Jog Speed (feedrate mm/min)")).toBeInTheDocument();
+      expect(screen.getByText(/first XY jog raises Z by 5 mm; later jogs keep that clearance/i)).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Use current position" }));
       const startModal = screen.getByText("Start bed mesh calibration?").parentElement;
       expect(startModal).toHaveClass("max-h-[calc(100dvh-2rem)]", "overflow-y-auto");
       expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
+    });
+
+    it("keeps compensation disabled for a loaded mesh when pen commands have no Z moves", async () => {
+      const [config] = useMachineStore.getState().configs;
+      useMachineStore.setState({
+        configs: [{
+          ...config,
+          bedMeshEnabled: true,
+          bedMesh: {
+            version: 1,
+            name: "flat",
+            xPoints: 2,
+            yPoints: 2,
+            widthMM: 10,
+            heightMM: 10,
+            points: [
+              { x: 0, y: 0, z: 0 },
+              { x: 10, y: 0, z: 0 },
+              { x: 0, y: 10, z: 0 },
+              { x: 10, y: 10, z: 0 },
+            ],
+            createdAt: "",
+          },
+        }],
+      });
+      await openBedMesh();
+
+      const checkbox = screen.getByRole("checkbox", {
+        name: "Enable bed mesh compensation",
+      });
+      expect(checkbox).toBeChecked();
+      expect(checkbox).toBeDisabled();
+      expect(screen.getByText(/needs Z moves in both pen-up and pen-down commands/i)).toBeInTheDocument();
     });
 
     it("uses aligned two-column fields for grid dimensions", async () => {

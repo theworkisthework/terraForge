@@ -1,6 +1,16 @@
-import type { BedMesh, BedMeshPoint } from "./index";
+import type { BedMesh, BedMeshPoint, MachineConfig } from "./index";
 
 export const MAX_BED_MESH_GRID_POINTS = 32;
+
+export function supportsBedMeshZCompensation(
+  config: Pick<MachineConfig, "penUpCommand" | "penDownCommand">,
+): boolean {
+  const hasZWord = (command: string) => {
+    const code = command.split(/[;(]/, 1)[0];
+    return /Z\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)/i.test(code);
+  };
+  return hasZWord(config.penUpCommand) && hasZWord(config.penDownCommand);
+}
 
 /** Returns the bilinearly interpolated Z offset, clamped to the calibrated bed. */
 export function isValidBedMesh(mesh: BedMesh | null | undefined): mesh is BedMesh {

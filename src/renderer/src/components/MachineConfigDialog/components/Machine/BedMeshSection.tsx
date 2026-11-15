@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { isValidBedMesh, MAX_BED_MESH_GRID_POINTS } from "../../../../../../types/bedMesh";
+import { ChevronDown, Crosshair } from "lucide-react";
+import {
+  isValidBedMesh,
+  MAX_BED_MESH_GRID_POINTS,
+  supportsBedMeshZCompensation,
+} from "../../../../../../types/bedMesh";
 import type { MachineConfigDialogController } from "../../hooks/useMachineConfigDialogController";
 import { Button } from "../../../ui";
+import { StepSelector } from "../../../JogControls/StepSelector";
+import { JogPad } from "../../../JogControls/JogPad";
+import { JogSpeedInput } from "../../../JogControls/JogSpeedInput";
 import { Section } from "../Section";
 import { clampGridPoints, useBedMeshCalibration } from "./useBedMeshCalibration";
 
@@ -15,10 +22,16 @@ export function BedMeshSection({ controller }: Props) {
   const {
     form, inputCls, connected, canCalibrate, open, showStartOptions,
     setStartChoice, startChoice, xPoints, yPoints, points, index, z, datumZ,
+    step, setStep, feedrate, setFeedrate, jogging,
     profileName, setProfileName, error, setXPoints, setYPoints, begin,
     startCalibration, next, cancelCalibration, jogZ, jogXY, setXYZero,
     save, load, persistMesh,
   } = useBedMeshCalibration(controller);
+  const validMesh = isValidBedMesh(form.bedMesh);
+  const zCompensationAvailable = supportsBedMeshZCompensation(form);
+  const invertX = form.origin === "bottom-right" || form.origin === "top-right";
+  const invertY = form.origin === "top-left" || form.origin === "top-right";
+  const zDirection = form.invertZJogControls ? -1 : 1;
 
   return (
     <Section title={
@@ -51,17 +64,23 @@ export function BedMeshSection({ controller }: Props) {
         <input
           type="checkbox"
           checked={form.bedMeshEnabled ?? false}
-          disabled={!isValidBedMesh(form.bedMesh)}
-          title={!isValidBedMesh(form.bedMesh) ? "Import or calibrate a valid mesh before enabling compensation." : undefined}
+          disabled={!validMesh || !zCompensationAvailable}
+          title={!validMesh
+            ? "Import or calibrate a valid mesh before enabling compensation."
+            : !zCompensationAvailable
+              ? "Both pen commands must include a Z move to use bed mesh compensation."
+              : undefined}
           onChange={(e) => void persistMesh({ bedMeshEnabled: e.currentTarget.checked })}
           className="mt-0.5 accent-accent disabled:opacity-50"
         />
         <span className="text-sm text-content">Enable bed mesh compensation</span>
       </label>
       <p className="text-xs text-content-faint mb-3">
-        {isValidBedMesh(form.bedMesh)
-          ? "Bilinear Z offsets will be added to generated G-code for this machine."
-          : "Import or calibrate a valid mesh profile before enabling compensation."}
+        {!zCompensationAvailable
+          ? "Bed mesh compensation needs Z moves in both pen-up and pen-down commands."
+          : validMesh
+            ? "Generated G-code uses offsets relative to the first probe point; outside the measured area, the nearest edge offset is used."
+            : "Import or calibrate a valid mesh profile before enabling compensation."}
       </p>
       <div className="grid grid-cols-2 gap-3 mb-3">
         <label className="flex flex-col gap-1 text-xs text-content-muted">X points
@@ -97,24 +116,27 @@ export function BedMeshSection({ controller }: Props) {
         <div className="rounded border border-border-ui p-3 space-y-3">
           <div>
             <p className="text-xs font-semibold text-content">Position the machine</p>
-            <p className="text-xs text-content-faint mt-1">
-              Jog XY to set a work zero before continuing, or home the machine. XY jogs first raise Z by 5 mm.
+              <p className="text-xs text-content-faint mt-1">
+                Jog XY to set a work zero before continuing, or home the machine. The first XY jog raises Z by 5 mm; later jogs keep that clearance. Keep the Z work zero unchanged while probing, and recalibrate after changing the bed or pen setup.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-1 w-36 mx-auto">
-            <span />
-            <Button size="sm" variant="secondary" aria-label="Jog Y positive 1 mm" onClick={() => void jogXY("Y", 1)}>Y+</Button>
-            <span />
-            <Button size="sm" variant="secondary" aria-label="Jog X negative 1 mm" onClick={() => void jogXY("X", -1)}>X−</Button>
-            <Button size="sm" variant="secondary" onClick={() => void setXYZero()}>Set XY zero</Button>
-            <Button size="sm" variant="secondary" aria-label="Jog X positive 1 mm" onClick={() => void jogXY("X", 1)}>X+</Button>
-            <span />
-            <Button size="sm" variant="secondary" aria-label="Jog Y negative 1 mm" onClick={() => void jogXY("Y", -1)}>Y−</Button>
-            <span />
-          </div>
+          <label className="block text-xs text-content-faint mb-1">Jog step (mm)</label>
+          <StepSelector step={step} onChange={setStep} />
+          <JogPad
+              step={step}
+              connected={canCalibrate && !jogging}
+              jog={(axis, direction) => jogXY(axis as "X" | "Y", direction * step)}
+              goToOrigin={setXYZero}
+              invertXJogControls={invertX}
+              invertYJogControls={invertY}
+              centerLabel={<Crosshair size={14} />}
+              centerTitle="Set XY work zero"
+              centerAriaLabel="Set XY zero"
+          />
+          <JogSpeedInput feedrate={feedrate} onChange={setFeedrate} />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setStartChoice("home")}>Home then calibrate</Button>
-            <Button size="sm" variant="secondary" onClick={() => setStartChoice("known")}>Use current position</Button>
+              <Button size="sm" variant="secondary" disabled={jogging} onClick={() => setStartChoice("home")}>Home then calibrate</Button>
+              <Button size="sm" variant="secondary" disabled={jogging} onClick={() => setStartChoice("known")}>Use current position</Button>
           </div>
         </div>
       )}
@@ -126,8 +148,8 @@ export function BedMeshSection({ controller }: Props) {
               The machine will raise Z by 5 mm, then move to X {(form.origin === "center" ? -form.bedWidth / 2 : 0).toFixed(2)}, Y {(form.origin === "center" ? -form.bedHeight / 2 : 0).toFixed(2)}. Homing moves to machine home first; using the current position preserves your work coordinates. Make sure the bed and pen are clear before continuing.
             </p>
             <div className="sticky bottom-0 flex justify-end gap-2 bg-app pt-3">
-              <Button variant="secondary" onClick={() => setStartChoice(null)}>Cancel</Button>
-              <Button onClick={() => void startCalibration(startChoice)}>Continue</Button>
+              <Button variant="secondary" disabled={jogging} onClick={() => setStartChoice(null)}>Cancel</Button>
+              <Button disabled={jogging} onClick={() => void startCalibration(startChoice)}>Continue</Button>
             </div>
           </div>
         </div>
@@ -137,15 +159,19 @@ export function BedMeshSection({ controller }: Props) {
           <div className="bg-app border border-border-ui rounded-xl shadow-2xl p-6 w-full max-w-[360px] max-h-[calc(100dvh-2rem)] overflow-y-auto my-auto">
             <h2 className="text-lg font-semibold text-content mb-2">Calibrate point {index + 1} of {points.length}</h2>
             <p className="text-sm text-content-muted mb-4">Adjust Z until the pen just touches the bed at X {points[index].x.toFixed(2)}, Y {points[index].y.toFixed(2)}.</p>
+            <div className="mb-3">
+              <label className="block text-xs text-content-faint mb-1">Jog step (mm)</label>
+              <StepSelector step={step} onChange={setStep} />
+            </div>
             <div className="flex gap-2 mb-3">
-              <Button size="sm" onClick={() => void jogZ(0.1)}>Raise Z</Button>
-              <Button size="sm" onClick={() => void jogZ(-0.1)}>Lower Z</Button>
+              <Button size="sm" disabled={jogging} onClick={() => void jogZ(step * zDirection)}>Raise Z {step} mm</Button>
+              <Button size="sm" disabled={jogging} onClick={() => void jogZ(-step * zDirection)}>Lower Z {step} mm</Button>
             </div>
             <p className="text-sm text-content">
               Captured Z offset: {z.toFixed(3)} mm
               {datumZ === null && " (first point establishes the datum)"}
             </p>
-            <div className="flex justify-end gap-2 mt-5"><Button variant="secondary" onClick={() => void cancelCalibration()}>Cancel</Button><Button onClick={() => void next()}>{index + 1 === points.length ? "Finish" : "Next"}</Button></div>
+            <div className="flex justify-end gap-2 mt-5"><Button variant="secondary" disabled={jogging} onClick={() => void cancelCalibration()}>Cancel</Button><Button disabled={jogging} onClick={() => void next()}>{index + 1 === points.length ? "Finish" : "Next"}</Button></div>
           </div>
         </div>
       )}

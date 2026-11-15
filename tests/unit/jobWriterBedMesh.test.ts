@@ -51,9 +51,52 @@ describe("JobWriter bed mesh compensation", () => {
     writer.writeSubpath({ points: [{ x: 0, y: 0 }, { x: 20, y: 0 }] });
 
     expect(lines).toContain("G91 G21 G0 Z0.250 ; Bed mesh offset");
-    expect(lines).toContain("G53 G0Z0.250 ; Pen down");
+    expect(lines).toContain("G90 G21 G53 G0Z0.250 ; Pen down");
     expect(lines).not.toContain("G0 Z1.250");
     expect(lines).not.toContain("G0 Z0.250");
+    expect(lines).not.toContain("G90 G21");
+  });
+
+  it("restores absolute mode inline after relative G53 mesh adjustments", () => {
+    const ridge: BedMesh = {
+      ...flatMesh,
+      xPoints: 3,
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 10, y: 0, z: 1 },
+        { x: 20, y: 0, z: 0 },
+        { x: 0, y: 10, z: 0 },
+        { x: 10, y: 10, z: 1 },
+        { x: 20, y: 10, z: 0 },
+      ],
+    };
+    const lines: string[] = [];
+    const config = createMachineConfig({
+      penUpCommand: "G53 G0Z1",
+      penDownCommand: "G53 G0Z0",
+    });
+    const settings = resolveGenerationSettings(config, createGcodeOptions({ bedMesh: ridge }));
+    const writer = new JobWriter(lines, config, settings);
+    writer.writeSubpath({ points: [{ x: 0, y: 0 }, { x: 20, y: 0 }] });
+
+    expect(lines.some((line) => /^G90 G21 G1 X/.test(line))).toBe(true);
+    expect(lines.filter((line) => line === "G90 G21")).toHaveLength(0);
+    expect(lines.filter((line) => line.includes("; Bed mesh offset")).length).toBeGreaterThan(1);
+  });
+
+  it("does not emit Z compensation for servo commands without Z moves", () => {
+    const lines: string[] = [];
+    const config = createMachineConfig({
+      penType: "servo",
+      penUpCommand: "M3 S0",
+      penDownCommand: "M3 S100",
+    });
+    const settings = resolveGenerationSettings(config, createGcodeOptions({ bedMesh: flatMesh }));
+    const writer = new JobWriter(lines, config, settings);
+    writer.writePointTap({ point: { x: 5, y: 5 }, repeats: 1 });
+
+    expect(settings.bedMesh).toBeUndefined();
+    expect(lines.some((line) => /\bZ\s*[-+]?\d/i.test(line))).toBe(false);
   });
 
   it("ignores Z values in pen-command comments", () => {

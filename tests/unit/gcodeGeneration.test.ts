@@ -124,10 +124,11 @@ describe("bed mesh G-code metadata", () => {
       ],
       createdAt: "",
     };
-    const settings = resolveGenerationSettings(config, createGcodeOptions({ bedMesh: mesh }));
+    const zPenConfig = { ...config, penUpCommand: "G0 Z15", penDownCommand: "G0 Z0" };
+    const settings = resolveGenerationSettings(zPenConfig, createGcodeOptions({ bedMesh: mesh }));
     const lines: string[] = [];
 
-    emitHeader(lines, config, createGcodeOptions(), settings);
+    emitHeader(lines, zPenConfig, createGcodeOptions(), settings);
 
     expect(lines).toContain("; Bed mesh : yes (mesh G0 Z-100 ;)");
     expect(lines.some((line) => line === "G0 Z-100")).toBe(false);

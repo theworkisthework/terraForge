@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createBedMeshPoints, interpolateBedMesh, isValidBedMesh } from "../../src/types/bedMesh";
+import {
+  createBedMeshPoints,
+  interpolateBedMesh,
+  isValidBedMesh,
+  supportsBedMeshZCompensation,
+} from "../../src/types/bedMesh";
 import type { BedMesh } from "../../src/types";
+import { createMachineConfig } from "../helpers/factories";
 
 const mesh: BedMesh = {
   version: 1,
@@ -21,6 +27,24 @@ const mesh: BedMesh = {
 describe("interpolateBedMesh", () => {
   it("bilinearly interpolates between four calibration points", () => {
     expect(interpolateBedMesh(mesh, 5, 5)).toBe(3);
+  });
+
+  describe("supportsBedMeshZCompensation", () => {
+    it("requires a Z move in both pen commands, ignoring comments", () => {
+      expect(supportsBedMeshZCompensation(createMachineConfig({
+        penUpCommand: "G0Z15 ; Z is configured",
+        penDownCommand: "G0Z0",
+      }))).toBe(true);
+      expect(supportsBedMeshZCompensation(createMachineConfig({
+        penType: "servo",
+        penUpCommand: "M3 S0",
+        penDownCommand: "M3 S100",
+      }))).toBe(false);
+      expect(supportsBedMeshZCompensation(createMachineConfig({
+        penUpCommand: "G0Z15",
+        penDownCommand: "M3 S100 (Z0)",
+      }))).toBe(false);
+    });
   });
 
   it("clamps coordinates outside the calibrated bed", () => {

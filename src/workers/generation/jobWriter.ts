@@ -5,7 +5,7 @@
  */
 import type { MachineConfig } from "../../types";
 import { fmtCoord as fmt } from "../gcodeEngine";
-import { createBedMeshInterpolator } from "../../types/bedMesh";
+import { createBedMeshInterpolator, supportsBedMeshZCompensation } from "../../types/bedMesh";
 import type { GenerationSettings } from "./document";
 import {
   canServiceInMode,
@@ -31,6 +31,7 @@ export class JobWriter {
   private readonly penUpZ: number;
   private readonly penDownZ: number;
   private currentMeshOffset = 0;
+  private relativeMode = false;
   private readonly canService: boolean;
   private readonly triggerBase: number;
   private readonly triggerJitter: number;
@@ -46,7 +47,9 @@ export class JobWriter {
     private readonly config: MachineConfig,
     private readonly settings: GenerationSettings,
   ) {
-    this.interpolate = createBedMeshInterpolator(settings.bedMesh);
+    this.interpolate = supportsBedMeshZCompensation(config)
+      ? createBedMeshInterpolator(settings.bedMesh)
+      : null;
     this.machineCoordinatePenZ =
       /\bG53\b/i.test(commandCode(config.penUpCommand)) ||
       /\bG53\b/i.test(commandCode(config.penDownCommand));
@@ -73,7 +76,7 @@ export class JobWriter {
     const dip = this.beginItem(color, layer);
     const { lines, config, settings } = this;
     const first = points[0];
-    lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)}${this.zWord(first.x, first.y, this.penUpZ)} ; Rapid travel`);
+    lines.push(this.absoluteCommand(`G0 X${fmt(first.x)} Y${fmt(first.y)}${this.zWord(first.x, first.y, this.penUpZ)} ; Rapid travel`));
     if (this.machineCoordinatePenZ) this.writeZAt(first, this.penUpZ);
     lines.push(`F${settings.drawSpeed}`);
     this.writePenCommand(config.penDownCommand, first, this.penDownZ, " ; Pen down");
@@ -89,7 +92,7 @@ export class JobWriter {
     this.beginItem(tap.color, tap.layer);
     const { lines, config, settings } = this;
     for (let rep = 0; rep < tap.repeats; rep++) {
-      lines.push(`G0 X${fmt(tap.point.x)} Y${fmt(tap.point.y)}${this.zWord(tap.point.x, tap.point.y, this.penUpZ)} ; Point rapid`);
+      lines.push(this.absoluteCommand(`G0 X${fmt(tap.point.x)} Y${fmt(tap.point.y)}${this.zWord(tap.point.x, tap.point.y, this.penUpZ)} ; Point rapid`));
       if (this.machineCoordinatePenZ) this.writeZAt(tap.point, this.penUpZ);
       lines.push(`F${settings.drawSpeed}`);
       this.writePenCommand(config.penDownCommand, tap.point, this.penDownZ, " ; Point tap");
@@ -108,11 +111,11 @@ export class JobWriter {
     const offset = this.interpolate(point.x, point.y);
     const commandNominalZ = commandZ(command);
     if (commandNominalZ !== null) {
-      this.lines.push(`${commandWithZOffset(command, offset)}${comment}`);
+      this.lines.push(this.absoluteCommand(`${commandWithZOffset(command, offset)}${comment}`));
       this.currentMeshOffset = offset;
       return;
     }
-    this.lines.push(command + comment);
+    this.lines.push(this.absoluteCommand(command + comment));
     this.writeZAt(point, nominalZ);
   }
 
@@ -154,6 +157,7 @@ export class JobWriter {
   private service(dip?: string): void {
     const ink = this.settings.inkService;
     if (!this.canService || !ink) return;
+    this.ensureAbsoluteMode();
     emitInkServiceMove(this.lines, this.config, ink, this.dipCursor, this.dipsSinceWash, this.currentDip, dip);
     if (this.machineCoordinatePenZ) this.currentMeshOffset = 0;
     // Restart the travel count whether or not a move was made, so drawing
@@ -209,7 +213,7 @@ export class JobWriter {
     if (this.machineCoordinatePenZ) {
       this.writeRelativeMeshOffset(offset);
     } else {
-      this.lines.push(`G0 Z${fmt(nominalZ + offset)}`);
+      this.lines.push(this.absoluteCommand(`G0 Z${fmt(nominalZ + offset)}`));
       this.currentMeshOffset = offset;
     }
   }
@@ -218,14 +222,26 @@ export class JobWriter {
     const delta = offset - this.currentMeshOffset;
     if (Math.abs(delta) > 1e-9) {
       this.lines.push(`G91 G21 G0 Z${fmt(delta)} ; Bed mesh offset`);
-      this.lines.push("G90 G21");
+      this.relativeMode = true;
     }
     this.currentMeshOffset = offset;
   }
 
+  private absoluteCommand(command: string): string {
+    if (!this.relativeMode) return command;
+    this.relativeMode = false;
+    return `G90 G21 ${command}`;
+  }
+
+  private ensureAbsoluteMode(): void {
+    if (!this.relativeMode) return;
+    this.lines.push("G90 G21");
+    this.relativeMode = false;
+  }
+
   private emitDrawingLine(from: Point, target: Point): void {
     if (!this.interpolate) {
-      this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}`);
+      this.lines.push(this.absoluteCommand(`G1 X${fmt(target.x)} Y${fmt(target.y)}`));
       return;
     }
 
@@ -291,10 +307,10 @@ export class JobWriter {
       return;
     }
     if (this.machineCoordinatePenZ) {
-      this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)}`);
+      this.lines.push(this.absoluteCommand(`G1 X${fmt(target.x)} Y${fmt(target.y)}`));
       this.writeRelativeMeshOffset(targetZ);
     } else {
-      this.lines.push(`G1 X${fmt(target.x)} Y${fmt(target.y)} Z${fmt(this.penDownZ + targetZ)}`);
+      this.lines.push(this.absoluteCommand(`G1 X${fmt(target.x)} Y${fmt(target.y)} Z${fmt(this.penDownZ + targetZ)}`));
       this.currentMeshOffset = targetZ;
     }
   }

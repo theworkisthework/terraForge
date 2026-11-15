@@ -4,6 +4,7 @@
  */
 import type { BedMesh, GcodeOptions, InkServiceSettings, MachineConfig } from "../../types";
 import { isSolenoidPenType } from "../../types";
+import { supportsBedMeshZCompensation } from "../../types/bedMesh";
 
 export interface GenerationSettings {
   optimise: boolean;
@@ -49,7 +50,7 @@ export function resolveGenerationSettings(config: MachineConfig, options: GcodeO
     penDownDelayMs: penDelayMs(options?.penDownDelayMsOverride, config.penDownDelayMs, config),
     penUpDelayMs: penDelayMs(options?.penUpDelayMsOverride, config.penUpDelayMs, config),
     drawSpeed: typeof options?.drawSpeedOverride === "number" ? options.drawSpeedOverride : config.drawSpeed,
-    bedMesh: options?.bedMesh,
+    bedMesh: supportsBedMeshZCompensation(config) ? options?.bedMesh : undefined,
   };
 }
 
