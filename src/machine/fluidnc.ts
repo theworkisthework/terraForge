@@ -44,6 +44,17 @@ export function encodeRemotePath(remotePath: string): string {
 }
 
 /**
+ * Splits a folder's path into its parent and its own name, refusing the root
+ * and anything with no name to act on.
+ */
+export function splitFolderPath(folderPath: string): { parent: string; name: string } {
+  const parts = folderPath.split("/").filter(Boolean);
+  const name = parts.pop();
+  if (!name) throw new Error("No folder given");
+  return { parent: "/" + parts.join("/"), name };
+}
+
+/**
  * Thrown by `connectWebSocket` when a disconnect, or a newer connect, arrived
  * while it was still resolving and probing the controller.
  */
@@ -493,18 +504,91 @@ export class FluidNCClient extends EventEmitter {
       try {
         const siblings = await this.listSDFiles(parent);
         if (!siblings.some((f) => f.isDirectory && f.name === name)) {
-          // Slashes stay as they are in `path`: 3.x resets the connection on
-          // %2F (see listSDFiles). The name has none.
-          await this.restClient.get(
-            `/upload?path=${encodeRemotePath(parent)}&action=createdir&filename=${encodeURIComponent(name)}`,
-            10_000,
-          );
+          await this.sdFolderAction("create", parent, name);
         }
       } catch {
         // Not creatable: the upload decides.
       }
       parent = parent === "/" ? `/${name}` : `${parent}/${name}`;
     }
+  }
+
+  /**
+   * Creates one folder on the SD card. Its parent must already exist. The
+   * machine does not reliably say when it refused, so the parent is listed
+   * again to see that the folder is there.
+   */
+  async createSdFolder(folderPath: string): Promise<void> {
+    const { parent, name } = splitFolderPath(folderPath);
+    await this.sdFolderActionThenCheck("create", parent, name);
+    if (!(await this.sdFolderListed(parent, name))) {
+      throw new Error(`The machine did not create the folder "${name}"`);
+    }
+  }
+
+  /**
+   * Deletes a folder on the SD card, with everything in it. Checked by
+   * listing the parent again, as with createSdFolder.
+   */
+  async deleteSdFolder(folderPath: string): Promise<void> {
+    const { parent, name } = splitFolderPath(folderPath);
+    await this.sdFolderActionThenCheck("delete", parent, name);
+    if (await this.sdFolderListed(parent, name)) {
+      throw new Error(`The machine did not delete the folder "${name}"`);
+    }
+  }
+
+  /**
+   * A folder operation whose outcome the caller checks by listing. A reply
+   * that is slow to come is not taken as failure: the operation may well
+   * have been done, and the listing says whether it was.
+   */
+  private async sdFolderActionThenCheck(
+    action: "create" | "delete",
+    parent: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      await this.sdFolderAction(action, parent, name);
+    } catch (err) {
+      if (!isTimeoutError(err)) throw err;
+    }
+  }
+
+  /**
+   * A folder operation on the SD card. 4.x serves the card over WebDAV, as
+   * deleteFile uses: MKCOL makes a folder and DELETE removes one with what
+   * is in it. 3.x takes the stock web UI's /upload actions instead.
+   */
+  private async sdFolderAction(
+    action: "create" | "delete",
+    parent: string,
+    name: string,
+  ): Promise<void> {
+    if (this.fwMajor === null || this.fwMajor >= 4) {
+      const folder = parent === "/" ? `/${name}` : `${parent}/${name}`;
+      await this.restClient.get(
+        `/sd${encodeRemotePath(folder)}`,
+        FluidNCClient.sdFolderTimeoutMs,
+        action === "create" ? "MKCOL" : "DELETE",
+      );
+      return;
+    }
+    // Slashes stay as they are in `path`: 3.x resets the connection on %2F
+    // (see listSDFiles). The name has none.
+    await this.restClient.get(
+      `/upload?path=${encodeRemotePath(parent)}&action=${action === "create" ? "createdir" : "deletedir"}&filename=${encodeURIComponent(name)}`,
+      FluidNCClient.sdFolderTimeoutMs,
+    );
+  }
+
+  /** As long as listing the card may take (see listSDFiles); deleting a
+   * full folder can take longer still. */
+  private static sdFolderTimeoutMs = 30_000;
+
+  private async sdFolderListed(parent: string, name: string): Promise<boolean> {
+    const siblings = await this.listSDFiles(parent);
+    return siblings.some((f) => f.isDirectory && f.name === name);
   }
 
   private resolveUploadTarget(

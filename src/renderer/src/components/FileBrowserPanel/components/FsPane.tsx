@@ -1,12 +1,14 @@
 import { ConfirmDialog } from "../../ConfirmDialog";
 import { Breadcrumb } from "./Breadcrumb";
 import { FileRow } from "./FileRow";
+import { NewFolderDialog } from "./NewFolderDialog";
 import { parentPath } from "../utils/pathUtils";
 import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
   Folder,
+  FolderPlus,
   RefreshCw,
   Upload,
 } from "lucide-react";
@@ -35,7 +37,7 @@ const ACCENTS = {
 } as const;
 
 /** The pane's confirmations: replacing the toolpath to run or preview a
- * file, and deleting one. */
+ * file, and deleting a file or folder. */
 function PaneDialogs({
   pendingRunFile,
   pendingPreviewFile,
@@ -77,18 +79,34 @@ function PaneDialogs({
           onCancel={onCancelPreview}
         />
       )}
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete File"
-          message={`Delete ${deleteTarget.name}?`}
-          confirmLabel="Delete"
-          onConfirm={onDelete}
-          onCancel={onCancelDelete}
-        />
-      )}
+      {deleteTarget &&
+        (deleteTarget.isDirectory ? (
+          <ConfirmDialog
+            title="Delete Folder"
+            message={`Delete the folder "${deleteTarget.name}" and everything in it? This cannot be undone.`}
+            confirmLabel="Delete"
+            onConfirm={onDelete}
+            onCancel={onCancelDelete}
+          />
+        ) : (
+          <ConfirmDialog
+            title="Delete File"
+            message={`Delete ${deleteTarget.name}?`}
+            confirmLabel="Delete"
+            onConfirm={onDelete}
+            onCancel={onCancelDelete}
+          />
+        ))}
     </>
   );
 }
+
+/** Why a new folder cannot be made here. */
+const NEW_FOLDER_BLOCKED = {
+  serial: "Creating folders is not available over serial",
+  transfer: "Unavailable while a file transfer is running",
+  busy: "New folder",
+} as const;
 
 /** Why the listing shows nothing: offline, no SD card, an error, or empty. */
 function ListingMessage({ connected, error, empty }: { connected: boolean; error: string | null; empty: boolean }) {
@@ -98,6 +116,51 @@ function ListingMessage({ connected, error, empty }: { connected: boolean; error
   if (error) return <p className="text-[10px] text-red-400 text-center py-3 px-3 break-all">{error}</p>;
   if (empty) return <p className="text-[10px] text-content-faint text-center py-4 px-3">Empty.</p>;
   return null;
+}
+
+/** Up a level, the current folder as crumbs, and — where folders can be
+ * made — a New folder button. */
+function PathBar({
+  path,
+  borderAccent,
+  connected,
+  navigate,
+  onNewFolder,
+  newFolderBlockedBy,
+}: {
+  path: string;
+  borderAccent: string;
+  connected: boolean;
+  navigate: (target: string) => void;
+  /** Opens the New folder dialog; null where folders cannot be made. */
+  onNewFolder: (() => void) | null;
+  newFolderBlockedBy: keyof typeof NEW_FOLDER_BLOCKED | null;
+}) {
+  return (
+    <div className={`shrink-0 flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}>
+      <button
+        onClick={() => navigate(parentPath(path))}
+        disabled={path === "/" || !connected}
+        title="Up"
+        aria-label="Up one level"
+        className="text-content-muted hover:text-content disabled:opacity-30 mr-0.5 transition-colors leading-none"
+      >
+        <ArrowUp size={12} />
+      </button>
+      <Breadcrumb path={path} navigate={navigate} />
+      {onNewFolder && (
+        <button
+          onClick={onNewFolder}
+          disabled={newFolderBlockedBy !== null}
+          aria-label="New folder"
+          title={newFolderBlockedBy ? NEW_FOLDER_BLOCKED[newFolderBlockedBy] : "New folder"}
+          className="ml-auto shrink-0 text-content-muted hover:text-content disabled:opacity-30 transition-colors leading-none"
+        >
+          <FolderPlus size={12} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 interface FsPaneProps extends FsPaneControllerProps {
@@ -114,6 +177,8 @@ export function FsPane({
   source,
   listFn,
   deleteFn,
+  createFolderFn,
+  deleteFolderFn,
   uploadFn,
   upsertTask,
   open,
@@ -140,6 +205,11 @@ export function FsPane({
     handleRun,
     handleDeleteConfirm,
     setDeleteTarget,
+    newFolderOpen,
+    setNewFolderOpen,
+    handleCreateFolder,
+    canCreateFolders,
+    canDeleteFolders,
     setPendingPreviewFile,
     setPendingRunFile,
     doPreview,
@@ -153,6 +223,8 @@ export function FsPane({
     source,
     listFn,
     deleteFn,
+    createFolderFn,
+    deleteFolderFn,
     uploadFn,
     upsertTask,
   });
@@ -173,6 +245,14 @@ export function FsPane({
         onCancelPreview={() => setPendingPreviewFile(null)}
         onCancelDelete={() => setDeleteTarget(null)}
       />
+      {newFolderOpen && (
+        <NewFolderDialog
+          parent={path}
+          existing={files}
+          onCreate={handleCreateFolder}
+          onCancel={() => setNewFolderOpen(false)}
+        />
+      )}
 
       <div
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}
@@ -210,23 +290,14 @@ export function FsPane({
 
       {!open ? null : (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div
-            className={`shrink-0 flex items-center gap-1 px-2 py-1 border-b ${borderAccent}/50 min-h-[24px]`}
-          >
-            <button
-              onClick={() => void navigate(parentPath(path))}
-              disabled={atRoot || !connected}
-              title="Up"
-              aria-label="Up one level"
-              className="text-content-muted hover:text-content disabled:opacity-30 mr-0.5 transition-colors leading-none"
-            >
-              <ArrowUp size={12} />
-            </button>
-            <Breadcrumb
-              path={path}
-              navigate={(target) => void navigate(target)}
-            />
-          </div>
+          <PathBar
+            path={path}
+            borderAccent={borderAccent}
+            connected={connected}
+            navigate={(target) => void navigate(target)}
+            onNewFolder={canCreateFolders ? () => setNewFolderOpen(true) : null}
+            newFolderBlockedBy={serialMode ? "serial" : hasRunningTransfer ? "transfer" : !connected || loading ? "busy" : null}
+          />
 
           <div className="flex-1 overflow-y-auto">
             <ListingMessage connected={connected} error={error} empty={files.length === 0 && !loading} />
@@ -258,6 +329,7 @@ export function FsPane({
                 onRun={handleRun}
                 onDownload={(target) => void handleDownload(target)}
                 onDelete={setDeleteTarget}
+                canDeleteFolder={canDeleteFolders}
               />
             ))}
           </div>

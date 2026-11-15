@@ -33,6 +33,8 @@ describe("registerFluidncIpcHandlers", () => {
       listSDFiles: vi.fn(),
       fetchFileText: vi.fn(),
       deleteFile: vi.fn(),
+      createSdFolder: vi.fn(),
+      deleteSdFolder: vi.fn(),
       runFile: vi.fn(),
       pauseJob: vi.fn(),
       resumeJob: vi.fn(),
@@ -54,6 +56,8 @@ describe("registerFluidncIpcHandlers", () => {
       listSDFiles: vi.fn(),
       fetchFileText: vi.fn(),
       deleteFile: vi.fn(),
+      createSdFolder: vi.fn(),
+      deleteSdFolder: vi.fn(),
       runFile: vi.fn(),
       sendRealtime: vi.fn(),
       listPorts: vi.fn(),
@@ -131,6 +135,10 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.serial.fetchFileText).toHaveBeenCalledWith("/c.gcode", "sdcard");
     expect(deps.serial.deleteFile).toHaveBeenCalledWith("/d.gcode", "sd");
     expect(deps.serial.runFile).toHaveBeenCalledWith("/e.gcode", "sd");
+    await call("fluidnc:createSdFolder", "/f");
+    await call("fluidnc:deleteSdFolder", "/g");
+    expect(deps.serial.createSdFolder).toHaveBeenCalledWith("/f");
+    expect(deps.serial.deleteSdFolder).toHaveBeenCalledWith("/g");
 
     deps.setCurrentType("wifi");
     await call("fluidnc:sendCommand", "$H");
@@ -145,6 +153,10 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.fluidnc.fetchFileText).toHaveBeenCalledWith("/c.gcode", undefined);
     expect(deps.fluidnc.deleteFile).toHaveBeenCalledWith("/d.gcode", "fs");
     expect(deps.fluidnc.runFile).toHaveBeenCalledWith("/e.gcode", undefined);
+    await call("fluidnc:createSdFolder", "/f");
+    await call("fluidnc:deleteSdFolder", "/g");
+    expect(deps.fluidnc.createSdFolder).toHaveBeenCalledWith("/f");
+    expect(deps.fluidnc.deleteSdFolder).toHaveBeenCalledWith("/g");
   });
 
   it("sends realtime controls over serial transport", async () => {
