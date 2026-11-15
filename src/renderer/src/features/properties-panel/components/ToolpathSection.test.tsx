@@ -113,6 +113,33 @@ describe("ToolpathSection", () => {
     expect(onSetColorized).toHaveBeenCalledWith(false);
   });
 
+  it("shows a slashed palette when colorize is off, like the eye toggle", () => {
+    const props = {
+      toolpath: buildToolpath(),
+      fileName: "sample.gcode",
+      selected: false,
+      visible: true,
+      opacity: 1,
+      isJobActive: false,
+      fallbackFeedrate: 300,
+      onToggleSelected: () => {},
+      onSetVisible: () => {},
+      onSetColorized: () => {},
+      onSetOpacity: () => {},
+      onClear: () => {},
+    };
+    const { rerender } = render(<ToolpathSection {...props} colorized />);
+    expect(screen.queryByTestId("palette-off-icon")).toBeNull();
+
+    rerender(<ToolpathSection {...props} colorized={false} />);
+    const enable = screen.getByRole("button", {
+      name: /Enable colorized toolpath/i,
+    });
+    expect(
+      enable.querySelector('[data-testid="palette-off-icon"]'),
+    ).not.toBeNull();
+  });
+
   it("opens the G-code preview from the file icon without toggling the row", () => {
     const onToggleSelected = vi.fn();
     (window as unknown as { terraForge: unknown }).terraForge = {
@@ -123,7 +150,11 @@ describe("ToolpathSection", () => {
       <ToolpathSection
         toolpath={buildToolpath()}
         fileName="sample.gcode"
-        source={{ path: "/sample.gcode", name: "sample.gcode", source: "local" }}
+        source={{
+          path: "/sample.gcode",
+          name: "sample.gcode",
+          source: "local",
+        }}
         selected={false}
         visible
         colorized
@@ -138,7 +169,9 @@ describe("ToolpathSection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Preview G-code text" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview G-code text" }),
+    );
     expect(onToggleSelected).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeDefined();
   });
