@@ -1,4 +1,4 @@
-export type FluidNCHttpMethod = "GET" | "POST" | "DELETE";
+export type FluidNCHttpMethod = "GET" | "POST" | "DELETE" | "MKCOL";
 
 /** The controller answered, but with a non-2xx status. */
 export class FluidNCHttpError extends Error {
@@ -38,7 +38,7 @@ export class FluidNCRestClient {
   async get(
     path: string,
     timeoutMs = 10_000,
-    method: Extract<FluidNCHttpMethod, "GET" | "DELETE"> = "GET",
+    method: Extract<FluidNCHttpMethod, "GET" | "DELETE" | "MKCOL"> = "GET",
     signal?: AbortSignal,
   ): Promise<Response> {
     const url = `${this.baseUrl}${path}`;

@@ -37,6 +37,10 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
     invoke<string>("fluidnc:fetchFileText", remotePath, filesystem),
   deleteFile: (remotePath, source?) =>
     invoke<void>("fluidnc:deleteFile", remotePath, source),
+  createSdFolder: (folderPath) =>
+    invoke<void>("fluidnc:createSdFolder", folderPath),
+  deleteSdFolder: (folderPath) =>
+    invoke<void>("fluidnc:deleteSdFolder", folderPath),
   runFile: (remotePath, filesystem) =>
     invoke<void>("fluidnc:runFile", remotePath, filesystem),
   uploadGcode: (taskId, content, remotePath) =>
