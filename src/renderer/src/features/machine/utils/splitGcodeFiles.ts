@@ -277,7 +277,10 @@ export async function runSplitFiles(
     tasks,
     usedFilenames,
     moreFollow = false,
+    sdFolder = "",
   }: {
+    /** SD card folder to upload into, e.g. "/drawing" (created if missing); "" for the root. */
+    sdFolder?: string;
     config: MachineConfig;
     options: GcodeOptions;
     /** Where to save each file, or null not to. */
@@ -327,7 +330,7 @@ export async function runSplitFiles(
     }
     if (upload()) {
       try {
-        await window.terraForge.fluidnc.uploadGcode(uuid(), gcode, "/" + file.filename);
+        await window.terraForge.fluidnc.uploadGcode(uuid(), gcode, `${sdFolder}/${file.filename}`);
       } catch {
         // Failed or cancelled: the upload task toast already says so
       }

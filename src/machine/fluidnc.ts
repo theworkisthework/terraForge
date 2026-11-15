@@ -418,8 +418,13 @@ export class FluidNCClient extends EventEmitter {
     });
 
     form.append("path", targetDir);
+    // FluidNC writes a file where its multipart filename says, as the stock
+    // web UI sends it; `path` alone leaves it in the SD root. form-data
+    // strips a `filename` to its basename, so the folder goes in `filepath`.
     form.append("file", stream, {
-      filename: targetFilename,
+      ...(targetDir === "/"
+        ? { filename: targetFilename }
+        : { filepath: `${targetDir.replace(/\/$/, "")}/${targetFilename}` }),
       knownLength: total,
     });
 
@@ -473,6 +478,33 @@ export class FluidNCClient extends EventEmitter {
 
     await this.verifyUploadedFileSize(targetDir, targetFilename, total, signal);
     onProgress?.(100);
+  }
+
+  /**
+   * Creates `dir` on the SD card, and any parent of it, one level at a time.
+   * A level that is already listed is left alone, as asking the machine to
+   * create what exists only gives it more to fail on. Best effort otherwise:
+   * if a folder is truly missing the upload itself fails.
+   */
+  async ensureSdDirectory(dir: string): Promise<void> {
+    const parts = dir.split("/").filter(Boolean);
+    let parent = "/";
+    for (const name of parts) {
+      try {
+        const siblings = await this.listSDFiles(parent);
+        if (!siblings.some((f) => f.isDirectory && f.name === name)) {
+          // Slashes stay as they are in `path`: 3.x resets the connection on
+          // %2F (see listSDFiles). The name has none.
+          await this.restClient.get(
+            `/upload?path=${encodeRemotePath(parent)}&action=createdir&filename=${encodeURIComponent(name)}`,
+            10_000,
+          );
+        }
+      } catch {
+        // Not creatable: the upload decides.
+      }
+      parent = parent === "/" ? `/${name}` : `${parent}/${name}`;
+    }
   }
 
   private resolveUploadTarget(

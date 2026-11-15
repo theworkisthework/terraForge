@@ -595,6 +595,7 @@ describe("GcodeOptionsDialog", () => {
       pathDirectionMode: "minimize-travel",
       uploadToSd: true,
       saveLocally: false,
+      uploadSplitToFolder: true,
       exportPerLayer: false,
       exportPerColor: false,
       exportPerHatch: false,

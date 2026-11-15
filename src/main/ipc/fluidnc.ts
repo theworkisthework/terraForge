@@ -127,6 +127,9 @@ function registerTransferHandlers({ fluidnc, taskManager, pathGrants }: FluidNCI
     // to the SD card, not the local path.
     const remoteFilename = remotePath.split(/[\\/]/).pop()!;
     const tempPath = join(tmpdir(), `tf-${Date.now()}-${remoteFilename}`);
+    // An upload into a folder (split exports) makes the folder first.
+    const remoteDir = remotePath.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+    if (remoteDir) await fluidnc.ensureSdDirectory(remoteDir);
     try {
       await trackTransfer(taskId, "file-upload", `Uploading ${remoteFilename}`, async (onProgress, signal) => {
         await writeFile(tempPath, content, "utf-8");
