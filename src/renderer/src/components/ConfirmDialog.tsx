@@ -41,23 +41,10 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  const { ref, trapTab } = useModalFocus<HTMLDivElement>();
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // The dialog is modal: keep keys away from the window-level shortcuts
-    // behind it (canvas Delete/Escape/Space, flyout close on Escape).
-    e.stopPropagation();
-    trapTab(e);
-    if (e.key === "Escape") {
-      e.preventDefault();
-      (onCancel ?? onConfirm)();
-    } else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) {
-      // A focused button activates itself on Enter; handling it here too
-      // would confirm twice, or confirm when Cancel was the focused button.
-      e.preventDefault();
-      onConfirm();
-    }
-  };
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onCancel ?? onConfirm,
+    onEnter: onConfirm,
+  });
 
   return (
     <div
@@ -69,7 +56,7 @@ export function ConfirmDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) (onCancel ?? onConfirm)();
       }}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
       tabIndex={-1}
     >
       <div

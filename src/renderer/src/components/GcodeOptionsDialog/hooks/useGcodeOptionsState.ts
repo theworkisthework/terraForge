@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useCanvasStore } from "../../../store/canvasStore";
 import {
   loadGcodePrefs,
@@ -14,7 +14,6 @@ import { buildLayerDipOptions } from "../utils/buildLayerDipOptions";
 export type GcodeOptionsTab = "paths" | "options" | "ink" | "vinyl" | "output";
 
 interface UseGcodeOptionsStateArgs {
-  onCancel: () => void;
   onConfirm: (prefs: GcodePrefs) => void;
 }
 
@@ -38,10 +37,7 @@ export function togglePref(prefs: GcodePrefs, key: keyof GcodePrefs): GcodePrefs
   };
 }
 
-export function useGcodeOptionsState({
-  onCancel,
-  onConfirm,
-}: UseGcodeOptionsStateArgs) {
+export function useGcodeOptionsState({ onConfirm }: UseGcodeOptionsStateArgs) {
   const imports = useCanvasStore((s) => s.imports);
   const layerDipOptions = useMemo(
     () => buildLayerDipOptions(imports),
@@ -104,17 +100,11 @@ export function useGcodeOptionsState({
     onConfirm(prefs);
   };
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") onCancel();
-    if (event.key === "Enter" && !neitherOutput) handleConfirm();
-  };
-
   return {
     activeTab,
     customGcodeOpen,
     layerDipOptions,
     neitherOutput,
-    onKeyDown,
     prefs,
     setActiveTab,
     setClipMode,
