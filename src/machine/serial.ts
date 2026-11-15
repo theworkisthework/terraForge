@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import { SerialPort, ReadlineParser } from "serialport";
 import type { MachineStatus, RemoteFile } from "../types";
+import { splitFolderPath } from "./fluidnc";
 
 // ─── Status parser ────────────────────────────────────────────────────────────
 // Shared with FluidNCClient — same <...> format arrives over both WS and serial.
@@ -403,6 +404,25 @@ export class SerialClient extends EventEmitter {
         ? `$SD/Delete=${remotePath}`
         : `$LocalFS/Delete=${remotePath}`;
     await this.sendAndReceive(cmd);
+  }
+
+  /** FluidNC has no serial command that makes a folder. */
+  async createSdFolder(_folderPath: string): Promise<void> {
+    throw new Error("Creating folders is not available over serial");
+  }
+
+  /**
+   * Deletes a folder on the SD card, with everything in it. `$SD/Delete`
+   * takes folders as well as files; the parent is listed again to see that
+   * it went, as FluidNCClient.deleteSdFolder does.
+   */
+  async deleteSdFolder(folderPath: string): Promise<void> {
+    const { parent, name } = splitFolderPath(folderPath);
+    await this.sendAndReceive(`$SD/Delete=${folderPath}`);
+    const siblings = await this.listSDFiles(parent);
+    if (siblings.some((f) => f.isDirectory && f.name === name)) {
+      throw new Error(`The machine did not delete the folder "${name}"`);
+    }
   }
 
   /** Run a file from SD or internal FS. */

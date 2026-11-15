@@ -909,6 +909,10 @@ export interface FluidNCApi {
   ) => Promise<string>;
   deleteFile: (remotePath: string, source?: "sd" | "fs") => Promise<void>;
   runFile: (remotePath: string, filesystem?: "sd" | "fs") => Promise<void>;
+  /** Creates one folder on the SD card; its parent must exist. Wi-Fi only. */
+  createSdFolder: (folderPath: string) => Promise<void>;
+  /** Deletes a folder on the SD card and everything in it. */
+  deleteSdFolder: (folderPath: string) => Promise<void>;
   /**
    * Upload a G-code string directly to the machine SD card.
    * Main process writes a temp file, streams it via the existing upload

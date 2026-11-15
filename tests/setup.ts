@@ -135,6 +135,8 @@ if (typeof window !== "undefined") {
       downloadFile: vi.fn().mockResolvedValue(undefined),
       fetchFileText: vi.fn().mockResolvedValue(""),
       deleteFile: vi.fn().mockResolvedValue(undefined),
+      createSdFolder: vi.fn().mockResolvedValue(undefined),
+      deleteSdFolder: vi.fn().mockResolvedValue(undefined),
       runFile: vi.fn().mockResolvedValue(undefined),
       uploadGcode: vi.fn().mockResolvedValue(undefined),
       pauseJob: vi.fn().mockResolvedValue(undefined),

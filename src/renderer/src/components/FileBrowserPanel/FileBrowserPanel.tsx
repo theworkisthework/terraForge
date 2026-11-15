@@ -115,6 +115,8 @@ export function FileBrowserPanel({ onHide }: FileBrowserPanelProps = {}) {
             source="sd"
             listFn={listSdFiles}
             deleteFn={(p) => window.terraForge.fluidnc.deleteFile(p, "sd")}
+            createFolderFn={(p) => window.terraForge.fluidnc.createSdFolder(p)}
+            deleteFolderFn={(p) => window.terraForge.fluidnc.deleteSdFolder(p)}
             open={sdOpen}
             onToggle={() => setSdOpen((v) => !v)}
           />

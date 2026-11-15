@@ -468,6 +468,26 @@ describe("SerialClient file operations", () => {
     );
   });
 
+  it("deleteSdFolder sends $SD/Delete for the folder, then checks it is gone", async () => {
+    const send = vi
+      .spyOn(client as any, "sendAndReceive")
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(["[DIR:other]"]);
+    await client.deleteSdFolder("/plots/old");
+    expect(send.mock.calls.map(([cmd]) => cmd)).toEqual(["$SD/Delete=/plots/old", "$SD/List=/plots"]);
+  });
+
+  it("deleteSdFolder says so when the folder is still listed", async () => {
+    vi.spyOn(client as any, "sendAndReceive")
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(["[DIR:old]"]);
+    await expect(client.deleteSdFolder("/old")).rejects.toThrow(/did not delete the folder "old"/);
+  });
+
+  it("createSdFolder is not available over serial", async () => {
+    await expect(client.createSdFolder("/new")).rejects.toThrow(/not available over serial/);
+  });
+
   it("deleteFile sends $LocalFS/Delete for fs source", async () => {
     const p = client.deleteFile("/config.yaml", "fs");
     (client as any).handleLine("ok");

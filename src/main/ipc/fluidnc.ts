@@ -56,6 +56,14 @@ function registerMachineHandlers({ fluidnc, serial, getConnectionType, setConnec
     overSerial() ? serial.deleteFile(remotePath, source ?? "sd") : fluidnc.deleteFile(remotePath, source ?? "fs"),
   );
 
+  ipcMain.handle("fluidnc:createSdFolder", (_e, folderPath: string) =>
+    overSerial() ? serial.createSdFolder(folderPath) : fluidnc.createSdFolder(folderPath),
+  );
+
+  ipcMain.handle("fluidnc:deleteSdFolder", (_e, folderPath: string) =>
+    overSerial() ? serial.deleteSdFolder(folderPath) : fluidnc.deleteSdFolder(folderPath),
+  );
+
   ipcMain.handle("fluidnc:runFile", (_e, remotePath: string, filesystem?: "sd" | "fs") =>
     overSerial() ? serial.runFile(remotePath, filesystem ?? "sd") : fluidnc.runFile(remotePath, filesystem),
   );

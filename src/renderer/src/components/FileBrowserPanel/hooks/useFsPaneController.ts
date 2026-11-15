@@ -8,6 +8,7 @@ import { selectFileBrowserPaneCanvasState } from "../../../store/canvasSelectors
 import { parseGcode } from "../../../utils/gcodeParser";
 import { useStableMachineState } from "../../../hooks/useStableMachineState";
 import { isGcodeFile } from "../utils/pathUtils";
+import { describeError } from "../../../utils/unexpectedErrors";
 import type { RemoteFile, TaskStatus } from "../../../../../types";
 
 export interface FsPaneControllerProps {
@@ -17,6 +18,10 @@ export interface FsPaneControllerProps {
   source: "fs" | "sd";
   listFn: (path: string) => Promise<RemoteFile[]>;
   deleteFn: (path: string) => Promise<void>;
+  /** Makes a folder at a path. Given only where the filesystem has folders. */
+  createFolderFn?: (path: string) => Promise<void>;
+  /** Deletes a folder and everything in it. Given only where the filesystem has folders. */
+  deleteFolderFn?: (path: string) => Promise<void>;
   uploadFn: (
     localPath: string,
     remotePath: string,
@@ -40,6 +45,8 @@ export function useFsPaneController({
   source,
   listFn,
   deleteFn,
+  createFolderFn,
+  deleteFolderFn,
   uploadFn,
   upsertTask,
 }: FsPaneControllerProps) {
@@ -174,12 +181,10 @@ export function useFsPaneController({
     [doRun, gcodeSource, gcodeToolpath, hasRunningTransfer],
   );
 
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return;
-    await deleteFn(deleteTarget.path);
-    await navigate(path);
-    setDeleteTarget(null);
-  }, [deleteFn, deleteTarget, navigate, path]);
+  const deleteAndFolders = useFsDeleteAndFolders({
+    deleteTarget, setDeleteTarget, deleteFn, deleteFolderFn, createFolderFn,
+    navigate, path, source, upsertTask, setSelectedJobFile,
+  });
 
   const handleFileClick = useCallback(
     (file: RemoteFile) => {
@@ -215,8 +220,10 @@ export function useFsPaneController({
     handleUpload,
     handlePreview,
     handleRun,
-    handleDeleteConfirm,
+    ...deleteAndFolders,
     setDeleteTarget,
+    canCreateFolders: createFolderFn !== undefined,
+    canDeleteFolders: deleteFolderFn !== undefined,
     setPendingPreviewFile,
     setPendingRunFile,
     doPreview,
@@ -226,6 +233,82 @@ export function useFsPaneController({
     serialMode,
     connected,
   };
+}
+
+/**
+ * Deleting the confirmed file or folder, and making a new folder in the
+ * current one. Each re-lists the folder when done.
+ */
+function useFsDeleteAndFolders({
+  deleteTarget,
+  setDeleteTarget,
+  deleteFn,
+  deleteFolderFn,
+  createFolderFn,
+  navigate,
+  path,
+  source,
+  upsertTask,
+  setSelectedJobFile,
+}: {
+  deleteTarget: RemoteFile | null;
+  setDeleteTarget: (file: RemoteFile | null) => void;
+  deleteFn: FsPaneControllerProps["deleteFn"];
+  deleteFolderFn: FsPaneControllerProps["deleteFolderFn"];
+  createFolderFn: FsPaneControllerProps["createFolderFn"];
+  navigate: (target: string) => Promise<void>;
+  path: string;
+  source: "fs" | "sd";
+  upsertTask: FsPaneControllerProps["upsertTask"];
+  setSelectedJobFile: ReturnType<typeof useMachineStore.getState>["setSelectedJobFile"];
+}) {
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+
+  /** Deletes the confirmed file or folder, reporting it as a task: a whole
+   * folder can take a while, and the machine may refuse. */
+  const handleDeleteConfirm = useCallback(async () => {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    const remove = target.isDirectory ? deleteFolderFn : deleteFn;
+    if (!remove) return;
+    const what = target.isDirectory ? `folder ${target.name}` : target.name;
+    const taskId = uuid();
+    upsertTask({ id: taskId, type: "file-delete", label: `Deleting ${what}…`, progress: null, status: "running" });
+    try {
+      await remove(target.path);
+      // The job file went with it, if it was this or was inside this.
+      const jobFile = useMachineStore.getState().selectedJobFile;
+      if (jobFile?.source === source && (jobFile.path === target.path || jobFile.path.startsWith(`${target.path}/`))) {
+        setSelectedJobFile(null);
+      }
+      upsertTask({ id: taskId, type: "file-delete", label: `Deleted ${what}`, progress: 100, status: "completed" });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "file-delete",
+        label: `Could not delete ${what}`,
+        progress: null,
+        status: "error",
+        error: describeError(err),
+      });
+    }
+    await navigate(path);
+  }, [deleteFn, deleteFolderFn, deleteTarget, navigate, path, setSelectedJobFile, source, upsertTask]);
+
+  /** Makes `name` in the current folder, then lists it. Rejects, for the
+   * dialog to show, when the machine would not. */
+  const handleCreateFolder = useCallback(
+    async (name: string) => {
+      if (!createFolderFn) return;
+      await createFolderFn(`${path === "/" ? "" : path}/${name}`);
+      setNewFolderOpen(false);
+      await navigate(path);
+    },
+    [createFolderFn, navigate, path],
+  );
+
+  return { handleDeleteConfirm, newFolderOpen, setNewFolderOpen, handleCreateFolder };
 }
 
 /** Downloading a file from the machine and uploading one to the current
