@@ -23,6 +23,7 @@ const defaultPrefs: GcodePrefs = {
   pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
+  uploadSplitToFolder: true,
   exportPerLayer: false,
   joinPaths: false,
   joinTolerance: 0.2,

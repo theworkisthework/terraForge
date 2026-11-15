@@ -282,7 +282,7 @@ describe("FluidNCClient.uploadFile", () => {
     mockUploadVerification(client, 1024, ["job.gcode"]);
     await client.uploadFile("/local/test.gcode", "/job.gcode");
 
-    const fileCall = state.form!.append.mock.calls.find(([name]: [string]) => name === "file")!;
+    const fileCall = state.form!.append.mock.calls.find((call: unknown[]) => call[0] === "file")!;
     expect(fileCall[2]).toMatchObject({ filename: "job.gcode" });
     expect(fileCall[2]).not.toHaveProperty("filepath");
   });
