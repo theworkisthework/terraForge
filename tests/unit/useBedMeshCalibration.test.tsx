@@ -156,4 +156,50 @@ describe("useBedMeshCalibration", () => {
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G90 G21");
     expect(window.terraForge.fluidnc.getStatus).not.toHaveBeenCalled();
   });
+
+  it("starts the retract immediately when an idle status is already available", async () => {
+    const config = createMachineConfig({
+      id: "mesh-machine",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
+    });
+    const controller = {
+      form: config,
+      change: vi.fn(),
+      inputCls: "",
+      selectedId: config.id,
+      machineStore: {
+        connected: true,
+        activeConfigId: config.id,
+        status: createMachineStatus(),
+        updateConfig: vi.fn(),
+      },
+    } as unknown as MachineConfigDialogController;
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+    let startPromise!: Promise<void>;
+
+    await act(async () => {
+      startPromise = result.current.startCalibration("known");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sendCommand).toHaveBeenNthCalledWith(1, "G91 G21 G0 Z5");
+    expect(sendCommand).toHaveBeenNthCalledWith(2, "G90 G21");
+
+    await act(async () => {
+      publishIdleStatus();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G0 X0.000 Y0.000");
+
+    await act(async () => {
+      publishIdleStatus();
+      await startPromise;
+    });
+    expect(result.current.open).toBe(true);
+  });
 });

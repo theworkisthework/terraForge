@@ -10,15 +10,27 @@ import type { MachineConfigDialogController } from "../../hooks/useMachineConfig
 
 const STATUS_TIMEOUT_MS = 10_000;
 
+function requireCurrentIdleStatus(): MachineStatus {
+  const status = useMachineStore.getState().status;
+  if (
+    !status ||
+    status.state !== "Idle" ||
+    !Number.isFinite(status.wpos.x) ||
+    !Number.isFinite(status.wpos.y) ||
+    !Number.isFinite(status.wpos.z)
+  ) {
+    throw new Error("Wait for a valid idle machine status before continuing.");
+  }
+  return status;
+}
+
 async function retractZ(): Promise<void> {
   await window.terraForge.fluidnc.sendCommand("G91 G21 G0 Z5");
   await window.terraForge.fluidnc.sendCommand("G90 G21");
 }
 
-function waitForStableIdleStatus(): Promise<MachineStatus> {
+function waitForIdleStatus(): Promise<MachineStatus> {
   return new Promise((resolve, reject) => {
-    let lastPosition: MachineStatus["wpos"] | null = null;
-    let stableUpdates = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe = () => {};
     const finish = (status: MachineStatus) => {
@@ -35,29 +47,14 @@ function waitForStableIdleStatus(): Promise<MachineStatus> {
         !Number.isFinite(status.wpos.y) ||
         !Number.isFinite(status.wpos.z)
       ) {
-        lastPosition = null;
-        stableUpdates = 0;
         return;
       }
-
-      const position = status.wpos;
-      if (
-        lastPosition &&
-        Math.abs(lastPosition.x - position.x) < 0.001 &&
-        Math.abs(lastPosition.y - position.y) < 0.001 &&
-        Math.abs(lastPosition.z - position.z) < 0.001
-      ) {
-        stableUpdates++;
-      } else {
-        stableUpdates = 1;
-      }
-      lastPosition = position;
-      if (stableUpdates >= 2) finish(status);
+      finish(status);
     });
 
     timer = setTimeout(() => {
       unsubscribe();
-      reject(new Error("No stable idle status was received. Check the machine status connection and try again."));
+      reject(new Error("No idle status update was received. Check the machine status connection and try again."));
     }, STATUS_TIMEOUT_MS);
   });
 }
@@ -109,11 +106,11 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
 
   const move = async (point: BedMeshPoint) => {
     await retractZ();
-    await waitForStableIdleStatus();
+    await waitForIdleStatus();
     await window.terraForge.fluidnc.sendCommand(
       `G90 G21 G0 X${point.x.toFixed(3)} Y${point.y.toFixed(3)}`,
     );
-    return waitForStableIdleStatus();
+    return waitForIdleStatus();
   };
 
   useEffect(() => {
@@ -146,6 +143,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     busyRef.current = true;
     setJogging(true);
     try {
+      requireCurrentIdleStatus();
       const xMin = form.origin === "center" ? -form.bedWidth / 2 : 0;
       const yMin = form.origin === "center" ? -form.bedHeight / 2 : 0;
       const gridPoints = createBedMeshPoints(
@@ -158,9 +156,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
       );
       if (choice === "home") {
         await window.terraForge.fluidnc.sendCommand("$H");
-        await waitForStableIdleStatus();
-      } else {
-        await waitForStableIdleStatus();
+        await waitForIdleStatus();
       }
       await move(gridPoints[0]);
       setPoints(gridPoints);
@@ -184,7 +180,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     busyRef.current = true;
     setJogging(true);
     try {
-      const status = await waitForStableIdleStatus();
+      const status = requireCurrentIdleStatus();
       const nextDatumZ = datumZ ?? status.wpos.z;
       const offset = status.wpos.z - nextDatumZ;
       const updated = points.map((point, pointIndex) =>
@@ -199,7 +195,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
         return;
       }
       await retractZ();
-      await waitForStableIdleStatus();
+      await waitForIdleStatus();
       const xMinMM = form.origin === "center" ? -form.bedWidth / 2 : 0;
       const yMinMM = form.origin === "center" ? -form.bedHeight / 2 : 0;
       const profile: BedMesh = {
@@ -230,7 +226,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     setJogging(true);
     try {
       await retractZ();
-      await waitForStableIdleStatus();
+      await waitForIdleStatus();
       setOpen(false);
     } catch (err) {
       setError(`Could not retract the Z axis: ${String(err)}`);
@@ -246,11 +242,11 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     setJogging(true);
     try {
       setError(null);
-      await waitForStableIdleStatus();
+      requireCurrentIdleStatus();
       await window.terraForge.fluidnc.sendCommand(
         `$J=G91 G21 Z${delta.toFixed(3)} F${feedrate}`,
       );
-      const status = await waitForStableIdleStatus();
+      const status = await waitForIdleStatus();
       if (datumZ !== null) setZ(status.wpos.z - datumZ);
     } catch (err) {
       setError(`Z adjustment failed: ${String(err)}`);
@@ -266,16 +262,16 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     setJogging(true);
     try {
       setError(null);
-      await waitForStableIdleStatus();
+      requireCurrentIdleStatus();
       if (!positioningClearanceRaised.current) {
         await retractZ();
-        await waitForStableIdleStatus();
+        await waitForIdleStatus();
         positioningClearanceRaised.current = true;
       }
       await window.terraForge.fluidnc.sendCommand(
         `$J=G91 G21 ${axis}${delta.toFixed(3)} F${feedrate}`,
       );
-      await waitForStableIdleStatus();
+      await waitForIdleStatus();
     } catch (err) {
       setError(`Position adjustment failed: ${String(err)}`);
     } finally {
@@ -290,9 +286,8 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     setJogging(true);
     try {
       setError(null);
-      await waitForStableIdleStatus();
+      requireCurrentIdleStatus();
       await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
-      await waitForStableIdleStatus();
     } catch (err) {
       setError(`XY zero could not be set: ${String(err)}`);
     } finally {
