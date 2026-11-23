@@ -535,6 +535,41 @@ describe("FluidNCClient", () => {
     await expect(client.abortJob()).rejects.toThrow("fetch failed");
   });
 
+  it("job controls count an empty HTTP reply as acted on (FluidNC 4.1)", async () => {
+    mockFetch.mockResolvedValue(mockResponse(""));
+    await expect(client.pauseJob()).resolves.toBeUndefined();
+  });
+
+  // FluidNC 4.0.x runs a realtime byte sent over HTTP as a line of text and
+  // replies with its help text; the machine does not pause. This is the
+  // sequence from #170's log: commandText refused with no WebSocket, then plain.
+  it.each([
+    ["pauseJob", "!"],
+    ["resumeJob", "~"],
+    ["abortJob", "\x18"],
+  ] as const)("%s rejects when the machine ran %j as text, not as a realtime command", async (method, char) => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("WebSocket dead", 500))
+      .mockResolvedValueOnce(
+        mockResponse("HLP:$$ $+ $# $S $L $G $I $N $x=val $Nx=line $J=line $SLP $C $X $H $F $E=err ~ ! ? ctrl-x\n"),
+      );
+    await expect(client[method]()).rejects.toThrow(/did not act on it .*HLP:/);
+    expect(mockFetch.mock.calls[1][0]).toContain(`/command?plain=${encodeURIComponent(char)}`);
+  });
+
+  it("job controls reject an error reply over HTTP", async () => {
+    mockFetch.mockResolvedValue(mockResponse("error:20\n"));
+    await expect(client.pauseJob()).rejects.toThrow('did not act on it (it replied "error:20")');
+  });
+
+  it("job controls reject when HTTP is blocked during motion", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("WebSocket dead", 500))
+      .mockResolvedValueOnce(mockResponse("Try again when not moving\n", 503));
+    // Refused by the controller itself, before the reply is looked at.
+    await expect(client.pauseJob()).rejects.toThrow(/HTTP 503/);
+  });
+
   // ── Remote path encoding ────────────────────────────────────────────────
 
   it("encodeRemotePath encodes each segment but keeps the slashes", () => {
