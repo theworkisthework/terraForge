@@ -16,6 +16,7 @@ import {
   useFsPaneController,
   type FsPaneControllerProps,
 } from "../hooks/useFsPaneController";
+import { LISTING_PAUSED_DURING_JOB } from "../../../../../types";
 import type { RemoteFile } from "../../../../../types";
 
 /** Each pane's colours, written out in full so Tailwind finds them. */
@@ -163,6 +164,78 @@ function PathBar({
   );
 }
 
+/** Why the listing cannot be refreshed now. */
+const REFRESH_BLOCKED = {
+  transfer: "Refresh disabled during file transfer",
+  job: "Refresh disabled while a job is running",
+  busy: "Refresh",
+} as const;
+
+/** The pane's title bar: toggles the pane open, says when listing is
+ * paused for a job, and — when open — refreshes the listing. */
+function PaneHeader({
+  label,
+  open,
+  onToggle,
+  bgAccent,
+  labelColor,
+  btnColor,
+  listingPaused,
+  refreshBlockedBy,
+  loading,
+  onRefresh,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  bgAccent: string;
+  labelColor: string;
+  btnColor: string;
+  listingPaused: boolean;
+  refreshBlockedBy: keyof typeof REFRESH_BLOCKED | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}
+      onClick={onToggle}
+    >
+      <span className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}>
+        {open ? (
+          <ChevronDown size={10} className="inline-block align-middle" />
+        ) : (
+          <ChevronRight size={10} className="inline-block align-middle" />
+        )}{" "}
+        {label}
+      </span>
+      {/* Always mounted, so its text coming and going moves nothing. */}
+      <span
+        role="status"
+        aria-live="polite"
+        title={listingPaused ? `${LISTING_PAUSED_DURING_JOB}. It refreshes when the job ends.` : undefined}
+        className="ml-auto mr-2 min-w-0 truncate text-[10px] text-content-faint"
+      >
+        {listingPaused ? "Paused during job" : ""}
+      </span>
+      {open && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRefresh();
+          }}
+          disabled={refreshBlockedBy !== null}
+          aria-label="Refresh"
+          title={refreshBlockedBy ? REFRESH_BLOCKED[refreshBlockedBy] : "Refresh"}
+          className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
+        >
+          {loading ? "…" : <RefreshCw size={12} />}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface FsPaneProps extends FsPaneControllerProps {
   accentColor: "blue" | "purple";
   open: boolean;
@@ -189,6 +262,8 @@ export function FsPane({
     path,
     loading,
     error,
+    listingPaused,
+    jobInProgress,
     previewing,
     runningFile,
     activeJobPath,
@@ -254,39 +329,18 @@ export function FsPane({
         />
       )}
 
-      <div
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer select-none shrink-0 ${bgAccent}`}
-        onClick={onToggle}
-      >
-        <span
-          className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}
-        >
-          {open ? (
-            <ChevronDown size={10} className="inline-block align-middle" />
-          ) : (
-            <ChevronRight size={10} className="inline-block align-middle" />
-          )}{" "}
-          {label}
-        </span>
-        {open && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              void navigate(path);
-            }}
-            disabled={!connected || loading || hasRunningTransfer}
-            aria-label="Refresh"
-            title={
-              hasRunningTransfer
-                ? "Refresh disabled during file transfer"
-                : "Refresh"
-            }
-            className={`text-xs disabled:opacity-40 transition-colors ${btnColor}`}
-          >
-              {loading ? "…" : <RefreshCw size={12} />}
-          </button>
-        )}
-      </div>
+      <PaneHeader
+        label={label}
+        open={open}
+        onToggle={onToggle}
+        bgAccent={bgAccent}
+        labelColor={labelColor}
+        btnColor={btnColor}
+        listingPaused={listingPaused}
+        refreshBlockedBy={hasRunningTransfer ? "transfer" : jobInProgress ? "job" : !connected || loading ? "busy" : null}
+        loading={loading}
+        onRefresh={() => void navigate(path)}
+      />
 
       {!open ? null : (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

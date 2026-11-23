@@ -8,6 +8,7 @@ import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { lookup } from "dns/promises";
 import FormData from "form-data";
 import type { MachineStatus, RemoteFile } from "../types";
+import { isJobInProgress, LISTING_PAUSED_DURING_JOB } from "../types";
 import {
   parseSdRemoteFiles,
   parseRemoteFiles,
@@ -65,6 +66,18 @@ export class ConnectSupersededError extends Error {
   }
 }
 
+/**
+ * Thrown by a file listing asked for while the machine is part-way through a
+ * job. FluidNC 4.0.x drops every connection, and the job with it, when the
+ * SD card is listed over HTTP mid-job (#170).
+ */
+export class JobInProgressError extends Error {
+  constructor() {
+    super(LISTING_PAUSED_DURING_JOB);
+    this.name = "JobInProgressError";
+  }
+}
+
 export class FluidNCClient extends EventEmitter {
   private baseUrl = "";
   private restClient = new FluidNCRestClient();
@@ -92,6 +105,19 @@ export class FluidNCClient extends EventEmitter {
    * socket the user has since asked to close.
    */
   private connectAttempt = 0;
+  /**
+   * The state in the controller's latest status report, or null before the
+   * first report of this connection. File listings are refused while it
+   * says a job is in progress.
+   */
+  private machineState: MachineStatus["state"] | null = null;
+  /** How long a listing waits for the first status report of a connection,
+   * to learn whether a job is running, before going ahead regardless. */
+  private static firstStatusWaitMs = 3000;
+  /** The wait for the first status report of this connection, shared by
+   * every listing made meanwhile. Made once per connection, so a controller
+   * that never sends one does not slow every listing. */
+  private firstStatusWait: Promise<void> | null = null;
   private static readonly uploadVerifyMaxAttempts = 6;
   private static readonly uploadVerifyDelayMs = 300;
   /**
@@ -303,6 +329,7 @@ export class FluidNCClient extends EventEmitter {
   // ─── File Management ─────────────────────────────────────────────────────
 
   async listFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    await this.assertNoJobInProgress();
     const res = await this.restClient.get(
       `/files?path=${encodeRemotePath(remotePath)}`,
     );
@@ -318,6 +345,7 @@ export class FluidNCClient extends EventEmitter {
   // FluidNC 3.9.x slow SD: same endpoint but may need up to 30 s for init.
   // Directories are identified by size === "-1" (returned as a string).
   async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    await this.assertNoJobInProgress();
     // Use a generous 30 s timeout — SD card initialisation can be slow on
     // first access in FluidNC 3.x.
     //
@@ -345,6 +373,28 @@ export class FluidNCClient extends EventEmitter {
     }
 
     return parseSdRemoteFiles(remotePath, json);
+  }
+
+  /**
+   * Rejects with JobInProgressError while the machine is running, holding or
+   * at an open door. Just after connecting, before any status report, it
+   * first waits a moment for one: connecting to a machine mid-job lists both
+   * filesystems straight away.
+   */
+  private async assertNoJobInProgress(): Promise<void> {
+    if (this.machineState === null && this.wsEnabled) {
+      this.firstStatusWait ??= new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          this.off("status", done);
+          resolve();
+        };
+        const timer = setTimeout(done, FluidNCClient.firstStatusWaitMs);
+        this.on("status", done);
+      });
+      await this.firstStatusWait;
+    }
+    if (isJobInProgress(this.machineState)) throw new JobInProgressError();
   }
 
   /** Fetch the text content of a remote file (for G-code preview). */
@@ -851,6 +901,8 @@ export class FluidNCClient extends EventEmitter {
     wsPort?: number,
   ): Promise<void> {
     const attempt = ++this.connectAttempt;
+    this.machineState = null;
+    this.firstStatusWait = null;
     const assertCurrent = () => {
       if (attempt !== this.connectAttempt) throw new ConnectSupersededError();
     };
@@ -921,6 +973,8 @@ export class FluidNCClient extends EventEmitter {
   disconnectWebSocket(): void {
     // Overtakes a connect still waiting on its probe.
     this.connectAttempt++;
+    this.machineState = null;
+    this.firstStatusWait = null;
     this.fwMajor = null;
     this.fwInfo = null;
     disconnectFluidNCWebSocket(this.getWsState(), {
@@ -941,7 +995,10 @@ export class FluidNCClient extends EventEmitter {
     openFluidNCWebSocket(this.getWsState(), {
       parseStatus: parseMachineStatus,
       emitConsole: (message) => this.emit("console", message),
-      emitStatus: (status) => this.emit("status", status),
+      emitStatus: (status) => {
+        this.machineState = status.state;
+        this.emit("status", status);
+      },
       emitPing: () => this.emit("ping"),
       scheduleReconnect: (generation) => this.scheduleReconnect(generation),
       setWsPort: (port) => {

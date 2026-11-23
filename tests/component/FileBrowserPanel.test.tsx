@@ -12,6 +12,22 @@ import { useTaskStore } from "@renderer/store/taskStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { FileBrowserPanel } from "@renderer/components/FileBrowserPanel";
 import { createMachineConfig } from "../helpers/factories";
+import { LISTING_PAUSED_DURING_JOB } from "../../src/types";
+
+/** Puts the machine part-way through a job. Tests do it once the listing
+ * has arrived, as nothing is listed while a job is in progress (#170). */
+function setMachineState(state: "Run" | "Hold") {
+  act(() => {
+    useMachineStore.setState({
+      status: {
+        state,
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: `<${state}|MPos:0,0,0>`,
+      } as any,
+    });
+  });
+}
 
 beforeEach(() => {
   const cfg = createMachineConfig({
@@ -718,9 +734,10 @@ describe("FileBrowserPanel", () => {
       useMachineStore.setState({
         connected: true,
         selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
-        status: { state: "Run", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 }, raw: "<Run>" } as any,
       });
       render(<FileBrowserPanel />);
+      await screen.findByText("jobs");
+      setMachineState("Run");
       const del = await screen.findByRole("button", { name: "Delete folder" });
       expect(del).toBeDisabled();
       expect(del).toHaveAttribute("title", "Unavailable while a job is running");
@@ -947,18 +964,12 @@ describe("FileBrowserPanel", () => {
     useMachineStore.setState({
       connected: true,
       selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
-      status: {
-        state: "Run" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Run|MPos:0,0,0>",
-        activeJobPath: "/run.gcode",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("run.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Run");
     expect(screen.getByTitle("Pause job")).toBeInTheDocument();
     await userEvent.click(screen.getByTitle("Pause job"));
     expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
@@ -985,18 +996,12 @@ describe("FileBrowserPanel", () => {
         source: "sd",
         name: "held.gcode",
       },
-      status: {
-        state: "Hold" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Hold|MPos:0,0,0>",
-        activeJobPath: "/held.gcode",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("held.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Hold");
     expect(screen.getByTitle("Resume job")).toBeInTheDocument();
     await userEvent.click(screen.getByTitle("Resume job"));
     expect(window.terraForge.fluidnc.resumeJob).toHaveBeenCalled();
@@ -1019,17 +1024,12 @@ describe("FileBrowserPanel", () => {
     useMachineStore.setState({
       connected: true,
       selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
-      status: {
-        state: "Run" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Run|MPos:0,0,0>",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("run.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Run");
 
     vi.useFakeTimers();
 
@@ -1064,6 +1064,84 @@ describe("FileBrowserPanel", () => {
     const row = screen.getByTestId("file-row-run.gcode");
     fireEvent.mouseOver(row);
     expect(screen.getByTitle("Run job now")).toBeInTheDocument();
+  });
+
+  // ── No listing while a job is in progress (#170) ────────────────────
+  // FluidNC 4.0.x drops every connection, and the job with it, when the SD
+  // card is listed mid-job.
+
+  describe("while a job is in progress", () => {
+    const listSd = () => window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>;
+    const listFs = () => window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>;
+    const sdStatus = () => screen.getAllByRole("status")[1];
+
+    function setIdle() {
+      act(() => {
+        useMachineStore.setState({
+          status: { state: "Idle", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 }, raw: "<Idle>" } as any,
+        });
+      });
+    }
+
+    beforeEach(() => {
+      listSd().mockResolvedValue([{ name: "job.gcode", path: "/job.gcode", size: 10, isDirectory: false }]);
+      listFs().mockResolvedValue([]);
+    });
+
+    it("lists nothing on connecting mid-job, says so, and lists once the job ends", async () => {
+      useMachineStore.setState({
+        connected: true,
+        status: { state: "Run", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 }, raw: "<Run>" } as any,
+      });
+      render(<FileBrowserPanel />);
+      await act(async () => {});
+      expect(listSd()).not.toHaveBeenCalled();
+      expect(listFs()).not.toHaveBeenCalled();
+      expect(sdStatus()).toHaveTextContent("Paused during job");
+      expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
+
+      setIdle();
+      // Past the grace period that rides out brief Idle blips mid-job.
+      await waitFor(() => expect(screen.getByText("job.gcode")).toBeInTheDocument());
+      expect(listSd()).toHaveBeenCalledWith("/");
+      expect(sdStatus()).toHaveTextContent("");
+    });
+
+    it("treats a listing the main process refused as paused, not as an error", async () => {
+      listSd().mockRejectedValueOnce(
+        new Error(`Error invoking remote method 'fluidnc:listSDFiles': Error: ${LISTING_PAUSED_DURING_JOB}`),
+      );
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await waitFor(() => expect(sdStatus()).toHaveTextContent("Paused during job"));
+      expect(screen.queryByText(/Error invoking/)).not.toBeInTheDocument();
+
+      // The machine's state reaches the renderer: a job, then its end.
+      setMachineState("Run");
+      setIdle();
+      await waitFor(() => expect(screen.getByText("job.gcode")).toBeInTheDocument());
+    });
+
+    it("does not re-list when files change mid-job, but does once it ends", async () => {
+      let onMessage: (msg: string) => void = () => {};
+      (window.terraForge.fluidnc.onConsoleMessage as ReturnType<typeof vi.fn>).mockImplementation((cb) => {
+        onMessage = cb;
+        return () => {};
+      });
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await screen.findByText("job.gcode");
+      setMachineState("Run");
+      listSd().mockClear();
+
+      act(() => onMessage("[MSG:Files changed]"));
+      await act(async () => {});
+      expect(listSd()).not.toHaveBeenCalled();
+      expect(sdStatus()).toHaveTextContent("Paused during job");
+
+      setIdle();
+      await waitFor(() => expect(listSd()).toHaveBeenCalledWith("/"));
+    });
   });
 
   // ── Drag-to-resize divider ──────────────────────────────────────────
