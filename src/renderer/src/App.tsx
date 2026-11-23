@@ -129,20 +129,21 @@ function AppShell() {
         <aside
           className={`${showFileBrowser ? "w-60 overflow-hidden" : "w-9 overflow-visible"} bg-panel border-r border-border-ui shrink-0 transition-[width] duration-200 ease-in-out`}
         >
-          {showFileBrowser ? (
-            <div className="h-full flex flex-col">
-              <div className="flex-1 min-h-0">
-                <PanelBoundary name="file browser">
-                  <FileBrowserPanel onHide={() => setShowFileBrowser(false)} />
-                </PanelBoundary>
-              </div>
-              <div className="h-40 border-t border-border-ui shrink-0">
-                <PanelBoundary name="job controls">
-                  <JobControls />
-                </PanelBoundary>
-              </div>
+          {/* Hidden rather than unmounted, so showing it again does not list
+              both filesystems afresh — mid-job, that can crash the machine (#170). */}
+          <div hidden={!showFileBrowser} className="h-full flex flex-col">
+            <div className="flex-1 min-h-0">
+              <PanelBoundary name="file browser">
+                <FileBrowserPanel onHide={() => setShowFileBrowser(false)} />
+              </PanelBoundary>
             </div>
-          ) : (
+            <div className="h-40 border-t border-border-ui shrink-0">
+              <PanelBoundary name="job controls">
+                <JobControls />
+              </PanelBoundary>
+            </div>
+          </div>
+          {!showFileBrowser && (
             <CollapsedFileBrowser
               onShow={() => setShowFileBrowser(true)}
               onAbort={() => setShowCollapsedAbortConfirm(true)}

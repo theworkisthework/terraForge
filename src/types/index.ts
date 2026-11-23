@@ -880,6 +880,18 @@ export interface MachineStatus {
   lineTotal?: number;
 }
 
+/**
+ * Whether the machine is part-way through a job: running, held, or stopped
+ * at an open door. Listing files then is refused — FluidNC 4.0.x drops every
+ * connection when asked to list the SD card mid-job, and the job with it (#170).
+ */
+export function isJobInProgress(state: MachineStatus["state"] | null | undefined): boolean {
+  return state === "Run" || state === "Hold" || state === "Door";
+}
+
+/** The error a file listing is refused with while a job is in progress. */
+export const LISTING_PAUSED_DURING_JOB = "File listing is paused while a job is running";
+
 // ─── IPC / Preload API Contract ───────────────────────────────────────────────
 
 export interface FluidNCApi {

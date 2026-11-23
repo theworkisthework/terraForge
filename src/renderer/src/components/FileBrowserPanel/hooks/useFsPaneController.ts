@@ -9,6 +9,7 @@ import { parseGcode } from "../../../utils/gcodeParser";
 import { useStableMachineState } from "../../../hooks/useStableMachineState";
 import { isGcodeFile } from "../utils/pathUtils";
 import { describeError } from "../../../utils/unexpectedErrors";
+import { isJobInProgress, LISTING_PAUSED_DURING_JOB } from "../../../../../types";
 import type { RemoteFile, TaskStatus } from "../../../../../types";
 
 export interface FsPaneControllerProps {
@@ -71,8 +72,10 @@ export function useFsPaneController({
   );
 
   const hasRunningTransfer = useMemo(() => anyTransferRunning(tasks), [tasks]);
+  const jobInProgress = isJobInProgress(displayMachineState);
 
-  const { files, path, loading, error, navigate, pendingRefreshRef } = useFsListing(connected, listFn, hasRunningTransfer);
+  const listing = useFsListing(connected, listFn, hasRunningTransfer, jobInProgress);
+  const { files, path, loading, error, listingPaused, navigate, pendingRefreshRef } = listing;
 
   const { handleDownload, handleUpload } = useFsTransfers({
     hasRunningTransfer,
@@ -204,6 +207,8 @@ export function useFsPaneController({
     path,
     loading,
     error,
+    listingPaused,
+    jobInProgress,
     previewing,
     runningFile,
     activeJobPath,
@@ -365,30 +370,58 @@ function useFsTransfers({
  * A folder listing on the machine: the root when connected, cleared when
  * not. It re-lists when FluidNC reports files changed — after any running
  * transfer finishes, so a half-written upload is not listed.
+ *
+ * Nothing is listed while a job is in progress: FluidNC 4.0.x drops every
+ * connection, and the job with it, when asked to list the SD card mid-job
+ * (#170). A listing asked for meanwhile — or refused by the main process,
+ * which may know of the job first — is held back, the last listing stays
+ * shown, and the folder is listed again once the job is over.
  */
-function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"], hasRunningTransfer: boolean) {
+function useFsListing(
+  connected: boolean,
+  listFn: FsPaneControllerProps["listFn"],
+  hasRunningTransfer: boolean,
+  jobInProgress: boolean,
+) {
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [path, setPath] = useState("/");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** A listing is waiting for the job to end. */
+  const [listingPaused, setListingPaused] = useState(false);
   const pendingRefreshRef = useRef(false);
+  // Read through a ref so `navigate` keeps its identity as jobs start and
+  // stop — the effect listing the root on connect depends on it.
+  const jobInProgressRef = useRef(jobInProgress);
+  jobInProgressRef.current = jobInProgress;
+
+  const holdBack = useCallback(() => {
+    pendingRefreshRef.current = true;
+    setListingPaused(true);
+  }, []);
 
   const navigate = useCallback(
     async (target: string) => {
       if (!connected) return;
+      if (jobInProgressRef.current) {
+        holdBack();
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
         const list = await listFn(target);
         setFiles(list);
         setPath(target);
+        setListingPaused(false);
       } catch (err) {
-        setError(String(err));
+        if (String(err).includes(LISTING_PAUSED_DURING_JOB)) holdBack();
+        else setError(String(err));
       } finally {
         setLoading(false);
       }
     },
-    [connected, listFn],
+    [connected, listFn, holdBack],
   );
 
   useEffect(() => {
@@ -399,6 +432,8 @@ function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"
     setFiles([]);
     setPath("/");
     setError(null);
+    setListingPaused(false);
+    pendingRefreshRef.current = false;
   }, [connected, navigate]);
 
   useEffect(() => {
@@ -414,12 +449,12 @@ function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"
   }, [connected, hasRunningTransfer, navigate, path]);
 
   useEffect(() => {
-    if (!connected || hasRunningTransfer || !pendingRefreshRef.current) return;
+    if (!connected || hasRunningTransfer || jobInProgress || !pendingRefreshRef.current) return;
     pendingRefreshRef.current = false;
     navigate(path);
-  }, [connected, hasRunningTransfer, navigate, path]);
+  }, [connected, hasRunningTransfer, jobInProgress, navigate, path]);
 
-  return { files, path, loading, error, navigate, pendingRefreshRef };
+  return { files, path, loading, error, listingPaused, navigate, pendingRefreshRef };
 }
 
 /**

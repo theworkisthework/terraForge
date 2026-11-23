@@ -3,7 +3,9 @@ import {
   FluidNCClient,
   ConnectSupersededError,
   encodeRemotePath,
+  JobInProgressError,
 } from "../../src/machine/fluidnc";
+import { LISTING_PAUSED_DURING_JOB } from "../../src/types";
 
 // ── Mock WebSocket from "ws" ──────────────────────────────────────────────────
 // vi.hoisted creates a value accessible in vi.mock factories (they're both
@@ -1025,6 +1027,79 @@ describe("FluidNCClient", () => {
   });
 
   // ── openWs WebSocket event handlers ────────────────────────────────────
+
+  // ── No listing while a job is in progress (#170) ────────────────────────
+  // FluidNC 4.0.x drops every connection, and the job with it, when the SD
+  // card is listed over HTTP mid-job.
+
+  describe("file listing during a job", () => {
+    beforeEach(() => {
+      (client as any).wsEnabled = true;
+      (client as any).openWs();
+    });
+
+    afterEach(() => {
+      (client as any).wsEnabled = false;
+      vi.useRealTimers();
+    });
+
+    const report = (raw: string) =>
+      wsCapture.instances[wsCapture.instances.length - 1].emit("message", raw);
+    const sdListing = () => mockResponse({ files: [], path: "/", status: "ok" });
+
+    it.each(["<Run|MPos:0,0,0>", "<Hold:0|MPos:0,0,0>", "<Door:1|MPos:0,0,0>"])(
+      "refuses both listings without asking the machine while it reports %s",
+      async (raw) => {
+        report(raw);
+        await expect(client.listSDFiles("/")).rejects.toBeInstanceOf(JobInProgressError);
+        await expect(client.listFiles("/")).rejects.toThrow(LISTING_PAUSED_DURING_JOB);
+        expect(mockFetch).not.toHaveBeenCalled();
+      },
+    );
+
+    it("lists again once the machine reports Idle", async () => {
+      report("<Run|MPos:0,0,0>");
+      await expect(client.listSDFiles("/")).rejects.toBeInstanceOf(JobInProgressError);
+      report("<Idle|MPos:0,0,0>");
+      mockFetch.mockResolvedValueOnce(sdListing());
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+
+    it("waits for the first status report after connecting, and refuses if a job is running", async () => {
+      const sd = client.listSDFiles("/");
+      const fs = client.listFiles("/");
+      await Promise.resolve();
+      expect(mockFetch).not.toHaveBeenCalled();
+      report("<Run|MPos:0,0,0>");
+      await expect(sd).rejects.toBeInstanceOf(JobInProgressError);
+      await expect(fs).rejects.toBeInstanceOf(JobInProgressError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("lists after the first status report when the machine is idle", async () => {
+      mockFetch.mockResolvedValueOnce(sdListing());
+      const sd = client.listSDFiles("/");
+      report("<Idle|MPos:0,0,0>");
+      await expect(sd).resolves.toEqual([]);
+    });
+
+    it("goes ahead, once, when no status report arrives", async () => {
+      vi.useFakeTimers();
+      mockFetch.mockResolvedValue(sdListing());
+      const first = client.listSDFiles("/");
+      await vi.advanceTimersByTimeAsync(3000);
+      await expect(first).resolves.toEqual([]);
+      // A controller that never reports does not slow every listing.
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+
+    it("forgets the last state on disconnect", async () => {
+      report("<Run|MPos:0,0,0>");
+      client.disconnectWebSocket();
+      mockFetch.mockResolvedValueOnce(sdListing());
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+  });
 
   describe("openWs event handlers", () => {
     beforeEach(() => {
