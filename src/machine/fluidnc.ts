@@ -56,6 +56,15 @@ export function splitFolderPath(folderPath: string): { parent: string; name: str
 }
 
 /**
+ * Whether an HTTP reply to a realtime command shows the machine took it as
+ * one: nothing, or only "ok". FluidNC sends no output for a realtime byte;
+ * help text or an error means it ran the byte as a line of text instead.
+ */
+function isRealtimeAccepted(reply: string): boolean {
+  return reply.split(/\r?\n/).every((line) => line.trim() === "" || line.trim() === "ok");
+}
+
+/**
  * Thrown by `connectWebSocket` when a disconnect, or a newer connect, arrived
  * while it was still resolving and probing the controller.
  */
@@ -314,6 +323,11 @@ export class FluidNCClient extends EventEmitter {
    * otherwise through the HTTP command endpoint (which may work, depending on
    * the firmware version). Rejects when neither delivers it, so a Pause or an
    * Abort that never left this machine is not reported as sent.
+   *
+   * Over HTTP, the reply must also show the byte was taken as a realtime
+   * command: empty, or "ok". FluidNC 4.0.x runs it as a line of text
+   * instead and replies with its help text, and with HTTP/BlockDuringMotion
+   * off it does so even mid-job — so the machine keeps moving.
    */
   private async sendRealtime(char: string): Promise<void> {
     const ws = this.ws;
@@ -323,7 +337,11 @@ export class FluidNCClient extends EventEmitter {
       });
       return;
     }
-    await this.sendCommand(char);
+    const reply = await this.sendCommand(char);
+    if (!isRealtimeAccepted(reply)) {
+      const preview = reply.trim().split("\n")[0].slice(0, 80);
+      throw new Error(`The machine did not act on it (it replied "${preview}")`);
+    }
   }
 
   // ─── File Management ─────────────────────────────────────────────────────
