@@ -239,6 +239,70 @@ describe("remapLayerMetadata", () => {
   });
 });
 
+describe("remapLayerMetadata lookup", () => {
+  // The old rule, comparing every subpath with every original in order.
+  function bruteForce(
+    previous: {
+      points: { x: number; y: number }[];
+      layer?: string;
+      color?: string;
+    }[],
+    first: { x: number; y: number },
+  ) {
+    let best = previous[0];
+    let bestScore = Infinity;
+    let ambiguous = false;
+    for (const c of previous) {
+      const end = c.points[c.points.length - 1];
+      const score = Math.min(
+        Math.hypot(first.x - c.points[0].x, first.y - c.points[0].y),
+        Math.hypot(first.x - end.x, first.y - end.y),
+      );
+      if (score < bestScore - 1e-9) {
+        bestScore = score;
+        best = c;
+        ambiguous = false;
+      } else if (
+        score <= bestScore + 1e-9 &&
+        (c.layer !== best.layer || c.color !== best.color)
+      ) {
+        ambiguous = true;
+      }
+    }
+    return { best, ambiguous };
+  }
+
+  it("matches checking every original, ties included", async () => {
+    let seed = 4;
+    const rnd = () =>
+      (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (const size of [4, 30, 200]) {
+      const previous = Array.from({ length: 600 }, () => ({
+        points: Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({
+          x: Math.floor(rnd() * size),
+          y: Math.floor(rnd() * size),
+        })),
+        layer: rnd() < 0.5 ? "A" : "B",
+        color: rnd() < 0.5 ? "#f00" : "#00f",
+      }));
+      const next = previous
+        .map((sp) => (rnd() < 0.5 ? [...sp.points].reverse() : sp.points))
+        .reverse();
+      const result = await remapLayerMetadata(previous, next);
+      let ambiguous = 0;
+      next.forEach((points, i) => {
+        const expected = bruteForce(previous, points[0]);
+        if (expected.ambiguous) ambiguous++;
+        expect([result?.subpaths[i].layer, result?.subpaths[i].color]).toEqual([
+          expected.best.layer,
+          expected.best.color,
+        ]);
+      });
+      expect(result?.ambiguous).toBe(ambiguous);
+    }
+  });
+});
+
 describe("approximateObjectSubpaths", () => {
   it("draws each command straight to its end point, closing on Z and splitting on M", () => {
     const obj = createVectorObject({

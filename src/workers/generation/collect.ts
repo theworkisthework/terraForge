@@ -80,35 +80,188 @@ export interface RemapHooks {
 const sameLabel = (a: TravelSubpath, b: TravelSubpath) =>
   a.layer === b.layer && a.color === b.color;
 
-/** The original nearest `first` (by its start or end), and whether an
- * original with another layer or colour was just as near. */
-function nearestOriginal(
+/** Two scores within this many mm count as a tie. */
+const TIE_MM = 1e-9;
+/** Originals this close to the nearest are rechecked one by one in input
+ * order, which is what decides ties (see `pickNearest`). */
+const NEAR_MM = 3 * TIE_MM;
+
+const isFinitePoint = (p: { x: number; y: number } | undefined) =>
+  !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+/**
+ * The originals' start and end points bucketed into a grid of about
+ * sqrt(n)×sqrt(n) cells. A lookup scans outward from the query ring by ring
+ * and stops once everything further out is further away than the nearest
+ * end found. Originals with a non-finite end are left out: their score is
+ * NaN, so they can never match.
+ */
+interface EndpointIndex {
+  cells: number[][];
+  cols: number;
+  rows: number;
+  xMin: number;
+  yMin: number;
+  cw: number;
+  ch: number;
+}
+
+function buildEndpointIndex(previous: TravelSubpath[]): EndpointIndex {
+  let xMin = Infinity,
+    yMin = Infinity,
+    xMax = -Infinity,
+    yMax = -Infinity;
+  const usable: number[] = [];
+  previous.forEach((sp, i) => {
+    const start = sp.points[0];
+    const end = sp.points[sp.points.length - 1];
+    if (!isFinitePoint(start) || !isFinitePoint(end)) return;
+    usable.push(i);
+    for (const { x, y } of [start, end]) {
+      xMin = Math.min(xMin, x);
+      yMin = Math.min(yMin, y);
+      xMax = Math.max(xMax, x);
+      yMax = Math.max(yMax, y);
+    }
+  });
+  const cols = Math.max(1, Math.ceil(Math.sqrt(previous.length)));
+  const rows = cols;
+  const cw = (xMax - xMin + 1e-9) / cols;
+  const ch = (yMax - yMin + 1e-9) / rows;
+  const index = { cells: [] as number[][], cols, rows, xMin, yMin, cw, ch };
+  index.cells = Array.from({ length: rows * cols }, () => []);
+  for (const i of usable) {
+    const { points } = previous[i];
+    const a = cellOf(index, points[0]);
+    const b = cellOf(index, points[points.length - 1]);
+    index.cells[a].push(i);
+    if (b !== a) index.cells[b].push(i);
+  }
+  return index;
+}
+
+const colOf = (g: EndpointIndex, x: number) =>
+  Math.min(g.cols - 1, Math.max(0, Math.floor((x - g.xMin) / g.cw)));
+const rowOf = (g: EndpointIndex, y: number) =>
+  Math.min(g.rows - 1, Math.max(0, Math.floor((y - g.yMin) / g.ch)));
+const cellOf = (g: EndpointIndex, p: { x: number; y: number }) =>
+  rowOf(g, p.y) * g.cols + colOf(g, p.x);
+
+/** How near to (x, y) a point could be in a cell more than `ring` steps
+ * from (cc, cr); Infinity when there are none. Slightly under, so rounding
+ * never ends a lookup early. */
+function beyondRing(
+  g: EndpointIndex,
+  cc: number,
+  cr: number,
+  ring: number,
+  x: number,
+  y: number,
+): number {
+  let bound = Infinity;
+  if (cc - ring > 0) bound = Math.min(bound, x - (g.xMin + (cc - ring) * g.cw));
+  if (cc + ring < g.cols - 1)
+    bound = Math.min(bound, g.xMin + (cc + ring + 1) * g.cw - x);
+  if (cr - ring > 0) bound = Math.min(bound, y - (g.yMin + (cr - ring) * g.ch));
+  if (cr + ring < g.rows - 1)
+    bound = Math.min(bound, g.yMin + (cr + ring + 1) * g.ch - y);
+  return bound - ((g.cw + g.ch) * 1e-6 + 1e-9);
+}
+
+/** Calls `visit` with each cell exactly `ring` steps from (cc, cr). */
+function forEachRingCell(
+  g: EndpointIndex,
+  cc: number,
+  cr: number,
+  ring: number,
+  visit: (cell: number[]) => void,
+) {
+  const top = cr - ring,
+    bottom = cr + ring,
+    left = cc - ring,
+    right = cc + ring;
+  for (let r = Math.max(0, top); r <= Math.min(g.rows - 1, bottom); r++) {
+    if (r === top || r === bottom) {
+      for (let c = Math.max(0, left); c <= Math.min(g.cols - 1, right); c++)
+        visit(g.cells[r * g.cols + c]);
+    } else {
+      if (left >= 0) visit(g.cells[r * g.cols + left]);
+      if (right < g.cols) visit(g.cells[r * g.cols + right]);
+    }
+  }
+}
+
+/**
+ * Of originals sorted by input order with their scores, the one taken as
+ * nearest and whether one with another layer or colour was just as near:
+ * each in turn replaces the best if it is nearer by more than a tie, and a
+ * later one within a tie of the best, on another label, makes it ambiguous.
+ */
+function pickNearest(
   previous: TravelSubpath[],
-  first: { x: number; y: number },
+  candidates: { idx: number; score: number }[],
 ) {
   let best = previous[0];
   let bestScore = Number.POSITIVE_INFINITY;
   let ambiguous = false;
-  for (const candidate of previous) {
-    const start = candidate.points[0];
-    const end = candidate.points[candidate.points.length - 1];
-    const score = Math.min(distanceMM(first, start), distanceMM(first, end));
-    if (score < bestScore - 1e-9) {
+  for (const { idx, score } of candidates) {
+    const candidate = previous[idx];
+    if (score < bestScore - TIE_MM) {
       bestScore = score;
       best = candidate;
       ambiguous = false;
-    } else if (score <= bestScore + 1e-9 && !sameLabel(candidate, best)) {
+    } else if (score <= bestScore + TIE_MM && !sameLabel(candidate, best)) {
       ambiguous = true;
     }
   }
   return { best, ambiguous };
 }
 
+/** The original nearest `first` (by its start or end), and whether an
+ * original with another layer or colour was just as near. */
+function nearestOriginal(
+  previous: TravelSubpath[],
+  index: EndpointIndex,
+  first: { x: number; y: number } | undefined,
+) {
+  if (!isFinitePoint(first)) return { best: previous[0], ambiguous: false };
+  const p = first!;
+  const cc = colOf(index, p.x);
+  const cr = rowOf(index, p.y);
+  const seen = new Set<number>();
+  const near: { idx: number; score: number }[] = [];
+  let nearest = Infinity;
+  for (let ring = 0; ; ring++) {
+    forEachRingCell(index, cc, cr, ring, (cell) => {
+      for (const idx of cell) {
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        const { points } = previous[idx];
+        const score = Math.min(
+          distanceMM(p, points[0]),
+          distanceMM(p, points[points.length - 1]),
+        );
+        if (score > nearest + NEAR_MM) continue;
+        near.push({ idx, score });
+        nearest = Math.min(nearest, score);
+      }
+    });
+    const bound = beyondRing(index, cc, cr, ring, p.x, p.y);
+    if (!(bound < Infinity) || bound > nearest + NEAR_MM) break;
+  }
+  return pickNearest(
+    previous,
+    near
+      .filter((c) => c.score <= nearest + NEAR_MM)
+      .sort((a, b) => a.idx - b.idx),
+  );
+}
+
 /**
  * Gives each reordered or rebuilt subpath the layer and colour of the
- * original it came from, found by matching its first point to an original's
- * start or end. Compares every subpath with every original, so it yields to
- * the event loop as it goes. Returns null if cancelled.
+ * original it came from, found by matching its first point to the nearest
+ * original start or end. Looks originals up in a grid of their ends, and
+ * yields to the event loop as it goes. Returns null if cancelled.
  */
 export async function remapLayerMetadata(
   previous: TravelSubpath[],
@@ -119,11 +272,12 @@ export async function remapLayerMetadata(
     return { subpaths: nextPoints.map((points) => ({ points })), ambiguous: 0 };
   }
   const subpaths: TravelSubpath[] = new Array(nextPoints.length);
+  const index = buildEndpointIndex(previous);
   let ambiguous = 0;
   let lastYield = Date.now();
   for (let i = 0; i < nextPoints.length; i++) {
     const points = nextPoints[i];
-    const match = nearestOriginal(previous, points[0]);
+    const match = nearestOriginal(previous, index, points[0]);
     if (match.ambiguous) ambiguous++;
     subpaths[i] = { points, layer: match.best.layer, color: match.best.color };
     hooks.onProgress?.(i + 1, nextPoints.length);
