@@ -64,30 +64,76 @@ export function isPointWithinBounds(
   );
 }
 
-export function remapLayerMetadata(
+export interface RemapResult {
+  subpaths: TravelSubpath[];
+  /** Subpaths whose nearest match was a tie between originals of different
+   * layers or colours, so the label they got may be the wrong one. */
+  ambiguous: number;
+}
+
+export interface RemapHooks {
+  onProgress?: (done: number, total: number) => void;
+  /** Checked as it goes; when true, stops and returns null. */
+  isCancelled?: () => boolean;
+}
+
+const sameLabel = (a: TravelSubpath, b: TravelSubpath) =>
+  a.layer === b.layer && a.color === b.color;
+
+/** The original nearest `first` (by its start or end), and whether an
+ * original with another layer or colour was just as near. */
+function nearestOriginal(
+  previous: TravelSubpath[],
+  first: { x: number; y: number },
+) {
+  let best = previous[0];
+  let bestScore = Number.POSITIVE_INFINITY;
+  let ambiguous = false;
+  for (const candidate of previous) {
+    const start = candidate.points[0];
+    const end = candidate.points[candidate.points.length - 1];
+    const score = Math.min(distanceMM(first, start), distanceMM(first, end));
+    if (score < bestScore - 1e-9) {
+      bestScore = score;
+      best = candidate;
+      ambiguous = false;
+    } else if (score <= bestScore + 1e-9 && !sameLabel(candidate, best)) {
+      ambiguous = true;
+    }
+  }
+  return { best, ambiguous };
+}
+
+/**
+ * Gives each reordered or rebuilt subpath the layer and colour of the
+ * original it came from, found by matching its first point to an original's
+ * start or end. Compares every subpath with every original, so it yields to
+ * the event loop as it goes. Returns null if cancelled.
+ */
+export async function remapLayerMetadata(
   previous: TravelSubpath[],
   nextPoints: Subpath[],
-): TravelSubpath[] {
+  hooks: RemapHooks = {},
+): Promise<RemapResult | null> {
   if (previous.length === 0) {
-    return nextPoints.map((points) => ({ points }));
+    return { subpaths: nextPoints.map((points) => ({ points })), ambiguous: 0 };
   }
-  return nextPoints.map((points) => {
-    const first = points[0];
-    let best = previous[0];
-    let bestScore = Number.POSITIVE_INFINITY;
-    for (const candidate of previous) {
-      const start = candidate.points[0];
-      const end = candidate.points[candidate.points.length - 1];
-      const startScore = distanceMM(first, start);
-      const endScore = distanceMM(first, end);
-      const score = Math.min(startScore, endScore);
-      if (score < bestScore) {
-        bestScore = score;
-        best = candidate;
-      }
+  const subpaths: TravelSubpath[] = new Array(nextPoints.length);
+  let ambiguous = 0;
+  let lastYield = Date.now();
+  for (let i = 0; i < nextPoints.length; i++) {
+    const points = nextPoints[i];
+    const match = nearestOriginal(previous, points[0]);
+    if (match.ambiguous) ambiguous++;
+    subpaths[i] = { points, layer: match.best.layer, color: match.best.color };
+    hooks.onProgress?.(i + 1, nextPoints.length);
+    if (Date.now() - lastYield >= 16) {
+      lastYield = Date.now();
+      await new Promise((r) => setTimeout(r, 0));
+      if (hooks.isCancelled?.()) return null;
     }
-    return { points, layer: best.layer, color: best.color };
-  });
+  }
+  return { subpaths, ambiguous };
 }
 
 export function approximateObjectSubpaths(
@@ -201,6 +247,13 @@ export function applyPassesToSubpaths(
   return result;
 }
 
+/** Why an object adds nothing to the job. */
+export type SkipReason =
+  | "unreadable path data"
+  | "no drawable geometry"
+  | "entirely outside the page or bed"
+  | "point tap outside the page or bed";
+
 /** Everything a job draws, in machine space: strokes and point taps. */
 export interface CollectedGeometry {
   subpaths: TravelSubpath[];
@@ -220,7 +273,12 @@ function placePointTap(
 ): TravelPoint | null {
   for (const candidate of normalized ? [normalized, obj] : [obj]) {
     if (!candidate.pointTap) continue;
-    const point = transformPt(candidate, config, candidate.pointTap.x, candidate.pointTap.y);
+    const point = transformPt(
+      candidate,
+      config,
+      candidate.pointTap.x,
+      candidate.pointTap.y,
+    );
     if (isPointWithinBounds(point, config, pageClip)) {
       return {
         point,
@@ -235,6 +293,13 @@ function placePointTap(
 
 type ClipRect = { xMin: number; xMax: number; yMin: number; yMax: number };
 
+interface ObjectGeometry {
+  clipped: Subpath[];
+  validGeometry: boolean;
+  /** Subpaths before clipping. */
+  rawCount: number;
+}
+
 /** An object flattened and clipped to the page (or bed). Malformed path data
  * falls back to a coarse endpoint approximation; `validGeometry` is false
  * when even that finds nothing. */
@@ -242,18 +307,25 @@ function clippedGeometry(
   candidate: VectorObject,
   config: MachineConfig,
   pageClipBounds: ClipRect | null,
-): { clipped: Subpath[]; validGeometry: boolean } {
+): ObjectGeometry {
   let raw: Subpath[];
   try {
     raw = flattenToSubpaths(candidate, config);
   } catch {
     raw = approximateObjectSubpaths(candidate, config);
-    if (raw.length === 0) return { clipped: [], validGeometry: false };
+    if (raw.length === 0)
+      return { clipped: [], validGeometry: false, rawCount: 0 };
   }
   const clipped = pageClipBounds
-    ? clipSubpathsToRect(raw, pageClipBounds.xMin, pageClipBounds.xMax, pageClipBounds.yMin, pageClipBounds.yMax)
+    ? clipSubpathsToRect(
+        raw,
+        pageClipBounds.xMin,
+        pageClipBounds.xMax,
+        pageClipBounds.yMin,
+        pageClipBounds.yMax,
+      )
     : clipSubpathsToBed(raw, config);
-  return { clipped, validGeometry: true };
+  return { clipped, validGeometry: true, rawCount: raw.length };
 }
 
 /** An object's visible strokes: from its normalised placement, or — if that
@@ -263,13 +335,14 @@ function objectGeometry(
   normalized: VectorObject | null,
   config: MachineConfig,
   pageClipBounds: ClipRect | null,
-): { clipped: Subpath[]; validGeometry: boolean } {
+): ObjectGeometry {
   const primary = clippedGeometry(normalized ?? obj, config, pageClipBounds);
   if (primary.clipped.length > 0 || !normalized) return primary;
   const fallback = clippedGeometry(obj, config, pageClipBounds);
   return {
     clipped: fallback.clipped.length > 0 ? fallback.clipped : primary.clipped,
     validGeometry: primary.validGeometry || fallback.validGeometry,
+    rawCount: Math.max(primary.rawCount, fallback.rawCount),
   };
 }
 
@@ -287,13 +360,23 @@ export async function collectGeometry(
   config: MachineConfig,
   options: GcodeOptions | undefined,
   lines: string[],
-  hooks: { isCancelled: () => boolean; afterEach: (done: number, total: number) => Promise<void> },
+  hooks: {
+    isCancelled: () => boolean;
+    afterEach: (done: number, total: number) => Promise<void>;
+    onSkip?: (reason: SkipReason, obj: VectorObject) => void;
+  },
 ): Promise<CollectedGeometry | null> {
-  const pageClipBounds = options?.pageClip ? resolvePageClipRect(config, options.pageClip) : null;
+  const pageClipBounds = options?.pageClip
+    ? resolvePageClipRect(config, options.pageClip)
+    : null;
   const sorted = objects
     .filter((o) => o.visible)
     .sort((a, b) => (a.sourceColor ?? "").localeCompare(b.sourceColor ?? ""));
-  const result: CollectedGeometry = { subpaths: [], points: [], skippedObjects: 0 };
+  const result: CollectedGeometry = {
+    subpaths: [],
+    points: [],
+    skippedObjects: 0,
+  };
   let lastColor: string | undefined = undefined;
   let colorObjectCount = 0;
 
@@ -304,6 +387,8 @@ export async function collectGeometry(
 
     const tap = placePointTap(obj, normalized, config, options?.pageClip);
     if (tap) result.points.push(tap);
+    else if (obj.pointTap)
+      hooks.onSkip?.("point tap outside the page or bed", obj);
 
     if (obj.sourceColor !== lastColor && i > 0) {
       lines.push(colorBatchComment(lastColor, colorObjectCount));
@@ -312,15 +397,40 @@ export async function collectGeometry(
     lastColor = obj.sourceColor;
     colorObjectCount++;
 
-    const { clipped, validGeometry } = objectGeometry(obj, normalized, config, pageClipBounds);
-    if (!validGeometry) result.skippedObjects++;
+    const { clipped, validGeometry, rawCount } = objectGeometry(
+      obj,
+      normalized,
+      config,
+      pageClipBounds,
+    );
+    if (!validGeometry) {
+      result.skippedObjects++;
+      hooks.onSkip?.("unreadable path data", obj);
+    } else if (clipped.length === 0 && !obj.pointTap) {
+      hooks.onSkip?.(
+        rawCount === 0
+          ? "no drawable geometry"
+          : "entirely outside the page or bed",
+        obj,
+      );
+    }
 
-    for (const sp of applyPassesToSubpaths(clipped, obj.passCount ?? 1, obj.passMode ?? "repeat")) {
-      if (sp.length >= 2) result.subpaths.push({ points: sp, layer: obj.layer, color: obj.sourceColor });
+    for (const sp of applyPassesToSubpaths(
+      clipped,
+      obj.passCount ?? 1,
+      obj.passMode ?? "repeat",
+    )) {
+      if (sp.length >= 2)
+        result.subpaths.push({
+          points: sp,
+          layer: obj.layer,
+          color: obj.sourceColor,
+        });
     }
     await hooks.afterEach(i + 1, sorted.length);
   }
 
-  if (sorted.length > 0 && lastColor !== undefined) lines.push(colorBatchComment(lastColor, colorObjectCount));
+  if (sorted.length > 0 && lastColor !== undefined)
+    lines.push(colorBatchComment(lastColor, colorObjectCount));
   return result;
 }
