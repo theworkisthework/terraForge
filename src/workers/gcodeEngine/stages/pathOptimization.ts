@@ -83,18 +83,26 @@ function buildStartGrid(subpaths: Subpath[], shouldCancel?: () => boolean): Star
   return { cells, cols, rows, xMin, yMin, cw, ch };
 }
 
-/** The cells of one ring around (cc, cr) — only its border, since the inner
- * rings were scanned before it. */
+/** The cells exactly `ring` steps from (cc, cr) that lie in the grid, row by
+ * row. Only the ring's own cells are visited (not the square inside it,
+ * which earlier rings covered), so a whole scan touches each cell once. */
 function ringCells(grid: StartGrid, cc: number, cr: number, ring: number): number[][] {
-  const rLo = Math.max(0, cr - ring),
-    rHi = Math.min(grid.rows - 1, cr + ring);
-  const cLo = Math.max(0, cc - ring),
-    cHi = Math.min(grid.cols - 1, cc + ring);
+  const { cols, rows, cells } = grid;
+  const top = cr - ring,
+    bottom = cr + ring,
+    left = cc - ring,
+    right = cc + ring;
+  const rLo = Math.max(0, top),
+    rHi = Math.min(rows - 1, bottom);
+  const cLo = Math.max(0, left),
+    cHi = Math.min(cols - 1, right);
   const out: number[][] = [];
   for (let gr = rLo; gr <= rHi; gr++) {
-    for (let gc = cLo; gc <= cHi; gc++) {
-      if (ring > 0 && gr > rLo && gr < rHi && gc > cLo && gc < cHi) continue;
-      out.push(grid.cells[gr * grid.cols + gc]);
+    if (gr === top || gr === bottom) {
+      for (let gc = cLo; gc <= cHi; gc++) out.push(cells[gr * cols + gc]);
+    } else {
+      if (left >= 0) out.push(cells[gr * cols + left]);
+      if (right < cols) out.push(cells[gr * cols + right]);
     }
   }
   return out;
