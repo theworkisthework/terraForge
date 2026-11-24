@@ -115,9 +115,13 @@ describe("gcode path optimization stage", () => {
 /** A scattered set of short subpaths, the same each run. */
 function scattered(n: number): Subpath[] {
   let seed = 5;
-  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const rnd = () =>
+    (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
   return Array.from({ length: n }, () =>
-    Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({ x: Math.round(rnd() * 80), y: Math.round(rnd() * 80) })),
+    Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({
+      x: Math.round(rnd() * 80),
+      y: Math.round(rnd() * 80),
+    })),
   );
 }
 
@@ -127,15 +131,17 @@ describe("cooperative path optimisation", () => {
   it("sorts exactly as the sync sort does, either way round", async () => {
     const input = scattered(40);
     for (const allowReverse of [true, false]) {
-      expect(await nearestNeighbourSortCooperative(input, { allowReverse })).toEqual(
-        nearestNeighbourSort(input, { allowReverse }),
-      );
+      expect(
+        await nearestNeighbourSortCooperative(input, { allowReverse }),
+      ).toEqual(nearestNeighbourSort(input, { allowReverse }));
     }
   });
 
   it("reports progress once per subpath placed", async () => {
     const progress: number[] = [];
-    await nearestNeighbourSortCooperative(scattered(12), { onProgress: (done, total) => progress.push(done / total) });
+    await nearestNeighbourSortCooperative(scattered(12), {
+      onProgress: (done, total) => progress.push(done / total),
+    });
     expect(progress).toHaveLength(12);
     expect(progress.at(-1)).toBe(1);
   });
@@ -144,19 +150,112 @@ describe("cooperative path optimisation", () => {
     const input = scattered(300);
     // The shortest yield interval (4 ms), so a slow run yields part-way; the
     // result must match the sync sort either way.
-    expect(await nearestNeighbourSortCooperative(input, { yieldIntervalMs: 0 })).toEqual(nearestNeighbourSort(input));
+    expect(
+      await nearestNeighbourSortCooperative(input, { yieldIntervalMs: 0 }),
+    ).toEqual(nearestNeighbourSort(input));
   });
 
   it("stops with OperationCancelledError when cancelled part-way", async () => {
     let calls = 0;
     await expect(
-      nearestNeighbourSortCooperative(scattered(30), { shouldCancel: () => ++calls > 40 }),
+      nearestNeighbourSortCooperative(scattered(30), {
+        shouldCancel: () => ++calls > 40,
+      }),
     ).rejects.toBeInstanceOf(OperationCancelledError);
   });
 
   it("joins exactly as the sync join does, and can be cancelled", async () => {
     const input = scattered(50);
-    expect(await joinSubpathsCooperative(input, 15, { yieldIntervalMs: 0 })).toEqual(joinSubpaths(input, 15));
-    await expect(joinSubpathsCooperative(input, 15, { shouldCancel: () => true })).rejects.toThrow("Operation cancelled");
+    expect(
+      await joinSubpathsCooperative(input, 15, { yieldIntervalMs: 0 }),
+    ).toEqual(joinSubpaths(input, 15));
+    await expect(
+      joinSubpathsCooperative(input, 15, { shouldCancel: () => true }),
+    ).rejects.toThrow("Operation cancelled");
+  });
+});
+
+/** Short strokes on a coarse integer grid, so many are equally near. */
+function tied(n: number, size: number): Subpath[] {
+  let seed = 9;
+  const rnd = () =>
+    (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  return Array.from({ length: n }, () =>
+    Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({
+      x: Math.floor(rnd() * size),
+      y: Math.floor(rnd() * size),
+    })),
+  );
+}
+
+const sqDist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+
+// The sort stops searching once nothing further out can be nearer; these
+// check it never stops too soon.
+describe("nearest-neighbour sort search", () => {
+  for (const allowReverse of [true, false]) {
+    it(`always takes a nearest remaining subpath (reverse ${allowReverse})`, () => {
+      for (const [n, size] of [
+        [400, 5],
+        [400, 60],
+        [1500, 300],
+      ]) {
+        const input = tied(n, size);
+        const sorted = nearestNeighbourSort(input, { allowReverse });
+        const remaining = new Set(input);
+        let pen = { x: 0, y: 0 };
+        for (const sp of sorted) {
+          let nearest = Infinity;
+          for (const r of remaining) {
+            nearest = Math.min(
+              nearest,
+              sqDist(pen, r[0]),
+              allowReverse ? sqDist(pen, r[r.length - 1]) : Infinity,
+            );
+          }
+          expect(sqDist(pen, sp[0])).toBe(nearest);
+          const original = remaining.has(sp)
+            ? sp
+            : input.find(
+                (r) =>
+                  remaining.has(r) &&
+                  r !== sp &&
+                  r.length === sp.length &&
+                  r.every((p, k) => p === sp[sp.length - 1 - k]),
+              );
+          expect(original).toBeDefined();
+          remaining.delete(original!);
+          pen = sp[sp.length - 1];
+        }
+        expect(remaining.size).toBe(0);
+      }
+    });
+  }
+
+  it("finds a reversed subpath whose start is far from the pen", () => {
+    const first: Subpath = [
+      { x: 0, y: 0 },
+      { x: 0, y: 1 },
+    ];
+    const near: Subpath = [
+      { x: 500, y: 1 },
+      { x: 0.5, y: 1 },
+    ];
+    const filler = Array.from({ length: 200 }, (_, i): Subpath => [
+      { x: 100 + i, y: 300 },
+      { x: 100 + i, y: 301 },
+    ]);
+    expect(nearestNeighbourSort([first, ...filler, near])[1]).toEqual(
+      [...near].reverse(),
+    );
+  });
+
+  it("sorts tens of thousands of subpaths quickly", () => {
+    const input = tied(50_000, 400);
+    const t0 = performance.now();
+    nearestNeighbourSort(input);
+    // Scanning the whole grid for every subpath took minutes at this size.
+    expect(performance.now() - t0).toBeLessThan(3_000);
   });
 });
