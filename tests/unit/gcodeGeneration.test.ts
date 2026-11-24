@@ -273,9 +273,14 @@ describe("remapLayerMetadata lookup", () => {
   }
 
   it("matches checking every original, ties included", async () => {
-    let seed = 4;
-    const rnd = () =>
-      (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    // mulberry32: a simple LCG puts x/y pairs on very few points.
+    let a = 4;
+    const rnd = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
     for (const size of [4, 30, 200]) {
       const previous = Array.from({ length: 600 }, () => ({
         points: Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({

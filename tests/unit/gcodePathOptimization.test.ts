@@ -175,11 +175,21 @@ describe("cooperative path optimisation", () => {
   });
 });
 
+/** A seeded random number generator (mulberry32). Simple LCGs give badly
+ * correlated x/y pairs: one put every start on just 64 points. */
+function seededRandom(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** Short strokes on a coarse integer grid, so many are equally near. */
 function tied(n: number, size: number): Subpath[] {
-  let seed = 9;
-  const rnd = () =>
-    (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const rnd = seededRandom(9);
   return Array.from({ length: n }, () =>
     Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({
       x: Math.floor(rnd() * size),
@@ -251,11 +261,97 @@ describe("nearest-neighbour sort search", () => {
     );
   });
 
-  it("sorts tens of thousands of subpaths quickly", () => {
+  it("sorts tens of thousands of subpaths quickly", { timeout: 60_000 }, () => {
     const input = tied(50_000, 400);
     const t0 = performance.now();
     nearestNeighbourSort(input);
-    // Scanning the whole grid for every subpath took minutes at this size.
-    expect(performance.now() - t0).toBeLessThan(3_000);
+    // Takes about 0.1 s locally; scanning the whole grid for every subpath
+    // took minutes. The limit leaves room for slow CI runners.
+    expect(performance.now() - t0).toBeLessThan(20_000);
   });
+});
+
+/** Checks `sorted` holds each of `input` exactly once, as is or reversed. */
+function expectEachPlacedOnce(input: Subpath[], sorted: Subpath[]) {
+  expect(sorted).toHaveLength(input.length);
+  const unplaced = new Set(input);
+  // A reversed copy holds the same point objects, so find it by its first one.
+  const byFirstPoint = new Map<object, Subpath[]>();
+  for (const sp of input) {
+    const key = sp[sp.length - 1];
+    byFirstPoint.set(key, [...(byFirstPoint.get(key) ?? []), sp]);
+  }
+  for (const sp of sorted) {
+    let original: Subpath | undefined = unplaced.has(sp) ? sp : undefined;
+    original ??= byFirstPoint
+      .get(sp[0])
+      ?.find(
+        (r) =>
+          unplaced.has(r) &&
+          r.length === sp.length &&
+          r.every((p, k) => p === sp[sp.length - 1 - k]),
+      );
+    expect(
+      original,
+      "a subpath placed twice, or not from the input",
+    ).toBeDefined();
+    unplaced.delete(original!);
+  }
+  expect(unplaced.size).toBe(0);
+}
+
+// Every subpath must come out exactly once, however awkward its layout.
+describe("nearest-neighbour sort keeps every subpath", () => {
+  const rnd = seededRandom(21);
+  const seg = (x1: number, y1: number, x2: number, y2: number): Subpath => [
+    { x: x1, y: y1 },
+    { x: x2, y: y2 },
+  ];
+  const layouts: Record<string, () => Subpath[]> = {
+    "random strokes": () => tied(5_000, 200),
+    "heavy ties on a tiny grid": () => tied(2_000, 4),
+    "everything on one point": () =>
+      Array.from({ length: 1_000 }, () => seg(5, 5, 5, 5)),
+    "single-point subpaths": () =>
+      Array.from({ length: 3_000 }, () => [
+        { x: Math.floor(rnd() * 50), y: Math.floor(rnd() * 50) },
+      ]),
+    "one vertical line": () =>
+      Array.from({ length: 1_500 }, (_, i) => seg(3, i, 3, i + 1)),
+    "hatching, ends far from starts": () =>
+      Array.from({ length: 1_500 }, (_, i) => seg(0, i * 0.1, 300, i * 0.1)),
+    "negative coordinates and a far outlier": () => [
+      ...Array.from({ length: 5_000 }, () =>
+        seg(
+          -80 + rnd() * 10,
+          -60 + rnd() * 10,
+          -80 + rnd() * 10,
+          -60 + rnd() * 10,
+        ),
+      ),
+      seg(1e6, 1e6, -1e6, -1e6),
+    ],
+    "two distant clusters": () =>
+      Array.from({ length: 5_000 }, (_, i) => {
+        const o = i % 2 ? 5_000 : 0;
+        return seg(o + rnd(), o + rnd(), o + rnd(), o + rnd());
+      }),
+    "a NaN end": () => [seg(0, 0, Number.NaN, 0), ...tied(500, 50)],
+  };
+
+  for (const [name, make] of Object.entries(layouts)) {
+    for (const allowReverse of [true, false]) {
+      it(`${name} (reverse ${allowReverse})`, { timeout: 30_000 }, async () => {
+        const input = make();
+        expectEachPlacedOnce(
+          input,
+          nearestNeighbourSort(input, { allowReverse }),
+        );
+        expectEachPlacedOnce(
+          input,
+          await nearestNeighbourSortCooperative(input, { allowReverse }),
+        );
+      });
+    }
+  }
 });
