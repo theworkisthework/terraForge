@@ -51,7 +51,8 @@ export function countReversed(input: Subpath[], sorted: Subpath[]): number {
 const mm = (n: number) => `${n.toFixed(1)} mm`;
 const ms = (n: number) => `${Math.round(n)} ms`;
 
-/** The stats as G-code comment lines. */
+/** The stats as G-code comment lines. Pass timings vary from run to run;
+ * snapshot tests mask the "<n> ms" on the timed lines. */
 export function formatStatsComments(stats: ProcessingStats): string[] {
   const lines = [`; Subpaths : ${stats.subpathsIn} in, ${stats.subpathsOut} out`];
   const saved = stats.travelBeforeMm - stats.travelAfterMm;
@@ -63,7 +64,7 @@ export function formatStatsComments(stats: ProcessingStats): string[] {
   );
   if (stats.sort) lines.push(`; Sort     : ${ms(stats.sort.ms)}, ${stats.sort.reversed ?? 0} reversed`);
   if (stats.join) lines.push(`; Join     : ${ms(stats.join.ms)}, ${stats.join.merged ?? 0} merged`);
-  if (stats.weedBorder) lines.push(`; Weed bd  : ${ms(stats.weedBorder.ms)}`);
-  if (stats.vinyl) lines.push(`; Vinyl    : ${ms(stats.vinyl.ms)}`);
+  if (stats.weedBorder) lines.push(`; Weed pass: ${ms(stats.weedBorder.ms)}`);
+  if (stats.vinyl) lines.push(`; Blade cmp: ${ms(stats.vinyl.ms)}`);
   return lines;
 }

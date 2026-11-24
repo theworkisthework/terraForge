@@ -18,6 +18,8 @@ G0Z5 ; Pen up
 
 ; -- Color: url(#_linear1) (1 object) --
 ; -- Sequential path (1 subpaths) -----------
+; Subpaths : 1 in, 1 out
+; Travel   : 34.3 mm
 ;@tf v=1 color=url(%23_linear1)
 G0 X25.786 Y22.661 ; Rapid travel
 F6000

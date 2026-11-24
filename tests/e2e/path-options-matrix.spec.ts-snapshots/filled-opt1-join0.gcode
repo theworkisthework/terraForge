@@ -21,6 +21,9 @@ G0Z5 ; Pen up
 ; -- Color: #ebebeb (88 objects) --
 ; -- Color: #ff1616 (72 objects) --
 ; -- Optimised path (236 subpaths) -----------
+; Subpaths : 236 in, 236 out
+; Travel   : 18284.3 mm -> 1351.0 mm (92.6% less)
+; Sort     : <n> ms, 118 reversed
 ;@tf v=1 color=%23000000
 G0 X8.480 Y0.000 ; Rapid travel
 F6000

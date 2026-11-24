@@ -51,12 +51,16 @@ describe("formatStatsComments", () => {
       travelAfterMm: 50,
       sort: { ms: 12.4, reversed: 3 },
       join: { ms: 1.6, merged: 2 },
+      weedBorder: { ms: 4 },
+      vinyl: { ms: 0.4 },
     });
     expect(lines).toEqual([
       "; Subpaths : 10 in, 8 out",
       "; Travel   : 200.0 mm -> 50.0 mm (75.0% less)",
       "; Sort     : 12 ms, 3 reversed",
       "; Join     : 2 ms, 2 merged",
+      "; Weed pass: 4 ms",
+      "; Blade cmp: 0 ms",
     ]);
   });
 
