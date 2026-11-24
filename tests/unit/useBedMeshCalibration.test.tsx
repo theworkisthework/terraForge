@@ -202,4 +202,42 @@ describe("useBedMeshCalibration", () => {
     });
     expect(result.current.open).toBe(true);
   });
+
+  it("catches idle status updates emitted before motion commands resolve", async () => {
+    const config = createMachineConfig({
+      id: "mesh-machine",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
+    });
+    const controller = {
+      form: config,
+      change: vi.fn(),
+      inputCls: "",
+      selectedId: config.id,
+      machineStore: {
+        connected: true,
+        activeConfigId: config.id,
+        status: createMachineStatus(),
+        updateConfig: vi.fn(),
+      },
+    } as unknown as MachineConfigDialogController;
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockImplementation(async () => {
+      act(() => publishIdleStatus());
+    });
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+
+    await act(async () => {
+      await result.current.startCalibration("home");
+    });
+
+    expect(sendCommand.mock.calls.map(([command]) => command)).toEqual([
+      "$H",
+      "G91 G21 G0 Z5",
+      "G90 G21",
+      "G90 G21 G0 X0.000 Y0.000",
+    ]);
+    expect(result.current.open).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
 });
