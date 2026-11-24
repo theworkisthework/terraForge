@@ -6,6 +6,8 @@ export interface GcodePrefs {
   pathDirectionMode: "respect" | "minimize-travel";
   uploadToSd: boolean;
   saveLocally: boolean;
+  /** When true, split files are uploaded into an SD folder named after the job, not the SD root. */
+  uploadSplitToFolder: boolean;
   /** When true, generate a separate G-code file per source SVG layer. */
   exportPerLayer: boolean;
   /** When true, generate a separate G-code file per layer group (multi-pen plots). */
@@ -56,6 +58,7 @@ export const DEFAULT_GCODE_PREFS: GcodePrefs = {
   pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
+  uploadSplitToFolder: true,
   exportPerLayer: false,
   exportPerGroup: false,
   exportPerColor: false,

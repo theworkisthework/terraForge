@@ -112,4 +112,67 @@ describe("ToolpathSection", () => {
     );
     expect(onSetColorized).toHaveBeenCalledWith(false);
   });
+
+  it("shows a slashed palette when colorize is off, like the eye toggle", () => {
+    const props = {
+      toolpath: buildToolpath(),
+      fileName: "sample.gcode",
+      selected: false,
+      visible: true,
+      opacity: 1,
+      isJobActive: false,
+      fallbackFeedrate: 300,
+      onToggleSelected: () => {},
+      onSetVisible: () => {},
+      onSetColorized: () => {},
+      onSetOpacity: () => {},
+      onClear: () => {},
+    };
+    const { rerender } = render(<ToolpathSection {...props} colorized />);
+    expect(screen.queryByTestId("palette-off-icon")).toBeNull();
+
+    rerender(<ToolpathSection {...props} colorized={false} />);
+    const enable = screen.getByRole("button", {
+      name: /Enable colorized toolpath/i,
+    });
+    expect(
+      enable.querySelector('[data-testid="palette-off-icon"]'),
+    ).not.toBeNull();
+  });
+
+  it("opens the G-code preview from the file icon without toggling the row", () => {
+    const onToggleSelected = vi.fn();
+    (window as unknown as { terraForge: unknown }).terraForge = {
+      fs: { readFile: vi.fn().mockResolvedValue("G0 X1") },
+    };
+
+    render(
+      <ToolpathSection
+        toolpath={buildToolpath()}
+        fileName="sample.gcode"
+        source={{
+          path: "/sample.gcode",
+          name: "sample.gcode",
+          source: "local",
+        }}
+        selected={false}
+        visible
+        colorized
+        opacity={1}
+        isJobActive={false}
+        fallbackFeedrate={300}
+        onToggleSelected={onToggleSelected}
+        onSetVisible={() => {}}
+        onSetColorized={() => {}}
+        onSetOpacity={() => {}}
+        onClear={() => {}}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview G-code text" }),
+    );
+    expect(onToggleSelected).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
 });

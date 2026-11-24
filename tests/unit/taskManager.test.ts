@@ -73,6 +73,12 @@ describe("TaskManager", () => {
     expect(tm.get("t1")).toBeUndefined();
   });
 
+  it("keeps a running task for as long as it runs", () => {
+    tm.create("t1", "gcode-generate", "Test");
+    vi.advanceTimersByTime(60_000);
+    expect(tm.get("t1")).toBeDefined();
+  });
+
   // ── fail ────────────────────────────────────────────────────────────────
 
   it("marks status as error with message", () => {
@@ -83,6 +89,16 @@ describe("TaskManager", () => {
     expect(task.error).toBe("Something went wrong");
   });
 
+  it("forgets a failed task after 5 seconds", () => {
+    tm.create("t1", "gcode-generate", "Test");
+    tm.fail("t1", "Something went wrong");
+    vi.advanceTimersByTime(4999);
+    expect(tm.get("t1")).toBeDefined();
+    vi.advanceTimersByTime(1);
+    expect(tm.get("t1")).toBeUndefined();
+    expect(tm.getAll()).toEqual([]);
+  });
+
   // ── cancel ──────────────────────────────────────────────────────────────
 
   it("marks status as cancelled and registers cancellation", () => {
@@ -90,6 +106,28 @@ describe("TaskManager", () => {
     tm.cancel("t1");
     expect(tm.get("t1")!.status).toBe("cancelled");
     expect(tm.isCancelled("t1")).toBe(true);
+  });
+
+  it("forgets a cancelled task, and the cancel request, after 5 seconds", () => {
+    tm.create("t1", "gcode-generate", "Test");
+    tm.cancel("t1");
+    // Still readable while the cancelled operation winds down.
+    vi.advanceTimersByTime(4999);
+    expect(tm.get("t1")).toBeDefined();
+    expect(tm.isCancelled("t1")).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(tm.get("t1")).toBeUndefined();
+    expect(tm.isCancelled("t1")).toBe(false);
+  });
+
+  it("does not forget other tasks along with a finished one", () => {
+    tm.create("t1", "gcode-generate", "Test");
+    tm.create("t2", "file-upload", "Upload");
+    tm.fail("t1", "oops");
+    tm.cancel("t2");
+    tm.create("t3", "file-download", "Download");
+    vi.advanceTimersByTime(5000);
+    expect(tm.getAll().map((t) => t.id)).toEqual(["t3"]);
   });
 
   // ── getAll ──────────────────────────────────────────────────────────────

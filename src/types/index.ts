@@ -904,10 +904,21 @@ export interface MachineStatus {
   lineTotal?: number;
 }
 
+/**
+ * Whether the machine is part-way through a job: running, held, or stopped
+ * at an open door. Listing files then is refused — FluidNC 4.0.x drops every
+ * connection when asked to list the SD card mid-job, and the job with it (#170).
+ */
+export function isJobInProgress(state: MachineStatus["state"] | null | undefined): boolean {
+  return state === "Run" || state === "Hold" || state === "Door";
+}
+
+/** The error a file listing is refused with while a job is in progress. */
+export const LISTING_PAUSED_DURING_JOB = "File listing is paused while a job is running";
+
 // ─── IPC / Preload API Contract ───────────────────────────────────────────────
 
 export interface FluidNCApi {
-  getStatus: () => Promise<MachineStatus>;
   sendCommand: (cmd: string) => Promise<string>;
   listFiles: (path?: string) => Promise<RemoteFile[]>;
   listSDFiles: (path?: string) => Promise<RemoteFile[]>;
@@ -934,6 +945,10 @@ export interface FluidNCApi {
   ) => Promise<string>;
   deleteFile: (remotePath: string, source?: "sd" | "fs") => Promise<void>;
   runFile: (remotePath: string, filesystem?: "sd" | "fs") => Promise<void>;
+  /** Creates one folder on the SD card; its parent must exist. Wi-Fi only. */
+  createSdFolder: (folderPath: string) => Promise<void>;
+  /** Deletes a folder on the SD card and everything in it. */
+  deleteSdFolder: (folderPath: string) => Promise<void>;
   /**
    * Upload a G-code string directly to the machine SD card.
    * Main process writes a temp file, streams it via the existing upload
@@ -964,7 +979,6 @@ export interface SerialApi {
   listPorts: () => Promise<string[]>;
   connect: (path: string, baudRate?: number) => Promise<void>;
   disconnect: () => Promise<void>;
-  send: (data: string) => Promise<void>;
   onData: (cb: (data: string) => void) => () => void;
   /**
    * The serial port closed on its own (cable unplugged, device reset), with
@@ -974,10 +988,7 @@ export interface SerialApi {
 }
 
 export interface FsApi {
-  openSvgDialog: () => Promise<string | null>;
-  openPdfDialog: () => Promise<string | null>;
   openFileDialog: () => Promise<string | null>;
-  openGcodeDialog: () => Promise<string | null>;
   openImportDialog: (opts?: { allowBitmap?: boolean }) => Promise<string | null>;
   readFile: (filePath: string) => Promise<string>;
   /** Read a file as raw bytes — required for binary formats such as PDF. */
@@ -998,22 +1009,12 @@ export interface FsApi {
   onMenuCloseLayout: (cb: () => void) => () => void;
   /** Notify the main process whether the Save/Close Layout menu items should be enabled. */
   setLayoutMenuState: (hasImports: boolean) => void;
-  loadConfigs: () => Promise<MachineConfig[]>;
   saveConfigs: (configs: MachineConfig[]) => Promise<void>;
 }
 
 export interface TasksApi {
   cancel: (taskId: string) => Promise<void>;
   onTaskUpdate: (cb: (task: BackgroundTask) => void) => () => void;
-}
-
-export interface JobsApi {
-  generateGcode: (
-    taskId: string,
-    objects: VectorObject[],
-    config: MachineConfig,
-    options: GcodeOptions,
-  ) => Promise<string>;
 }
 
 export interface ConfigApi {
@@ -1083,8 +1084,6 @@ export interface RendererPluginsApi {
 export interface AppApi {
   /** Returns the version string from package.json (via app.getVersion()). */
   getVersion: () => Promise<string>;
-  /** Open a URL in the system default browser. */
-  openExternal: (url: string) => Promise<void>;
   /**
    * Tell the main process whether the canvas has changes that are not in a
    * saved layout. While it does, closing the window or quitting asks first.
@@ -1115,7 +1114,6 @@ export interface TerraForgeAPI {
   serial: SerialApi;
   fs: FsApi;
   tasks: TasksApi;
-  jobs: JobsApi;
   config: ConfigApi;
   app: AppApi;
   edit: EditApi;

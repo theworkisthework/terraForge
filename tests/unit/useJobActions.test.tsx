@@ -153,12 +153,115 @@ describe("useJobActions G-code generation", () => {
       ["/out/Red pen.gcode", "G:a1"],
       ["/out/Blue_pen.gcode", "G:b1"],
     ]);
-    expect(uploaded.map(([p]) => p)).toEqual(["/ungrouped.gcode", "/Red pen.gcode", "/Blue_pen.gcode"]);
+    expect(uploaded.map(([p]) => p)).toEqual(["/test-import/ungrouped.gcode", "/test-import/Red pen.gcode", "/test-import/Blue_pen.gcode"]);
     expect(labels.filter((l) => l.startsWith("completed"))).toEqual([
       "completed: ungrouped ready",
       "completed: Red pen ready",
       "completed: Blue/pen ready",
     ]);
+  });
+
+  it("uploads split files to the SD root when the folder option is off", async () => {
+    const groups: LayerGroup[] = [
+      { id: "g1", name: "Red pen", color: "#f00", importIds: ["a"] },
+      { id: "g2", name: "Blue/pen", color: "#00f", importIds: ["b"] },
+      { id: "g3", name: "Empty", color: "#000", importIds: [] },
+    ];
+    useCanvasStore.setState({
+      imports: [
+        createSvgImport({ id: "a", paths: [path("a1")] }),
+        createSvgImport({ id: "b", paths: [path("b1")] }),
+        createSvgImport({ id: "c", paths: [path("c1")] }),
+      ],
+      layerGroups: groups,
+    });
+    await generate({ exportPerGroup: true, optimise: false, saveLocally: false, uploadToSd: true, uploadSplitToFolder: false });
+    expect(uploaded.map(([p]) => p)).toEqual(["/ungrouped.gcode", "/Red pen.gcode", "/Blue_pen.gcode"]);
+  });
+  it("uploads per-layer files into the job folder", async () => {
+    useCanvasStore.setState({
+      imports: [
+        createSvgImport({
+          id: "a",
+          name: "map",
+          layers: [{ id: "L1", name: "Roads", visible: true }] as never,
+          paths: [path("a1", { layer: "L1" })],
+        }),
+      ],
+    });
+    await generate({ exportPerLayer: true, optimise: false, saveLocally: false, uploadToSd: true });
+    expect(uploaded.map(([p]) => p)).toEqual(["/map/map_Roads.gcode"]);
+
+    uploaded.length = 0;
+    await generate({ exportPerLayer: true, optimise: false, saveLocally: false, uploadToSd: true, uploadSplitToFolder: false });
+    expect(uploaded.map(([p]) => p)).toEqual(["/map_Roads.gcode"]);
+  });
+
+  describe("the SD folder for split uploads", () => {
+    const twoGroups = (names: { import?: string; group?: string }) => {
+      useCanvasStore.setState({
+        imports: [createSvgImport({ id: "a", name: names.import ?? "drawing", paths: [path("a1")] })],
+        layerGroups: [{ id: "g1", name: names.group ?? "Pen", color: "#000", importIds: ["a"] }],
+      });
+    };
+    const folderOf = () => uploaded.map(([p]) => p.split("/")[1]);
+
+    it("replaces characters that cannot be in a path", async () => {
+      twoGroups({ import: 'a/b:c*d?"e<f>g|h\\i' });
+      await generate({ exportPerGroup: true, optimise: false, saveLocally: false, uploadToSd: true });
+      expect(folderOf()).toEqual(["a_b_c_d__e_f_g_h_i"]);
+    });
+
+    it("falls back to untitled when the name is empty", async () => {
+      twoGroups({ import: "  " });
+      await generate({ exportPerGroup: true, optimise: false, saveLocally: false, uploadToSd: true });
+      expect(folderOf()).toEqual(["untitled"]);
+    });
+
+    it("is named after the selected group, else the selected import, else the first import", async () => {
+      useCanvasStore.setState({
+        imports: [
+          createSvgImport({ id: "a", name: "first", paths: [path("a1")] }),
+          createSvgImport({ id: "b", name: "second", paths: [path("b1")] }),
+        ],
+        layerGroups: [{ id: "g1", name: "Pen", color: "#000", importIds: ["a"] }],
+      });
+      const run = async () => {
+        uploaded.length = 0;
+        await generate({ exportPerGroup: true, optimise: false, saveLocally: false, uploadToSd: true });
+        return new Set(folderOf());
+      };
+      expect(await run()).toEqual(new Set(["first"]));
+      useCanvasStore.setState({ selectedImportId: "b" });
+      expect(await run()).toEqual(new Set(["second"]));
+      useCanvasStore.setState({ selectedGroupId: "g1" });
+      expect(await run()).toEqual(new Set(["Pen"]));
+    });
+
+    it("holds colour files and their hatch files together, or leaves both in the root", async () => {
+      useCanvasStore.setState({
+        imports: [
+          createSvgImport({
+            id: "a",
+            name: "plot",
+            paths: [path("a1", { strokeColor: "#ff0000", sourceColor: "#ff0000", fillColor: "#ff0000", hatchLines: ["M0 0 L5 5"] })],
+          }),
+        ],
+      });
+      const prefs = { exportPerColor: true, exportPerHatch: true, optimise: false, saveLocally: false, uploadToSd: true };
+      await generate(prefs);
+      expect(uploaded.map(([p]) => p)).toEqual(["/plot/plot_color_red.gcode", "/plot/plot_hatch_red.gcode"]);
+
+      uploaded.length = 0;
+      await generate({ ...prefs, uploadSplitToFolder: false });
+      expect(uploaded.map(([p]) => p)).toEqual(["/plot_color_red.gcode", "/plot_hatch_red.gcode"]);
+    });
+
+    it("leaves a single whole-job upload in the root", async () => {
+      twoGroups({ import: "logo" });
+      await generate({ optimise: false, saveLocally: false, uploadToSd: true });
+      expect(uploaded.map(([p]) => p)).toEqual(["/logo.gcode"]);
+    });
   });
 
   it("splits by source layer, naming each file after its import and layer", async () => {
@@ -302,7 +405,7 @@ describe("useJobActions G-code generation", () => {
 
       expect(errors["Could not save First.gcode"]).toBe("EACCES: permission denied");
       expect(written).toEqual([["/out/Second.gcode", "G:a1"]]);
-      expect(uploaded.map(([p]) => p)).toEqual(["/First.gcode", "/Second.gcode"]);
+      expect(uploaded.map(([p]) => p)).toEqual(["/test-import/First.gcode", "/test-import/Second.gcode"]);
     });
   });
 

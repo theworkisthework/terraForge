@@ -21,6 +21,13 @@ function downloadTitle(transferRunning: boolean, jobActive: boolean, serialMode:
   return "Download";
 }
 
+/** Why deleting a folder is unavailable, or what the button does. */
+function deleteFolderTitle(transferRunning: boolean, jobActive: boolean): string {
+  if (transferRunning) return "Unavailable while a file transfer is running";
+  if (jobActive) return "Unavailable while a job is running";
+  return "Delete folder";
+}
+
 /** Clicks on a row's buttons act on the button, not the row. */
 const only = (action: () => void) => (e: React.MouseEvent) => {
   e.stopPropagation();
@@ -101,6 +108,8 @@ interface FileRowProps {
   onRun: (file: RemoteFile) => void;
   onDownload: (file: RemoteFile) => void;
   onDelete: (file: RemoteFile) => void;
+  /** Whether a folder row offers to delete the folder. */
+  canDeleteFolder?: boolean;
 }
 
 export function FileRow({
@@ -118,6 +127,7 @@ export function FileRow({
   onRun,
   onDownload,
   onDelete,
+  canDeleteFolder = false,
 }: FileRowProps) {
   const isGcode = isGcodeFile(file.name);
   const isThisRunning =
@@ -150,9 +160,23 @@ export function FileRow({
       )}
 
       {file.isDirectory ? (
-        <span className="text-content-faint text-[9px] hidden group-hover:block shrink-0">
-          <ChevronRight size={10} />
-        </span>
+        <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
+          {canDeleteFolder && (
+            <Button
+              variant="danger"
+              size="xs"
+              onClick={only(() => onDelete(file))}
+              aria-label="Delete folder"
+              disabled={anyJobActive || hasRunningTransfer}
+              title={deleteFolderTitle(hasRunningTransfer, anyJobActive)}
+            >
+              <Trash2 size={12} />
+            </Button>
+          )}
+          <span className="text-content-faint text-[9px]">
+            <ChevronRight size={10} />
+          </span>
+        </div>
       ) : (
         <div
           data-testid={`file-actions-${file.name}`}

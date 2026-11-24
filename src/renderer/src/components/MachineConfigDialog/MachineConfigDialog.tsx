@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Button } from "../ui";
 import { TabHeader } from "../TabHeader";
+import { useModalFocus } from "../../hooks/useModalFocus";
 import { PEN_DEFAULTS } from "./utils/machineConfigDefaults";
 import {
   MachineConfigurationsTab,
@@ -31,10 +32,17 @@ export function MachineConfigDialog({ onClose }: Props) {
   const { machineStore, selectedId, isNew, pendingPenType, setPendingPenType } =
     controller;
   const { connected } = machineStore;
+  // No Escape-to-close: it would throw away unsaved edits on a stray keypress.
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>();
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div
+        ref={ref}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+        onKeyDown={onKeyDown}
+        tabIndex={-1}
+      >
         <div
           role="dialog"
           aria-modal="true"

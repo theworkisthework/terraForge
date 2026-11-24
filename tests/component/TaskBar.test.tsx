@@ -36,7 +36,22 @@ describe("TaskBar", () => {
     });
     useTaskStore.setState({ tasks: { t1: task } });
     render(<TaskBar />);
-    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(screen.getByText("75.0%")).toBeInTheDocument();
+  });
+
+  it("keeps one decimal place so the percentage width stays stable", () => {
+    const task = createBackgroundTask({
+      id: "t1",
+      label: "Optimizing",
+      status: "running",
+      progress: 72.5,
+    });
+    useTaskStore.setState({ tasks: { t1: task } });
+    const { rerender } = render(<TaskBar />);
+    expect(screen.getByText("72.5%")).toBeInTheDocument();
+    useTaskStore.setState({ tasks: { t1: { ...task, progress: 73 } } });
+    rerender(<TaskBar />);
+    expect(screen.getByText("73.0%")).toBeInTheDocument();
   });
 
   it("shows completed task controls", () => {

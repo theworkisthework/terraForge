@@ -12,6 +12,7 @@
 
 import React from "react";
 import { Button } from "./ui";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 interface Props {
   /** Number of imported objects, used to build the message. */
@@ -27,12 +28,14 @@ export function CloseLayoutDialog({
   onDiscard,
   onCancel,
 }: Props) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onCancel();
-  };
+  // Only buttons can take focus here, and they handle Enter themselves.
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onCancel,
+  });
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-modal="true"
       aria-labelledby="close-layout-dialog-title"
@@ -40,7 +43,7 @@ export function CloseLayoutDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
       tabIndex={-1}
     >
       <div className="bg-panel border border-border-ui rounded-lg shadow-2xl w-[340px] p-5 flex flex-col gap-4">
@@ -66,7 +69,7 @@ export function CloseLayoutDialog({
           <Button variant="secondary" onClick={onDiscard}>
             Exit without Saving
           </Button>
-          <Button variant="primary" onClick={onSave} autoFocus>
+          <Button variant="primary" onClick={onSave} data-autofocus>
             Save and Exit
           </Button>
         </div>

@@ -3,7 +3,9 @@ import {
   FluidNCClient,
   ConnectSupersededError,
   encodeRemotePath,
+  JobInProgressError,
 } from "../../src/machine/fluidnc";
+import { LISTING_PAUSED_DURING_JOB } from "../../src/types";
 
 // ── Mock WebSocket from "ws" ──────────────────────────────────────────────────
 // vi.hoisted creates a value accessible in vi.mock factories (they're both
@@ -322,6 +324,149 @@ describe("FluidNCClient", () => {
     );
   });
 
+  // ── ensureSdDirectory ───────────────────────────────────────────────────
+
+  it("3.x: creates a missing SD folder, with slashes left unencoded in path", async () => {
+    (client as any).fwMajor = 3;
+    mockFetch
+      .mockResolvedValueOnce(mockResponse({ files: [], path: "/" }))
+      .mockResolvedValueOnce(mockResponse("ok"));
+    await client.ensureSdDirectory("/my job");
+    const url = String(mockFetch.mock.calls[1][0]);
+    expect(url).toContain("/upload?path=/&action=createdir&filename=my%20job");
+    expect(url).not.toContain("%2F");
+  });
+
+  it("leaves an SD folder that is already listed alone", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse({ files: [{ name: "job", size: "-1" }], path: "/" }),
+    );
+    await client.ensureSdDirectory("/job");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("3.x: creates each missing level of a nested SD folder, parent first", async () => {
+    (client as any).fwMajor = 3;
+    const listing = (path: string) => mockResponse({ files: [], path });
+    mockFetch.mockImplementation(async (url: string) =>
+      String(url).includes("action=createdir") ? mockResponse("ok") : listing(decodeURIComponent(new URL(String(url)).searchParams.get("path") ?? "/")),
+    );
+    await client.ensureSdDirectory("/a/b");
+    const urls = mockFetch.mock.calls.map(([u]) => String(u));
+    const creates = urls.filter((u) => u.includes("action=createdir"));
+    expect(creates).toHaveLength(2);
+    expect(creates[0]).toContain("path=/&action=createdir&filename=a");
+    expect(creates[1]).toContain("path=/a&action=createdir&filename=b");
+    expect(urls.some((u) => u.includes("%2F"))).toBe(false);
+  });
+
+  it("does not create a folder it could not check for, and does not throw", async () => {
+    mockFetch.mockRejectedValue(new Error("SD card: No SD card"));
+    await expect(client.ensureSdDirectory("/job")).resolves.toBeUndefined();
+    expect(mockFetch.mock.calls.some(([u]) => String(u).includes("action=createdir"))).toBe(false);
+  });
+
+  it("3.x: carries on to the next level when a folder cannot be created", async () => {
+    (client as any).fwMajor = 3;
+    mockFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes("action=createdir")) return mockResponse("nope", 500);
+      return mockResponse({ files: [], path: "/" });
+    });
+    await expect(client.ensureSdDirectory("/a/b")).resolves.toBeUndefined();
+    const creates = mockFetch.mock.calls.filter(([u]) => String(u).includes("action=createdir"));
+    expect(creates).toHaveLength(2);
+  });
+
+  it("makes nothing for the root", async () => {
+    await client.ensureSdDirectory("/");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // ── createSdFolder / deleteSdFolder ─────────────────────────────────────
+
+  /** Answers folder actions with "ok" and listings with `listed`. */
+  function sdMachine(listed: Array<{ name: string; size: string }>) {
+    mockFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      init?.method !== "GET" || String(url).includes("action=")
+        ? mockResponse("ok")
+        : mockResponse({ files: listed, path: "/" }),
+    );
+  }
+
+  it("4.x: creates a folder with WebDAV MKCOL, never the /upload action that crashes it", async () => {
+    (client as any).fwMajor = 4;
+    sdMachine([{ name: "new #1", size: "-1" }]);
+    await client.createSdFolder("/plots/new #1");
+    expect(mockFetch.mock.calls[0][0]).toBe("http://192.168.1.100:80/sd/plots/new%20%231");
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ method: "MKCOL" });
+    expect(mockFetch.mock.calls.some(([u]) => String(u).includes("action="))).toBe(false);
+  });
+
+  it("4.x: deletes a folder with WebDAV DELETE", async () => {
+    (client as any).fwMajor = 4;
+    sdMachine([]);
+    await client.deleteSdFolder("/plots/old");
+    expect(mockFetch.mock.calls[0][0]).toBe("http://192.168.1.100:80/sd/plots/old");
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("4.x: makes upload folders with MKCOL too", async () => {
+    (client as any).fwMajor = 4;
+    sdMachine([]);
+    await client.ensureSdDirectory("/job");
+    const mkcol = mockFetch.mock.calls.filter(([, init]) => init?.method === "MKCOL");
+    expect(mkcol.map(([u]) => String(u))).toEqual(["http://192.168.1.100:80/sd/job"]);
+    expect(mockFetch.mock.calls.some(([u]) => String(u).includes("action="))).toBe(false);
+  });
+
+  it("takes a slow reply as done when the listing shows the folder", async () => {
+    (client as any).fwMajor = 4;
+    mockFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "MKCOL") throw Object.assign(new Error("aborted"), { name: "TimeoutError" });
+      return mockResponse({ files: [{ name: "slow", size: "-1" }], path: "/" });
+    });
+    await expect(client.createSdFolder("/slow")).resolves.toBeUndefined();
+  });
+
+  it("passes on a refusal that is not a timeout", async () => {
+    (client as any).fwMajor = 4;
+    mockFetch.mockResolvedValue(mockResponse("no", 500));
+    await expect(client.createSdFolder("/x")).rejects.toThrow(/HTTP 500/);
+  });
+
+  it("3.x: creates a folder inside the given parent, then checks it is listed", async () => {
+    (client as any).fwMajor = 3;
+    sdMachine([{ name: "new #1", size: "-1" }]);
+    await client.createSdFolder("/plots/new #1");
+    const urls = mockFetch.mock.calls.map(([u]) => String(u));
+    expect(urls[0]).toContain("/upload?path=/plots&action=createdir&filename=new%20%231");
+    expect(urls[1]).toContain("/upload?path=/plots");
+    expect(urls.some((u) => u.includes("%2F"))).toBe(false);
+  });
+
+  it("says so when the machine did not create the folder", async () => {
+    sdMachine([]);
+    await expect(client.createSdFolder("/jobs")).rejects.toThrow(/did not create the folder "jobs"/);
+  });
+
+  it("3.x: deletes a folder, then checks it is gone", async () => {
+    (client as any).fwMajor = 3;
+    sdMachine([{ name: "other", size: "-1" }]);
+    await client.deleteSdFolder("/jobs");
+    expect(String(mockFetch.mock.calls[0][0])).toContain("/upload?path=/&action=deletedir&filename=jobs");
+  });
+
+  it("says so when the machine did not delete the folder", async () => {
+    sdMachine([{ name: "jobs", size: "-1" }]);
+    await expect(client.deleteSdFolder("/jobs")).rejects.toThrow(/did not delete the folder "jobs"/);
+  });
+
+  it("refuses to create or delete the root", async () => {
+    await expect(client.createSdFolder("/")).rejects.toThrow(/no folder/i);
+    await expect(client.deleteSdFolder("/")).rejects.toThrow(/no folder/i);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   // ── deleteFile ──────────────────────────────────────────────────────────
 
   it("sends WebDAV DELETE to /sd/ for SD delete (4.x)", async () => {
@@ -390,6 +535,41 @@ describe("FluidNCClient", () => {
     await expect(client.pauseJob()).rejects.toThrow("fetch failed");
     await expect(client.resumeJob()).rejects.toThrow("fetch failed");
     await expect(client.abortJob()).rejects.toThrow("fetch failed");
+  });
+
+  it("job controls count an empty HTTP reply as acted on (FluidNC 4.1)", async () => {
+    mockFetch.mockResolvedValue(mockResponse(""));
+    await expect(client.pauseJob()).resolves.toBeUndefined();
+  });
+
+  // FluidNC 4.0.x runs a realtime byte sent over HTTP as a line of text and
+  // replies with its help text; the machine does not pause. This is the
+  // sequence from #170's log: commandText refused with no WebSocket, then plain.
+  it.each([
+    ["pauseJob", "!"],
+    ["resumeJob", "~"],
+    ["abortJob", "\x18"],
+  ] as const)("%s rejects when the machine ran %j as text, not as a realtime command", async (method, char) => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("WebSocket dead", 500))
+      .mockResolvedValueOnce(
+        mockResponse("HLP:$$ $+ $# $S $L $G $I $N $x=val $Nx=line $J=line $SLP $C $X $H $F $E=err ~ ! ? ctrl-x\n"),
+      );
+    await expect(client[method]()).rejects.toThrow(/did not act on it .*HLP:/);
+    expect(mockFetch.mock.calls[1][0]).toContain(`/command?plain=${encodeURIComponent(char)}`);
+  });
+
+  it("job controls reject an error reply over HTTP", async () => {
+    mockFetch.mockResolvedValue(mockResponse("error:20\n"));
+    await expect(client.pauseJob()).rejects.toThrow('did not act on it (it replied "error:20")');
+  });
+
+  it("job controls reject when HTTP is blocked during motion", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse("WebSocket dead", 500))
+      .mockResolvedValueOnce(mockResponse("Try again when not moving\n", 503));
+    // Refused by the controller itself, before the reply is looked at.
+    await expect(client.pauseJob()).rejects.toThrow(/HTTP 503/);
   });
 
   // ── Remote path encoding ────────────────────────────────────────────────
@@ -882,6 +1062,79 @@ describe("FluidNCClient", () => {
   });
 
   // ── openWs WebSocket event handlers ────────────────────────────────────
+
+  // ── No listing while a job is in progress (#170) ────────────────────────
+  // FluidNC 4.0.x drops every connection, and the job with it, when the SD
+  // card is listed over HTTP mid-job.
+
+  describe("file listing during a job", () => {
+    beforeEach(() => {
+      (client as any).wsEnabled = true;
+      (client as any).openWs();
+    });
+
+    afterEach(() => {
+      (client as any).wsEnabled = false;
+      vi.useRealTimers();
+    });
+
+    const report = (raw: string) =>
+      wsCapture.instances[wsCapture.instances.length - 1].emit("message", raw);
+    const sdListing = () => mockResponse({ files: [], path: "/", status: "ok" });
+
+    it.each(["<Run|MPos:0,0,0>", "<Hold:0|MPos:0,0,0>", "<Door:1|MPos:0,0,0>"])(
+      "refuses both listings without asking the machine while it reports %s",
+      async (raw) => {
+        report(raw);
+        await expect(client.listSDFiles("/")).rejects.toBeInstanceOf(JobInProgressError);
+        await expect(client.listFiles("/")).rejects.toThrow(LISTING_PAUSED_DURING_JOB);
+        expect(mockFetch).not.toHaveBeenCalled();
+      },
+    );
+
+    it("lists again once the machine reports Idle", async () => {
+      report("<Run|MPos:0,0,0>");
+      await expect(client.listSDFiles("/")).rejects.toBeInstanceOf(JobInProgressError);
+      report("<Idle|MPos:0,0,0>");
+      mockFetch.mockResolvedValueOnce(sdListing());
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+
+    it("waits for the first status report after connecting, and refuses if a job is running", async () => {
+      const sd = client.listSDFiles("/");
+      const fs = client.listFiles("/");
+      await Promise.resolve();
+      expect(mockFetch).not.toHaveBeenCalled();
+      report("<Run|MPos:0,0,0>");
+      await expect(sd).rejects.toBeInstanceOf(JobInProgressError);
+      await expect(fs).rejects.toBeInstanceOf(JobInProgressError);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("lists after the first status report when the machine is idle", async () => {
+      mockFetch.mockResolvedValueOnce(sdListing());
+      const sd = client.listSDFiles("/");
+      report("<Idle|MPos:0,0,0>");
+      await expect(sd).resolves.toEqual([]);
+    });
+
+    it("goes ahead, once, when no status report arrives", async () => {
+      vi.useFakeTimers();
+      mockFetch.mockResolvedValue(sdListing());
+      const first = client.listSDFiles("/");
+      await vi.advanceTimersByTimeAsync(3000);
+      await expect(first).resolves.toEqual([]);
+      // A controller that never reports does not slow every listing.
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+
+    it("forgets the last state on disconnect", async () => {
+      report("<Run|MPos:0,0,0>");
+      client.disconnectWebSocket();
+      mockFetch.mockResolvedValueOnce(sdListing());
+      await expect(client.listSDFiles("/")).resolves.toEqual([]);
+    });
+  });
 
   describe("openWs event handlers", () => {
     beforeEach(() => {

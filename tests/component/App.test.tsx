@@ -70,10 +70,28 @@ describe("App", () => {
     await act(async () => {});
 
     await userEvent.click(screen.getByLabelText("Hide file browser panel"));
-    expect(screen.queryByText("File Browser")).not.toBeInTheDocument();
+    // Hidden, not unmounted: showing it again must not list the machine's
+    // files afresh, which mid-job can crash FluidNC (#170).
+    expect(screen.getByText("File Browser")).not.toBeVisible();
 
     await userEvent.click(screen.getByLabelText("Show file browser panel"));
-    expect(screen.getByText("File Browser")).toBeInTheDocument();
+    expect(screen.getByText("File Browser")).toBeVisible();
+  });
+
+  it("does not list the machine's files again when the file browser is shown again (#170)", async () => {
+    useMachineStore.setState({ connected: true });
+    render(<App />);
+    await act(async () => {});
+    const listSd = window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>;
+    const listFs = window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>;
+    const calls = listSd.mock.calls.length + listFs.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByLabelText("Hide file browser panel"));
+    await userEvent.click(screen.getByLabelText("Show file browser panel"));
+    await act(async () => {});
+
+    expect(listSd.mock.calls.length + listFs.mock.calls.length).toBe(calls);
   });
 
   it("shows collapsed mini job controls when file browser is hidden and a job is active", async () => {

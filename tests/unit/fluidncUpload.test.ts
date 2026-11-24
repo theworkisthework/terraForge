@@ -262,7 +262,7 @@ describe("FluidNCClient.uploadFile", () => {
     );
   });
 
-  it("splits full remote path into directory and filename", async () => {
+  it("splits full remote path into directory and filename, naming the file by its full path", async () => {
     const client = buildClient();
     mockUploadVerification(client, 1024, ["job.gcode"]);
     await client.uploadFile("/local/test.gcode", "/sd/dest/job.gcode");
@@ -273,8 +273,18 @@ describe("FluidNCClient.uploadFile", () => {
     expect(form!.append).toHaveBeenCalledWith(
       "file",
       expect.anything(),
-      expect.objectContaining({ filename: "job.gcode" }),
+      expect.objectContaining({ filepath: "/sd/dest/job.gcode" }),
     );
+  });
+
+  it("sends a root upload's bare filename, with no folder path", async () => {
+    const client = buildClient();
+    mockUploadVerification(client, 1024, ["job.gcode"]);
+    await client.uploadFile("/local/test.gcode", "/job.gcode");
+
+    const fileCall = state.form!.append.mock.calls.find((call: unknown[]) => call[0] === "file")!;
+    expect(fileCall[2]).toMatchObject({ filename: "job.gcode" });
+    expect(fileCall[2]).not.toHaveProperty("filepath");
   });
 
   it("rejects when post-upload size verification mismatches", async () => {

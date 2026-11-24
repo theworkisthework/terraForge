@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import TerraForgeLogo from "../assets/terraForgeAnimated.svg?react";
 import TerraForgeLogotype from "../assets/terraForgeLogotype.svg?react";
 import { Button } from "./ui";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 interface Props {
   onClose: () => void;
@@ -17,12 +18,14 @@ export function AboutDialog({ onClose }: Props) {
       .catch(() => setVersion("unknown"));
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  };
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onClose,
+    onEnter: onClose,
+  });
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-modal="true"
       aria-labelledby="about-dialog-title"
@@ -30,7 +33,7 @@ export function AboutDialog({ onClose }: Props) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
       tabIndex={-1}
     >
       <div className="bg-panel border border-border-ui rounded-xl shadow-2xl w-[340px] p-7 flex flex-col items-center gap-4 text-center">
@@ -84,7 +87,7 @@ export function AboutDialog({ onClose }: Props) {
         <Button
           variant="secondary"
           onClick={onClose}
-          autoFocus
+          data-autofocus
           className="mt-1 px-5"
         >
           Close

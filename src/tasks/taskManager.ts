@@ -2,13 +2,30 @@ import { EventEmitter } from "events";
 import type { BackgroundTask, TaskType } from "../types";
 
 /**
+ * How long a finished task is kept, so that whoever ran it can still read
+ * its final state, before it is forgotten.
+ */
+const FORGET_AFTER_MS = 5000;
+
+/**
  * Tracks all background tasks (upload, download, gcode gen, etc.)
  * and emits 'task-update' events that the main process forwards to the renderer.
+ *
+ * A task that has finished — completed, failed or cancelled — is forgotten a
+ * few seconds later, so that the map does not grow for as long as the app runs.
  */
 export class TaskManager extends EventEmitter {
   private tasks = new Map<string, BackgroundTask>();
   private cancelRequests = new Set<string>();
   private cancelHandlers = new Map<string, () => void>();
+
+  /** Drops the task, and any cancel request against it, a little later. */
+  private forgetLater(id: string): void {
+    setTimeout(() => {
+      this.tasks.delete(id);
+      this.cancelRequests.delete(id);
+    }, FORGET_AFTER_MS).unref?.();
+  }
 
   create(id: string, type: TaskType, label: string): BackgroundTask {
     const task: BackgroundTask = {
@@ -41,8 +58,7 @@ export class TaskManager extends EventEmitter {
     this.cancelHandlers.delete(id);
     this.cancelRequests.delete(id);
     this.emit("task-update", { ...task });
-    // Clean up after a short delay
-    setTimeout(() => this.tasks.delete(id), 5000);
+    this.forgetLater(id);
   }
 
   fail(id: string, error: string): void {
@@ -53,6 +69,7 @@ export class TaskManager extends EventEmitter {
     this.cancelHandlers.delete(id);
     this.cancelRequests.delete(id);
     this.emit("task-update", { ...task });
+    this.forgetLater(id);
   }
 
   cancel(id: string): void {
@@ -70,6 +87,9 @@ export class TaskManager extends EventEmitter {
     }
     this.cancelHandlers.delete(id);
     this.emit("task-update", { ...task });
+    // The cancel request stays readable until then: the operation that was
+    // cancelled checks it once it has stopped.
+    this.forgetLater(id);
   }
 
   registerCancelHandler(id: string, handler: () => void): void {

@@ -8,6 +8,8 @@ import { selectFileBrowserPaneCanvasState } from "../../../store/canvasSelectors
 import { parseGcode } from "../../../utils/gcodeParser";
 import { useStableMachineState } from "../../../hooks/useStableMachineState";
 import { isGcodeFile } from "../utils/pathUtils";
+import { describeError } from "../../../utils/unexpectedErrors";
+import { isJobInProgress, LISTING_PAUSED_DURING_JOB } from "../../../../../types";
 import type { RemoteFile, TaskStatus } from "../../../../../types";
 
 export interface FsPaneControllerProps {
@@ -17,6 +19,10 @@ export interface FsPaneControllerProps {
   source: "fs" | "sd";
   listFn: (path: string) => Promise<RemoteFile[]>;
   deleteFn: (path: string) => Promise<void>;
+  /** Makes a folder at a path. Given only where the filesystem has folders. */
+  createFolderFn?: (path: string) => Promise<void>;
+  /** Deletes a folder and everything in it. Given only where the filesystem has folders. */
+  deleteFolderFn?: (path: string) => Promise<void>;
   uploadFn: (
     localPath: string,
     remotePath: string,
@@ -40,6 +46,8 @@ export function useFsPaneController({
   source,
   listFn,
   deleteFn,
+  createFolderFn,
+  deleteFolderFn,
   uploadFn,
   upsertTask,
 }: FsPaneControllerProps) {
@@ -64,8 +72,10 @@ export function useFsPaneController({
   );
 
   const hasRunningTransfer = useMemo(() => anyTransferRunning(tasks), [tasks]);
+  const jobInProgress = isJobInProgress(displayMachineState);
 
-  const { files, path, loading, error, navigate, pendingRefreshRef } = useFsListing(connected, listFn, hasRunningTransfer);
+  const listing = useFsListing(connected, listFn, hasRunningTransfer, jobInProgress);
+  const { files, path, loading, error, listingPaused, navigate, pendingRefreshRef } = listing;
 
   const { handleDownload, handleUpload } = useFsTransfers({
     hasRunningTransfer,
@@ -174,12 +184,10 @@ export function useFsPaneController({
     [doRun, gcodeSource, gcodeToolpath, hasRunningTransfer],
   );
 
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return;
-    await deleteFn(deleteTarget.path);
-    await navigate(path);
-    setDeleteTarget(null);
-  }, [deleteFn, deleteTarget, navigate, path]);
+  const deleteAndFolders = useFsDeleteAndFolders({
+    deleteTarget, setDeleteTarget, deleteFn, deleteFolderFn, createFolderFn,
+    navigate, path, source, upsertTask, setSelectedJobFile,
+  });
 
   const handleFileClick = useCallback(
     (file: RemoteFile) => {
@@ -199,6 +207,8 @@ export function useFsPaneController({
     path,
     loading,
     error,
+    listingPaused,
+    jobInProgress,
     previewing,
     runningFile,
     activeJobPath,
@@ -215,8 +225,10 @@ export function useFsPaneController({
     handleUpload,
     handlePreview,
     handleRun,
-    handleDeleteConfirm,
+    ...deleteAndFolders,
     setDeleteTarget,
+    canCreateFolders: createFolderFn !== undefined,
+    canDeleteFolders: deleteFolderFn !== undefined,
     setPendingPreviewFile,
     setPendingRunFile,
     doPreview,
@@ -226,6 +238,82 @@ export function useFsPaneController({
     serialMode,
     connected,
   };
+}
+
+/**
+ * Deleting the confirmed file or folder, and making a new folder in the
+ * current one. Each re-lists the folder when done.
+ */
+function useFsDeleteAndFolders({
+  deleteTarget,
+  setDeleteTarget,
+  deleteFn,
+  deleteFolderFn,
+  createFolderFn,
+  navigate,
+  path,
+  source,
+  upsertTask,
+  setSelectedJobFile,
+}: {
+  deleteTarget: RemoteFile | null;
+  setDeleteTarget: (file: RemoteFile | null) => void;
+  deleteFn: FsPaneControllerProps["deleteFn"];
+  deleteFolderFn: FsPaneControllerProps["deleteFolderFn"];
+  createFolderFn: FsPaneControllerProps["createFolderFn"];
+  navigate: (target: string) => Promise<void>;
+  path: string;
+  source: "fs" | "sd";
+  upsertTask: FsPaneControllerProps["upsertTask"];
+  setSelectedJobFile: ReturnType<typeof useMachineStore.getState>["setSelectedJobFile"];
+}) {
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+
+  /** Deletes the confirmed file or folder, reporting it as a task: a whole
+   * folder can take a while, and the machine may refuse. */
+  const handleDeleteConfirm = useCallback(async () => {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    const remove = target.isDirectory ? deleteFolderFn : deleteFn;
+    if (!remove) return;
+    const what = target.isDirectory ? `folder ${target.name}` : target.name;
+    const taskId = uuid();
+    upsertTask({ id: taskId, type: "file-delete", label: `Deleting ${what}…`, progress: null, status: "running" });
+    try {
+      await remove(target.path);
+      // The job file went with it, if it was this or was inside this.
+      const jobFile = useMachineStore.getState().selectedJobFile;
+      if (jobFile?.source === source && (jobFile.path === target.path || jobFile.path.startsWith(`${target.path}/`))) {
+        setSelectedJobFile(null);
+      }
+      upsertTask({ id: taskId, type: "file-delete", label: `Deleted ${what}`, progress: 100, status: "completed" });
+    } catch (err) {
+      upsertTask({
+        id: taskId,
+        type: "file-delete",
+        label: `Could not delete ${what}`,
+        progress: null,
+        status: "error",
+        error: describeError(err),
+      });
+    }
+    await navigate(path);
+  }, [deleteFn, deleteFolderFn, deleteTarget, navigate, path, setSelectedJobFile, source, upsertTask]);
+
+  /** Makes `name` in the current folder, then lists it. Rejects, for the
+   * dialog to show, when the machine would not. */
+  const handleCreateFolder = useCallback(
+    async (name: string) => {
+      if (!createFolderFn) return;
+      await createFolderFn(`${path === "/" ? "" : path}/${name}`);
+      setNewFolderOpen(false);
+      await navigate(path);
+    },
+    [createFolderFn, navigate, path],
+  );
+
+  return { handleDeleteConfirm, newFolderOpen, setNewFolderOpen, handleCreateFolder };
 }
 
 /** Downloading a file from the machine and uploading one to the current
@@ -282,30 +370,58 @@ function useFsTransfers({
  * A folder listing on the machine: the root when connected, cleared when
  * not. It re-lists when FluidNC reports files changed — after any running
  * transfer finishes, so a half-written upload is not listed.
+ *
+ * Nothing is listed while a job is in progress: FluidNC 4.0.x drops every
+ * connection, and the job with it, when asked to list the SD card mid-job
+ * (#170). A listing asked for meanwhile — or refused by the main process,
+ * which may know of the job first — is held back, the last listing stays
+ * shown, and the folder is listed again once the job is over.
  */
-function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"], hasRunningTransfer: boolean) {
+function useFsListing(
+  connected: boolean,
+  listFn: FsPaneControllerProps["listFn"],
+  hasRunningTransfer: boolean,
+  jobInProgress: boolean,
+) {
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [path, setPath] = useState("/");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** A listing is waiting for the job to end. */
+  const [listingPaused, setListingPaused] = useState(false);
   const pendingRefreshRef = useRef(false);
+  // Read through a ref so `navigate` keeps its identity as jobs start and
+  // stop — the effect listing the root on connect depends on it.
+  const jobInProgressRef = useRef(jobInProgress);
+  jobInProgressRef.current = jobInProgress;
+
+  const holdBack = useCallback(() => {
+    pendingRefreshRef.current = true;
+    setListingPaused(true);
+  }, []);
 
   const navigate = useCallback(
     async (target: string) => {
       if (!connected) return;
+      if (jobInProgressRef.current) {
+        holdBack();
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
         const list = await listFn(target);
         setFiles(list);
         setPath(target);
+        setListingPaused(false);
       } catch (err) {
-        setError(String(err));
+        if (String(err).includes(LISTING_PAUSED_DURING_JOB)) holdBack();
+        else setError(String(err));
       } finally {
         setLoading(false);
       }
     },
-    [connected, listFn],
+    [connected, listFn, holdBack],
   );
 
   useEffect(() => {
@@ -316,6 +432,8 @@ function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"
     setFiles([]);
     setPath("/");
     setError(null);
+    setListingPaused(false);
+    pendingRefreshRef.current = false;
   }, [connected, navigate]);
 
   useEffect(() => {
@@ -331,12 +449,12 @@ function useFsListing(connected: boolean, listFn: FsPaneControllerProps["listFn"
   }, [connected, hasRunningTransfer, navigate, path]);
 
   useEffect(() => {
-    if (!connected || hasRunningTransfer || !pendingRefreshRef.current) return;
+    if (!connected || hasRunningTransfer || jobInProgress || !pendingRefreshRef.current) return;
     pendingRefreshRef.current = false;
     navigate(path);
-  }, [connected, hasRunningTransfer, navigate, path]);
+  }, [connected, hasRunningTransfer, jobInProgress, navigate, path]);
 
-  return { files, path, loading, error, navigate, pendingRefreshRef };
+  return { files, path, loading, error, listingPaused, navigate, pendingRefreshRef };
 }
 
 /**

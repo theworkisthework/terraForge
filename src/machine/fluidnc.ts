@@ -8,6 +8,7 @@ import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { lookup } from "dns/promises";
 import FormData from "form-data";
 import type { MachineStatus, RemoteFile } from "../types";
+import { isJobInProgress, LISTING_PAUSED_DURING_JOB } from "../types";
 import {
   parseSdRemoteFiles,
   parseRemoteFiles,
@@ -44,6 +45,26 @@ export function encodeRemotePath(remotePath: string): string {
 }
 
 /**
+ * Splits a folder's path into its parent and its own name, refusing the root
+ * and anything with no name to act on.
+ */
+export function splitFolderPath(folderPath: string): { parent: string; name: string } {
+  const parts = folderPath.split("/").filter(Boolean);
+  const name = parts.pop();
+  if (!name) throw new Error("No folder given");
+  return { parent: "/" + parts.join("/"), name };
+}
+
+/**
+ * Whether an HTTP reply to a realtime command shows the machine took it as
+ * one: nothing, or only "ok". FluidNC sends no output for a realtime byte;
+ * help text or an error means it ran the byte as a line of text instead.
+ */
+function isRealtimeAccepted(reply: string): boolean {
+  return reply.split(/\r?\n/).every((line) => line.trim() === "" || line.trim() === "ok");
+}
+
+/**
  * Thrown by `connectWebSocket` when a disconnect, or a newer connect, arrived
  * while it was still resolving and probing the controller.
  */
@@ -51,6 +72,18 @@ export class ConnectSupersededError extends Error {
   constructor() {
     super("Connection attempt cancelled");
     this.name = "ConnectSupersededError";
+  }
+}
+
+/**
+ * Thrown by a file listing asked for while the machine is part-way through a
+ * job. FluidNC 4.0.x drops every connection, and the job with it, when the
+ * SD card is listed over HTTP mid-job (#170).
+ */
+export class JobInProgressError extends Error {
+  constructor() {
+    super(LISTING_PAUSED_DURING_JOB);
+    this.name = "JobInProgressError";
   }
 }
 
@@ -81,6 +114,19 @@ export class FluidNCClient extends EventEmitter {
    * socket the user has since asked to close.
    */
   private connectAttempt = 0;
+  /**
+   * The state in the controller's latest status report, or null before the
+   * first report of this connection. File listings are refused while it
+   * says a job is in progress.
+   */
+  private machineState: MachineStatus["state"] | null = null;
+  /** How long a listing waits for the first status report of a connection,
+   * to learn whether a job is running, before going ahead regardless. */
+  private static firstStatusWaitMs = 3000;
+  /** The wait for the first status report of this connection, shared by
+   * every listing made meanwhile. Made once per connection, so a controller
+   * that never sends one does not slow every listing. */
+  private firstStatusWait: Promise<void> | null = null;
   private static readonly uploadVerifyMaxAttempts = 6;
   private static readonly uploadVerifyDelayMs = 300;
   /**
@@ -277,6 +323,11 @@ export class FluidNCClient extends EventEmitter {
    * otherwise through the HTTP command endpoint (which may work, depending on
    * the firmware version). Rejects when neither delivers it, so a Pause or an
    * Abort that never left this machine is not reported as sent.
+   *
+   * Over HTTP, the reply must also show the byte was taken as a realtime
+   * command: empty, or "ok". FluidNC 4.0.x runs it as a line of text
+   * instead and replies with its help text, and with HTTP/BlockDuringMotion
+   * off it does so even mid-job — so the machine keeps moving.
    */
   private async sendRealtime(char: string): Promise<void> {
     const ws = this.ws;
@@ -286,12 +337,17 @@ export class FluidNCClient extends EventEmitter {
       });
       return;
     }
-    await this.sendCommand(char);
+    const reply = await this.sendCommand(char);
+    if (!isRealtimeAccepted(reply)) {
+      const preview = reply.trim().split("\n")[0].slice(0, 80);
+      throw new Error(`The machine did not act on it (it replied "${preview}")`);
+    }
   }
 
   // ─── File Management ─────────────────────────────────────────────────────
 
   async listFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    await this.assertNoJobInProgress();
     const res = await this.restClient.get(
       `/files?path=${encodeRemotePath(remotePath)}`,
     );
@@ -307,6 +363,7 @@ export class FluidNCClient extends EventEmitter {
   // FluidNC 3.9.x slow SD: same endpoint but may need up to 30 s for init.
   // Directories are identified by size === "-1" (returned as a string).
   async listSDFiles(remotePath = "/"): Promise<RemoteFile[]> {
+    await this.assertNoJobInProgress();
     // Use a generous 30 s timeout — SD card initialisation can be slow on
     // first access in FluidNC 3.x.
     //
@@ -334,6 +391,28 @@ export class FluidNCClient extends EventEmitter {
     }
 
     return parseSdRemoteFiles(remotePath, json);
+  }
+
+  /**
+   * Rejects with JobInProgressError while the machine is running, holding or
+   * at an open door. Just after connecting, before any status report, it
+   * first waits a moment for one: connecting to a machine mid-job lists both
+   * filesystems straight away.
+   */
+  private async assertNoJobInProgress(): Promise<void> {
+    if (this.machineState === null && this.wsEnabled) {
+      this.firstStatusWait ??= new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          this.off("status", done);
+          resolve();
+        };
+        const timer = setTimeout(done, FluidNCClient.firstStatusWaitMs);
+        this.on("status", done);
+      });
+      await this.firstStatusWait;
+    }
+    if (isJobInProgress(this.machineState)) throw new JobInProgressError();
   }
 
   /** Fetch the text content of a remote file (for G-code preview). */
@@ -418,8 +497,13 @@ export class FluidNCClient extends EventEmitter {
     });
 
     form.append("path", targetDir);
+    // FluidNC writes a file where its multipart filename says, as the stock
+    // web UI sends it; `path` alone leaves it in the SD root. form-data
+    // strips a `filename` to its basename, so the folder goes in `filepath`.
     form.append("file", stream, {
-      filename: targetFilename,
+      ...(targetDir === "/"
+        ? { filename: targetFilename }
+        : { filepath: `${targetDir.replace(/\/$/, "")}/${targetFilename}` }),
       knownLength: total,
     });
 
@@ -473,6 +557,106 @@ export class FluidNCClient extends EventEmitter {
 
     await this.verifyUploadedFileSize(targetDir, targetFilename, total, signal);
     onProgress?.(100);
+  }
+
+  /**
+   * Creates `dir` on the SD card, and any parent of it, one level at a time.
+   * A level that is already listed is left alone, as asking the machine to
+   * create what exists only gives it more to fail on. Best effort otherwise:
+   * if a folder is truly missing the upload itself fails.
+   */
+  async ensureSdDirectory(dir: string): Promise<void> {
+    const parts = dir.split("/").filter(Boolean);
+    let parent = "/";
+    for (const name of parts) {
+      try {
+        const siblings = await this.listSDFiles(parent);
+        if (!siblings.some((f) => f.isDirectory && f.name === name)) {
+          await this.sdFolderAction("create", parent, name);
+        }
+      } catch {
+        // Not creatable: the upload decides.
+      }
+      parent = parent === "/" ? `/${name}` : `${parent}/${name}`;
+    }
+  }
+
+  /**
+   * Creates one folder on the SD card. Its parent must already exist. The
+   * machine does not reliably say when it refused, so the parent is listed
+   * again to see that the folder is there.
+   */
+  async createSdFolder(folderPath: string): Promise<void> {
+    const { parent, name } = splitFolderPath(folderPath);
+    await this.sdFolderActionThenCheck("create", parent, name);
+    if (!(await this.sdFolderListed(parent, name))) {
+      throw new Error(`The machine did not create the folder "${name}"`);
+    }
+  }
+
+  /**
+   * Deletes a folder on the SD card, with everything in it. Checked by
+   * listing the parent again, as with createSdFolder.
+   */
+  async deleteSdFolder(folderPath: string): Promise<void> {
+    const { parent, name } = splitFolderPath(folderPath);
+    await this.sdFolderActionThenCheck("delete", parent, name);
+    if (await this.sdFolderListed(parent, name)) {
+      throw new Error(`The machine did not delete the folder "${name}"`);
+    }
+  }
+
+  /**
+   * A folder operation whose outcome the caller checks by listing. A reply
+   * that is slow to come is not taken as failure: the operation may well
+   * have been done, and the listing says whether it was.
+   */
+  private async sdFolderActionThenCheck(
+    action: "create" | "delete",
+    parent: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      await this.sdFolderAction(action, parent, name);
+    } catch (err) {
+      if (!isTimeoutError(err)) throw err;
+    }
+  }
+
+  /**
+   * A folder operation on the SD card. 4.x serves the card over WebDAV, as
+   * deleteFile uses: MKCOL makes a folder and DELETE removes one with what
+   * is in it. 3.x takes the stock web UI's /upload actions instead.
+   */
+  private async sdFolderAction(
+    action: "create" | "delete",
+    parent: string,
+    name: string,
+  ): Promise<void> {
+    if (this.fwMajor === null || this.fwMajor >= 4) {
+      const folder = parent === "/" ? `/${name}` : `${parent}/${name}`;
+      await this.restClient.get(
+        `/sd${encodeRemotePath(folder)}`,
+        FluidNCClient.sdFolderTimeoutMs,
+        action === "create" ? "MKCOL" : "DELETE",
+      );
+      return;
+    }
+    // Slashes stay as they are in `path`: 3.x resets the connection on %2F
+    // (see listSDFiles). The name has none.
+    await this.restClient.get(
+      `/upload?path=${encodeRemotePath(parent)}&action=${action === "create" ? "createdir" : "deletedir"}&filename=${encodeURIComponent(name)}`,
+      FluidNCClient.sdFolderTimeoutMs,
+    );
+  }
+
+  /** As long as listing the card may take (see listSDFiles); deleting a
+   * full folder can take longer still. */
+  private static sdFolderTimeoutMs = 30_000;
+
+  private async sdFolderListed(parent: string, name: string): Promise<boolean> {
+    const siblings = await this.listSDFiles(parent);
+    return siblings.some((f) => f.isDirectory && f.name === name);
   }
 
   private resolveUploadTarget(
@@ -735,6 +919,8 @@ export class FluidNCClient extends EventEmitter {
     wsPort?: number,
   ): Promise<void> {
     const attempt = ++this.connectAttempt;
+    this.machineState = null;
+    this.firstStatusWait = null;
     const assertCurrent = () => {
       if (attempt !== this.connectAttempt) throw new ConnectSupersededError();
     };
@@ -805,6 +991,8 @@ export class FluidNCClient extends EventEmitter {
   disconnectWebSocket(): void {
     // Overtakes a connect still waiting on its probe.
     this.connectAttempt++;
+    this.machineState = null;
+    this.firstStatusWait = null;
     this.fwMajor = null;
     this.fwInfo = null;
     disconnectFluidNCWebSocket(this.getWsState(), {
@@ -825,7 +1013,10 @@ export class FluidNCClient extends EventEmitter {
     openFluidNCWebSocket(this.getWsState(), {
       parseStatus: parseMachineStatus,
       emitConsole: (message) => this.emit("console", message),
-      emitStatus: (status) => this.emit("status", status),
+      emitStatus: (status) => {
+        this.machineState = status.state;
+        this.emit("status", status);
+      },
       emitPing: () => this.emit("ping"),
       scheduleReconnect: (generation) => this.scheduleReconnect(generation),
       setWsPort: (port) => {

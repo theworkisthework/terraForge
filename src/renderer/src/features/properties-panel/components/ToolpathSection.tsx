@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -8,12 +9,30 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "../../../components/ui";
+import {
+  GcodePreviewDialog,
+  type GcodePreviewFile,
+} from "../../../components/GcodePreviewDialog";
 import type { GcodeToolpath } from "../../../utils/gcodeParser";
 import { estimateDuration, formatBytes } from "../utils/toolpathMetrics";
+
+/**
+ * Lucide has no "palette-off" glyph, so overlay the same diagonal slash that
+ * EyeOff uses — keeps the colorize toggle visually parallel to show/hide.
+ */
+function PaletteOff({ size }: { size: number }) {
+  return (
+    <Palette size={size} aria-hidden="true" data-testid="palette-off-icon">
+      <path d="m2 2 20 20" />
+    </Palette>
+  );
+}
 
 interface ToolpathSectionProps {
   toolpath: GcodeToolpath;
   fileName: string;
+  /** Where the G-code came from; enables the text preview when present. */
+  source?: GcodePreviewFile | null;
   selected: boolean;
   visible: boolean;
   colorized: boolean;
@@ -30,6 +49,7 @@ interface ToolpathSectionProps {
 export function ToolpathSection({
   toolpath,
   fileName,
+  source = null,
   selected,
   visible,
   colorized,
@@ -42,6 +62,7 @@ export function ToolpathSection({
   onSetOpacity,
   onClear,
 }: ToolpathSectionProps) {
+  const [showPreview, setShowPreview] = useState(false);
   const duration = estimateDuration(toolpath, fallbackFeedrate);
 
   return (
@@ -67,7 +88,23 @@ export function ToolpathSection({
             {selected ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           </Button>
 
-          <FileText className="shrink-0 text-sky-400" size={11} strokeWidth={2} />
+          {source ? (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0"
+              title="Preview G-code text"
+              aria-label="Preview G-code text"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPreview(true);
+              }}
+            >
+              <FileText size={11} />
+            </Button>
+          ) : (
+            <FileText className="shrink-0 text-content-faint" size={11} />
+          )}
 
           <Button
             variant="ghost"
@@ -88,10 +125,7 @@ export function ToolpathSection({
               onSetColorized(!colorized);
             }}
           >
-            <Palette
-              size={11}
-              className={colorized ? "text-sky-400" : "text-content-faint"}
-            />
+            {colorized ? <Palette size={11} /> : <PaletteOff size={11} />}
           </Button>
 
           <Button
@@ -188,6 +222,12 @@ export function ToolpathSection({
             </span>
           </div>
         </div>
+      )}
+      {showPreview && source && (
+        <GcodePreviewDialog
+          file={source}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </div>
   );

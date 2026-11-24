@@ -12,6 +12,7 @@ import {
 import { GcodeOptionsDialogActions } from "./components/GcodeOptionsDialogActions";
 import { GcodeOptionsDialogTabPanel } from "./components/GcodeOptionsDialogTabPanel";
 import type { GcodePrefs } from "../../features/gcode-options/gcodePrefs";
+import { useModalFocus } from "../../hooks/useModalFocus";
 
 interface Props {
   onConfirm: (prefs: GcodePrefs) => void;
@@ -33,7 +34,6 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     handleConfirm,
     layerDipOptions,
     neitherOutput,
-    onKeyDown,
     prefs,
     setActiveTab,
     setClipMode,
@@ -52,7 +52,13 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
     setTextField,
     setVinylWeedBorderMargin,
     toggle,
-  } = useGcodeOptionsState({ onCancel, onConfirm });
+  } = useGcodeOptionsState({ onConfirm });
+  const { ref, onKeyDown } = useModalFocus<HTMLDivElement>({
+    onEscape: onCancel,
+    // Enter in a text field generates, as in a form; the custom G-code
+    // textarea and focused buttons keep their own Enter behaviour.
+    onEnter: neitherOutput ? undefined : handleConfirm,
+  });
 
   const dipStations = inkServiceStations
     .filter((station) => station.type === "dip" && station.enabled !== false)
@@ -60,6 +66,7 @@ export function GcodeOptionsDialog({ onConfirm, onCancel }: Props) {
 
   return (
     <div
+      ref={ref}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(event) => {
         if (event.target === event.currentTarget) onCancel();

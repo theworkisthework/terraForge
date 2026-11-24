@@ -205,7 +205,7 @@ export function useJobActions() {
     cfg: ReturnType<typeof activeConfig>,
     buildFiles: () => SplitFile[],
     /** A second run of files within the same job. */
-    after?: { wanted: boolean; run: (saveDir: string | null, usedFilenames: Set<string>) => Promise<unknown> },
+    after?: { wanted: boolean; run: (saveDir: string | null, usedFilenames: Set<string>, sdFolder: string) => Promise<unknown> },
   ) => {
     if (!cfg) return;
     const options = await buildOptions(prefs);
@@ -221,9 +221,14 @@ export function useJobActions() {
     setGenerating(true);
     // Shared with `after`, whose files land in the same folder and SD root.
     const usedFilenames = new Set<string>();
+    // Uploaded files go in a folder named after the job (if asked), so they stay together.
+    const sdFolder = prefs.uploadSplitToFolder
+      ? "/" + (wholeJobName().replace(/[\\/:*?"<>|]/g, "_").trim() || "untitled")
+      : "";
     const finished = await runSplitFiles(files, {
       config: cfg,
       options,
+      sdFolder,
       saveDir,
       upload: uploadWanted(prefs),
       tasks,
@@ -231,7 +236,7 @@ export function useJobActions() {
       moreFollow: after?.wanted === true,
     });
     // Cancelling the job cancels what would have followed.
-    if (finished && after?.wanted) await after.run(saveDir, usedFilenames);
+    if (finished && after?.wanted) await after.run(saveDir, usedFilenames, sdFolder);
   };
 
   const handleGenerateGcodePerGroup = (prefs: GcodePrefs, cfg: ReturnType<typeof activeConfig>) =>
@@ -254,11 +259,11 @@ export function useJobActions() {
       {
         wanted: prefs.exportPerHatch,
         // Hatch-only files per colour, for hatching with a separate pen.
-        run: async (saveDir, usedFilenames) => {
+        run: async (saveDir, usedFilenames, sdFolder) => {
           if (!cfg) return;
           const options = await buildOptions(prefs);
           const files = hatchFiles(useCanvasStore.getState().toVectorObjects(), prefs.optimise);
-          await runSplitFiles(files, { config: cfg, options, saveDir, upload: uploadWanted(prefs), tasks, usedFilenames });
+          await runSplitFiles(files, { config: cfg, options, sdFolder, saveDir, upload: uploadWanted(prefs), tasks, usedFilenames });
         },
       },
     );

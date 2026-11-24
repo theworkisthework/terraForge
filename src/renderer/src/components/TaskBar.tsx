@@ -65,8 +65,8 @@ function Toast({ task }: { task: BackgroundTask }) {
               style={{ width: `${task.progress}%` }}
             />
           </div>
-          <span className="text-[10px] text-content-faint w-7 text-right">
-            {task.progress}%
+          <span className="text-[10px] text-content-faint w-9 text-right tabular-nums">
+            {task.progress.toFixed(1)}%
           </span>
         </div>
       )}

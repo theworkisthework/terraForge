@@ -12,6 +12,22 @@ import { useTaskStore } from "@renderer/store/taskStore";
 import { useCanvasStore } from "@renderer/store/canvasStore";
 import { FileBrowserPanel } from "@renderer/components/FileBrowserPanel";
 import { createMachineConfig } from "../helpers/factories";
+import { LISTING_PAUSED_DURING_JOB } from "../../src/types";
+
+/** Puts the machine part-way through a job. Tests do it once the listing
+ * has arrived, as nothing is listed while a job is in progress (#170). */
+function setMachineState(state: "Run" | "Hold") {
+  act(() => {
+    useMachineStore.setState({
+      status: {
+        state,
+        mpos: { x: 0, y: 0, z: 0 },
+        wpos: { x: 0, y: 0, z: 0 },
+        raw: `<${state}|MPos:0,0,0>`,
+      } as any,
+    });
+  });
+}
 
 beforeEach(() => {
   const cfg = createMachineConfig({
@@ -592,6 +608,182 @@ describe("FileBrowserPanel", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  // ── Folders ───────────────────────────────────────────────────────────
+
+  describe("SD card folders", () => {
+    const fluidnc = () => window.terraForge.fluidnc as unknown as Record<string, ReturnType<typeof vi.fn>>;
+
+    async function showSd(files: Array<{ name: string; path: string; size: number; isDirectory: boolean }>) {
+      fluidnc().listSDFiles.mockResolvedValue(files);
+      fluidnc().listFiles.mockResolvedValue([]);
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "New folder" })).toBeEnabled());
+    }
+
+    it("creates a folder in the current folder and lists it", async () => {
+      await showSd([{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }]);
+      await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+      const input = screen.getByRole("textbox", { name: "Folder name" });
+      expect(input).toHaveFocus();
+      await userEvent.type(input, "plots{Enter}");
+      await waitFor(() => expect(fluidnc().createSdFolder).toHaveBeenCalledWith("/plots"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(fluidnc().listSDFiles).toHaveBeenLastCalledWith("/");
+    });
+
+    it("will not create a folder whose name is taken or not allowed", async () => {
+      await showSd([{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }]);
+      await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+      const create = screen.getByRole("button", { name: "Create" });
+      expect(create).toBeDisabled();
+      await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "JOBS");
+      expect(screen.getByRole("alert")).toHaveTextContent('"JOBS" already exists here');
+      expect(create).toBeDisabled();
+      await userEvent.clear(screen.getByRole("textbox", { name: "Folder name" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "a/b{Enter}");
+      expect(screen.getByRole("alert")).toHaveTextContent("cannot contain");
+      expect(fluidnc().createSdFolder).not.toHaveBeenCalled();
+    });
+
+    it("keeps the dialog open and says why when the machine will not create it", async () => {
+      await showSd([]);
+      fluidnc().createSdFolder.mockRejectedValueOnce(
+        new Error("Error invoking remote method 'fluidnc:createSdFolder': Error: The machine did not create the folder \"x\""),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "x");
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(/^The machine did not create the folder "x"$/),
+      );
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("creates a folder inside the folder being shown", async () => {
+      fluidnc().listSDFiles.mockImplementation(async (path: string) =>
+        path === "/jobs" ? [] : [{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }],
+      );
+      fluidnc().listFiles.mockResolvedValue([]);
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await userEvent.click(await screen.findByText("jobs"));
+      await waitFor(() => expect(fluidnc().listSDFiles).toHaveBeenLastCalledWith("/jobs"));
+      await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+      expect(screen.getByText("Create a folder in /jobs")).toBeInTheDocument();
+      await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "  drafts  {Enter}");
+      await waitFor(() => expect(fluidnc().createSdFolder).toHaveBeenCalledWith("/jobs/drafts"));
+      await waitFor(() => expect(fluidnc().listSDFiles).toHaveBeenLastCalledWith("/jobs"));
+    });
+
+    it("closes the new folder dialog on Cancel, Escape, or a click outside, creating nothing", async () => {
+      await showSd([]);
+      const open = async () => {
+        await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+        await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "x");
+      };
+      await open();
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await open();
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await open();
+      await userEvent.click(screen.getByRole("dialog"));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(fluidnc().createSdFolder).not.toHaveBeenCalled();
+    });
+
+    it("cannot be cancelled while the folder is being created", async () => {
+      await showSd([]);
+      let finish: () => void = () => {};
+      fluidnc().createSdFolder.mockReturnValueOnce(new Promise<void>((resolve) => (finish = resolve)));
+      await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Folder name" }), "slow{Enter}");
+      expect(await screen.findByRole("button", { name: "Creating…" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      fireEvent.click(screen.getByRole("dialog"));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      await act(async () => finish());
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("blocks deleting a folder while a file transfer runs", async () => {
+      useTaskStore.setState({
+        tasks: { t: { id: "t", type: "file-upload", label: "", progress: 5, status: "running" } },
+      });
+      fluidnc().listSDFiles.mockResolvedValue([{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }]);
+      fluidnc().listFiles.mockResolvedValue([]);
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      const del = await screen.findByRole("button", { name: "Delete folder" });
+      expect(del).toBeDisabled();
+      expect(del).toHaveAttribute("title", "Unavailable while a file transfer is running");
+      const create = screen.getByRole("button", { name: "New folder" });
+      expect(create).toBeDisabled();
+      expect(create).toHaveAttribute("title", "Unavailable while a file transfer is running");
+    });
+
+    it("blocks deleting a folder while a job runs", async () => {
+      fluidnc().listSDFiles.mockResolvedValue([
+        { name: "jobs", path: "/jobs", size: 0, isDirectory: true },
+        { name: "run.gcode", path: "/run.gcode", size: 100, isDirectory: false },
+      ]);
+      fluidnc().listFiles.mockResolvedValue([]);
+      useMachineStore.setState({
+        connected: true,
+        selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
+      });
+      render(<FileBrowserPanel />);
+      await screen.findByText("jobs");
+      setMachineState("Run");
+      const del = await screen.findByRole("button", { name: "Delete folder" });
+      expect(del).toBeDisabled();
+      expect(del).toHaveAttribute("title", "Unavailable while a job is running");
+    });
+
+    it("offers no new folder over serial", async () => {
+      const cfg = createMachineConfig({ connection: { type: "usb", serialPath: "/dev/ttyUSB0" } });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id });
+      fluidnc().listSDFiles.mockResolvedValue([]);
+      fluidnc().listFiles.mockResolvedValue([]);
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      const button = await screen.findByRole("button", { name: "New folder" });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("title", "Creating folders is not available over serial");
+    });
+
+    it("deletes a folder after a warning, clears a job file inside it, and reports it", async () => {
+      useMachineStore.setState({ selectedJobFile: { path: "/jobs/a.gcode", source: "sd", name: "a.gcode" } });
+      await showSd([{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }]);
+      await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+      expect(screen.getByText(/and everything in it/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+      await waitFor(() => expect(fluidnc().deleteSdFolder).toHaveBeenCalledWith("/jobs"));
+      expect(fluidnc().deleteFile).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(Object.values(useTaskStore.getState().tasks).map((t) => `${t.status}: ${t.label}`)).toEqual([
+          "completed: Deleted folder jobs",
+        ]),
+      );
+      expect(useMachineStore.getState().selectedJobFile).toBeNull();
+    });
+
+    it("reports a folder the machine would not delete", async () => {
+      await showSd([{ name: "jobs", path: "/jobs", size: 0, isDirectory: true }]);
+      fluidnc().deleteSdFolder.mockRejectedValueOnce(new Error("nope"));
+      await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+      await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+      await waitFor(() => {
+        const [task] = Object.values(useTaskStore.getState().tasks);
+        expect(task).toMatchObject({ status: "error", label: "Could not delete folder jobs" });
+        expect(task.error).toContain("nope");
+      });
+    });
+  });
+
   // ── Both panes open → drag divider visible ────────────────────────────
 
   it("drag divider appears when both internal and SD panes are open", async () => {
@@ -772,18 +964,12 @@ describe("FileBrowserPanel", () => {
     useMachineStore.setState({
       connected: true,
       selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
-      status: {
-        state: "Run" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Run|MPos:0,0,0>",
-        activeJobPath: "/run.gcode",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("run.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Run");
     expect(screen.getByTitle("Pause job")).toBeInTheDocument();
     await userEvent.click(screen.getByTitle("Pause job"));
     expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
@@ -810,18 +996,12 @@ describe("FileBrowserPanel", () => {
         source: "sd",
         name: "held.gcode",
       },
-      status: {
-        state: "Hold" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Hold|MPos:0,0,0>",
-        activeJobPath: "/held.gcode",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("held.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Hold");
     expect(screen.getByTitle("Resume job")).toBeInTheDocument();
     await userEvent.click(screen.getByTitle("Resume job"));
     expect(window.terraForge.fluidnc.resumeJob).toHaveBeenCalled();
@@ -844,17 +1024,12 @@ describe("FileBrowserPanel", () => {
     useMachineStore.setState({
       connected: true,
       selectedJobFile: { path: "/run.gcode", source: "sd", name: "run.gcode" },
-      status: {
-        state: "Run" as any,
-        mpos: { x: 0, y: 0, z: 0 },
-        wpos: { x: 0, y: 0, z: 0 },
-        raw: "<Run|MPos:0,0,0>",
-      } as any,
     });
     render(<FileBrowserPanel />);
     await waitFor(() =>
       expect(screen.getByText("run.gcode")).toBeInTheDocument(),
     );
+    setMachineState("Run");
 
     vi.useFakeTimers();
 
@@ -889,6 +1064,84 @@ describe("FileBrowserPanel", () => {
     const row = screen.getByTestId("file-row-run.gcode");
     fireEvent.mouseOver(row);
     expect(screen.getByTitle("Run job now")).toBeInTheDocument();
+  });
+
+  // ── No listing while a job is in progress (#170) ────────────────────
+  // FluidNC 4.0.x drops every connection, and the job with it, when the SD
+  // card is listed mid-job.
+
+  describe("while a job is in progress", () => {
+    const listSd = () => window.terraForge.fluidnc.listSDFiles as ReturnType<typeof vi.fn>;
+    const listFs = () => window.terraForge.fluidnc.listFiles as ReturnType<typeof vi.fn>;
+    const sdStatus = () => screen.getAllByRole("status")[1];
+
+    function setIdle() {
+      act(() => {
+        useMachineStore.setState({
+          status: { state: "Idle", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 }, raw: "<Idle>" } as any,
+        });
+      });
+    }
+
+    beforeEach(() => {
+      listSd().mockResolvedValue([{ name: "job.gcode", path: "/job.gcode", size: 10, isDirectory: false }]);
+      listFs().mockResolvedValue([]);
+    });
+
+    it("lists nothing on connecting mid-job, says so, and lists once the job ends", async () => {
+      useMachineStore.setState({
+        connected: true,
+        status: { state: "Run", mpos: { x: 0, y: 0, z: 0 }, wpos: { x: 0, y: 0, z: 0 }, raw: "<Run>" } as any,
+      });
+      render(<FileBrowserPanel />);
+      await act(async () => {});
+      expect(listSd()).not.toHaveBeenCalled();
+      expect(listFs()).not.toHaveBeenCalled();
+      expect(sdStatus()).toHaveTextContent("Paused during job");
+      expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
+
+      setIdle();
+      // Past the grace period that rides out brief Idle blips mid-job.
+      await waitFor(() => expect(screen.getByText("job.gcode")).toBeInTheDocument());
+      expect(listSd()).toHaveBeenCalledWith("/");
+      expect(sdStatus()).toHaveTextContent("");
+    });
+
+    it("treats a listing the main process refused as paused, not as an error", async () => {
+      listSd().mockRejectedValueOnce(
+        new Error(`Error invoking remote method 'fluidnc:listSDFiles': Error: ${LISTING_PAUSED_DURING_JOB}`),
+      );
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await waitFor(() => expect(sdStatus()).toHaveTextContent("Paused during job"));
+      expect(screen.queryByText(/Error invoking/)).not.toBeInTheDocument();
+
+      // The machine's state reaches the renderer: a job, then its end.
+      setMachineState("Run");
+      setIdle();
+      await waitFor(() => expect(screen.getByText("job.gcode")).toBeInTheDocument());
+    });
+
+    it("does not re-list when files change mid-job, but does once it ends", async () => {
+      let onMessage: (msg: string) => void = () => {};
+      (window.terraForge.fluidnc.onConsoleMessage as ReturnType<typeof vi.fn>).mockImplementation((cb) => {
+        onMessage = cb;
+        return () => {};
+      });
+      useMachineStore.setState({ connected: true });
+      render(<FileBrowserPanel />);
+      await screen.findByText("job.gcode");
+      setMachineState("Run");
+      listSd().mockClear();
+
+      act(() => onMessage("[MSG:Files changed]"));
+      await act(async () => {});
+      expect(listSd()).not.toHaveBeenCalled();
+      expect(sdStatus()).toHaveTextContent("Paused during job");
+
+      setIdle();
+      await waitFor(() => expect(listSd()).toHaveBeenCalledWith("/"));
+    });
   });
 
   // ── Drag-to-resize divider ──────────────────────────────────────────

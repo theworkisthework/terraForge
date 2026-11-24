@@ -3,6 +3,14 @@ interface BreadcrumbProps {
   navigate: (path: string) => void;
 }
 
+const CURRENT = "text-content font-semibold";
+const ANCESTOR = "text-content-muted hover:text-content transition-colors";
+
+/**
+ * The current folder as clickable crumbs: `/` for the root, then each
+ * segment. The root button doubles as the first slash, so separators sit
+ * only between segments — `/a/b`, never `//a/b`.
+ */
 export function Breadcrumb({ path, navigate }: BreadcrumbProps) {
   const parts = path.split("/").filter(Boolean);
 
@@ -10,11 +18,8 @@ export function Breadcrumb({ path, navigate }: BreadcrumbProps) {
     <div className="flex items-center gap-0.5 text-[10px] overflow-x-auto flex-1 min-w-0">
       <button
         onClick={() => navigate("/")}
-        className={
-          path === "/"
-            ? "text-white font-semibold"
-            : "text-accent hover:text-content"
-        }
+        aria-label="Root folder"
+        className={parts.length === 0 ? CURRENT : ANCESTOR}
       >
         /
       </button>
@@ -22,14 +27,10 @@ export function Breadcrumb({ path, navigate }: BreadcrumbProps) {
         const segPath = "/" + parts.slice(0, i + 1).join("/");
         return (
           <span key={segPath} className="flex items-center gap-0.5 shrink-0">
-            <span className="text-content-faint">/</span>
+            {i > 0 && <span className="text-content-faint">/</span>}
             <button
               onClick={() => navigate(segPath)}
-              className={
-                segPath === path
-                  ? "text-white font-semibold"
-                  : "text-accent hover:text-content"
-              }
+              className={i === parts.length - 1 ? CURRENT : ANCESTOR}
             >
               {seg}
             </button>

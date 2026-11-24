@@ -72,7 +72,6 @@ describe("useBedMeshCalibration", () => {
       await secondJog;
     });
 
-    expect(window.terraForge.fluidnc.getStatus).not.toHaveBeenCalled();
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(1, "G91 G21 G0 Z5");
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(2, "G90 G21");
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
@@ -115,7 +114,6 @@ describe("useBedMeshCalibration", () => {
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
       "$J=G91 G21 Z0.100 F3000",
     );
-    expect(window.terraForge.fluidnc.getStatus).not.toHaveBeenCalled();
   });
 
   it("waits for the final retract before saving a completed mesh", async () => {
@@ -154,7 +152,6 @@ describe("useBedMeshCalibration", () => {
       expect.objectContaining({ bedMeshEnabled: false, bedMesh: expect.any(Object) }),
     );
     expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G90 G21");
-    expect(window.terraForge.fluidnc.getStatus).not.toHaveBeenCalled();
   });
 
   it("starts the retract immediately when an idle status is already available", async () => {

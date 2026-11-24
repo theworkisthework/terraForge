@@ -73,7 +73,6 @@ const noOpReturn = (..._: any[]) => Promise.resolve(undefined as any);
 (globalThis as any).window ??= globalThis;
 (window as any).terraForge = {
   fluidnc: {
-    getStatus: noOpReturn,
     sendCommand: noOpReturn,
     listFiles: noOpReturn,
     listSDFiles: noOpReturn,
@@ -96,27 +95,21 @@ const noOpReturn = (..._: any[]) => Promise.resolve(undefined as any);
     listPorts: () => Promise.resolve([]),
     connect: noOp,
     disconnect: noOp,
-    send: noOp,
     onData: () => () => {},
     onDisconnected: () => () => {},
   },
   fs: {
-    openSvgDialog: noOpReturn,
     openFileDialog: noOpReturn,
-    openGcodeDialog: noOpReturn,
+    openImportDialog: noOpReturn,
     readFile: noOpReturn,
     writeFile: noOp,
     saveGcodeDialog: noOpReturn,
     saveFileDialog: noOpReturn,
-    loadConfigs: () => Promise.resolve([]),
     saveConfigs: noOp,
   },
   tasks: {
     cancel: noOp,
     onTaskUpdate: () => () => {},
-  },
-  jobs: {
-    generateGcode: noOpReturn,
   },
   config: {
     getMachineConfigs: () => Promise.resolve([]),

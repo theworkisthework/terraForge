@@ -23,6 +23,7 @@ const defaultPrefs: GcodePrefs = {
   pathDirectionMode: "minimize-travel",
   uploadToSd: true,
   saveLocally: false,
+  uploadSplitToFolder: true,
   exportPerLayer: false,
   joinPaths: false,
   joinTolerance: 0.2,
@@ -339,6 +340,29 @@ describe("GcodeOptionsDialog", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("focuses Generate on open", () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    expect(screen.getByRole("button", { name: "Generate" })).toHaveFocus();
+  });
+
+  it("Enter on the focused Cancel button does not also generate", () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), {
+      key: "Enter",
+    });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("Enter in the custom G-code textarea does not generate", async () => {
+    render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("tab", { name: /^options$/i }));
+    await userEvent.click(screen.getByText("Custom G-code"));
+    fireEvent.keyDown(screen.getByLabelText("Custom start G-code"), {
+      key: "Enter",
+    });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("clicking the backdrop calls onCancel", async () => {
     render(<GcodeOptionsDialog onConfirm={onConfirm} onCancel={onCancel} />);
     const overlay = document.querySelector('[tabindex="-1"]') as HTMLElement;
@@ -595,6 +619,7 @@ describe("GcodeOptionsDialog", () => {
       pathDirectionMode: "minimize-travel",
       uploadToSd: true,
       saveLocally: false,
+      uploadSplitToFolder: true,
       exportPerLayer: false,
       exportPerColor: false,
       exportPerHatch: false,

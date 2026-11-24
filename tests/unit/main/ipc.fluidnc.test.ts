@@ -28,12 +28,13 @@ describe("registerFluidncIpcHandlers", () => {
     let connectionType: "wifi" | "serial" | null = null;
 
     const fluidnc = {
-      getStatus: vi.fn(),
       sendCommand: vi.fn(),
       listFiles: vi.fn(),
       listSDFiles: vi.fn(),
       fetchFileText: vi.fn(),
       deleteFile: vi.fn(),
+      createSdFolder: vi.fn(),
+      deleteSdFolder: vi.fn(),
       runFile: vi.fn(),
       pauseJob: vi.fn(),
       resumeJob: vi.fn(),
@@ -41,6 +42,7 @@ describe("registerFluidncIpcHandlers", () => {
       connectWebSocket: vi.fn(),
       disconnectWebSocket: vi.fn(),
       uploadFile: vi.fn(),
+      ensureSdDirectory: vi.fn().mockResolvedValue(undefined),
       downloadFile: vi.fn(),
     };
 
@@ -54,6 +56,8 @@ describe("registerFluidncIpcHandlers", () => {
       listSDFiles: vi.fn(),
       fetchFileText: vi.fn(),
       deleteFile: vi.fn(),
+      createSdFolder: vi.fn(),
+      deleteSdFolder: vi.fn(),
       runFile: vi.fn(),
       sendRealtime: vi.fn(),
       listPorts: vi.fn(),
@@ -111,18 +115,6 @@ describe("registerFluidncIpcHandlers", () => {
     };
   }
 
-  it("routes getStatus to serial when connection is serial, otherwise to fluidnc", async () => {
-    const deps = buildDeps();
-
-    deps.setCurrentType("serial");
-    await mocks.handlers.get("fluidnc:getStatus")?.();
-    expect(deps.serial.sendCommand).toHaveBeenCalledWith("?");
-
-    deps.setCurrentType("wifi");
-    await mocks.handlers.get("fluidnc:getStatus")?.();
-    expect(deps.fluidnc.getStatus).toHaveBeenCalled();
-  });
-
   it("routes commands and file operations to the active transport, with each one's defaults", async () => {
     const deps = buildDeps();
     const call = (channel: string, ...args: unknown[]) => mocks.handlers.get(channel)?.({}, ...args);
@@ -143,6 +135,10 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.serial.fetchFileText).toHaveBeenCalledWith("/c.gcode", "sdcard");
     expect(deps.serial.deleteFile).toHaveBeenCalledWith("/d.gcode", "sd");
     expect(deps.serial.runFile).toHaveBeenCalledWith("/e.gcode", "sd");
+    await call("fluidnc:createSdFolder", "/f");
+    await call("fluidnc:deleteSdFolder", "/g");
+    expect(deps.serial.createSdFolder).toHaveBeenCalledWith("/f");
+    expect(deps.serial.deleteSdFolder).toHaveBeenCalledWith("/g");
 
     deps.setCurrentType("wifi");
     await call("fluidnc:sendCommand", "$H");
@@ -157,6 +153,10 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.fluidnc.fetchFileText).toHaveBeenCalledWith("/c.gcode", undefined);
     expect(deps.fluidnc.deleteFile).toHaveBeenCalledWith("/d.gcode", "fs");
     expect(deps.fluidnc.runFile).toHaveBeenCalledWith("/e.gcode", undefined);
+    await call("fluidnc:createSdFolder", "/f");
+    await call("fluidnc:deleteSdFolder", "/g");
+    expect(deps.fluidnc.createSdFolder).toHaveBeenCalledWith("/f");
+    expect(deps.fluidnc.deleteSdFolder).toHaveBeenCalledWith("/g");
   });
 
   it("sends realtime controls over serial transport", async () => {
@@ -268,6 +268,18 @@ describe("registerFluidncIpcHandlers", () => {
     expect(deps.serial.disconnect).toHaveBeenCalled();
   });
 
+  it("creates the folder first when uploadGcode targets one", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+
+    await mocks.handlers.get("fluidnc:uploadGcode")?.({}, "task-1", "G1 X10", "/drawing/red.gcode");
+    expect(deps.fluidnc.ensureSdDirectory).toHaveBeenCalledWith("/drawing");
+
+    deps.fluidnc.ensureSdDirectory.mockClear();
+    await mocks.handlers.get("fluidnc:uploadGcode")?.({}, "task-2", "G1 X10", "/root.gcode");
+    expect(deps.fluidnc.ensureSdDirectory).not.toHaveBeenCalled();
+  });
+
   it("reports task progress and completion for uploadGcode", async () => {
     const deps = buildDeps();
     deps.fluidnc.uploadFile.mockImplementation(
@@ -303,7 +315,21 @@ describe("registerFluidncIpcHandlers", () => {
       progress: 50,
     });
     expect(deps.taskManager.complete).toHaveBeenCalledWith("task-1");
-    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-1" });
+  });
+
+  it("leaves task:update to the TaskManager's forwarder, so each update is sent once", async () => {
+    const deps = buildDeps();
+    deps.fluidnc.uploadFile.mockResolvedValue(undefined);
+    deps.fluidnc.downloadFile.mockRejectedValue(new Error("download failed"));
+
+    await mocks.handlers.get("fluidnc:uploadFile")?.({}, "task-1", "local.gcode", "/remote.gcode");
+    await expect(
+      mocks.handlers.get("fluidnc:downloadFile")?.({}, "task-2", "/remote.gcode", "downloaded.gcode", "sdcard"),
+    ).rejects.toThrow("download failed");
+
+    expect(deps.taskManager.complete).toHaveBeenCalledWith("task-1");
+    expect(deps.taskManager.fail).toHaveBeenCalledWith("task-2", "Error: download failed");
+    expect(deps.safeSend.mock.calls.filter(([channel]) => channel === "task:update")).toEqual([]);
   });
 
   it("marks uploadGcode failures and rethrows the error", async () => {
@@ -323,7 +349,6 @@ describe("registerFluidncIpcHandlers", () => {
       "task-2",
       "Error: upload failed",
     );
-    expect(deps.safeSend).toHaveBeenCalledWith("task:update", { id: "task-2" });
   });
 
   it("tracks uploadFile and downloadFile task progress paths", async () => {

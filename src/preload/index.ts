@@ -20,7 +20,6 @@ function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 // ─── FluidNC API ─────────────────────────────────────────────────────────────
 
 const fluidnc: TerraForgeAPI["fluidnc"] = {
-  getStatus: () => invoke<MachineStatus>("fluidnc:getStatus"),
   sendCommand: (cmd) => invoke<string>("fluidnc:sendCommand", cmd),
   listFiles: (path) => invoke<RemoteFile[]>("fluidnc:listFiles", path),
   listSDFiles: (path) => invoke<RemoteFile[]>("fluidnc:listSDFiles", path),
@@ -38,6 +37,10 @@ const fluidnc: TerraForgeAPI["fluidnc"] = {
     invoke<string>("fluidnc:fetchFileText", remotePath, filesystem),
   deleteFile: (remotePath, source?) =>
     invoke<void>("fluidnc:deleteFile", remotePath, source),
+  createSdFolder: (folderPath) =>
+    invoke<void>("fluidnc:createSdFolder", folderPath),
+  deleteSdFolder: (folderPath) =>
+    invoke<void>("fluidnc:deleteSdFolder", folderPath),
   runFile: (remotePath, filesystem) =>
     invoke<void>("fluidnc:runFile", remotePath, filesystem),
   uploadGcode: (taskId, content, remotePath) =>
@@ -85,7 +88,6 @@ const serial: TerraForgeAPI["serial"] = {
   listPorts: () => invoke<string[]>("serial:listPorts"),
   connect: (path, baudRate) => invoke<void>("serial:connect", path, baudRate),
   disconnect: () => invoke<void>("serial:disconnect"),
-  send: (data) => invoke<void>("serial:send", data),
 
   onData: (cb) => {
     const listener = (_event: Electron.IpcRendererEvent, data: string) =>
@@ -105,10 +107,7 @@ const serial: TerraForgeAPI["serial"] = {
 // ─── File-System API ─────────────────────────────────────────────────────────
 
 const fs: TerraForgeAPI["fs"] = {
-  openSvgDialog: () => invoke<string | null>("fs:openSvgDialog"),
-  openPdfDialog: () => invoke<string | null>("fs:openPdfDialog"),
   openFileDialog: () => invoke<string | null>("fs:openFileDialog"),
-  openGcodeDialog: () => invoke<string | null>("fs:openGcodeDialog"),
   openImportDialog: (opts?: { allowBitmap?: boolean }) =>
     invoke<string | null>("fs:openImportDialog", opts),
   readFile: (filePath) => invoke<string>("fs:readFile", filePath),
@@ -151,7 +150,6 @@ const fs: TerraForgeAPI["fs"] = {
   setLayoutMenuState: (hasImports) =>
     ipcRenderer.send("menu:setLayoutMenuState", hasImports),
 
-  loadConfigs: () => invoke<MachineConfig[]>("fs:loadConfigs"),
   saveConfigs: (configs) => invoke<void>("fs:saveConfigs", configs),
 };
 
@@ -168,13 +166,6 @@ const tasks: TerraForgeAPI["tasks"] = {
     ipcRenderer.on("task:update", listener);
     return () => ipcRenderer.off("task:update", listener);
   },
-};
-
-// ─── Jobs API ────────────────────────────────────────────────────────────────
-
-const jobs: TerraForgeAPI["jobs"] = {
-  generateGcode: (taskId, objects, config, options) =>
-    invoke<string>("jobs:generateGcode", taskId, objects, config, options),
 };
 
 // ─── Config API ──────────────────────────────────────────────────────────────
@@ -196,7 +187,6 @@ const config: TerraForgeAPI["config"] = {
 
 const appApi: TerraForgeAPI["app"] = {
   getVersion: () => invoke<string>("app:getVersion"),
-  openExternal: (url) => invoke<void>("app:openExternal", url),
   setUnsavedChanges: (unsaved) => ipcRenderer.send("app:setUnsavedChanges", unsaved),
   onMenuAbout: (cb) => {
     const listener = () => cb();
@@ -250,7 +240,6 @@ const api: TerraForgeAPI = {
   serial,
   fs,
   tasks,
-  jobs,
   config,
   app: appApi,
   edit: editApi,
