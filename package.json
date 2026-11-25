@@ -141,7 +141,9 @@
     },
     "mac": {
       "icon": "build/icon.icns",
-      "target": "dmg"
+      "target": "dmg",
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "linux": {
       "icon": "build/icon.png",
