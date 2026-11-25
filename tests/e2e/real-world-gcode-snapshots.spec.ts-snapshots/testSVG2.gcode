@@ -19,6 +19,8 @@ G0Z5 ; Pen up
 ; -- Color: #231f20 (4 objects) --
 ; -- Color: #ed2024 (42 objects) --
 ; -- Sequential path (46 subpaths) -----------
+; Subpaths : 46 in, 46 out
+; Travel   : 856.2 mm
 ;@tf v=1 color=%23231f20
 G0 X24.368 Y65.532 ; Rapid travel
 F6000

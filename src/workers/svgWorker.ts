@@ -14,17 +14,30 @@
  */
 
 import type { VectorObject, MachineConfig, GcodeOptions } from "../types";
+import type {
+  GcodeGenerationStage,
+  TravelPoint,
+  TravelSubpath,
+} from "./generation/output";
 import {
-  joinSubpathsCooperative,
-  nearestNeighbourSortCooperative,
-  OperationCancelledError,
-} from "./gcodeEngine/stages/pathOptimization";
-import { applyVinylCompensation } from "./gcodeEngine/stages/vinylCompensation";
-import { applyVinylWeedBorder } from "./gcodeEngine/stages/vinylWeedBorder";
-import type { GcodeGenerationStage, TravelSubpath } from "./generation/output";
-import { collectGeometry, remapLayerMetadata } from "./generation/collect";
-import { emitFooter, emitHeader, resolveGenerationSettings, type GenerationSettings } from "./generation/document";
+  collectGeometry,
+  type CollectedGeometry,
+  type SkipReason,
+} from "./generation/collect";
+import {
+  emitFooter,
+  emitHeader,
+  resolveGenerationSettings,
+  type GenerationSettings,
+} from "./generation/document";
 import { JobWriter } from "./generation/jobWriter";
+import {
+  createJobLog,
+  MAX_ITEM_WARNINGS,
+  type JobLog,
+} from "./generation/jobLog";
+import { formatStatsComments } from "./generation/pathStats";
+import { processSubpaths, type Processed } from "./generation/process";
 
 interface GenerateMessage {
   type: "generate";
@@ -47,6 +60,7 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
     cancelled.add(msg.taskId);
   } else if (msg.type === "generate") {
     generate(msg).catch((err: unknown) => {
+      console.error(`[gcode ${msg.taskId.slice(0, 8)}] failed:`, err);
       self.postMessage({
         type: "error",
         taskId: msg.taskId,
@@ -62,7 +76,11 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
 function progressReporter(taskId: string) {
   let lastPercent = -1;
   let lastStage: GcodeGenerationStage | null = null;
-  return (percent: number, stage: GcodeGenerationStage, force: boolean = false): void => {
+  return (
+    percent: number,
+    stage: GcodeGenerationStage,
+    force: boolean = false,
+  ): void => {
     const normalized = Number(Math.max(0, Math.min(100, percent)).toFixed(1));
     if (!force && lastStage === stage && normalized === lastPercent) return;
     lastPercent = normalized;
@@ -85,98 +103,93 @@ function makeYielder() {
 }
 
 /** Clears a cancellation and tells the caller the job stopped. */
-function reportCancelled(taskId: string): void {
+function reportCancelled(taskId: string, log?: JobLog): void {
+  log?.info(`cancelled after ${log.elapsed()}`);
   cancelled.delete(taskId);
   self.postMessage({ type: "cancelled", taskId });
 }
 
-/**
- * The optional passes between collecting and writing — nearest-neighbour
- * reordering, joining, vinyl weed border and blade compensation — reporting
- * progress from 40% to 95%. Returns null if cancelled.
- */
-async function processSubpaths(
-  taskId: string,
-  subpaths: TravelSubpath[],
-  options: GcodeOptions | undefined,
-  settings: GenerationSettings,
-  postProgress: ReturnType<typeof progressReporter>,
-): Promise<TravelSubpath[] | null> {
-  let ordered = subpaths;
+/** UI progress for the processing passes (40–95%), only ever moving forward
+ * within a stage, in steps of at least 0.1%. */
+function passProgress(postProgress: ReturnType<typeof progressReporter>) {
   let progress = 40;
-  let stage: GcodeGenerationStage = "optimizing";
-  const report = (pct: number, force: boolean = false): void => {
-    const clamped = Math.max(40, Math.min(95, pct));
-    if (force || clamped - progress >= 0.1) {
+  let current: GcodeGenerationStage = "optimizing";
+  return (
+    pct: number,
+    stage: GcodeGenerationStage,
+    force: boolean = false,
+  ): void => {
+    const clamped = Math.max(progress, Math.max(40, Math.min(95, pct)));
+    if (force || stage !== current || clamped - progress >= 0.1) {
       progress = clamped;
+      current = stage;
       postProgress(clamped, stage, force);
     }
   };
-  const startStage = (next: GcodeGenerationStage) => {
-    stage = next;
-    report(progress, true);
-  };
-  const points = (list: TravelSubpath[]) => list.map((sp) => sp.points);
-  const shouldCancel = () => cancelled.has(taskId);
-
-  try {
-    if (settings.optimise) {
-      startStage("optimizing");
-      const sorted = await nearestNeighbourSortCooperative(points(subpaths), {
-        allowReverse: settings.allowPathReversal,
-        shouldCancel,
-        // Ease-out, so very large jobs show movement early rather than
-        // sitting on one integer percentage.
-        onProgress: (completed, total) => {
-          if (total > 0) report(40 + Math.sqrt(Math.max(0, Math.min(1, completed / total))) * 50);
-        },
-      });
-      ordered = remapLayerMetadata(subpaths, sorted);
-      report(90);
-    }
-    // After the sort, so subpaths it placed side by side can be merged.
-    if (settings.join) {
-      startStage("joining");
-      const joined = await joinSubpathsCooperative(points(ordered), settings.joinTolerance, {
-        shouldCancel,
-        onProgress: (completed, total) => {
-          if (total > 0) report(90 + (completed / total) * 3);
-        },
-      });
-      ordered = remapLayerMetadata(ordered, joined);
-      report(93);
-    }
-  } catch (err: unknown) {
-    if (err instanceof OperationCancelledError || cancelled.has(taskId)) return null;
-    throw err;
-  }
-
-  if (options?.vinylCutting && options?.vinylWeedBorder) {
-    startStage("postprocessing");
-    ordered = remapLayerMetadata(ordered, applyVinylWeedBorder(points(ordered), options.vinylWeedBorder));
-    report(94);
-  }
-  if (options?.vinylCutting) {
-    startStage("postprocessing");
-    ordered = remapLayerMetadata(ordered, applyVinylCompensation(points(ordered), options.vinylCutting));
-    report(95);
-  }
-  return ordered;
 }
 
-async function generate(msg: GenerateMessage): Promise<void> {
-  const { taskId, objects, config, options } = msg;
-  const lines: string[] = [];
-  const postProgress = progressReporter(taskId);
-  const settings = resolveGenerationSettings(config, options);
-  emitHeader(lines, config, options, settings);
+/** Logs what the job was given, so a slow or odd run can be sized up. */
+function logJobStart(
+  log: JobLog,
+  objects: VectorObject[],
+  settings: GenerationSettings,
+  options?: GcodeOptions,
+) {
+  const visible = objects.filter((o) => o.visible);
+  log.info("job started", {
+    objects: objects.length,
+    visible: visible.length,
+    hidden: objects.length - visible.length,
+    layers: new Set(visible.map((o) => o.layer ?? "")).size,
+    colours: new Set(visible.map((o) => o.sourceColor ?? "")).size,
+    optimise: settings.optimise,
+    allowReversal: settings.allowPathReversal,
+    join: settings.join ? settings.joinTolerance : false,
+    vinyl: !!options?.vinylCutting,
+    pageClip: !!options?.pageClip,
+  });
+}
 
-  // ── Collect: flatten, clip and multi-pass every visible object (0–40%)
+/** Warns about each object that adds nothing to the job (the first few
+ * individually), then summarises the rest. */
+function skipLogger(log: JobLog) {
+  const counts = new Map<SkipReason, number>();
+  let logged = 0;
+  return {
+    onSkip(reason: SkipReason, obj: VectorObject) {
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+      if (logged++ < MAX_ITEM_WARNINGS) {
+        log.warn(`skipped object: ${reason}`, {
+          id: obj.id,
+          layer: obj.layer,
+          colour: obj.sourceColor,
+        });
+      }
+    },
+    summarise() {
+      if (counts.size === 0) return;
+      log.warn(`skipped ${logged} object(s)`, Object.fromEntries(counts));
+    },
+  };
+}
+
+async function collect(
+  msg: GenerateMessage,
+  lines: string[],
+  log: JobLog,
+  postProgress: ReturnType<typeof progressReporter>,
+) {
+  const { taskId, objects, config, options } = msg;
+  const visibleCount = objects.filter((o) => o.visible).length;
+  const stage = log.stage("collect", visibleCount);
+  const skips = skipLogger(log);
   const yieldCollect = makeYielder();
   let lastCollectPct = -1;
   const collected = await collectGeometry(objects, config, options, lines, {
     isCancelled: () => cancelled.has(taskId),
+    onSkip: skips.onSkip,
     afterEach: async (done, total) => {
+      stage.tick(done);
       const pct = Math.round((done / total) * 40);
       if (pct !== lastCollectPct) {
         lastCollectPct = pct;
@@ -185,48 +198,128 @@ async function generate(msg: GenerateMessage): Promise<void> {
       await yieldCollect();
     },
   });
-  if (!collected) return reportCancelled(taskId);
+  if (!collected) return null;
+  stage.end({
+    subpaths: collected.subpaths.length,
+    points: collected.subpaths.reduce((n, sp) => n + sp.points.length, 0),
+    pointTaps: collected.points.length,
+  });
+  skips.summarise();
+  return collected;
+}
 
-  // ── Process: reorder, join, vinyl passes (40–95%)
-  const ordered = await processSubpaths(taskId, collected.subpaths, options, settings, postProgress);
-  if (!ordered) return reportCancelled(taskId);
-
-  // ── Write: strokes, then point taps (to 100%)
-  const { points, skippedObjects } = collected;
-  lines.push(`; -- ${settings.optimise ? "Optimised" : "Sequential"} path (${ordered.length} subpaths) -----------`);
-  if (points.length > 0) lines.push(`; -- Point taps (${points.length} points) ---------------------`);
-  if (skippedObjects > 0) lines.push(`; NOTE: skipped ${skippedObjects} invalid path object(s)`);
-
-  const writer = new JobWriter(lines, config, settings);
+/** Writes strokes, then point taps, to 100%. Returns false if cancelled. */
+async function write(
+  msg: GenerateMessage,
+  writer: JobWriter,
+  ordered: TravelSubpath[],
+  points: TravelPoint[],
+  startPct: number,
+  ctx: { log: JobLog; postProgress: ReturnType<typeof progressReporter> },
+): Promise<boolean> {
   const totalOperations = ordered.length + points.length;
-  const hasPreEmitProcessing =
-    settings.optimise || settings.join || !!options?.vinylCutting || !!options?.vinylWeedBorder;
-  const startPct = hasPreEmitProcessing ? 95 : 40;
+  const stage = ctx.log.stage("write", totalOperations);
   const yieldWrite = makeYielder();
   let lastWritePct = -1;
   const afterWrite = async (done: number) => {
-    const pct = totalOperations > 0 ? startPct + Math.round((done / totalOperations) * (100 - startPct)) : 100;
+    stage.tick(done);
+    const pct =
+      totalOperations > 0
+        ? startPct + Math.round((done / totalOperations) * (100 - startPct))
+        : 100;
     if (pct !== lastWritePct) {
       lastWritePct = pct;
-      postProgress(pct, "emitting");
+      ctx.postProgress(pct, "emitting");
     }
     await yieldWrite();
   };
 
   writer.primeBeforeFirst(ordered, points);
   for (let i = 0; i < ordered.length; i++) {
-    if (cancelled.has(taskId)) return reportCancelled(taskId);
+    if (cancelled.has(msg.taskId)) return false;
     writer.writeSubpath(ordered[i]);
     await afterWrite(i + 1);
   }
   for (let i = 0; i < points.length; i++) {
-    if (cancelled.has(taskId)) return reportCancelled(taskId);
+    if (cancelled.has(msg.taskId)) return false;
     writer.writePointTap(points[i]);
     await afterWrite(ordered.length + i + 1);
   }
   writer.writeFinalWash(totalOperations);
+  stage.end();
+  return true;
+}
+
+/** The comments between the header and the moves: what was drawn, and what
+ * the processing passes did. */
+function emitBody(
+  lines: string[],
+  collected: CollectedGeometry,
+  processed: Processed,
+  settings: GenerationSettings,
+) {
+  const { ordered, stats } = processed;
+  lines.push(
+    `; -- ${settings.optimise ? "Optimised" : "Sequential"} path (${ordered.length} subpaths) -----------`,
+  );
+  lines.push(...formatStatsComments(stats));
+  if (collected.points.length > 0)
+    lines.push(
+      `; -- Point taps (${collected.points.length} points) ---------------------`,
+    );
+  if (collected.skippedObjects > 0)
+    lines.push(
+      `; NOTE: skipped ${collected.skippedObjects} invalid path object(s)`,
+    );
+}
+
+async function generate(msg: GenerateMessage): Promise<void> {
+  const { taskId, objects, config, options } = msg;
+  const lines: string[] = [];
+  const log = createJobLog(taskId);
+  const postProgress = progressReporter(taskId);
+  const settings = resolveGenerationSettings(config, options);
+  logJobStart(log, objects, settings, options);
+  emitHeader(lines, config, options, settings);
+
+  // ── Collect: flatten, clip and multi-pass every visible object (0–40%)
+  const collected = await collect(msg, lines, log, postProgress);
+  if (!collected) return reportCancelled(taskId, log);
+
+  // ── Process: reorder, join, vinyl passes (40–95%)
+  const processed = await processSubpaths(collected.subpaths, {
+    options,
+    settings,
+    log,
+    shouldCancel: () => cancelled.has(taskId),
+    report: passProgress(postProgress),
+  });
+  if (!processed) return reportCancelled(taskId, log);
+  const { ordered, stats } = processed;
+
+  emitBody(lines, collected, processed, settings);
+
+  const hasPreEmitProcessing =
+    settings.optimise ||
+    settings.join ||
+    !!options?.vinylCutting ||
+    !!options?.vinylWeedBorder;
+  const writer = new JobWriter(lines, config, settings);
+  const finished = await write(
+    msg,
+    writer,
+    ordered,
+    collected.points,
+    hasPreEmitProcessing ? 95 : 40,
+    {
+      log,
+      postProgress,
+    },
+  );
+  if (!finished) return reportCancelled(taskId, log);
 
   emitFooter(lines, config, settings);
+  log.info(`job finished in ${log.elapsed()}`, stats);
   self.postMessage({ type: "complete", taskId, gcode: lines.join("\n") });
 }
 

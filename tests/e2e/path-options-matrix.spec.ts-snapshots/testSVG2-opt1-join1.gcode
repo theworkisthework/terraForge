@@ -19,6 +19,10 @@ G0Z5 ; Pen up
 ; -- Color: #231f20 (4 objects) --
 ; -- Color: #ed2024 (42 objects) --
 ; -- Optimised path (45 subpaths) -----------
+; Subpaths : 46 in, 45 out
+; Travel   : 856.2 mm -> 249.2 mm (70.9% less)
+; Sort     : <n> ms, 22 reversed
+; Join     : <n> ms, 1 merged
 ;@tf v=1 color=%23ed2024
 G0 X2.290 Y3.779 ; Rapid travel
 F6000

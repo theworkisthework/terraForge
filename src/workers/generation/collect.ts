@@ -64,30 +64,230 @@ export function isPointWithinBounds(
   );
 }
 
-export function remapLayerMetadata(
+export interface RemapResult {
+  subpaths: TravelSubpath[];
+  /** Subpaths whose nearest match was a tie between originals of different
+   * layers or colours, so the label they got may be the wrong one. */
+  ambiguous: number;
+}
+
+export interface RemapHooks {
+  onProgress?: (done: number, total: number) => void;
+  /** Checked as it goes; when true, stops and returns null. */
+  isCancelled?: () => boolean;
+}
+
+const sameLabel = (a: TravelSubpath, b: TravelSubpath) =>
+  a.layer === b.layer && a.color === b.color;
+
+/** Two scores within this many mm count as a tie. */
+const TIE_MM = 1e-9;
+/** Originals this close to the nearest are rechecked one by one in input
+ * order, which is what decides ties (see `pickNearest`). */
+const NEAR_MM = 3 * TIE_MM;
+
+const isFinitePoint = (p: { x: number; y: number } | undefined) =>
+  !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+/**
+ * The originals' start and end points bucketed into a grid of about
+ * sqrt(n)×sqrt(n) cells. A lookup scans outward from the query ring by ring
+ * and stops once everything further out is further away than the nearest
+ * end found. Originals with a non-finite end are left out: their score is
+ * NaN, so they can never match.
+ */
+interface EndpointIndex {
+  cells: number[][];
+  cols: number;
+  rows: number;
+  xMin: number;
+  yMin: number;
+  cw: number;
+  ch: number;
+}
+
+function buildEndpointIndex(previous: TravelSubpath[]): EndpointIndex {
+  let xMin = Infinity,
+    yMin = Infinity,
+    xMax = -Infinity,
+    yMax = -Infinity;
+  const usable: number[] = [];
+  previous.forEach((sp, i) => {
+    const start = sp.points[0];
+    const end = sp.points[sp.points.length - 1];
+    if (!isFinitePoint(start) || !isFinitePoint(end)) return;
+    usable.push(i);
+    for (const { x, y } of [start, end]) {
+      xMin = Math.min(xMin, x);
+      yMin = Math.min(yMin, y);
+      xMax = Math.max(xMax, x);
+      yMax = Math.max(yMax, y);
+    }
+  });
+  const cols = Math.max(1, Math.ceil(Math.sqrt(previous.length)));
+  const rows = cols;
+  const cw = (xMax - xMin + 1e-9) / cols;
+  const ch = (yMax - yMin + 1e-9) / rows;
+  const index = { cells: [] as number[][], cols, rows, xMin, yMin, cw, ch };
+  index.cells = Array.from({ length: rows * cols }, () => []);
+  for (const i of usable) {
+    const { points } = previous[i];
+    const a = cellOf(index, points[0]);
+    const b = cellOf(index, points[points.length - 1]);
+    index.cells[a].push(i);
+    if (b !== a) index.cells[b].push(i);
+  }
+  return index;
+}
+
+const colOf = (g: EndpointIndex, x: number) =>
+  Math.min(g.cols - 1, Math.max(0, Math.floor((x - g.xMin) / g.cw)));
+const rowOf = (g: EndpointIndex, y: number) =>
+  Math.min(g.rows - 1, Math.max(0, Math.floor((y - g.yMin) / g.ch)));
+const cellOf = (g: EndpointIndex, p: { x: number; y: number }) =>
+  rowOf(g, p.y) * g.cols + colOf(g, p.x);
+
+/** How near to (x, y) a point could be in a cell more than `ring` steps
+ * from (cc, cr); Infinity when there are none. Slightly under, so rounding
+ * never ends a lookup early. */
+function beyondRing(
+  g: EndpointIndex,
+  cc: number,
+  cr: number,
+  ring: number,
+  x: number,
+  y: number,
+): number {
+  let bound = Infinity;
+  if (cc - ring > 0) bound = Math.min(bound, x - (g.xMin + (cc - ring) * g.cw));
+  if (cc + ring < g.cols - 1)
+    bound = Math.min(bound, g.xMin + (cc + ring + 1) * g.cw - x);
+  if (cr - ring > 0) bound = Math.min(bound, y - (g.yMin + (cr - ring) * g.ch));
+  if (cr + ring < g.rows - 1)
+    bound = Math.min(bound, g.yMin + (cr + ring + 1) * g.ch - y);
+  return bound - ((g.cw + g.ch) * 1e-6 + 1e-9);
+}
+
+/** Calls `visit` with each cell exactly `ring` steps from (cc, cr). */
+function forEachRingCell(
+  g: EndpointIndex,
+  cc: number,
+  cr: number,
+  ring: number,
+  visit: (cell: number[]) => void,
+) {
+  const top = cr - ring,
+    bottom = cr + ring,
+    left = cc - ring,
+    right = cc + ring;
+  for (let r = Math.max(0, top); r <= Math.min(g.rows - 1, bottom); r++) {
+    if (r === top || r === bottom) {
+      for (let c = Math.max(0, left); c <= Math.min(g.cols - 1, right); c++)
+        visit(g.cells[r * g.cols + c]);
+    } else {
+      if (left >= 0) visit(g.cells[r * g.cols + left]);
+      if (right < g.cols) visit(g.cells[r * g.cols + right]);
+    }
+  }
+}
+
+/**
+ * Of originals sorted by input order with their scores, the one taken as
+ * nearest and whether one with another layer or colour was just as near:
+ * each in turn replaces the best if it is nearer by more than a tie, and a
+ * later one within a tie of the best, on another label, makes it ambiguous.
+ */
+function pickNearest(
+  previous: TravelSubpath[],
+  candidates: { idx: number; score: number }[],
+) {
+  let best = previous[0];
+  let bestScore = Number.POSITIVE_INFINITY;
+  let ambiguous = false;
+  for (const { idx, score } of candidates) {
+    const candidate = previous[idx];
+    if (score < bestScore - TIE_MM) {
+      bestScore = score;
+      best = candidate;
+      ambiguous = false;
+    } else if (score <= bestScore + TIE_MM && !sameLabel(candidate, best)) {
+      ambiguous = true;
+    }
+  }
+  return { best, ambiguous };
+}
+
+/** The original nearest `first` (by its start or end), and whether an
+ * original with another layer or colour was just as near. */
+function nearestOriginal(
+  previous: TravelSubpath[],
+  index: EndpointIndex,
+  first: { x: number; y: number } | undefined,
+) {
+  if (!isFinitePoint(first)) return { best: previous[0], ambiguous: false };
+  const p = first!;
+  const cc = colOf(index, p.x);
+  const cr = rowOf(index, p.y);
+  const seen = new Set<number>();
+  const near: { idx: number; score: number }[] = [];
+  let nearest = Infinity;
+  for (let ring = 0; ; ring++) {
+    forEachRingCell(index, cc, cr, ring, (cell) => {
+      for (const idx of cell) {
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        const { points } = previous[idx];
+        const score = Math.min(
+          distanceMM(p, points[0]),
+          distanceMM(p, points[points.length - 1]),
+        );
+        if (score > nearest + NEAR_MM) continue;
+        near.push({ idx, score });
+        nearest = Math.min(nearest, score);
+      }
+    });
+    const bound = beyondRing(index, cc, cr, ring, p.x, p.y);
+    if (!(bound < Infinity) || bound > nearest + NEAR_MM) break;
+  }
+  return pickNearest(
+    previous,
+    near
+      .filter((c) => c.score <= nearest + NEAR_MM)
+      .sort((a, b) => a.idx - b.idx),
+  );
+}
+
+/**
+ * Gives each reordered or rebuilt subpath the layer and colour of the
+ * original it came from, found by matching its first point to the nearest
+ * original start or end. Looks originals up in a grid of their ends, and
+ * yields to the event loop as it goes. Returns null if cancelled.
+ */
+export async function remapLayerMetadata(
   previous: TravelSubpath[],
   nextPoints: Subpath[],
-): TravelSubpath[] {
+  hooks: RemapHooks = {},
+): Promise<RemapResult | null> {
   if (previous.length === 0) {
-    return nextPoints.map((points) => ({ points }));
+    return { subpaths: nextPoints.map((points) => ({ points })), ambiguous: 0 };
   }
-  return nextPoints.map((points) => {
-    const first = points[0];
-    let best = previous[0];
-    let bestScore = Number.POSITIVE_INFINITY;
-    for (const candidate of previous) {
-      const start = candidate.points[0];
-      const end = candidate.points[candidate.points.length - 1];
-      const startScore = distanceMM(first, start);
-      const endScore = distanceMM(first, end);
-      const score = Math.min(startScore, endScore);
-      if (score < bestScore) {
-        bestScore = score;
-        best = candidate;
-      }
+  const subpaths: TravelSubpath[] = new Array(nextPoints.length);
+  const index = buildEndpointIndex(previous);
+  let ambiguous = 0;
+  let lastYield = Date.now();
+  for (let i = 0; i < nextPoints.length; i++) {
+    const points = nextPoints[i];
+    const match = nearestOriginal(previous, index, points[0]);
+    if (match.ambiguous) ambiguous++;
+    subpaths[i] = { points, layer: match.best.layer, color: match.best.color };
+    hooks.onProgress?.(i + 1, nextPoints.length);
+    if (Date.now() - lastYield >= 16) {
+      lastYield = Date.now();
+      await new Promise((r) => setTimeout(r, 0));
+      if (hooks.isCancelled?.()) return null;
     }
-    return { points, layer: best.layer, color: best.color };
-  });
+  }
+  return { subpaths, ambiguous };
 }
 
 export function approximateObjectSubpaths(
@@ -201,6 +401,13 @@ export function applyPassesToSubpaths(
   return result;
 }
 
+/** Why an object adds nothing to the job. */
+export type SkipReason =
+  | "unreadable path data"
+  | "no drawable geometry"
+  | "entirely outside the page or bed"
+  | "point tap outside the page or bed";
+
 /** Everything a job draws, in machine space: strokes and point taps. */
 export interface CollectedGeometry {
   subpaths: TravelSubpath[];
@@ -220,7 +427,12 @@ function placePointTap(
 ): TravelPoint | null {
   for (const candidate of normalized ? [normalized, obj] : [obj]) {
     if (!candidate.pointTap) continue;
-    const point = transformPt(candidate, config, candidate.pointTap.x, candidate.pointTap.y);
+    const point = transformPt(
+      candidate,
+      config,
+      candidate.pointTap.x,
+      candidate.pointTap.y,
+    );
     if (isPointWithinBounds(point, config, pageClip)) {
       return {
         point,
@@ -235,6 +447,13 @@ function placePointTap(
 
 type ClipRect = { xMin: number; xMax: number; yMin: number; yMax: number };
 
+interface ObjectGeometry {
+  clipped: Subpath[];
+  validGeometry: boolean;
+  /** Subpaths before clipping. */
+  rawCount: number;
+}
+
 /** An object flattened and clipped to the page (or bed). Malformed path data
  * falls back to a coarse endpoint approximation; `validGeometry` is false
  * when even that finds nothing. */
@@ -242,18 +461,25 @@ function clippedGeometry(
   candidate: VectorObject,
   config: MachineConfig,
   pageClipBounds: ClipRect | null,
-): { clipped: Subpath[]; validGeometry: boolean } {
+): ObjectGeometry {
   let raw: Subpath[];
   try {
     raw = flattenToSubpaths(candidate, config);
   } catch {
     raw = approximateObjectSubpaths(candidate, config);
-    if (raw.length === 0) return { clipped: [], validGeometry: false };
+    if (raw.length === 0)
+      return { clipped: [], validGeometry: false, rawCount: 0 };
   }
   const clipped = pageClipBounds
-    ? clipSubpathsToRect(raw, pageClipBounds.xMin, pageClipBounds.xMax, pageClipBounds.yMin, pageClipBounds.yMax)
+    ? clipSubpathsToRect(
+        raw,
+        pageClipBounds.xMin,
+        pageClipBounds.xMax,
+        pageClipBounds.yMin,
+        pageClipBounds.yMax,
+      )
     : clipSubpathsToBed(raw, config);
-  return { clipped, validGeometry: true };
+  return { clipped, validGeometry: true, rawCount: raw.length };
 }
 
 /** An object's visible strokes: from its normalised placement, or — if that
@@ -263,13 +489,14 @@ function objectGeometry(
   normalized: VectorObject | null,
   config: MachineConfig,
   pageClipBounds: ClipRect | null,
-): { clipped: Subpath[]; validGeometry: boolean } {
+): ObjectGeometry {
   const primary = clippedGeometry(normalized ?? obj, config, pageClipBounds);
   if (primary.clipped.length > 0 || !normalized) return primary;
   const fallback = clippedGeometry(obj, config, pageClipBounds);
   return {
     clipped: fallback.clipped.length > 0 ? fallback.clipped : primary.clipped,
     validGeometry: primary.validGeometry || fallback.validGeometry,
+    rawCount: Math.max(primary.rawCount, fallback.rawCount),
   };
 }
 
@@ -287,13 +514,23 @@ export async function collectGeometry(
   config: MachineConfig,
   options: GcodeOptions | undefined,
   lines: string[],
-  hooks: { isCancelled: () => boolean; afterEach: (done: number, total: number) => Promise<void> },
+  hooks: {
+    isCancelled: () => boolean;
+    afterEach: (done: number, total: number) => Promise<void>;
+    onSkip?: (reason: SkipReason, obj: VectorObject) => void;
+  },
 ): Promise<CollectedGeometry | null> {
-  const pageClipBounds = options?.pageClip ? resolvePageClipRect(config, options.pageClip) : null;
+  const pageClipBounds = options?.pageClip
+    ? resolvePageClipRect(config, options.pageClip)
+    : null;
   const sorted = objects
     .filter((o) => o.visible)
     .sort((a, b) => (a.sourceColor ?? "").localeCompare(b.sourceColor ?? ""));
-  const result: CollectedGeometry = { subpaths: [], points: [], skippedObjects: 0 };
+  const result: CollectedGeometry = {
+    subpaths: [],
+    points: [],
+    skippedObjects: 0,
+  };
   let lastColor: string | undefined = undefined;
   let colorObjectCount = 0;
 
@@ -304,6 +541,8 @@ export async function collectGeometry(
 
     const tap = placePointTap(obj, normalized, config, options?.pageClip);
     if (tap) result.points.push(tap);
+    else if (obj.pointTap)
+      hooks.onSkip?.("point tap outside the page or bed", obj);
 
     if (obj.sourceColor !== lastColor && i > 0) {
       lines.push(colorBatchComment(lastColor, colorObjectCount));
@@ -312,15 +551,40 @@ export async function collectGeometry(
     lastColor = obj.sourceColor;
     colorObjectCount++;
 
-    const { clipped, validGeometry } = objectGeometry(obj, normalized, config, pageClipBounds);
-    if (!validGeometry) result.skippedObjects++;
+    const { clipped, validGeometry, rawCount } = objectGeometry(
+      obj,
+      normalized,
+      config,
+      pageClipBounds,
+    );
+    if (!validGeometry) {
+      result.skippedObjects++;
+      hooks.onSkip?.("unreadable path data", obj);
+    } else if (clipped.length === 0 && !obj.pointTap) {
+      hooks.onSkip?.(
+        rawCount === 0
+          ? "no drawable geometry"
+          : "entirely outside the page or bed",
+        obj,
+      );
+    }
 
-    for (const sp of applyPassesToSubpaths(clipped, obj.passCount ?? 1, obj.passMode ?? "repeat")) {
-      if (sp.length >= 2) result.subpaths.push({ points: sp, layer: obj.layer, color: obj.sourceColor });
+    for (const sp of applyPassesToSubpaths(
+      clipped,
+      obj.passCount ?? 1,
+      obj.passMode ?? "repeat",
+    )) {
+      if (sp.length >= 2)
+        result.subpaths.push({
+          points: sp,
+          layer: obj.layer,
+          color: obj.sourceColor,
+        });
     }
     await hooks.afterEach(i + 1, sorted.length);
   }
 
-  if (sorted.length > 0 && lastColor !== undefined) lines.push(colorBatchComment(lastColor, colorObjectCount));
+  if (sorted.length > 0 && lastColor !== undefined)
+    lines.push(colorBatchComment(lastColor, colorObjectCount));
   return result;
 }

@@ -21,6 +21,9 @@ G0Z5 ; Pen up
 ; -- Color: #ebebeb (88 objects) --
 ; -- Color: #ff1616 (72 objects) --
 ; -- Sequential path (236 subpaths) -----------
+; Subpaths : 236 in, 236 out
+; Travel   : 18284.3 mm -> 18284.3 mm (0.0% less)
+; Join     : <n> ms, 0 merged
 ;@tf v=1 color=%23000000
 G0 X81.478 Y330.337 ; Rapid travel
 F6000

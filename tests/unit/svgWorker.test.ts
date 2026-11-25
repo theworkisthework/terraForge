@@ -25,6 +25,9 @@ import {
 // self.postMessage() calls inside generate() route to the spy.
 const postSpy = vi.fn();
 vi.stubGlobal("postMessage", postSpy);
+// The worker logs each job's progress and stats; keep the run quiet.
+const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+vi.spyOn(console, "warn").mockImplementation(() => {});
 
 // ── Load the worker module ────────────────────────────────────────────────────
 // Using a dynamic import keeps it below the vi.stubGlobal call in evaluation
@@ -1509,6 +1512,25 @@ describe("svgWorker — optimised mode", () => {
     const msg = await waitForMsg("complete");
     const gcode = msg.gcode as string;
     expect(gcode).toContain("Optimised: yes (nearest-neighbour)");
+  });
+
+  it("records path-processing stats after optimising", async () => {
+    dispatch({
+      type: "generate",
+      taskId: "opt-stats",
+      objects: [makeSimpleObj()],
+      config: makeConfig(),
+      options: createGcodeOptions({ optimisePaths: true }),
+    });
+    const msg = await waitForMsg("complete");
+    const gcode = msg.gcode as string;
+    expect(gcode).toMatch(/; Subpaths : \d+ in, \d+ out/);
+    expect(gcode).toMatch(/; Travel   : [\d.]+ mm -> [\d.]+ mm/);
+    expect(gcode).toMatch(/; Sort     : \d+ ms, \d+ reversed/);
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^\[gcode opt-stat\] job finished in /),
+      expect.objectContaining({ subpathsIn: expect.any(Number), sort: expect.any(Object) }),
+    );
   });
 
   it("still produces G0/G1 moves in optimised mode", async () => {

@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { approximateObjectSubpaths, collectGeometry, remapLayerMetadata } from "../../src/workers/generation/collect";
+import {
+  approximateObjectSubpaths,
+  collectGeometry,
+  remapLayerMetadata,
+} from "../../src/workers/generation/collect";
 import { resolveGenerationSettings } from "../../src/workers/generation/document";
-import { createGcodeOptions, createMachineConfig, createVectorObject } from "../helpers/factories";
+import {
+  createGcodeOptions,
+  createMachineConfig,
+  createVectorObject,
+} from "../helpers/factories";
 
-const config = createMachineConfig({ origin: "bottom-left", bedWidth: 200, bedHeight: 200 });
+const config = createMachineConfig({
+  origin: "bottom-left",
+  bedWidth: 200,
+  bedHeight: 200,
+});
 const noHooks = { isCancelled: () => false, afterEach: async () => {} };
 
 describe("collectGeometry", () => {
@@ -21,19 +33,36 @@ describe("collectGeometry", () => {
       lines,
       noHooks,
     );
-    expect(result!.subpaths.map((sp) => sp.color)).toEqual(["#0000ff", "#ff0000", "#ff0000"]);
-    expect(lines).toEqual(["; -- Color: #0000ff (1 object) --", "; -- Color: #ff0000 (2 objects) --"]);
+    expect(result!.subpaths.map((sp) => sp.color)).toEqual([
+      "#0000ff",
+      "#ff0000",
+      "#ff0000",
+    ]);
+    expect(lines).toEqual([
+      "; -- Color: #0000ff (1 object) --",
+      "; -- Color: #ff0000 (2 objects) --",
+    ]);
   });
 
   it("repeats an object's strokes for each pass", async () => {
-    const result = await collectGeometry([createVectorObject({ path: "M0 0 L10 0", passCount: 3 })], config, undefined, [], noHooks);
+    const result = await collectGeometry(
+      [createVectorObject({ path: "M0 0 L10 0", passCount: 3 })],
+      config,
+      undefined,
+      [],
+      noHooks,
+    );
     expect(result!.subpaths).toHaveLength(3);
   });
 
   it("keeps a point tap only where it lands on the bed, tapping once per pass", async () => {
     const result = await collectGeometry(
       [
-        createVectorObject({ path: "", pointTap: { x: 5, y: 5 }, passCount: 2 }),
+        createVectorObject({
+          path: "",
+          pointTap: { x: 5, y: 5 },
+          passCount: 2,
+        }),
         createVectorObject({ path: "", pointTap: { x: 5, y: 5 }, x: 500 }),
       ],
       config,
@@ -45,10 +74,41 @@ describe("collectGeometry", () => {
     expect(result!.points[0].repeats).toBe(2);
   });
 
+  it("reports each object that adds nothing to the job, and why", async () => {
+    const skipped: [string, string][] = [];
+    const objects = [
+      createVectorObject({ id: "drawn", path: "M0 0 L10 0" }),
+      createVectorObject({ id: "offbed", path: "M0 0 L10 0", x: 5000 }),
+      createVectorObject({ id: "empty", path: "" }),
+      createVectorObject({
+        id: "tap-off",
+        path: "",
+        pointTap: { x: 5, y: 5 },
+        x: 500,
+      }),
+    ];
+    await collectGeometry(objects, config, undefined, [], {
+      ...noHooks,
+      onSkip: (reason, obj) => skipped.push([obj.id, reason]),
+    });
+    expect(skipped).toEqual([
+      ["offbed", "entirely outside the page or bed"],
+      ["empty", "no drawable geometry"],
+      ["tap-off", "point tap outside the page or bed"],
+    ]);
+  });
+
   it("stops between objects when cancelled", async () => {
     let checks = 0;
-    const objects = [createVectorObject(), createVectorObject(), createVectorObject()];
-    const result = await collectGeometry(objects, config, undefined, [], { ...noHooks, isCancelled: () => ++checks > 1 });
+    const objects = [
+      createVectorObject(),
+      createVectorObject(),
+      createVectorObject(),
+    ];
+    const result = await collectGeometry(objects, config, undefined, [], {
+      ...noHooks,
+      isCancelled: () => ++checks > 1,
+    });
     expect(result).toBeNull();
   });
 });
@@ -60,24 +120,202 @@ describe("remapLayerMetadata", () => {
     color,
   });
 
-  it("gives a reordered or reversed stroke the layer and colour of the stroke it came from", () => {
-    const before = [sp([[0, 0], [10, 0]], "L1", "#ff0000"), sp([[50, 50], [60, 50]], "L2", "#0000ff")];
-    const after = [[{ x: 60, y: 50 }, { x: 50, y: 50 }], [{ x: 0, y: 0 }, { x: 10, y: 0 }]];
-    expect(remapLayerMetadata(before, after).map(({ layer, color }) => [layer, color])).toEqual([
+  it("gives a reordered or reversed stroke the layer and colour of the stroke it came from", async () => {
+    const before = [
+      sp(
+        [
+          [0, 0],
+          [10, 0],
+        ],
+        "L1",
+        "#ff0000",
+      ),
+      sp(
+        [
+          [50, 50],
+          [60, 50],
+        ],
+        "L2",
+        "#0000ff",
+      ),
+    ];
+    const after = [
+      [
+        { x: 60, y: 50 },
+        { x: 50, y: 50 },
+      ],
+      [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    ];
+    const result = await remapLayerMetadata(before, after);
+    expect(result?.subpaths.map(({ layer, color }) => [layer, color])).toEqual([
       ["L2", "#0000ff"],
       ["L1", "#ff0000"],
     ]);
+    expect(result?.ambiguous).toBe(0);
   });
 
-  it("returns bare strokes when there was nothing to carry over", () => {
-    expect(remapLayerMetadata([], [[{ x: 1, y: 1 }]])).toEqual([{ points: [{ x: 1, y: 1 }] }]);
+  it("returns bare strokes when there was nothing to carry over", async () => {
+    expect(await remapLayerMetadata([], [[{ x: 1, y: 1 }]])).toEqual({
+      subpaths: [{ points: [{ x: 1, y: 1 }] }],
+      ambiguous: 0,
+    });
+  });
+
+  it("counts strokes whose start ties with originals on different layers", async () => {
+    // B starts where A ends, so B's first point matches A as well as B.
+    const before = [
+      sp(
+        [
+          [0, 0],
+          [10, 0],
+        ],
+        "A",
+      ),
+      sp(
+        [
+          [10, 0],
+          [20, 0],
+        ],
+        "B",
+      ),
+    ];
+    const result = await remapLayerMetadata(
+      before,
+      before.map((s) => s.points),
+    );
+    expect(result?.ambiguous).toBe(1);
+  });
+
+  it("does not count ties between originals with the same layer and colour", async () => {
+    const before = [
+      sp(
+        [
+          [0, 0],
+          [10, 0],
+        ],
+        "A",
+      ),
+      sp(
+        [
+          [10, 0],
+          [20, 0],
+        ],
+        "A",
+      ),
+    ];
+    expect(
+      (
+        await remapLayerMetadata(
+          before,
+          before.map((s) => s.points),
+        )
+      )?.ambiguous,
+    ).toBe(0);
+  });
+
+  it("reports progress per stroke", async () => {
+    const before = [
+      sp(
+        [
+          [0, 0],
+          [1, 0],
+        ],
+        "A",
+      ),
+    ];
+    const next = Array.from({ length: 5 }, () => [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    const progress: number[] = [];
+    const done = await remapLayerMetadata(before, next, {
+      onProgress: (d) => progress.push(d),
+    });
+    expect(done?.subpaths).toHaveLength(5);
+    expect(progress).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("remapLayerMetadata lookup", () => {
+  // The old rule, comparing every subpath with every original in order.
+  function bruteForce(
+    previous: {
+      points: { x: number; y: number }[];
+      layer?: string;
+      color?: string;
+    }[],
+    first: { x: number; y: number },
+  ) {
+    let best = previous[0];
+    let bestScore = Infinity;
+    let ambiguous = false;
+    for (const c of previous) {
+      const end = c.points[c.points.length - 1];
+      const score = Math.min(
+        Math.hypot(first.x - c.points[0].x, first.y - c.points[0].y),
+        Math.hypot(first.x - end.x, first.y - end.y),
+      );
+      if (score < bestScore - 1e-9) {
+        bestScore = score;
+        best = c;
+        ambiguous = false;
+      } else if (
+        score <= bestScore + 1e-9 &&
+        (c.layer !== best.layer || c.color !== best.color)
+      ) {
+        ambiguous = true;
+      }
+    }
+    return { best, ambiguous };
+  }
+
+  it("matches checking every original, ties included", async () => {
+    // mulberry32: a simple LCG puts x/y pairs on very few points.
+    let a = 4;
+    const rnd = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (const size of [4, 30, 200]) {
+      const previous = Array.from({ length: 600 }, () => ({
+        points: Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => ({
+          x: Math.floor(rnd() * size),
+          y: Math.floor(rnd() * size),
+        })),
+        layer: rnd() < 0.5 ? "A" : "B",
+        color: rnd() < 0.5 ? "#f00" : "#00f",
+      }));
+      const next = previous
+        .map((sp) => (rnd() < 0.5 ? [...sp.points].reverse() : sp.points))
+        .reverse();
+      const result = await remapLayerMetadata(previous, next);
+      let ambiguous = 0;
+      next.forEach((points, i) => {
+        const expected = bruteForce(previous, points[0]);
+        if (expected.ambiguous) ambiguous++;
+        expect([result?.subpaths[i].layer, result?.subpaths[i].color]).toEqual([
+          expected.best.layer,
+          expected.best.color,
+        ]);
+      });
+      expect(result?.ambiguous).toBe(ambiguous);
+    }
   });
 });
 
 describe("approximateObjectSubpaths", () => {
   it("draws each command straight to its end point, closing on Z and splitting on M", () => {
-    const obj = createVectorObject({ path: "M0 0 C1 1 2 2 10 0 Q5 5 10 10 Z M20 20 A5 5 0 0 1 30 20 H40 V30" });
-    const subpaths = approximateObjectSubpaths(obj, config).map((sp) => sp.map(({ x, y }) => [Math.round(x), Math.round(y)]));
+    const obj = createVectorObject({
+      path: "M0 0 C1 1 2 2 10 0 Q5 5 10 10 Z M20 20 A5 5 0 0 1 30 20 H40 V30",
+    });
+    const subpaths = approximateObjectSubpaths(obj, config).map((sp) =>
+      sp.map(({ x, y }) => [Math.round(x), Math.round(y)]),
+    );
     expect(subpaths).toHaveLength(2);
     expect(subpaths[0]).toHaveLength(4); // start, curve end, quad end, back to start
     expect(subpaths[0][3]).toEqual(subpaths[0][0]);
@@ -92,17 +330,42 @@ describe("approximateObjectSubpaths", () => {
 
 describe("resolveGenerationSettings pen delays", () => {
   it("uses the job's override, else the machine's delay for pen types that need one", () => {
-    const servo = createMachineConfig({ penType: "servo", penDownDelayMs: 80, penUpDelayMs: 30 });
-    const stepper = createMachineConfig({ penType: "stepper", penDownDelayMs: 80, penUpDelayMs: 30 });
-    expect(resolveGenerationSettings(servo, createGcodeOptions())).toMatchObject({ penDownDelayMs: 80, penUpDelayMs: 30 });
-    expect(resolveGenerationSettings(stepper, createGcodeOptions())).toMatchObject({ penDownDelayMs: 0, penUpDelayMs: 0 });
+    const servo = createMachineConfig({
+      penType: "servo",
+      penDownDelayMs: 80,
+      penUpDelayMs: 30,
+    });
+    const stepper = createMachineConfig({
+      penType: "stepper",
+      penDownDelayMs: 80,
+      penUpDelayMs: 30,
+    });
     expect(
-      resolveGenerationSettings(stepper, createGcodeOptions({ penDownDelayMsOverride: 120, penUpDelayMsOverride: -5 })),
+      resolveGenerationSettings(servo, createGcodeOptions()),
+    ).toMatchObject({ penDownDelayMs: 80, penUpDelayMs: 30 });
+    expect(
+      resolveGenerationSettings(stepper, createGcodeOptions()),
+    ).toMatchObject({ penDownDelayMs: 0, penUpDelayMs: 0 });
+    expect(
+      resolveGenerationSettings(
+        stepper,
+        createGcodeOptions({
+          penDownDelayMsOverride: 120,
+          penUpDelayMsOverride: -5,
+        }),
+      ),
     ).toMatchObject({ penDownDelayMs: 120, penUpDelayMs: 0 });
   });
 
   it("draws at the job's speed override when set", () => {
-    expect(resolveGenerationSettings(config, createGcodeOptions({ drawSpeedOverride: 1234 })).drawSpeed).toBe(1234);
-    expect(resolveGenerationSettings(config, undefined).drawSpeed).toBe(config.drawSpeed);
+    expect(
+      resolveGenerationSettings(
+        config,
+        createGcodeOptions({ drawSpeedOverride: 1234 }),
+      ).drawSpeed,
+    ).toBe(1234);
+    expect(resolveGenerationSettings(config, undefined).drawSpeed).toBe(
+      config.drawSpeed,
+    );
   });
 });

@@ -33,6 +33,8 @@ function normalizeGcodeForSnapshot(gcode: string): string {
     .replace(/^; Generated:.*$/m, "; Generated: <normalized>")
     .replace(/^; Vinyl\s+:.*\n?/gm, "")
     .replace(/^; Weed bd\s+:.*\n?/gm, "")
+    // Pass timings in the optimiser stats vary from run to run.
+    .replace(/^(; (?:Sort|Join|Weed pass|Blade cmp)\s*: )\d+ ms/gm, "$1<n> ms")
     .trim();
 }
 
