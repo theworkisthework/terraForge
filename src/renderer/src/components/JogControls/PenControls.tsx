@@ -10,6 +10,8 @@ interface PenControlsProps {
   penUp: string;
   onMovePen: (action: "up" | "down") => Promise<void>;
   onZeroZ: () => Promise<void>;
+  /** Grey out Zero Z while leaving pen up/down usable. */
+  zeroZDisabled?: boolean;
 }
 
 /**
@@ -23,6 +25,7 @@ export function PenControls({
   penUp,
   onMovePen,
   onZeroZ,
+  zeroZDisabled = false,
 }: PenControlsProps) {
   const penDownTitle = isSolenoidPenType(penType)
     ? penDown
@@ -74,7 +77,7 @@ export function PenControls({
           size="sm"
           aria-label="Zero Z"
           onClick={onZeroZ}
-          disabled={!connected || isSolenoidPenType(penType)}
+          disabled={!connected || zeroZDisabled || isSolenoidPenType(penType)}
         >
           <CircleSlash2 size={14} />
         </Button>

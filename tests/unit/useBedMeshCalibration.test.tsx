@@ -39,83 +39,6 @@ describe("useBedMeshCalibration", () => {
     });
   }
 
-  it("raises Z only for the first XY setup jog and uses streamed status instead of getStatus", async () => {
-    const config = createMachineConfig({
-      id: "mesh-machine",
-      penUpCommand: "G0Z15",
-      penDownCommand: "G0Z0",
-    });
-    const controller = {
-      form: config,
-      change: vi.fn(),
-      inputCls: "",
-      selectedId: config.id,
-      machineStore: {
-        connected: true,
-        activeConfigId: config.id,
-        status: createMachineStatus(),
-        updateConfig: vi.fn(),
-      },
-    } as unknown as MachineConfigDialogController;
-    const { result } = renderHook(() => useBedMeshCalibration(controller));
-
-    await act(async () => {
-      const firstJog = result.current.jogXY("X", 1);
-      publishIdleStatus();
-      publishIdleStatus();
-      await firstJog;
-    });
-    await act(async () => {
-      const secondJog = result.current.jogXY("Y", -1);
-      publishIdleStatus();
-      publishIdleStatus();
-      await secondJog;
-    });
-
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(1, "G91 G21 G0 Z5");
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(2, "G90 G21");
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
-      3,
-      "$J=G91 G21 X1.000 F3000",
-    );
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenNthCalledWith(
-      4,
-      "$J=G91 G21 Y-1.000 F3000",
-    );
-  });
-
-  it("uses settled status-stream updates after Z jogs", async () => {
-    const config = createMachineConfig({
-      id: "mesh-machine",
-      penUpCommand: "G0Z15",
-      penDownCommand: "G0Z0",
-    });
-    const controller = {
-      form: config,
-      change: vi.fn(),
-      inputCls: "",
-      selectedId: config.id,
-      machineStore: {
-        connected: true,
-        activeConfigId: config.id,
-        status: createMachineStatus(),
-        updateConfig: vi.fn(),
-      },
-    } as unknown as MachineConfigDialogController;
-    const { result } = renderHook(() => useBedMeshCalibration(controller));
-
-    await act(async () => {
-      const jog = result.current.jogZ(0.1);
-      publishIdleStatus();
-      publishIdleStatus();
-      await jog;
-    });
-
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith(
-      "$J=G91 G21 Z0.100 F3000",
-    );
-  });
-
   it("waits for the final retract before saving a completed mesh", async () => {
     const config = createMachineConfig({
       id: "mesh-machine",
@@ -141,17 +64,28 @@ describe("useBedMeshCalibration", () => {
       result.current.setXPoints(2);
       result.current.setYPoints(2);
     });
-    await runWithIdleStatus(() => result.current.startCalibration("known"));
+    await runWithIdleStatus(() => result.current.startProbing());
     for (let point = 0; point < 4; point++) {
-      await runWithIdleStatus(() => result.current.next());
+      await runWithIdleStatus(() => result.current.recordPoint());
     }
 
-    expect(result.current.open).toBe(false);
+    // The last point lifts the pen and readies the mesh, but stays on the
+    // probe step until the user moves on. Nothing is saved yet.
+    expect(result.current.wizardStep).toBe("probe");
+    act(() => result.current.showReview());
+    expect(result.current.wizardStep).toBe("review");
+    expect(result.current.result?.points).toHaveLength(4);
+    expect(updateConfig).not.toHaveBeenCalled();
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G90 G21");
+
+    await act(async () => {
+      await result.current.saveResult(true);
+    });
+    expect(result.current.wizardStep).toBe("closed");
     expect(updateConfig).toHaveBeenCalledWith(
       config.id,
-      expect.objectContaining({ bedMeshEnabled: false, bedMesh: expect.any(Object) }),
+      expect.objectContaining({ bedMeshEnabled: true, bedMesh: expect.any(Object) }),
     );
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G90 G21");
   });
 
   it("starts the retract immediately when an idle status is already available", async () => {
@@ -178,7 +112,7 @@ describe("useBedMeshCalibration", () => {
     let startPromise!: Promise<void>;
 
     await act(async () => {
-      startPromise = result.current.startCalibration("known");
+      startPromise = result.current.startProbing();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -197,7 +131,7 @@ describe("useBedMeshCalibration", () => {
       publishIdleStatus();
       await startPromise;
     });
-    expect(result.current.open).toBe(true);
+    expect(result.current.wizardStep).toBe("probe");
   });
 
   it("catches idle status updates emitted before motion commands resolve", async () => {
@@ -225,7 +159,11 @@ describe("useBedMeshCalibration", () => {
     const { result } = renderHook(() => useBedMeshCalibration(controller));
 
     await act(async () => {
-      await result.current.startCalibration("home");
+      await result.current.home();
+    });
+    expect(result.current.originReady).toBe(true);
+    await act(async () => {
+      await result.current.startProbing();
     });
 
     expect(sendCommand.mock.calls.map(([command]) => command)).toEqual([
@@ -234,7 +172,136 @@ describe("useBedMeshCalibration", () => {
       "G90 G21",
       "G90 G21 G0 X0.000 Y0.000",
     ]);
-    expect(result.current.open).toBe(true);
+    expect(result.current.wizardStep).toBe("probe");
     expect(result.current.error).toBeNull();
+  });
+  function zController() {
+    const config = createMachineConfig({
+      id: "mesh-machine",
+      penUpCommand: "G0Z15",
+      penDownCommand: "G0Z0",
+    });
+    return {
+      form: config,
+      change: vi.fn(),
+      inputCls: "",
+      selectedId: config.id,
+      machineStore: {
+        connected: true,
+        activeConfigId: config.id,
+        status: createMachineStatus(),
+        updateConfig: vi.fn(),
+      },
+    } as unknown as MachineConfigDialogController;
+  }
+
+  it("marks the origin ready once it is confirmed", () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    expect(result.current.originReady).toBe(false);
+    act(() => result.current.confirmOrigin());
+    expect(result.current.originReady).toBe(true);
+  });
+
+  it("lifts the pen when probing is cancelled", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await runWithIdleStatus(() => result.current.startProbing());
+    expect(result.current.wizardStep).toBe("probe");
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockClear();
+
+    await runWithIdleStatus(() => result.current.cancel());
+
+    expect(sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z5");
+    expect(result.current.wizardStep).toBe("closed");
+  });
+
+  it("can't calibrate when the pen commands don't move Z", () => {
+    const controller = zController();
+    controller.form = { ...controller.form, penUpCommand: "M3S0", penDownCommand: "M3S1" };
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+    expect(result.current.canCalibrate).toBe(false);
+    act(() => result.current.openWizard());
+    expect(result.current.wizardStep).toBe("closed");
+  });
+  it("lifts the pen and discards progress when jumping back from probing", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await runWithIdleStatus(() => result.current.startProbing());
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockClear();
+
+    await runWithIdleStatus(() => result.current.goToStep("origin"));
+
+    expect(sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z5");
+    expect(result.current.wizardStep).toBe("origin");
+    expect(result.current.points).toHaveLength(0);
+  });
+
+  it("ignores jumps forward", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    act(() => result.current.openWizard());
+    await act(async () => {
+      await result.current.goToStep("review");
+    });
+    expect(result.current.wizardStep).toBe("grid");
+  });
+  it("starts probing when the pen is already at the first point (no status report follows)", async () => {
+    // Set Zero leaves the pen at X0 Y0, so the move to the first point changes
+    // nothing and FluidNC (reporting on change only) stays silent.
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockImplementation(async (command: string) => {
+      if (command.startsWith("G91")) setTimeout(() => act(() => publishIdleStatus()), 0);
+    });
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+
+    await act(async () => {
+      await result.current.startProbing();
+    });
+
+    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G0 X0.000 Y0.000");
+    expect(result.current.error).toBeNull();
+    expect(result.current.wizardStep).toBe("probe");
+  });
+
+  it("lifts the pen with a negative Z move on machines with inverted Z jog", async () => {
+    const controller = zController();
+    controller.form = { ...controller.form, invertZJogControls: true };
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+    await runWithIdleStatus(() => result.current.startProbing());
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z-5");
+  });
+  it("tracks the point the pen is travelling to until the machine arrives", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await act(async () => {
+      result.current.setXPoints(2);
+      result.current.setYPoints(2);
+    });
+    await runWithIdleStatus(() => result.current.startProbing());
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockResolvedValue(undefined); // no automatic status replies
+
+    let recording!: Promise<void>;
+    await act(async () => {
+      recording = result.current.recordPoint();
+      await Promise.resolve();
+    });
+    expect(result.current.movingTo).toBe(1);
+    expect(result.current.index).toBe(0);
+
+    await act(async () => {
+      publishIdleStatus();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      publishIdleStatus();
+      await recording;
+    });
+    expect(result.current.movingTo).toBeNull();
+    expect(result.current.index).toBe(1);
+  });
+
+  it("reports the machine as not ready to record while it's jogging", () => {
+    useMachineStore.setState({ status: { ...createMachineStatus(), state: "Jog" } });
+    const controller = zController();
+    (controller.machineStore as { status: unknown }).status = useMachineStore.getState().status;
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+    expect(result.current.machineIdle).toBe(false);
   });
 });

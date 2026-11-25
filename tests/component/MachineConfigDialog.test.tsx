@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMachineStore } from "@renderer/store/machineStore";
 import { MachineConfigDialog } from "@renderer/components/MachineConfigDialog";
@@ -254,34 +254,96 @@ describe("MachineConfigDialog", () => {
   describe("bed mesh calibration", () => {
     async function openBedMesh() {
       render(<MachineConfigDialog onClose={onClose} />);
-      await userEvent.click(screen.getByRole("button", { name: "Bed Mesh Compensation" }));
+      await userEvent.click(screen.getByRole("button", { name: /configure mesh/i }));
     }
 
-    it("explains how to create a mesh while disconnected and leaves profile loading available", async () => {
+    /** A connected machine whose pen commands move Z, so calibration is possible. */
+    function connectZMachine() {
+      const [config] = useMachineStore.getState().configs;
+      useMachineStore.setState({
+        connected: true,
+        configs: [{ ...config, penType: "stepper", penUpCommand: "G0Z15", penDownCommand: "G0Z0" }],
+      });
+    }
+
+    it("explains that calibrating needs the machine connected", async () => {
+      useMachineStore.setState({
+        configs: useMachineStore.getState().configs.map((c) => ({
+          ...c, penUpCommand: "G0Z15", penDownCommand: "G0Z0",
+        })),
+      });
       await openBedMesh();
 
-      expect(screen.getByText(/connect the active machine/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Calibrate grid" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Load mesh JSON" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: "Bed Mesh Compensation" })).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText(/connect to this machine to calibrate/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Calibrate…" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /configure mesh/i })).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("offers positioning controls in the calibration setup wizard and keeps dialogs in the viewport", async () => {
+    it("keeps calibration closed until the wizard is opened", async () => {
+      connectZMachine();
+      await openBedMesh();
+      expect(screen.queryByRole("dialog", { name: "Bed mesh calibration" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
+    });
+
+    it("walks from grid to origin and only shows jog controls for machines without end stops", async () => {
+      connectZMachine();
+      await openBedMesh();
+      await userEvent.click(screen.getByRole("button", { name: "Calibrate…" }));
+
+      const wizard = screen.getByRole("dialog", { name: "Bed mesh calibration" });
+      expect(within(wizard).getByRole("img", { name: "Bed preview: 3 by 3 probe points" })
+        .querySelectorAll("circle")).toHaveLength(9);
+      const xInput = within(wizard).getByLabelText("X grid points");
+      await userEvent.clear(xInput);
+      await userEvent.type(xInput, "4");
+      expect(within(wizard).getByRole("img", { name: "Bed preview: 4 by 3 probe points" })
+        .querySelectorAll("circle")).toHaveLength(12);
+      await userEvent.click(within(wizard).getByRole("button", { name: "Next" }));
+
+      expect(within(wizard).getByRole("radiogroup", { name: "Origin method" })).toBeInTheDocument();
+      expect(within(wizard).getByRole("button", { name: "Next" })).toBeDisabled();
+      expect(within(wizard).queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
+
+      await userEvent.click(within(wizard).getByRole("radio", { name: /home it/i }));
+      expect(within(wizard).getByRole("button", { name: "Run homing" })).toBeInTheDocument();
+      expect(within(wizard).queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
+
+      await userEvent.click(within(wizard).getByRole("radio", { name: /jog and set zero/i }));
+      // The regular jog panel, pen controls included, minus homing (no end stops).
+      expect(within(wizard).getByRole("button", { name: "Jog X-" })).toBeEnabled();
+      expect(within(wizard).getByRole("button", { name: "Go to origin" })).toBeInTheDocument();
+      expect(within(wizard).getByRole("button", { name: "Pen up" })).toBeInTheDocument();
+      expect(within(wizard).queryByRole("button", { name: /run homing/i })).not.toBeInTheDocument();
+
+      await userEvent.click(within(wizard).getByRole("button", { name: "Set Zero" }));
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G10 L20 P1 X0 Y0");
+      expect(within(wizard).getByRole("button", { name: "Next" })).toBeEnabled();
+
+      // Finished steps are buttons back to them; later steps aren't.
+      expect(within(wizard).getByRole("button", { name: /step 3: probe the bed/i })).toBeDisabled();
+      await userEvent.click(within(wizard).getByRole("button", { name: /step 1: choose the grid \(done\)/i }));
+      expect(within(wizard).getByRole("heading", { name: "1. Choose the grid" })).toBeInTheDocument();
+      expect(within(wizard).getByLabelText("X grid points")).toBeInTheDocument();
+    });
+
+    it("can't calibrate when the pen commands don't move Z", async () => {
       useMachineStore.setState({ connected: true });
       await openBedMesh();
-      await userEvent.click(screen.getByRole("button", { name: "Calibrate grid" }));
+      expect(screen.getByRole("button", { name: "Calibrate…" })).toBeDisabled();
+      expect(screen.getByText(/pen-up and pen-down commands must both move Z \(e\.g\./i)).toBeInTheDocument();
+    });
 
-      expect(screen.getByText("Position the machine")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Jog X-" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: "Set XY zero" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: "100" })).toBeInTheDocument();
-      expect(screen.getByText("Jog Speed (feedrate mm/min)")).toBeInTheDocument();
-      expect(screen.getByText(/first XY jog raises Z by 5 mm; later jogs keep that clearance/i)).toBeInTheDocument();
-
-      await userEvent.click(screen.getByRole("button", { name: "Use current position" }));
-      const startModal = screen.getByText("Start bed mesh calibration?").parentElement;
-      expect(startModal).toHaveClass("max-h-[calc(100dvh-2rem)]", "overflow-y-auto");
-      expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
+    it("says why calibration is unavailable when connected to a different machine", async () => {
+      connectZMachine();
+      const [config] = useMachineStore.getState().configs;
+      const other = createMachineConfig({ name: "Other Plotter" });
+      useMachineStore.setState({ configs: [config, other], activeConfigId: other.id });
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("Test Plotter"));
+      await userEvent.click(screen.getByRole("button", { name: /configure mesh/i }));
+      expect(screen.getByRole("button", { name: "Calibrate…" })).toBeDisabled();
+      expect(screen.getByText(/connected to a different machine/i)).toBeInTheDocument();
     });
 
     it("keeps compensation disabled for a loaded mesh when pen commands have no Z moves", async () => {
@@ -314,13 +376,40 @@ describe("MachineConfigDialog", () => {
       });
       expect(checkbox).toBeChecked();
       expect(checkbox).toBeDisabled();
-      expect(screen.getByText(/needs Z moves in both pen-up and pen-down commands/i)).toBeInTheDocument();
+      expect(screen.getByText("flat")).toBeInTheDocument();
+    });
+  });
+
+  describe("connect button", () => {
+    it("connects the active machine from the dialog", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      const connect = screen.getByRole("button", { name: "Connect" });
+      expect(connect).toBeEnabled();
+      await userEvent.click(connect);
+      expect(window.terraForge.fluidnc.connectWebSocket).toHaveBeenCalledWith("fluidnc.local", 80, undefined);
     });
 
-    it("uses aligned two-column fields for grid dimensions", async () => {
-      await openBedMesh();
-      expect(screen.getByLabelText("X grid points").closest("label")).toHaveClass("flex", "flex-col", "gap-1");
-      expect(screen.getByLabelText("Y grid points").closest("label")).toHaveClass("flex", "flex-col", "gap-1");
+    it("can't connect with unsaved changes", async () => {
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.type(screen.getByDisplayValue("Test Plotter"), " 2");
+      expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
+    });
+
+    it("can't connect a profile that isn't the active one", async () => {
+      const [config] = useMachineStore.getState().configs;
+      const other = createMachineConfig({ name: "Other Plotter" });
+      useMachineStore.setState({ configs: [config, other], activeConfigId: other.id });
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByText("Test Plotter"));
+      expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
+    });
+
+    it("disconnects when connected", async () => {
+      useMachineStore.setState({ connected: true, wsLive: true });
+      render(<MachineConfigDialog onClose={onClose} />);
+      await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+      expect(window.terraForge.fluidnc.disconnectWebSocket).toHaveBeenCalled();
+      expect(useMachineStore.getState().connected).toBe(false);
     });
   });
 

@@ -138,7 +138,7 @@ describe("registerFsIpcHandlers", () => {
       await expect(call("fs:readFileBinary", filePath)).resolves.toEqual(Buffer.from("hello"));
     });
 
-    it.each(["fs:saveGcodeDialog", "fs:saveFileDialog", "fs:saveLayoutDialog", "fs:saveBedMeshDialog"])("%s makes its file writable", async (channel) => {
+    it.each(["fs:saveGcodeDialog", "fs:saveFileDialog", "fs:saveLayoutDialog"])("%s makes its file writable", async (channel) => {
       const filePath = join(tempDir, "saved.out");
       await pickToSave(filePath, channel);
 
@@ -146,7 +146,7 @@ describe("registerFsIpcHandlers", () => {
       await expect(readFile(filePath, "utf-8")).resolves.toBe("saved");
     });
 
-    it.each(["fs:openFileDialog", "fs:openImportDialog", "fs:openLayoutDialog", "fs:openBedMeshDialog"])(
+    it.each(["fs:openFileDialog", "fs:openImportDialog", "fs:openLayoutDialog"])(
       "%s makes its file readable",
       async (channel) => {
         const filePath = join(tempDir, "picked.in");

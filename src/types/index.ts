@@ -998,8 +998,6 @@ export interface FsApi {
   saveFileDialog: (defaultName: string) => Promise<string | null>;
   saveLayoutDialog: (defaultName: string) => Promise<string | null>;
   openLayoutDialog: () => Promise<string | null>;
-  saveBedMeshDialog: (defaultName: string) => Promise<string | null>;
-  openBedMeshDialog: () => Promise<string | null>;
   /** Open a native folder picker. Returns the chosen directory path, or null if cancelled. */
   chooseDirectory: () => Promise<string | null>;
   /** Subscribe to native File-menu → layout action events. Returns an unsubscribe fn. */
