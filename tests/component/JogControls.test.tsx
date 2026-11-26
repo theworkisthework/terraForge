@@ -752,4 +752,28 @@ describe("JogControls — zero-Z button disabled with solenoid pen types", () =>
       vi.useRealTimers();
     }
   });
+
+  describe("zOnly mode (bed mesh probing)", () => {
+    beforeEach(() => {
+      const cfg = createMachineConfig({ penType: "solenoid-hardware", penUpCommand: "G0Z15", penDownCommand: "G0Z0" });
+      useMachineStore.setState({ configs: [cfg], activeConfigId: cfg.id, connected: true });
+    });
+
+    it("greys out XY, zeroing and homing but keeps the pen buttons", () => {
+      render(<JogControls zOnly />);
+      for (const name of ["Jog X-", "Jog X+", "Jog Y-", "Jog Y+", "Go to origin", "Zero Z"]) {
+        expect(screen.getByRole("button", { name })).toBeDisabled();
+      }
+      expect(screen.getByRole("button", { name: /run homing/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /set zero/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Pen down" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Pen up" })).toBeEnabled();
+    });
+
+    it("jogs Z by the step even when the pen type would send pen commands", async () => {
+      render(<JogControls zOnly />);
+      await userEvent.click(screen.getByRole("button", { name: "Pen down" }));
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("$J=G91 G21 Z-1.000 F3000");
+    });
+  });
 });

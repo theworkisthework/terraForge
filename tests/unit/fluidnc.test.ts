@@ -126,6 +126,28 @@ describe("FluidNCClient", () => {
     );
   });
 
+  it("passes on a status report found in a command reply", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse("<Idle|MPos:0.000,0.000,20.000|FS:0,0|Ov:100,100,100>\n"),
+    );
+    const onStatus = vi.fn();
+    client.on("status", onStatus);
+    await client.sendCommand("?");
+    expect(onStatus).toHaveBeenCalledTimes(1);
+    expect(onStatus.mock.calls[0][0]).toMatchObject({
+      state: "Idle",
+      mpos: { x: 0, y: 0, z: 20 },
+    });
+  });
+
+  it("emits no status for a reply without a status report", async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse("[MSG:Homed:XY]\nok\n"));
+    const onStatus = vi.fn();
+    client.on("status", onStatus);
+    await client.sendCommand("$H");
+    expect(onStatus).not.toHaveBeenCalled();
+  });
+
   it("does not resend via plain query when commandText times out", async () => {
     const timeout = new DOMException("The operation timed out", "TimeoutError");
     mockFetch.mockRejectedValueOnce(timeout);

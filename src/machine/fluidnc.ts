@@ -192,7 +192,29 @@ export class FluidNCClient extends EventEmitter {
 
   // ─── Commands ─────────────────────────────────────────────────────────────
 
+  /**
+   * A reply can carry a status report — the answer to "?" over HTTP — which
+   * goes out like one from the WebSocket. FluidNC 4.1 auto-reports only some
+   * changes, so asking is the way to get the current state.
+   */
+  private emitStatusFromReply(body: string): void {
+    if (typeof body !== "string") return;
+    for (const line of body.split("\n")) {
+      const trimmed = line.trim();
+      if (!/^<[^<>]+>$/.test(trimmed)) continue;
+      const status = parseMachineStatus(trimmed);
+      this.machineState = status.state;
+      this.emit("status", status);
+    }
+  }
+
   async sendCommand(cmd: string): Promise<string> {
+    const body = await this.sendCommandRaw(cmd);
+    this.emitStatusFromReply(body);
+    return body;
+  }
+
+  private async sendCommandRaw(cmd: string): Promise<string> {
     // Keep raw command execution unchanged; this only makes log output readable
     // and safe by escaping control characters and capping length.
     const logCmd = cmd

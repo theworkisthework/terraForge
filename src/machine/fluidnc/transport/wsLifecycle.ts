@@ -119,24 +119,12 @@ export function openFluidNCWebSocket(
     // Any frame proves the socket is live. Not every firmware sends PING
     // frames (or sends them often enough), but status reports arrive steadily.
     handlers.emitPing();
-    const text = raw.toString().trim();
-    if (text.startsWith("<")) {
-      handlers.emitStatus(handlers.parseStatus(text));
-      return;
-    }
-    if (text === "PING" || text.startsWith("PING:")) {
-      return;
-    }
-    if (
-      text.startsWith("currentID:") ||
-      text.startsWith("CURRENT_ID:") ||
-      text.startsWith("activeID:") ||
-      text.startsWith("ACTIVE_ID:")
-    ) {
-      return;
-    }
-    if (text.length > 0) {
-      handlers.emitConsole(text);
+    // One frame can hold several lines — FluidNC 4.1 sends e.g.
+    // "[MSG:Homed:XY]\n<Idle|…>" or "<Idle|…>\nok" together — so each line
+    // is handled on its own. Otherwise a status report that isn't first in
+    // its frame ends up in the console and the machine's state goes stale.
+    for (const line of raw.toString().split(/\r?\n/)) {
+      handleWsLine(line.trim(), handlers);
     }
   });
 
@@ -170,4 +158,24 @@ export function openFluidNCWebSocket(
       handlers.emitConsole(`[terraForge] WebSocket error: ${err.message}`);
     }
   });
+}
+
+function handleWsLine(text: string, handlers: OpenHandlers): void {
+  if (text.length === 0) return;
+  if (text.startsWith("<")) {
+    handlers.emitStatus(handlers.parseStatus(text));
+    return;
+  }
+  if (text === "PING" || text.startsWith("PING:")) {
+    return;
+  }
+  if (
+    text.startsWith("currentID:") ||
+    text.startsWith("CURRENT_ID:") ||
+    text.startsWith("activeID:") ||
+    text.startsWith("ACTIVE_ID:")
+  ) {
+    return;
+  }
+  handlers.emitConsole(text);
 }

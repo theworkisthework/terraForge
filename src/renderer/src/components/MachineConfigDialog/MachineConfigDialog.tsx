@@ -15,6 +15,7 @@ import {
   MachineConfigurationsTab,
   ApplicationConfigurationTab,
 } from "./components";
+import { MachineConnectButton } from "./components/MachineConnectButton";
 import { useMachineConfigDialogController } from "./hooks/useMachineConfigDialogController";
 import type { MachineConfigDialogController } from "./hooks/useMachineConfigDialogController";
 
@@ -79,7 +80,7 @@ export function MachineConfigDialog({ onClose }: Props) {
           )}
 
           {activeTab === "machines" ? (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border-ui">
+            <div className="flex items-center gap-3 px-6 py-4 border-t border-border-ui">
               <Button
                 onClick={controller.handleActivate}
                 disabled={!selectedId || isNew || connected}
@@ -92,7 +93,12 @@ export function MachineConfigDialog({ onClose }: Props) {
               >
                 Set as Active
               </Button>
-              <div className="flex gap-3">
+              <MachineConnectButton
+                selectedId={selectedId}
+                isNew={isNew}
+                isDirty={controller.isDirty}
+              />
+              <div className="flex gap-3 ml-auto">
                 <Button variant="secondary" size="lg" onClick={onClose}>
                   Close
                 </Button>

@@ -33,6 +33,7 @@ function normalizeGcodeForSnapshot(gcode: string): string {
     .replace(/^; Generated:.*$/m, "; Generated: <normalized>")
     .replace(/^; Vinyl\s+:.*\n?/gm, "")
     .replace(/^; Weed bd\s+:.*\n?/gm, "")
+    .replace(/^; Bed mesh\s+:.*\n?/gm, "")
     .trim();
 }
 
