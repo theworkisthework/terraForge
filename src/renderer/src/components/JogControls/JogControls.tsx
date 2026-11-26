@@ -23,9 +23,18 @@ function usesRightOrigin(origin?: OriginType): boolean {
 
 interface Props {
   onClose?: () => void;
+  /** Called after Set Zero has been sent (e.g. so a wizard can move on). */
+  onSetZero?: () => void;
+  /** Hide Run Homing — for flows where the machine has no end stops. */
+  showHoming?: boolean;
+  /**
+   * Only Z can move: XY, zeroing and homing are greyed out, and the pen
+   * buttons always jog Z by the step (e.g. bed mesh probing).
+   */
+  zOnly?: boolean;
 }
 
-export function JogControls({ onClose }: Props) {
+export function JogControls({ onClose, onSetZero, showHoming = true, zOnly = false }: Props) {
   const [step, setStep] = useState<JogStep>(1);
   const activeConfig = useMachineStore((s) => s.activeConfig());
   const connected = useMachineStore((s) => s.connected);
@@ -47,7 +56,7 @@ export function JogControls({ onClose }: Props) {
   const invertYJogControls = usesTopOrigin(activeConfig?.origin);
 
   const movePen = async (action: "up" | "down") => {
-    if (isSolenoidPenType(penType)) {
+    if (isSolenoidPenType(penType) && !zOnly) {
       const cmd = action === "down" ? penDown : penUp;
       if (cmd) await window.terraForge.fluidnc.sendCommand(cmd);
       return;
@@ -81,6 +90,7 @@ export function JogControls({ onClose }: Props) {
 
   const setZero = async () => {
     await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
+    onSetZero?.();
   };
 
   return (
@@ -100,7 +110,7 @@ export function JogControls({ onClose }: Props) {
 
       <JogPad
         step={step}
-        connected={connected}
+        connected={connected && !zOnly}
         jog={jog}
         goToOrigin={goToOrigin}
         invertXJogControls={invertXJogControls}
@@ -109,7 +119,8 @@ export function JogControls({ onClose }: Props) {
 
       <PenControls
         connected={connected}
-        penType={penType}
+        zeroZDisabled={zOnly}
+        penType={zOnly ? "stepper" : penType}
         penDown={penDown}
         penUp={penUp}
         onMovePen={movePen}
@@ -119,8 +130,8 @@ export function JogControls({ onClose }: Props) {
       <JogSpeedInput feedrate={feedrate} onChange={setFeedrate} />
 
       <PositioningSection
-        connected={connected}
-        onHome={home}
+        connected={connected && !zOnly}
+        onHome={showHoming ? home : undefined}
         onSetZero={setZero}
       />
     </div>

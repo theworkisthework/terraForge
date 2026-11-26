@@ -33,6 +33,10 @@
   /* File row selected state */
   --tf-file-selected: #1a3a6e;
   --tf-file-selected-hover: #1f4480;
+  /* Bed mesh heat map: one blue ramp, the low end receding toward the
+     surface (dark here, light in the light theme). */
+  --tf-mesh-low: #184f95;
+  --tf-mesh-high: #cde2fb;
 }
 
 :root.light {
@@ -57,6 +61,9 @@
   --tf-fs-purple-border: #c4a0e0;
   --tf-fs-purple-text: #7c3aed;
   /* File row selected state */
+  /* Bed mesh heat map (see :root) */
+  --tf-mesh-low: #cde2fb;
+  --tf-mesh-high: #184f95;
   --tf-file-selected: #bfcff0;
   --tf-file-selected-hover: #a8bde8;
 }

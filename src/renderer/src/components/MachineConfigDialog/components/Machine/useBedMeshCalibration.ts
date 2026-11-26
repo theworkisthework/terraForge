@@ -1,21 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import {
   createBedMeshPoints,
-  isValidBedMesh,
   MAX_BED_MESH_GRID_POINTS,
+  supportsBedMeshZCompensation,
 } from "../../../../../../types/bedMesh";
-import type { BedMesh, BedMeshPoint, JogStep, MachineConfig, MachineStatus } from "../../../../../../types";
+import type { BedMesh, BedMeshPoint, MachineStatus } from "../../../../../../types";
 import { useMachineStore } from "../../../../store/machineStore";
 import type { MachineConfigDialogController } from "../../hooks/useMachineConfigDialogController";
 
 const STATUS_TIMEOUT_MS = 10_000;
 
+/** Where the calibration wizard is. "closed" means no wizard is showing. */
+export type BedMeshWizardStep = "closed" | "grid" | "origin" | "probe" | "review";
+
+/**
+ * How the user establishes X0 Y0 before probing: run the homing cycle
+ * (machines with end stops) or jog to a point and set it as zero
+ * (machines without).
+ */
+export type BedMeshOriginMethod = "home" | "jog";
+
+/**
+ * How long the status stream must stay quiet, after a command, before an
+ * idle machine is taken to have finished. FluidNC auto-reports ($RI=500)
+ * only when something changes, so a command that doesn't move anything —
+ * e.g. "go to X0 Y0" when already there — produces no report at all.
+ * Motion that does start is reported within one 500 ms interval.
+ */
+const QUIET_IDLE_MS = 1_500;
+
+/*
+ * Z offsets are measured from machine position (MPos), not WPos. Reports
+ * carry WCO only every so often, and the status parser falls back to MPos
+ * when it's absent, so status.wpos can jump by the work offset between
+ * reports. Offsets are relative to the first point, so MPos is exact.
+ */
 function isValidIdleStatus(status: MachineStatus | null | undefined): status is MachineStatus {
   return !!status &&
     status.state === "Idle" &&
-    Number.isFinite(status.wpos.x) &&
-    Number.isFinite(status.wpos.y) &&
-    Number.isFinite(status.wpos.z);
+    Number.isFinite(status.mpos.x) &&
+    Number.isFinite(status.mpos.y) &&
+    Number.isFinite(status.mpos.z);
 }
 
 function requireCurrentIdleStatus(): MachineStatus {
@@ -26,19 +51,31 @@ function requireCurrentIdleStatus(): MachineStatus {
   return status;
 }
 
-async function retractZ(): Promise<void> {
-  await sendCommandsAndWaitForIdle("G91 G21 G0 Z5", "G90 G21");
+/** Lifts the pen 5 mm. `up` is -1 on machines whose Z jog is inverted. */
+async function retractZ(up: 1 | -1): Promise<void> {
+  await sendCommandsAndWaitForIdle(`G91 G21 G0 Z${5 * up}`, "G90 G21");
 }
 
 function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatus> {
   return new Promise((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe = () => {};
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
     let commandAccepted = false;
     let idleStatus: MachineStatus | null = null;
+    let lastStatus = useMachineStore.getState().status;
     const cleanup = () => {
       if (timer) clearTimeout(timer);
+      if (quietTimer) clearTimeout(quietTimer);
       unsubscribe();
+    };
+    // Restarted by every report; fires only if the machine stays silent.
+    const armQuietTimer = () => {
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => {
+        const current = useMachineStore.getState().status;
+        if (isValidIdleStatus(current)) finish(current);
+      }, QUIET_IDLE_MS);
     };
     const finish = (status: MachineStatus) => {
       cleanup();
@@ -46,6 +83,9 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
     };
     unsubscribe = useMachineStore.subscribe((state) => {
       const status = state.status;
+      if (status === lastStatus) return; // some other part of the store changed
+      lastStatus = status;
+      if (commandAccepted) armQuietTimer();
       if (!isValidIdleStatus(status)) return;
       idleStatus = status;
       if (commandAccepted) finish(status);
@@ -53,7 +93,12 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
 
     timer = setTimeout(() => {
       cleanup();
-      reject(new Error("No idle status update was received. Check the machine status connection and try again."));
+      const state = useMachineStore.getState().status?.state;
+      reject(new Error(
+        state && state !== "Idle"
+          ? `The machine didn't return to Idle (it reports ${state}). Check the machine and try again.`
+          : "No idle status update was received. Check the machine status connection and try again.",
+      ));
     }, STATUS_TIMEOUT_MS);
     void (async () => {
       for (const command of commands) {
@@ -61,6 +106,7 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
       }
       commandAccepted = true;
       if (idleStatus) finish(idleStatus);
+      else armQuietTimer();
     })().catch((error: unknown) => {
       cleanup();
       reject(error);
@@ -73,34 +119,37 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   const connected = controller.machineStore.connected;
   const activeConfigId = controller.machineStore.activeConfigId;
   const selectedId = controller.selectedId;
-  const canCalibrate = connected && !!activeConfigId && selectedId === activeConfigId;
-  const [open, setOpen] = useState(false);
-  const [showStartOptions, setShowStartOptions] = useState(false);
-  const [startChoice, setStartChoice] = useState<"home" | "known" | null>(null);
+  const zCompensationAvailable = supportsBedMeshZCompensation(form);
+  const canCalibrate =
+    connected && !!activeConfigId && selectedId === activeConfigId && zCompensationAvailable;
+
+  const [wizardStep, setWizardStep] = useState<BedMeshWizardStep>("closed");
+  const [originMethod, setOriginMethodState] = useState<BedMeshOriginMethod | null>(null);
+  const [originReady, setOriginReady] = useState(false);
   const [xPoints, setXPoints] = useState(form.bedMesh?.xPoints ?? 3);
   const [yPoints, setYPoints] = useState(form.bedMesh?.yPoints ?? 3);
+  const [meshName, setMeshName] = useState(form.bedMesh?.name ?? "Bed mesh");
   const [points, setPoints] = useState<BedMeshPoint[]>([]);
   const [index, setIndex] = useState(0);
+  /** The point the pen is travelling to, until the machine reports it's there. */
+  const [movingTo, setMovingTo] = useState<number | null>(null);
   const [z, setZ] = useState(0);
-  const [step, setStep] = useState<JogStep>(1);
-  const [feedrate, setFeedrate] = useState(form.jogSpeed ?? 3000);
-  const [jogging, setJogging] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [datumZ, setDatumZ] = useState<number | null>(null);
-  const [profileName, setProfileName] = useState(form.bedMesh?.name ?? "Bed mesh");
+  const [result, setResult] = useState<BedMesh | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busyRef = useRef(false);
-  const positioningClearanceRaised = useRef(false);
   const machineStatus = controller.machineStore.status;
+  /** A reading can only be taken with the machine stopped (not mid-jog). */
+  const machineIdle = isValidIdleStatus(machineStatus);
 
   useEffect(() => {
-    if (datumZ !== null && machineStatus && Number.isFinite(machineStatus.wpos.z)) {
-      setZ(machineStatus.wpos.z - datumZ);
+    if (datumZ !== null && machineStatus && Number.isFinite(machineStatus.mpos.z)) {
+      setZ(machineStatus.mpos.z - datumZ);
     }
-  }, [datumZ, machineStatus?.wpos.z]);
+  }, [datumZ, machineStatus?.mpos.z]);
 
-  useEffect(() => {
-    setProfileName(form.bedMesh?.name ?? "Bed mesh");
-  }, [form.bedMesh?.name]);
+  const lift = () => retractZ(form.invertZJogControls ? -1 : 1);
 
   const persistMesh = async (patch: Partial<typeof form>) => {
     change(patch);
@@ -113,228 +162,237 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     }
   };
 
+  /** Runs one machine operation at a time, surfacing failures as `error`. */
+  const runExclusive = async (failure: string, operation: () => Promise<void>) => {
+    if (!canCalibrate || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      setError(null);
+      await operation();
+    } catch (err) {
+      setError(`${failure}: ${String(err)}`);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
   const move = async (point: BedMeshPoint) => {
-    await retractZ();
+    await lift();
     return sendCommandsAndWaitForIdle(
       `G90 G21 G0 X${point.x.toFixed(3)} Y${point.y.toFixed(3)}`,
     );
   };
 
+  // Losing the connection (or switching profile) closes the wizard. If the
+  // pen was near the bed, lift it clear on the way out.
   useEffect(() => {
-    if (canCalibrate) return;
-    setShowStartOptions(false);
-    setStartChoice(null);
-    if (open) {
-      setOpen(false);
-      if (connected) {
-        void retractZ().catch((err: unknown) =>
-          setError(`Could not retract the Z axis: ${String(err)}`),
-        );
-      }
+    if (canCalibrate || wizardStep === "closed") return;
+    const wasProbing = wizardStep === "probe";
+    setWizardStep("closed");
+    if (wasProbing && connected) {
+      void lift().catch((err: unknown) =>
+        setError(`Could not retract the Z axis: ${String(err)}`),
+      );
     }
-  }, [canCalibrate, connected, open]);
+  }, [canCalibrate, connected, wizardStep]);
 
-  const begin = () => {
+  const openWizard = () => {
     if (!canCalibrate) return;
+    setError(null);
+    setOriginMethodState(null);
+    setOriginReady(false);
+    setResult(null);
+    setWizardStep("grid");
+  };
+
+  const gridPoints = (): BedMeshPoint[] => {
+    const xMin = form.origin === "center" ? -form.bedWidth / 2 : 0;
+    const yMin = form.origin === "center" ? -form.bedHeight / 2 : 0;
+    return createBedMeshPoints(xPoints, yPoints, form.bedWidth, form.bedHeight, xMin, yMin);
+  };
+
+  const confirmGrid = () => {
     if (!hasValidGrid(xPoints, yPoints, form.bedWidth, form.bedHeight)) {
       setError("Choose valid grid dimensions and bed size before calibrating.");
       return;
     }
-    positioningClearanceRaised.current = false;
+    if (!meshName.trim()) {
+      setError("Enter a name for the bed mesh.");
+      return;
+    }
     setError(null);
-    setShowStartOptions(true);
+    setWizardStep("origin");
   };
 
-  const startCalibration = async (choice: "home" | "known") => {
-    if (!canCalibrate || busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
+  const setOriginMethod = (method: BedMeshOriginMethod) => {
+    setOriginMethodState(method);
+    setOriginReady(false);
+    setError(null);
+  };
+
+  const home = () =>
+    runExclusive("Homing failed", async () => {
       requireCurrentIdleStatus();
-      const xMin = form.origin === "center" ? -form.bedWidth / 2 : 0;
-      const yMin = form.origin === "center" ? -form.bedHeight / 2 : 0;
-      const gridPoints = createBedMeshPoints(
-        xPoints,
-        yPoints,
-        form.bedWidth,
-        form.bedHeight,
-        xMin,
-        yMin,
-      );
-      if (choice === "home") {
-        await sendCommandsAndWaitForIdle("$H");
-      }
-      await move(gridPoints[0]);
-      setPoints(gridPoints);
+      await sendCommandsAndWaitForIdle("$H");
+      setOriginReady(true);
+    });
+
+  /**
+   * X0 Y0 is in place — set from the embedded jog panel, or already set
+   * before calibration started.
+   */
+  const confirmOrigin = () => {
+    setError(null);
+    setOriginReady(true);
+  };
+
+  const startProbing = () =>
+    runExclusive("Calibration could not start", async () => {
+      requireCurrentIdleStatus();
+      const grid = gridPoints();
+      await move(grid[0]);
+      setPoints(grid);
+      setResult(null);
       setIndex(0);
       setZ(0);
       setDatumZ(null);
-      setOpen(true);
-      setStartChoice(null);
-      setShowStartOptions(false);
-      setError(null);
-    } catch (err) {
-      setError(`Calibration could not start: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
-    }
-  };
+      setWizardStep("probe");
+    });
 
-  const next = async () => {
-    if (!canCalibrate || busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
+  /**
+   * Records the pen height at the current point and moves to the next one.
+   * After the last point the pen is lifted and the mesh is ready to review
+   * (`result` is set); the wizard stays on the probe step until the user
+   * moves on with `showReview`.
+   */
+  const recordPoint = () =>
+    runExclusive("Calibration could not continue", async () => {
       const status = requireCurrentIdleStatus();
-      const nextDatumZ = datumZ ?? status.wpos.z;
-      const offset = status.wpos.z - nextDatumZ;
+      const nextDatumZ = datumZ ?? status.mpos.z;
+      const offset = status.mpos.z - nextDatumZ;
       const updated = points.map((point, pointIndex) =>
         pointIndex === index ? { ...point, z: offset } : point,
       );
       if (index + 1 < updated.length) {
-        const nextStatus = await move(updated[index + 1]);
+        setMovingTo(index + 1);
+        const nextStatus = await move(updated[index + 1]).finally(() => setMovingTo(null));
         setPoints(updated);
         setIndex(index + 1);
         setDatumZ(nextDatumZ);
-        setZ(nextStatus.wpos.z - nextDatumZ);
+        setZ(nextStatus.mpos.z - nextDatumZ);
         return;
       }
-      await retractZ();
-      const xMinMM = form.origin === "center" ? -form.bedWidth / 2 : 0;
-      const yMinMM = form.origin === "center" ? -form.bedHeight / 2 : 0;
-      const profile: BedMesh = {
+      await lift();
+      setPoints(updated);
+      setResult({
         version: 1,
-        name: form.bedMesh?.name ?? "Bed mesh",
+        name: meshName.trim(),
         xPoints,
         yPoints,
-        xMinMM,
-        yMinMM,
+        xMinMM: form.origin === "center" ? -form.bedWidth / 2 : 0,
+        yMinMM: form.origin === "center" ? -form.bedHeight / 2 : 0,
         widthMM: form.bedWidth,
         heightMM: form.bedHeight,
         points: updated,
         createdAt: new Date().toISOString(),
-      };
-      await persistMesh({ bedMesh: profile, bedMeshEnabled: false });
-      setOpen(false);
-    } catch (err) {
-      setError(`Calibration could not continue: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
-    }
+      });
+      setIndex(updated.length);
+    });
+
+  const showReview = () => {
+    if (wizardStep === "probe" && result) setWizardStep("review");
   };
 
-  const cancelCalibration = async () => {
+  const back = () => {
+    setError(null);
+    if (wizardStep === "origin") setWizardStep("grid");
+  };
+
+  /**
+   * Jumps back to an earlier step (the stepper's circles). Leaving probing
+   * lifts the pen first; probed points and an unsaved result are discarded.
+   * Returning to "probe" from the review re-probes from the first point.
+   */
+  const goToStep = async (target: BedMeshWizardStep) => {
+    const order: BedMeshWizardStep[] = ["grid", "origin", "probe", "review"];
+    if (busyRef.current || order.indexOf(target) < 0 || order.indexOf(target) >= order.indexOf(wizardStep)) return;
+    setError(null);
+    if (target === "probe") {
+      await startProbing();
+      return;
+    }
+    if (wizardStep === "probe") {
+      await runExclusive("Could not retract the Z axis", async () => {
+        await lift();
+        setPoints([]);
+        setWizardStep(target);
+      });
+      return;
+    }
+    setResult(null);
+    setWizardStep(target);
+  };
+
+  /** Stores the reviewed mesh on the machine profile and closes the wizard. */
+  const saveResult = async (enable: boolean) => {
+    if (!result) return;
+    await persistMesh({ bedMesh: result, bedMeshEnabled: enable });
+    setWizardStep("closed");
+  };
+
+  const cancel = async () => {
     if (busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
-      await retractZ();
-      setOpen(false);
-    } catch (err) {
-      setError(`Could not retract the Z axis: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
-    }
-  };
-
-  const jogZ = async (delta: number) => {
-    if (!canCalibrate || busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
+    if (wizardStep !== "probe") {
       setError(null);
-      requireCurrentIdleStatus();
-      const status = await sendCommandsAndWaitForIdle(
-        `$J=G91 G21 Z${delta.toFixed(3)} F${feedrate}`,
-      );
-      if (datumZ !== null) setZ(status.wpos.z - datumZ);
-    } catch (err) {
-      setError(`Z adjustment failed: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
+      setWizardStep("closed");
+      return;
     }
+    // Probing leaves the pen at (or near) the bed — lift it before closing.
+    await runExclusive("Could not retract the Z axis", async () => {
+      await lift();
+      setWizardStep("closed");
+    });
   };
 
-  const jogXY = async (axis: "X" | "Y", delta: number) => {
-    if (!canCalibrate || busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
-      setError(null);
-      requireCurrentIdleStatus();
-      if (!positioningClearanceRaised.current) {
-        await retractZ();
-        positioningClearanceRaised.current = true;
-      }
-      await sendCommandsAndWaitForIdle(
-        `$J=G91 G21 ${axis}${delta.toFixed(3)} F${feedrate}`,
-      );
-    } catch (err) {
-      setError(`Position adjustment failed: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
-    }
-  };
-
-  const setXYZero = async () => {
-    if (!canCalibrate || busyRef.current) return;
-    busyRef.current = true;
-    setJogging(true);
-    try {
-      setError(null);
-      requireCurrentIdleStatus();
-      await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
-    } catch (err) {
-      setError(`XY zero could not be set: ${String(err)}`);
-    } finally {
-      busyRef.current = false;
-      setJogging(false);
-    }
-  };
-
-  const save = () => saveMeshProfile(form.bedMesh, profileName, persistMesh, setError);
-  const load = () => loadMeshProfile(persistMesh, setError, setXPoints, setYPoints);
 
   return {
     form,
     inputCls,
     connected,
     canCalibrate,
-    open,
-    showStartOptions,
-    setShowStartOptions,
-    startChoice,
-    setStartChoice,
+    zCompensationAvailable,
+    wizardStep,
+    originMethod,
+    originReady,
     xPoints,
     yPoints,
-    points,
-    index,
-    z,
-    step,
-    setStep,
-    feedrate,
-    setFeedrate,
-    jogging,
-    datumZ,
-    profileName,
-    setProfileName,
-    error,
     setXPoints,
     setYPoints,
-    begin,
-    startCalibration,
-    next,
-    cancelCalibration,
-    jogZ,
-    jogXY,
-    setXYZero,
-    save,
-    load,
+    meshName,
+    setMeshName,
+    points,
+    index,
+    movingTo,
+    machineIdle,
+    z,
+    datumZ,
+    busy,
+    result,
+    error,
+    openWizard,
+    confirmGrid,
+    setOriginMethod,
+    home,
+    confirmOrigin,
+    startProbing,
+    recordPoint,
+    showReview,
+    back,
+    goToStep,
+    saveResult,
+    cancel,
     persistMesh,
   };
 }
@@ -349,51 +407,4 @@ function hasValidGrid(xPoints: number, yPoints: number, width: number, height: n
     Number.isInteger(yPoints) && yPoints >= 2 && yPoints <= MAX_BED_MESH_GRID_POINTS &&
     Number.isFinite(width) && width > 0 &&
     Number.isFinite(height) && height > 0;
-}
-
-type PersistMesh = (patch: Partial<Omit<MachineConfig, "id">>) => Promise<void>;
-
-async function saveMeshProfile(
-  mesh: BedMesh | undefined,
-  profileName: string,
-  persistMesh: PersistMesh,
-  setError: (error: string | null) => void,
-): Promise<void> {
-  if (!mesh) return;
-  const name = profileName.trim();
-  if (!name) {
-    setError("Enter a name for the bed mesh profile.");
-    return;
-  }
-  try {
-    setError(null);
-    const filename = name.replace(/[\\/:*?"<>|]/g, "_").replace(/\.json$/i, "");
-    const path = await window.terraForge.fs.saveBedMeshDialog(`${filename}.json`);
-    if (!path) return;
-    const renamedMesh = { ...mesh, name };
-    await window.terraForge.fs.writeFile(path, JSON.stringify(renamedMesh, null, 2));
-    await persistMesh({ bedMesh: renamedMesh });
-  } catch (err) {
-    setError(`Mesh could not be saved: ${String(err)}`);
-  }
-}
-
-async function loadMeshProfile(
-  persistMesh: PersistMesh,
-  setError: (error: string | null) => void,
-  setXPoints: (points: number) => void,
-  setYPoints: (points: number) => void,
-): Promise<void> {
-  try {
-    const path = await window.terraForge.fs.openBedMeshDialog();
-    if (!path) return;
-    setError(null);
-    const parsed = JSON.parse(await window.terraForge.fs.readFile(path)) as BedMesh;
-    if (!isValidBedMesh(parsed)) throw new Error("Invalid dimensions, size, or point data.");
-    await persistMesh({ bedMesh: parsed, bedMeshEnabled: false });
-    setXPoints(parsed.xPoints);
-    setYPoints(parsed.yPoints);
-  } catch (err) {
-    setError(`Mesh import failed: ${String(err)}`);
-  }
 }

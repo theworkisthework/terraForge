@@ -4,7 +4,8 @@ import { Button } from "../ui";
 
 interface PositioningSectionProps {
   connected: boolean;
-  onHome: () => Promise<void>;
+  /** Omit to hide the Run Homing button. */
+  onHome?: () => Promise<void>;
   onSetZero: () => Promise<void>;
 }
 
@@ -21,17 +22,19 @@ export function PositioningSection({
       <span className="text-[9px] uppercase tracking-wider text-content-faint">
         Positioning
       </span>
-      <Tooltip text="Run the machine homing cycle ($H)">
-        <Button
-          variant="secondary"
-          onClick={onHome}
-          disabled={!connected}
-          className="w-full"
-          icon={<House size={13} />}
-        >
-          Run Homing
-        </Button>
-      </Tooltip>
+      {onHome && (
+        <Tooltip text="Run the machine homing cycle ($H)">
+          <Button
+            variant="secondary"
+            onClick={onHome}
+            disabled={!connected}
+            className="w-full"
+            icon={<House size={13} />}
+          >
+            Run Homing
+          </Button>
+        </Tooltip>
+      )}
       <Tooltip text="Set the current position as X0, Y0 (Z is unaffected)">
         <Button
           variant="secondary"

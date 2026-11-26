@@ -17,9 +17,6 @@ interface JogPadProps {
   goToOrigin: () => Promise<void>;
   invertXJogControls: boolean;
   invertYJogControls: boolean;
-  centerLabel?: React.ReactNode;
-  centerTitle?: string;
-  centerAriaLabel?: string;
 }
 
 /**
@@ -32,9 +29,6 @@ export function JogPad({
   goToOrigin,
   invertXJogControls,
   invertYJogControls,
-  centerLabel = <House size={14} />,
-  centerTitle = "Move pen to X0, Y0",
-  centerAriaLabel = "Go to origin",
 }: JogPadProps) {
   const leftDir: 1 | -1 = invertXJogControls ? 1 : -1;
   const rightDir: 1 | -1 = invertXJogControls ? -1 : 1;
@@ -61,9 +55,9 @@ export function JogPad({
         disabled={!connected}
       />
       <JogBtn
-        label={centerLabel}
-        title={centerTitle}
-        ariaLabel={centerAriaLabel}
+        label={<House size={14} />}
+        title="Move pen to X0, Y0"
+        ariaLabel="Go to origin"
         onClick={goToOrigin}
         disabled={!connected}
       />
