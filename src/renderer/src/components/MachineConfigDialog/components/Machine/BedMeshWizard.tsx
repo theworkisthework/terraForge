@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, OctagonX } from "lucide-react";
 import { createBedMeshInterpolator, MAX_BED_MESH_GRID_POINTS } from "../../../../../../types/bedMesh";
 import type { BedMesh } from "../../../../../../types";
 import { useModalFocus } from "../../../../hooks/useModalFocus";
@@ -382,10 +382,11 @@ function OriginStep({ calibration }: { calibration: Calibration }) {
       </div>
 
       {originMethod === "home" && (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-3">
           <Button onClick={() => void home()} disabled={busy} loading={busy}>
             Run homing
           </Button>
+          <HomeCheckPanel calibration={calibration} />
         </div>
       )}
 
@@ -414,15 +415,73 @@ function OriginStep({ calibration }: { calibration: Calibration }) {
   );
 }
 
+/**
+ * After homing, says where X0 Y0 is relative to the homed position. Homing
+ * doesn't set X0 Y0; a stale work offset would send the first move
+ * somewhere unexpected, so anything but "at home" needs a decision.
+ */
+function HomeCheckPanel({ calibration }: { calibration: Calibration }) {
+  const { homeCheck, busy, setZeroAtHome, confirmOrigin, originReady, setOriginMethod } = calibration;
+  if (!homeCheck || busy) return null;
+
+  if (homeCheck.kind === "at-home") {
+    return (
+      <p className="text-xs text-content-muted flex items-start gap-1.5 self-stretch">
+        <Check size={13} className="text-green-400 shrink-0 mt-px" />
+        <span>Homed. X0 Y0 is at the home position.</span>
+      </p>
+    );
+  }
+
+  const fmt = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
+  return (
+    <div className="self-stretch rounded border border-amber-600/60 bg-amber-900/20 p-3 text-xs text-content-muted space-y-2">
+      <p className="flex items-start gap-1.5">
+        <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-px" />
+        <span>
+          {homeCheck.kind === "offset" ? (
+            <>
+              Homed, but X0 Y0 is <span className="text-content font-mono">
+                X {fmt(homeCheck.dx)}, Y {fmt(homeCheck.dy)} mm
+              </span>{" "}
+              from the home position. Homing doesn't move X0 Y0, so it may be left over from an
+              earlier session. Probing starts there.
+            </>
+          ) : (
+            <>
+              Homed, but terraForge couldn't tell where X0 Y0 is (the machine hasn't reported its
+              work offset yet). Probing starts at X0 Y0.
+            </>
+          )}
+        </span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="primary" onClick={() => void setZeroAtHome()}>
+          Set X0 Y0 at home
+        </Button>
+        {homeCheck.kind === "offset" && (
+          <Button size="sm" variant="secondary" onClick={confirmOrigin} disabled={originReady}>
+            {originReady ? "Keeping X0 Y0" : "Keep X0 Y0 where it is"}
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setOriginMethod("jog")}>
+          Jog to it instead
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function OriginStatus({ calibration, ready }: { calibration: Calibration; ready: boolean }) {
-  const { form, busy, originMethod } = calibration;
+  const { form, busy, originMethod, homeCheck } = calibration;
   const firstX = form.origin === "center" ? -form.bedWidth / 2 : 0;
   const firstY = form.origin === "center" ? -form.bedHeight / 2 : 0;
   let text = "";
   if (busy) text = "Waiting for the machine…";
   else if (ready)
-    text = `Origin ready. Starting lifts the pen 5 mm and moves to the first point (X ${firstX.toFixed(1)}, Y ${firstY.toFixed(1)}).`;
-  else if (originMethod) text = originMethod === "home" ? "Not homed yet." : "X0 Y0 not confirmed yet.";
+    text = `Origin ready. Next lifts the pen 5 mm and moves at jog speed to the first point (X ${firstX.toFixed(1)}, Y ${firstY.toFixed(1)}).`;
+  else if (originMethod === "home") text = homeCheck ? "Choose where X0 Y0 should be." : "Not homed yet.";
+  else if (originMethod) text = "X0 Y0 not confirmed yet.";
   return (
     // Fixed height so the status changing never moves the controls above it.
     <p className="text-xs min-h-8 flex items-start gap-1.5 text-content-muted" aria-live="polite">
@@ -433,7 +492,9 @@ function OriginStatus({ calibration, ready }: { calibration: Calibration; ready:
 }
 
 function ProbeStep({ calibration }: { calibration: Calibration }) {
-  const { points, index, movingTo, machineIdle, z, datumZ, busy, recordPoint, result } = calibration;
+  const {
+    points, index, movingTo, atPoint, machineIdle, z, datumZ, busy, recordPoint, moveToPoint, result,
+  } = calibration;
   const point = points[index];
   const complete = result !== null;
   if (!point && !complete) return null;
@@ -466,15 +527,28 @@ function ProbeStep({ calibration }: { calibration: Calibration }) {
                 <li>Lower the pen until it just touches the bed.</li>
                 <li>Press <span className="text-content">Record point</span>.</li>
               </ol>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void recordPoint()}
-                disabled={busy || !machineIdle}
-                className="self-start"
-              >
-                Record point
-              </Button>
+              {atPoint || busy ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void recordPoint()}
+                  disabled={busy || !machineIdle}
+                  className="self-start"
+                >
+                  Record point
+                </Button>
+              ) : (
+                // The move here was stopped or failed: get there before recording.
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void moveToPoint()}
+                  disabled={!machineIdle}
+                  className="self-start"
+                >
+                  Move to point {index + 1}
+                </Button>
+              )}
             </>
           )}
           <p className="text-xs font-mono text-content min-h-4" aria-live="polite">
@@ -757,14 +831,23 @@ function MethodCard({
 function Footer({ calibration }: { calibration: Calibration }) {
   const {
     wizardStep, busy, cancel, back, confirmGrid, originReady, startProbing, showReview,
-    result, saveResult, zCompensationAvailable,
+    result, saveResult, zCompensationAvailable, stop,
   } = calibration;
   const forward = <ChevronRight size={14} />;
   return (
     <div className="flex gap-2 items-center px-5 py-3 border-t border-border-ui">
-      <Button variant="secondary" onClick={() => void cancel()} disabled={busy} className="mr-auto">
-        {wizardStep === "review" ? "Discard" : "Cancel"}
-      </Button>
+      {busy ? (
+        // While the wizard has the machine moving, Cancel becomes Stop.
+        <Tooltip text="Feed hold, then reset: stops the machine" className="mr-auto">
+          <Button variant="danger" onClick={() => void stop()} icon={<OctagonX size={14} />}>
+            Stop
+          </Button>
+        </Tooltip>
+      ) : (
+        <Button variant="secondary" onClick={() => void cancel()} className="mr-auto">
+          {wizardStep === "review" ? "Discard" : "Cancel"}
+        </Button>
+      )}
       <Button
         variant="ghost"
         onClick={back}
@@ -777,7 +860,7 @@ function Footer({ calibration }: { calibration: Calibration }) {
         <Button variant="primary" onClick={confirmGrid} data-autofocus>Next{forward}</Button>
       )}
       {wizardStep === "origin" && (
-        <Tooltip text={originReady ? "Lifts the pen 5 mm and moves to the first probe point" : "Set the origin first"}>
+        <Tooltip text={originReady ? "Lifts the pen 5 mm and moves at jog speed to the first probe point" : "Set the origin first"}>
           <Button variant="primary" onClick={() => void startProbing()} disabled={busy || !originReady}>
             Next{forward}
           </Button>

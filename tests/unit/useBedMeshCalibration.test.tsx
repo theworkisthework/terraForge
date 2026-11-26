@@ -125,7 +125,7 @@ describe("useBedMeshCalibration", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G0 X0.000 Y0.000");
+    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G1 X0.000 Y0.000 F3000");
 
     await act(async () => {
       publishIdleStatus();
@@ -161,7 +161,9 @@ describe("useBedMeshCalibration", () => {
     await act(async () => {
       await result.current.home();
     });
-    expect(result.current.originReady).toBe(true);
+    // No work offset has been reported, so where X0 Y0 is can't be told.
+    expect(result.current.homeCheck).toEqual({ kind: "unknown" });
+    expect(result.current.originReady).toBe(false);
     await act(async () => {
       await result.current.startProbing();
     });
@@ -170,7 +172,7 @@ describe("useBedMeshCalibration", () => {
       "$H",
       "G91 G21 G0 Z5",
       "G90 G21",
-      "G90 G21 G0 X0.000 Y0.000",
+      "G90 G21 G1 X0.000 Y0.000 F3000",
     ]);
     expect(result.current.wizardStep).toBe("probe");
     expect(result.current.error).toBeNull();
@@ -257,7 +259,7 @@ describe("useBedMeshCalibration", () => {
       await result.current.startProbing();
     });
 
-    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G0 X0.000 Y0.000");
+    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G1 X0.000 Y0.000 F3000");
     expect(result.current.error).toBeNull();
     expect(result.current.wizardStep).toBe("probe");
   });
@@ -284,8 +286,10 @@ describe("useBedMeshCalibration", () => {
       recording = result.current.recordPoint();
       await Promise.resolve();
     });
+    // The reading is stored and the target advanced before the move.
     expect(result.current.movingTo).toBe(1);
-    expect(result.current.index).toBe(0);
+    expect(result.current.index).toBe(1);
+    expect(result.current.atPoint).toBe(false);
 
     await act(async () => {
       publishIdleStatus();
@@ -295,6 +299,7 @@ describe("useBedMeshCalibration", () => {
     });
     expect(result.current.movingTo).toBeNull();
     expect(result.current.index).toBe(1);
+    expect(result.current.atPoint).toBe(true);
   });
 
   it("reports the machine as not ready to record while it's jogging", () => {
@@ -303,5 +308,80 @@ describe("useBedMeshCalibration", () => {
     (controller.machineStore as { status: unknown }).status = useMachineStore.getState().status;
     const { result } = renderHook(() => useBedMeshCalibration(controller));
     expect(result.current.machineIdle).toBe(false);
+  });
+  describe("after homing", () => {
+    /** A controller whose status stream has reported the given work offset. */
+    function controllerWithWco(wco: string) {
+      const controller = zController();
+      (controller.machineStore as { status: unknown }).status = createMachineStatus({
+        raw: `<Idle|MPos:0.000,0.000,0.000|FS:0,0|WCO:${wco}>`,
+      });
+      return controller;
+    }
+
+    async function homeWith(controller: MachineConfigDialogController) {
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async () => {
+        act(() => publishIdleStatus());
+      });
+      const { result } = renderHook(() => useBedMeshCalibration(controller));
+      await act(async () => {
+        await result.current.home();
+      });
+      return result;
+    }
+
+    it("is ready when X0 Y0 is the homed position", async () => {
+      const result = await homeWith(controllerWithWco("0.000,0.000,26.962"));
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+      expect(result.current.originReady).toBe(true);
+    });
+
+    it("isn't ready when X0 Y0 is somewhere else, and says where", async () => {
+      const result = await homeWith(controllerWithWco("120.000,-35.000,0.000"));
+      expect(result.current.homeCheck).toEqual({ kind: "offset", dx: 120, dy: -35 });
+      expect(result.current.originReady).toBe(false);
+    });
+
+    it("can set X0 Y0 at the homed position", async () => {
+      const result = await homeWith(controllerWithWco("120.000,-35.000,0.000"));
+      await act(async () => {
+        await result.current.setZeroAtHome();
+      });
+      expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G10 L20 P1 X0 Y0");
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+      expect(result.current.originReady).toBe(true);
+    });
+  });
+
+  it("stops the machine and ends the wait, leaving the point to be moved to again", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await act(async () => {
+      result.current.setXPoints(2);
+      result.current.setYPoints(2);
+    });
+    await runWithIdleStatus(() => result.current.startProbing());
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockResolvedValue(undefined); // the move never reports
+
+    let recording!: Promise<void>;
+    await act(async () => {
+      recording = result.current.recordPoint();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await result.current.stop();
+      await recording;
+    });
+
+    expect(window.terraForge.fluidnc.pauseJob).toHaveBeenCalled();
+    expect(window.terraForge.fluidnc.abortJob).toHaveBeenCalled();
+    expect(result.current.error).toMatch(/^Stopped/);
+    expect(result.current.busy).toBe(false);
+    expect(result.current.index).toBe(1);
+    expect(result.current.atPoint).toBe(false);
+
+    await runWithIdleStatus(() => result.current.moveToPoint());
+    expect(result.current.atPoint).toBe(true);
   });
 });

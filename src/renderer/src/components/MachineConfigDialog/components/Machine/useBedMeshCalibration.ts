@@ -21,6 +21,22 @@ export type BedMeshWizardStep = "closed" | "grid" | "origin" | "probe" | "review
 export type BedMeshOriginMethod = "home" | "jog";
 
 /**
+ * Where work X0 Y0 is after homing. Homing only sets machine position; the
+ * work offset (G54) is whatever was stored before — possibly set while the
+ * machine was unhomed, which puts X0 Y0 somewhere arbitrary.
+ *  - "at-home": X0 Y0 is the homed position.
+ *  - "offset": X0 Y0 is (dx, dy) mm from the homed position.
+ *  - "unknown": no work offset has been reported yet, so it can't be told.
+ */
+export type BedMeshHomeCheck =
+  | { kind: "at-home" }
+  | { kind: "offset"; dx: number; dy: number }
+  | { kind: "unknown" };
+
+/** Within this, X0 Y0 counts as the homed position. */
+const AT_HOME_TOLERANCE_MM = 0.05;
+
+/**
  * How long the status stream must stay quiet, after a command, before an
  * idle machine is taken to have finished. FluidNC auto-reports ($RI=500)
  * only when something changes, so a command that doesn't move anything —
@@ -56,6 +72,21 @@ async function retractZ(up: 1 | -1): Promise<void> {
   await sendCommandsAndWaitForIdle(`G91 G21 G0 Z${5 * up}`, "G90 G21");
 }
 
+/** Rejecters for waits in progress, so Stop can end them at once. */
+const activeWaits = new Set<(error: Error) => void>();
+
+/** Ends every wait in progress with `error` (used by Stop). */
+function cancelActiveWaits(error: Error): void {
+  for (const cancel of [...activeWaits]) cancel(error);
+}
+
+type XYZ = { x: number; y: number; z: number };
+
+function parseXYZ(raw: string | undefined, key: "WCO" | "WPos"): XYZ | null {
+  const m = raw?.match(new RegExp(`${key}:([-\\d.]+),([-\\d.]+),([-\\d.]+)`));
+  return m ? { x: +m[1], y: +m[2], z: +m[3] } : null;
+}
+
 function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatus> {
   return new Promise((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -64,10 +95,16 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
     let commandAccepted = false;
     let idleStatus: MachineStatus | null = null;
     let lastStatus = useMachineStore.getState().status;
+    const cancel = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    activeWaits.add(cancel);
     const cleanup = () => {
       if (timer) clearTimeout(timer);
       if (quietTimer) clearTimeout(quietTimer);
       unsubscribe();
+      activeWaits.delete(cancel);
     };
     // Restarted by every report; fires only if the machine stays silent.
     const armQuietTimer = () => {
@@ -126,6 +163,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   const [wizardStep, setWizardStep] = useState<BedMeshWizardStep>("closed");
   const [originMethod, setOriginMethodState] = useState<BedMeshOriginMethod | null>(null);
   const [originReady, setOriginReady] = useState(false);
+  const [homeCheck, setHomeCheck] = useState<BedMeshHomeCheck | null>(null);
   const [xPoints, setXPoints] = useState(form.bedMesh?.xPoints ?? 3);
   const [yPoints, setYPoints] = useState(form.bedMesh?.yPoints ?? 3);
   const [meshName, setMeshName] = useState(form.bedMesh?.name ?? "Bed mesh");
@@ -133,13 +171,29 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   const [index, setIndex] = useState(0);
   /** The point the pen is travelling to, until the machine reports it's there. */
   const [movingTo, setMovingTo] = useState<number | null>(null);
+  /** The pen has reached point `index` (false if a move there was stopped or failed). */
+  const [atPoint, setAtPoint] = useState(true);
   const [z, setZ] = useState(0);
   const [busy, setBusy] = useState(false);
   const [datumZ, setDatumZ] = useState<number | null>(null);
   const [result, setResult] = useState<BedMesh | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const stoppedRef = useRef(false);
   const machineStatus = controller.machineStore.status;
+  // FluidNC reports WCO only every few reports (and when it changes), so
+  // keep the last one seen. Explicit WPos gives it too.
+  const wcoRef = useRef<XYZ | null>(null);
+  useEffect(() => {
+    if (!machineStatus) return;
+    const wco = parseXYZ(machineStatus.raw, "WCO");
+    const wpos = parseXYZ(machineStatus.raw, "WPos");
+    if (wco) wcoRef.current = wco;
+    else if (wpos) {
+      const { mpos } = machineStatus;
+      wcoRef.current = { x: mpos.x - wpos.x, y: mpos.y - wpos.y, z: mpos.z - wpos.z };
+    }
+  }, [machineStatus]);
   /** A reading can only be taken with the machine stopped (not mid-jog). */
   const machineIdle = isValidIdleStatus(machineStatus);
 
@@ -167,21 +221,32 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     if (!canCalibrate || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
+    stoppedRef.current = false;
     try {
       setError(null);
       await operation();
     } catch (err) {
-      setError(`${failure}: ${String(err)}`);
+      setError(
+        stoppedRef.current
+          ? "Stopped. Check the machine before continuing."
+          : `${failure}: ${String(err)}`,
+      );
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   };
 
-  const move = async (point: BedMeshPoint) => {
+  /**
+   * Lifts the pen and moves to a probe point. `slow` uses the jog speed
+   * instead of a rapid — for the first move, the one that goes wrong if
+   * X0 Y0 isn't where the user thinks.
+   */
+  const move = async (point: BedMeshPoint, slow = false) => {
     await lift();
+    const xy = `X${point.x.toFixed(3)} Y${point.y.toFixed(3)}`;
     return sendCommandsAndWaitForIdle(
-      `G90 G21 G0 X${point.x.toFixed(3)} Y${point.y.toFixed(3)}`,
+      slow ? `G90 G21 G1 ${xy} F${form.jogSpeed ?? 3000}` : `G90 G21 G0 ${xy}`,
     );
   };
 
@@ -203,6 +268,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     setError(null);
     setOriginMethodState(null);
     setOriginReady(false);
+    setHomeCheck(null);
     setResult(null);
     setWizardStep("grid");
   };
@@ -229,15 +295,61 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   const setOriginMethod = (method: BedMeshOriginMethod) => {
     setOriginMethodState(method);
     setOriginReady(false);
+    setHomeCheck(null);
     setError(null);
   };
 
+  /**
+   * Homes, then works out where work X0 Y0 sits relative to the homed
+   * position. Only "X0 Y0 is at home" makes the origin ready by itself;
+   * otherwise the user sets X0 Y0 at home or keeps it knowingly.
+   */
   const home = () =>
     runExclusive("Homing failed", async () => {
       requireCurrentIdleStatus();
-      await sendCommandsAndWaitForIdle("$H");
+      setHomeCheck(null);
+      setOriginReady(false);
+      const homed = await sendCommandsAndWaitForIdle("$H");
+      const wco = wcoRef.current;
+      if (!wco) {
+        setHomeCheck({ kind: "unknown" });
+        return;
+      }
+      // X0 Y0 is at machine position WCO; home is at the current MPos.
+      const dx = wco.x - homed.mpos.x;
+      const dy = wco.y - homed.mpos.y;
+      if (Math.abs(dx) <= AT_HOME_TOLERANCE_MM && Math.abs(dy) <= AT_HOME_TOLERANCE_MM) {
+        setHomeCheck({ kind: "at-home" });
+        setOriginReady(true);
+      } else {
+        setHomeCheck({ kind: "offset", dx, dy });
+      }
+    });
+
+  /** After homing: make the homed position X0 Y0. */
+  const setZeroAtHome = () =>
+    runExclusive("X0 Y0 could not be set", async () => {
+      requireCurrentIdleStatus();
+      await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
+      setHomeCheck({ kind: "at-home" });
       setOriginReady(true);
     });
+
+  /**
+   * Stops whatever the wizard has the machine doing: feed hold, so it
+   * decelerates, then a soft reset to clear the remaining motion. Waits in
+   * progress end straight away.
+   */
+  const stop = async () => {
+    stoppedRef.current = true;
+    cancelActiveWaits(new Error("Stopped"));
+    try {
+      await window.terraForge.fluidnc.pauseJob();
+      await window.terraForge.fluidnc.abortJob();
+    } catch (err) {
+      setError(`Stop could not be sent: ${String(err)}. Use the machine's own stop.`);
+    }
+  };
 
   /**
    * X0 Y0 is in place — set from the embedded jog panel, or already set
@@ -252,7 +364,8 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     runExclusive("Calibration could not start", async () => {
       requireCurrentIdleStatus();
       const grid = gridPoints();
-      await move(grid[0]);
+      await move(grid[0], true);
+      setAtPoint(true);
       setPoints(grid);
       setResult(null);
       setIndex(0);
@@ -276,11 +389,15 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
         pointIndex === index ? { ...point, z: offset } : point,
       );
       if (index + 1 < updated.length) {
-        setMovingTo(index + 1);
-        const nextStatus = await move(updated[index + 1]).finally(() => setMovingTo(null));
+        // The reading is kept even if the move on is stopped; the next
+        // point can then be reached with moveToPoint before recording it.
         setPoints(updated);
         setIndex(index + 1);
         setDatumZ(nextDatumZ);
+        setAtPoint(false);
+        setMovingTo(index + 1);
+        const nextStatus = await move(updated[index + 1]).finally(() => setMovingTo(null));
+        setAtPoint(true);
         setZ(nextStatus.mpos.z - nextDatumZ);
         return;
       }
@@ -299,6 +416,17 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
         createdAt: new Date().toISOString(),
       });
       setIndex(updated.length);
+    });
+
+  /** Moves to the current point again — after a move there was stopped or failed. */
+  const moveToPoint = () =>
+    runExclusive("Could not move to the point", async () => {
+      requireCurrentIdleStatus();
+      const point = points[index];
+      if (!point) return;
+      setMovingTo(index);
+      await move(point).finally(() => setMovingTo(null));
+      setAtPoint(true);
     });
 
   const showReview = () => {
@@ -375,6 +503,11 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     points,
     index,
     movingTo,
+    atPoint,
+    homeCheck,
+    setZeroAtHome,
+    stop,
+    moveToPoint,
     machineIdle,
     z,
     datumZ,
