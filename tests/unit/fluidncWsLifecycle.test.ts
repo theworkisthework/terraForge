@@ -116,6 +116,30 @@ describe("FluidNC WebSocket lifecycle", () => {
     expect(emitConsole).not.toHaveBeenCalled();
   });
 
+  // FluidNC 4.1 sends several lines in one frame. A status report that isn't
+  // first must still update the status, not land in the console.
+  it("handles each line of a multi-line frame", () => {
+    const state = createState();
+    const parseStatus = vi.fn((text: string) => ({ state: text.slice(1, 5) }));
+    const emitStatus = vi.fn();
+    const emitConsole = vi.fn();
+
+    openFluidNCWebSocket(state, {
+      parseStatus,
+      emitConsole,
+      emitStatus,
+      emitPing: vi.fn(),
+      scheduleReconnect: vi.fn(),
+      setWsPort: vi.fn(),
+    });
+
+    lastWs().emit("message", "[MSG:Homed:XY]\r\n<Idle|MPos:0.000,0.000,20.000|FS:0,0>\nok\n");
+
+    expect(emitConsole.mock.calls).toEqual([["[MSG:Homed:XY]"], ["ok"]]);
+    expect(parseStatus).toHaveBeenCalledWith("<Idle|MPos:0.000,0.000,20.000|FS:0,0>");
+    expect(emitStatus).toHaveBeenCalledWith({ state: "Idle" });
+  });
+
   it("treats a status report alone as liveness when no PING is sent", () => {
     const state = createState();
     const emitPing = vi.fn();

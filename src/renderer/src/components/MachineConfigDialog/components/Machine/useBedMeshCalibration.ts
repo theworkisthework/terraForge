@@ -59,17 +59,110 @@ function isValidIdleStatus(status: MachineStatus | null | undefined): status is 
     Number.isFinite(status.mpos.z);
 }
 
-function requireCurrentIdleStatus(): MachineStatus {
-  const status = useMachineStore.getState().status;
+/**
+ * Asks the machine for a status report ("?"). FluidNC 4.1 doesn't
+ * auto-report every state change — e.g. Home → Idle at the same position —
+ * so the last report can be stale. The reply updates the machine store.
+ * Best effort: older firmware may not answer "?" over HTTP, which leaves
+ * the auto-reports to go on.
+ */
+async function refreshStatus(): Promise<MachineStatus | null> {
+  const { configs, activeConfigId } = useMachineStore.getState();
+  const active = configs.find((c) => c.id === activeConfigId);
+  // USB (serial) polls "?" itself, and a "?" line gets no "ok" there — it would
+  // hold the serial queue until it timed out.
+  if (active?.connection.type === "usb") return useMachineStore.getState().status;
+  try {
+    await window.terraForge.fluidnc.sendCommand("?");
+  } catch {
+    // Keep the last report.
+  }
+  return useMachineStore.getState().status;
+}
+
+/** The machine's status, which must be Idle — asking afresh if the last report isn't. */
+async function requireCurrentIdleStatus(): Promise<MachineStatus> {
+  let status = useMachineStore.getState().status;
+  if (!isValidIdleStatus(status)) status = await refreshStatus();
   if (!isValidIdleStatus(status)) {
-    throw new Error("Wait for a valid idle machine status before continuing.");
+    const state = (status as MachineStatus | null)?.state;
+    throw new Error(
+      state && state !== "Idle"
+        ? `The machine reports ${state}. Wait for it to be Idle and try again.`
+        : "Wait for a valid idle machine status before continuing.",
+    );
   }
   return status;
 }
 
-/** Lifts the pen 5 mm. `up` is -1 on machines whose Z jog is inverted. */
-async function retractZ(up: 1 | -1): Promise<void> {
-  await sendCommandsAndWaitForIdle(`G91 G21 G0 Z${5 * up}`, "G90 G21");
+/**
+ * Homing runs from Idle, or from the Alarm a machine with end stops starts
+ * in. A leftover Home is let through too: it's the state most likely to be
+ * stale, and FluidNC itself refuses $H while a cycle is really running.
+ */
+async function requireReadyToHome(): Promise<void> {
+  let status = useMachineStore.getState().status;
+  const ready = (s: MachineStatus | null) =>
+    s?.state === "Idle" || s?.state === "Alarm" || s?.state === "Home";
+  if (!ready(status)) status = await refreshStatus();
+  if (!ready(status)) {
+    throw new Error(
+      `The machine reports ${status?.state ?? "no status"}. Wait for it to stop and try again.`,
+    );
+  }
+}
+
+/**
+ * Probing goes back and forth along the rows (an S, or "boustrophedon"):
+ * left to right on the first row, right to left on the next, and so on, so
+ * each move is to a neighbouring point instead of back across the bed.
+ * Points are still stored in grid order (row by row, left to right), so
+ * this maps probe step ↔ grid index. It is its own inverse.
+ */
+export function serpentineIndex(i: number, xPoints: number): number {
+  const row = Math.floor(i / xPoints);
+  const col = i % xPoints;
+  return row * xPoints + (row % 2 === 1 ? xPoints - 1 - col : col);
+}
+
+/** How far above the first probe point's touch height the pen travels. */
+const TRAVEL_CLEARANCE_MM = 5;
+
+/**
+ * Lifts the pen to travel height. `up` is -1 on machines whose Z jog is
+ * inverted. Never a blind "up 5 mm": a pen that's already high would hit the
+ * top of the Z axis, and repeated lifts would climb.
+ *
+ * - Once the first point is recorded: TRAVEL_CLEARANCE_MM above where the
+ *   pen touched it (`datumZ`, machine Z). (Measuring from the highest touch
+ *   would climb: a reading taken without lowering the pen is itself at
+ *   travel height.)
+ * - Before that: back to `startZ`, the height probing started from, which
+ *   the user made sure was clear of the bed in the origin step.
+ *
+ * The pen is never lowered to reach travel height, and isn't moved if it's
+ * already there. With neither height known (not probing) it doesn't move.
+ *
+ * One line, in machine coordinates (G53 applies to that line only), so the
+ * lift leaves no modal state behind. A relative lift needs a second line to
+ * restore G90, and FluidNC 4.1 refuses HTTP commands while the machine is
+ * moving (503 "Try again when not moving") — that second line arrives
+ * mid-lift.
+ */
+async function retractZ(
+  up: 1 | -1,
+  datumZ: number | null,
+  startZ: number | null,
+): Promise<void> {
+  const travel = datumZ !== null ? datumZ + TRAVEL_CLEARANCE_MM * up : startZ;
+  if (travel === null) return;
+  const z = useMachineStore.getState().status?.mpos.z;
+  if (typeof z !== "number" || !Number.isFinite(z)) {
+    throw new Error("The machine's Z position is unknown, so the pen can't be lifted.");
+  }
+  const target = up * Math.max(up * z, up * travel);
+  if (Math.abs(target - z) < 0.001) return; // already clear
+  await sendCommandsAndWaitForIdle(`G21 G53 G0 Z${target.toFixed(3)}`);
 }
 
 /** Rejecters for waits in progress, so Stop can end them at once. */
@@ -112,6 +205,8 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
       quietTimer = setTimeout(() => {
         const current = useMachineStore.getState().status;
         if (isValidIdleStatus(current)) finish(current);
+        // Silent but not Idle: the change to Idle may not have been reported.
+        else void refreshStatus();
       }, QUIET_IDLE_MS);
     };
     const finish = (status: MachineStatus) => {
@@ -121,6 +216,8 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
     unsubscribe = useMachineStore.subscribe((state) => {
       const status = state.status;
       if (status === lastStatus) return; // some other part of the store changed
+      // A changed report means it's still going: a long move isn't a hang.
+      if (status?.raw !== lastStatus?.raw) armTimeout();
       lastStatus = status;
       if (commandAccepted) armQuietTimer();
       if (!isValidIdleStatus(status)) return;
@@ -128,26 +225,100 @@ function sendCommandsAndWaitForIdle(...commands: string[]): Promise<MachineStatu
       if (commandAccepted) finish(status);
     });
 
-    timer = setTimeout(() => {
-      cleanup();
-      const state = useMachineStore.getState().status?.state;
-      reject(new Error(
-        state && state !== "Idle"
-          ? `The machine didn't return to Idle (it reports ${state}). Check the machine and try again.`
-          : "No idle status update was received. Check the machine status connection and try again.",
-      ));
-    }, STATUS_TIMEOUT_MS);
+    // Times out only after STATUS_TIMEOUT_MS without any report.
+    const armTimeout = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        cleanup();
+        const state = useMachineStore.getState().status?.state;
+        reject(new Error(
+          state && state !== "Idle"
+            ? `The machine didn't return to Idle (it reports ${state}). Check the machine and try again.`
+            : "No idle status update was received. Check the machine status connection and try again.",
+        ));
+      }, STATUS_TIMEOUT_MS);
+    };
+    armTimeout();
+    const accepted = () => {
+      commandAccepted = true;
+      if (idleStatus) finish(idleStatus);
+      else armQuietTimer();
+    };
     void (async () => {
       for (const command of commands) {
         await window.terraForge.fluidnc.sendCommand(command);
       }
-      commandAccepted = true;
-      if (idleStatus) finish(idleStatus);
-      else armQuietTimer();
+      accepted();
     })().catch((error: unknown) => {
       cleanup();
       reject(error);
     });
+  });
+}
+
+/** Homing on a large machine can take a while, and may report nothing meanwhile. */
+const HOMING_TIMEOUT_MS = 120_000;
+const HOMED_MESSAGE = /\[MSG:Homed/;
+const HOMING_FAILED = /ALARM:\d|\[MSG:ERR/;
+
+/**
+ * Runs `$H` and resolves with the machine's status once homing is done.
+ *
+ * Position reports can't say when that is: FluidNC reports only on change,
+ * so homing a machine already at home may send none at all, and 4.1 can
+ * deliver an Idle report from before the cycle started after `$H` is
+ * accepted. FluidNC prints "[MSG:Homed:…]" when it finishes, which arrives
+ * in the command's reply (4.1 holds the reply until the cycle ends) or on
+ * the console. A Home report followed by Idle counts too.
+ */
+function homeAndWaitForIdle(): Promise<MachineStatus> {
+  const homed = new Promise<void>((resolve, reject) => {
+    let sawHoming = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      unsubscribeStatus();
+      unsubscribeConsole();
+      activeWaits.delete(cancel);
+    };
+    const done = () => {
+      cleanup();
+      resolve();
+    };
+    const cancel = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    activeWaits.add(cancel);
+    const check = (text: string) => {
+      if (HOMING_FAILED.test(text)) {
+        cancel(new Error(`The machine reported ${text.trim()}. Check the end stops and try again.`));
+      } else if (HOMED_MESSAGE.test(text)) {
+        done();
+      }
+    };
+    const timer = setTimeout(
+      () => cancel(new Error("Homing didn't finish. Check the machine and try again.")),
+      HOMING_TIMEOUT_MS,
+    );
+    const unsubscribeConsole = window.terraForge.fluidnc.onConsoleMessage(check);
+    const unsubscribeStatus = useMachineStore.subscribe((state, previous) => {
+      if (state.status === previous.status) return;
+      if (state.status?.state === "Home") sawHoming = true;
+      else if (sawHoming && isValidIdleStatus(state.status)) done();
+    });
+    window.terraForge.fluidnc.sendCommand("$H").then(
+      (reply) => check(String(reply ?? "")),
+      (error: unknown) => {
+        // A reply held open for the whole cycle can time out; the console
+        // still says when homing ends.
+        if (!/timed? ?out/i.test(String(error))) cancel(error as Error);
+      },
+    );
+  });
+  // Then the position, asked for: the end of the cycle may not be reported.
+  return homed.then(async () => {
+    const status = await refreshStatus();
+    return isValidIdleStatus(status) ? status : sendCommandsAndWaitForIdle();
   });
 }
 
@@ -203,7 +374,13 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
     }
   }, [datumZ, machineStatus?.mpos.z]);
 
-  const lift = () => retractZ(form.invertZJogControls ? -1 : 1);
+  const zUp: 1 | -1 = form.invertZJogControls ? -1 : 1;
+  // Machine Z where the pen touched the first point; travel height is
+  // measured from it. A ref, as recordPoint sets it and lifts in one go.
+  const travelDatumRef = useRef<number | null>(null);
+  // Machine Z when probing started: clear of the bed, the user made sure.
+  const startZRef = useRef<number | null>(null);
+  const lift = () => retractZ(zUp, travelDatumRef.current, startZRef.current);
 
   const persistMesh = async (patch: Partial<typeof form>) => {
     change(patch);
@@ -306,10 +483,10 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
    */
   const home = () =>
     runExclusive("Homing failed", async () => {
-      requireCurrentIdleStatus();
+      await requireReadyToHome();
       setHomeCheck(null);
       setOriginReady(false);
-      const homed = await sendCommandsAndWaitForIdle("$H");
+      const homed = await homeAndWaitForIdle();
       const wco = wcoRef.current;
       if (!wco) {
         setHomeCheck({ kind: "unknown" });
@@ -329,7 +506,7 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   /** After homing: make the homed position X0 Y0. */
   const setZeroAtHome = () =>
     runExclusive("X0 Y0 could not be set", async () => {
-      requireCurrentIdleStatus();
+      await requireCurrentIdleStatus();
       await window.terraForge.fluidnc.sendCommand("G10 L20 P1 X0 Y0");
       setHomeCheck({ kind: "at-home" });
       setOriginReady(true);
@@ -362,8 +539,12 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
 
   const startProbing = () =>
     runExclusive("Calibration could not start", async () => {
-      requireCurrentIdleStatus();
+      const status = await requireCurrentIdleStatus();
       const grid = gridPoints();
+      // A new run. The pen travels to the first point at its current height,
+      // which the origin step asked the user to make clear of the bed.
+      travelDatumRef.current = null;
+      startZRef.current = status.mpos.z;
       await move(grid[0], true);
       setAtPoint(true);
       setPoints(grid);
@@ -382,11 +563,12 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
    */
   const recordPoint = () =>
     runExclusive("Calibration could not continue", async () => {
-      const status = requireCurrentIdleStatus();
+      const status = await requireCurrentIdleStatus();
       const nextDatumZ = datumZ ?? status.mpos.z;
+      travelDatumRef.current = nextDatumZ;
       const offset = status.mpos.z - nextDatumZ;
       const updated = points.map((point, pointIndex) =>
-        pointIndex === index ? { ...point, z: offset } : point,
+        pointIndex === serpentineIndex(index, xPoints) ? { ...point, z: offset } : point,
       );
       if (index + 1 < updated.length) {
         // The reading is kept even if the move on is stopped; the next
@@ -396,7 +578,8 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
         setDatumZ(nextDatumZ);
         setAtPoint(false);
         setMovingTo(index + 1);
-        const nextStatus = await move(updated[index + 1]).finally(() => setMovingTo(null));
+        const nextStatus = await move(updated[serpentineIndex(index + 1, xPoints)])
+          .finally(() => setMovingTo(null));
         setAtPoint(true);
         setZ(nextStatus.mpos.z - nextDatumZ);
         return;
@@ -421,8 +604,8 @@ export function useBedMeshCalibration(controller: MachineConfigDialogController)
   /** Moves to the current point again — after a move there was stopped or failed. */
   const moveToPoint = () =>
     runExclusive("Could not move to the point", async () => {
-      requireCurrentIdleStatus();
-      const point = points[index];
+      await requireCurrentIdleStatus();
+      const point = points[serpentineIndex(index, xPoints)];
       if (!point) return;
       setMovingTo(index);
       await move(point).finally(() => setMovingTo(null));

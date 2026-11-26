@@ -286,7 +286,7 @@ describe("MachineConfigDialog", () => {
       expect(screen.queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
     });
 
-    it("walks from grid to origin and only shows jog controls for machines without end stops", async () => {
+    it("walks from grid to origin, with pen-only controls when homing and full jog controls without end stops", async () => {
       connectZMachine();
       await openBedMesh();
       await userEvent.click(screen.getByRole("button", { name: "Calibrate…" }));
@@ -305,11 +305,13 @@ describe("MachineConfigDialog", () => {
       expect(within(wizard).getByRole("button", { name: "Next" })).toBeDisabled();
       expect(within(wizard).queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
 
-      await userEvent.click(within(wizard).getByRole("radio", { name: /home it/i }));
-      expect(within(wizard).getByRole("button", { name: "Run homing" })).toBeInTheDocument();
-      expect(within(wizard).queryByRole("button", { name: "Jog X-" })).not.toBeInTheDocument();
+      await userEvent.click(within(wizard).getByRole("radio", { name: /home automatically/i }));
+      expect(within(wizard).getByRole("button", { name: "Run Homing" })).toBeInTheDocument();
+      // Pen up/down to raise it clear before Next; X/Y jogging is greyed out.
+      expect(within(wizard).getByRole("button", { name: "Pen up" })).toBeEnabled();
+      expect(within(wizard).getByRole("button", { name: "Jog X-" })).toBeDisabled();
 
-      await userEvent.click(within(wizard).getByRole("radio", { name: /jog and set zero/i }));
+      await userEvent.click(within(wizard).getByRole("radio", { name: /home manually/i }));
       // The regular jog panel, pen controls included, minus homing (no end stops).
       expect(within(wizard).getByRole("button", { name: "Jog X-" })).toBeEnabled();
       expect(within(wizard).getByRole("button", { name: "Go to origin" })).toBeInTheDocument();
@@ -322,8 +324,8 @@ describe("MachineConfigDialog", () => {
 
       // Finished steps are buttons back to them; later steps aren't.
       expect(within(wizard).getByRole("button", { name: /step 3: probe the bed/i })).toBeDisabled();
-      await userEvent.click(within(wizard).getByRole("button", { name: /step 1: choose the grid \(done\)/i }));
-      expect(within(wizard).getByRole("heading", { name: "1. Choose the grid" })).toBeInTheDocument();
+      await userEvent.click(within(wizard).getByRole("button", { name: /step 1: choose the number of calibration points \(done\)/i }));
+      expect(within(wizard).getByRole("heading", { name: "1. Choose the number of calibration points" })).toBeInTheDocument();
       expect(within(wizard).getByLabelText("X grid points")).toBeInTheDocument();
     });
 

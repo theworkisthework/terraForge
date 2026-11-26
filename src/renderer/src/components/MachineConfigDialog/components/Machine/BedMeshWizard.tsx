@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect, useState } from "react";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, OctagonX } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, House, OctagonX } from "lucide-react";
 import { createBedMeshInterpolator, MAX_BED_MESH_GRID_POINTS } from "../../../../../../types/bedMesh";
 import type { BedMesh } from "../../../../../../types";
 import { useModalFocus } from "../../../../hooks/useModalFocus";
@@ -9,6 +9,7 @@ import { JogControls } from "../../../JogControls";
 import { ConfirmDialog } from "../../../ConfirmDialog";
 import {
   clampGridPoints,
+  serpentineIndex,
   type BedMeshWizardStep,
   type useBedMeshCalibration,
 } from "./useBedMeshCalibration";
@@ -16,8 +17,8 @@ import {
 type Calibration = ReturnType<typeof useBedMeshCalibration>;
 
 const STEPS = [
-  { id: "grid", title: "Choose the grid" },
-  { id: "origin", title: "Set the origin" },
+  { id: "grid", title: "Choose the number of calibration points" },
+  { id: "origin", title: "Set the home position (origin)" },
   { id: "probe", title: "Probe the bed" },
   { id: "review", title: "Review the mesh" },
 ] as const;
@@ -153,12 +154,12 @@ function Stepper({
 // ── Steps ─────────────────────────────────────────────────────────────────────
 
 function GridStep({ calibration }: { calibration: Calibration }) {
-  const { form, inputCls, xPoints, yPoints, setXPoints, setYPoints, meshName, setMeshName } = calibration;
+  const { inputCls, xPoints, yPoints, setXPoints, setYPoints, meshName, setMeshName } = calibration;
   return (
     <>
       <p className="text-sm text-content-muted leading-relaxed">
-        At each point you lower the pen until it just touches the {form.bedWidth} × {form.bedHeight} mm
-        bed. More points follow an uneven bed more closely but take longer to probe.
+        At each point, lower the pen until it touches the bed. More calibration points follow an
+        uneven bed more closely, but calibration will take longer to probe.
       </p>
       <label className="block text-xs text-content-muted">
         Mesh name
@@ -269,7 +270,10 @@ function BedPreview({
   calibration: Calibration;
   maxWidth?: number;
   maxHeight?: number;
-  /** While probing: points before this are done, this one is current. */
+  /**
+   * While probing, the probe step (not grid index — probing runs in an S):
+   * points probed before it are done, this one is current.
+   */
   currentIndex?: number;
   /** The pen is still travelling to `currentIndex`: pulse a ring around it. */
   moving?: boolean;
@@ -279,12 +283,18 @@ function BedPreview({
   const centre = form.origin === "center";
   const dotR = Math.max(2, Math.min(5, Math.min(w / xPoints, h / yPoints) / 5));
 
+  const targetGrid =
+    currentIndex !== undefined && currentIndex < xPoints * yPoints
+      ? serpentineIndex(currentIndex, xPoints)
+      : null;
+
   const dots = [];
   for (let r = 0; r < yPoints; r++) {
     for (let c = 0; c < xPoints; c++) {
       const i = r * xPoints + c;
-      const highlighted = currentIndex === undefined ? i === 0 : i === currentIndex;
-      const done = currentIndex !== undefined && i < currentIndex;
+      const step = serpentineIndex(i, xPoints);
+      const highlighted = currentIndex === undefined ? i === 0 : step === currentIndex;
+      const done = currentIndex !== undefined && step < currentIndex;
       dots.push(
         <circle
           key={i}
@@ -337,10 +347,10 @@ function BedPreview({
       />
       <g className="stroke-border-ui" strokeWidth={1}>{gridLines}</g>
       {dots}
-      {moving && currentIndex !== undefined && currentIndex < xPoints * yPoints && (
+      {moving && targetGrid !== null && (
         <TargetRing
-          cx={sx((currentIndex % xPoints) / (xPoints - 1))}
-          cy={sy(Math.floor(currentIndex / xPoints) / (yPoints - 1))}
+          cx={sx((targetGrid % xPoints) / (xPoints - 1))}
+          cy={sy(Math.floor(targetGrid / xPoints) / (yPoints - 1))}
           r={dotR + 4}
         />
       )}
@@ -361,33 +371,61 @@ function OriginStep({ calibration }: { calibration: Calibration }) {
   return (
     <>
       <p className="text-sm text-content-muted leading-relaxed">
-        Probing is measured from X0 Y0, so that needs to be in the right place first. How does
-        this machine find X0 Y0?
+        Probing is measured from X0, Y0, so that needs to be set correctly before we can run the
+        calibration. Choose automatic or manual.
       </p>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Origin method">
         <MethodCard
           selected={originMethod === "home"}
           onSelect={() => setOriginMethod("home")}
-          title="Home it"
-          detail="The machine has end stops. Runs the homing cycle ($H)."
+          title="Home Automatically"
+          detail="The machine has end stops. Automatically home the machine."
           disabled={busy}
         />
         <MethodCard
           selected={originMethod === "jog"}
           onSelect={() => setOriginMethod("jog")}
-          title="Jog and set zero"
-          detail="No end stops. Move the pen to the origin corner and set it as X0 Y0."
+          title="Home Manually"
+          detail="The machine has no end stops. Manually home the machine using the jog controls."
           disabled={busy}
         />
       </div>
 
       {originMethod === "home" && (
-        <div className="flex flex-col items-center gap-3">
-          <Button onClick={() => void home()} disabled={busy} loading={busy}>
-            Run homing
-          </Button>
+        <>
+          <div className="flex gap-5 items-start">
+            {/* Pen controls only: the pen travels to the first point at its
+                current height, so it has to be raised clear first. */}
+            <JogPanelFrame>
+              <JogControls zOnly showHoming={false} />
+            </JogPanelFrame>
+            <div className="flex flex-col gap-3 text-sm text-content-muted leading-relaxed">
+              <ol className="list-decimal pl-4 space-y-2">
+                <li>Raise the pen clear of the bed, if it isn't already.</li>
+                <li>
+                  Press <span className="text-content">Run Homing</span>.
+                </li>
+                <li>
+                  Press <span className="text-content">Next</span>.
+                </li>
+              </ol>
+              {/* Same button as the jog panel's Run Homing. */}
+              <Tooltip text="Run the machine homing cycle ($H)" className="self-start">
+                <Button
+                  variant="secondary"
+                  onClick={() => void home()}
+                  disabled={busy}
+                  loading={busy}
+                  icon={<House size={13} />}
+                >
+                  Run Homing
+                </Button>
+              </Tooltip>
+              <OriginStatus calibration={calibration} ready={originReady} />
+            </div>
+          </div>
           <HomeCheckPanel calibration={calibration} />
-        </div>
+        </>
       )}
 
       {originMethod === "jog" && (
@@ -410,7 +448,7 @@ function OriginStep({ calibration }: { calibration: Calibration }) {
         </div>
       )}
 
-      {originMethod !== "jog" && <OriginStatus calibration={calibration} ready={originReady} />}
+      {originMethod === null && <OriginStatus calibration={calibration} ready={originReady} />}
     </>
   );
 }
@@ -465,7 +503,7 @@ function HomeCheckPanel({ calibration }: { calibration: Calibration }) {
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={() => setOriginMethod("jog")}>
-          Jog to it instead
+          Home manually instead
         </Button>
       </div>
     </div>
@@ -479,7 +517,7 @@ function OriginStatus({ calibration, ready }: { calibration: Calibration; ready:
   let text = "";
   if (busy) text = "Waiting for the machine…";
   else if (ready)
-    text = `Origin ready. Next lifts the pen 5 mm and moves at jog speed to the first point (X ${firstX.toFixed(1)}, Y ${firstY.toFixed(1)}).`;
+    text = `Origin ready. Next moves the pen at jog speed, at its current height, to the first point (X ${firstX.toFixed(1)}, Y ${firstY.toFixed(1)}).`;
   else if (originMethod === "home") text = homeCheck ? "Choose where X0 Y0 should be." : "Not homed yet.";
   else if (originMethod) text = "X0 Y0 not confirmed yet.";
   return (
@@ -494,8 +532,10 @@ function OriginStatus({ calibration, ready }: { calibration: Calibration; ready:
 function ProbeStep({ calibration }: { calibration: Calibration }) {
   const {
     points, index, movingTo, atPoint, machineIdle, z, datumZ, busy, recordPoint, moveToPoint, result,
+    xPoints,
   } = calibration;
-  const point = points[index];
+  // `index` counts probe steps; probing runs in an S, so map it to the grid.
+  const point = points[serpentineIndex(index, xPoints)];
   const complete = result !== null;
   if (!point && !complete) return null;
 
@@ -519,7 +559,7 @@ function ProbeStep({ calibration }: { calibration: Calibration }) {
           {complete ? (
             <p className="flex items-start gap-1.5">
               <Check size={14} className="text-green-400 shrink-0 mt-1" />
-              <span>The pen has been lifted clear. Press <span className="text-content">Next</span> to review the mesh.</span>
+              <span>All points probed. Press <span className="text-content">Next</span> to review the mesh.</span>
             </p>
           ) : (
             <>
@@ -860,7 +900,7 @@ function Footer({ calibration }: { calibration: Calibration }) {
         <Button variant="primary" onClick={confirmGrid} data-autofocus>Next{forward}</Button>
       )}
       {wizardStep === "origin" && (
-        <Tooltip text={originReady ? "Lifts the pen 5 mm and moves at jog speed to the first probe point" : "Set the origin first"}>
+        <Tooltip text={originReady ? "Moves the pen at jog speed, at its current height, to the first probe point" : "Set the home position first"}>
           <Button variant="primary" onClick={() => void startProbing()} disabled={busy || !originReady}>
             Next{forward}
           </Button>

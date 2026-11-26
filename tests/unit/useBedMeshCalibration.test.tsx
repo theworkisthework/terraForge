@@ -1,6 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useBedMeshCalibration } from "../../src/renderer/src/components/MachineConfigDialog/components/Machine/useBedMeshCalibration";
+import {
+  serpentineIndex,
+  useBedMeshCalibration,
+} from "../../src/renderer/src/components/MachineConfigDialog/components/Machine/useBedMeshCalibration";
 import type { MachineConfigDialogController } from "../../src/renderer/src/components/MachineConfigDialog/hooks/useMachineConfigDialogController";
 import { useMachineStore } from "../../src/renderer/src/store/machineStore";
 import { createMachineConfig, createMachineStatus } from "../helpers/factories";
@@ -8,6 +11,22 @@ import { createMachineConfig, createMachineStatus } from "../helpers/factories";
 function publishIdleStatus() {
   const status = createMachineStatus();
   useMachineStore.getState().setStatus(status);
+}
+
+/** An Idle report with the pen at machine Z `z`. */
+function publishIdleAt(z: number) {
+  const status = createMachineStatus();
+  useMachineStore.getState().setStatus({
+    ...status,
+    raw: `<Idle|MPos:${status.mpos.x.toFixed(3)},${status.mpos.y.toFixed(3)},${z.toFixed(3)}|FS:0,0>`,
+    mpos: { ...status.mpos, z },
+  });
+}
+
+/** The reports a homing cycle produces: Home, then Idle at the home position. */
+function publishHomingCycle() {
+  useMachineStore.getState().setStatus(createMachineStatus({ state: "Home" }));
+  publishIdleStatus();
 }
 
 describe("useBedMeshCalibration", () => {
@@ -76,7 +95,7 @@ describe("useBedMeshCalibration", () => {
     expect(result.current.wizardStep).toBe("review");
     expect(result.current.result?.points).toHaveLength(4);
     expect(updateConfig).not.toHaveBeenCalled();
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G90 G21");
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenLastCalledWith("G21 G53 G0 Z5.000");
 
     await act(async () => {
       await result.current.saveResult(true);
@@ -88,7 +107,7 @@ describe("useBedMeshCalibration", () => {
     );
   });
 
-  it("starts the retract immediately when an idle status is already available", async () => {
+  it("goes straight to the first point at the pen's current height", async () => {
     const config = createMachineConfig({
       id: "mesh-machine",
       penUpCommand: "G0Z15",
@@ -117,15 +136,9 @@ describe("useBedMeshCalibration", () => {
       await Promise.resolve();
     });
 
-    expect(sendCommand).toHaveBeenNthCalledWith(1, "G91 G21 G0 Z5");
-    expect(sendCommand).toHaveBeenNthCalledWith(2, "G90 G21");
-
-    await act(async () => {
-      publishIdleStatus();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(sendCommand).toHaveBeenCalledWith("G90 G21 G1 X0.000 Y0.000 F3000");
+    // No lift first: the origin step had the user raise the pen clear, and
+    // a blind lift from an already-high pen can hit the top of the Z axis.
+    expect(sendCommand).toHaveBeenNthCalledWith(1, "G90 G21 G1 X0.000 Y0.000 F3000");
 
     await act(async () => {
       publishIdleStatus();
@@ -153,8 +166,8 @@ describe("useBedMeshCalibration", () => {
       },
     } as unknown as MachineConfigDialogController;
     const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
-    sendCommand.mockImplementation(async () => {
-      act(() => publishIdleStatus());
+    sendCommand.mockImplementation(async (command: string) => {
+      act(() => (command === "$H" ? publishHomingCycle() : publishIdleStatus()));
     });
     const { result } = renderHook(() => useBedMeshCalibration(controller));
 
@@ -170,8 +183,7 @@ describe("useBedMeshCalibration", () => {
 
     expect(sendCommand.mock.calls.map(([command]) => command)).toEqual([
       "$H",
-      "G91 G21 G0 Z5",
-      "G90 G21",
+      "?", // the end of homing may not be reported, so it asks
       "G90 G21 G1 X0.000 Y0.000 F3000",
     ]);
     expect(result.current.wizardStep).toBe("probe");
@@ -210,10 +222,12 @@ describe("useBedMeshCalibration", () => {
     expect(result.current.wizardStep).toBe("probe");
     const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
     sendCommand.mockClear();
+    act(() => publishIdleAt(-3)); // the user lowered the pen to the bed
 
     await runWithIdleStatus(() => result.current.cancel());
 
-    expect(sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z5");
+    // Back up to the height probing started from (Z0 here).
+    expect(sendCommand).toHaveBeenCalledWith("G21 G53 G0 Z0.000");
     expect(result.current.wizardStep).toBe("closed");
   });
 
@@ -230,10 +244,11 @@ describe("useBedMeshCalibration", () => {
     await runWithIdleStatus(() => result.current.startProbing());
     const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
     sendCommand.mockClear();
+    act(() => publishIdleAt(-3)); // the user lowered the pen to the bed
 
     await runWithIdleStatus(() => result.current.goToStep("origin"));
 
-    expect(sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z5");
+    expect(sendCommand).toHaveBeenCalledWith("G21 G53 G0 Z0.000");
     expect(result.current.wizardStep).toBe("origin");
     expect(result.current.points).toHaveLength(0);
   });
@@ -250,9 +265,7 @@ describe("useBedMeshCalibration", () => {
     // Set Zero leaves the pen at X0 Y0, so the move to the first point changes
     // nothing and FluidNC (reporting on change only) stays silent.
     const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
-    sendCommand.mockImplementation(async (command: string) => {
-      if (command.startsWith("G91")) setTimeout(() => act(() => publishIdleStatus()), 0);
-    });
+    sendCommand.mockImplementation(async () => {});
     const { result } = renderHook(() => useBedMeshCalibration(zController()));
 
     await act(async () => {
@@ -264,12 +277,159 @@ describe("useBedMeshCalibration", () => {
     expect(result.current.wizardStep).toBe("probe");
   });
 
+  // Travel height is absolute (5 mm above the first touch), so recording
+  // points without lowering the pen doesn't make it climb 5 mm every move.
+  it("doesn't keep lifting the pen when it wasn't lowered between points", async () => {
+    let z = 0;
+    const publishAt = (zNow: number) => {
+      const status = createMachineStatus();
+      useMachineStore.getState().setStatus({
+        ...status,
+        raw: `<Idle|MPos:0.000,0.000,${zNow.toFixed(3)}|FS:0,0>`,
+        mpos: { ...status.mpos, z: zNow },
+      });
+    };
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockImplementation(async (command: string) => {
+      const lift = command.match(/G53 G0 Z(-?[\d.]+)/);
+      if (lift) z = Number(lift[1]);
+      setTimeout(() => act(() => publishAt(z)), 0);
+    });
+    useMachineStore.setState({ status: createMachineStatus() });
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await act(async () => {
+      result.current.setXPoints(2);
+      result.current.setYPoints(2);
+    });
+    await act(async () => {
+      await result.current.startProbing();
+    });
+    // Before any touch: no lift, the pen travels at its current height.
+    expect(sendCommand.mock.calls.some(([c]) => String(c).includes("G53"))).toBe(false);
+
+    // The user lowers the pen to the bed (Z0) and records the first point.
+    z = 0;
+    act(() => publishAt(0));
+    sendCommand.mockClear();
+    await act(async () => {
+      await result.current.recordPoint();
+    });
+    expect(sendCommand).toHaveBeenCalledWith("G21 G53 G0 Z5.000");
+
+    // Now records twice without lowering it: the pen is already at travel
+    // height, so it isn't lifted again.
+    for (let i = 0; i < 2; i++) {
+      sendCommand.mockClear();
+      await act(async () => {
+        await result.current.recordPoint();
+      });
+      expect(sendCommand.mock.calls.some(([c]) => String(c).includes("G53"))).toBe(false);
+    }
+    expect(z).toBe(5);
+  });
+
+  it("maps probe steps to grid indices in an S, and back", () => {
+    // 3 × 3: row 0 left→right, row 1 right→left, row 2 left→right.
+    const order = Array.from({ length: 9 }, (_, step) => serpentineIndex(step, 3));
+    expect(order).toEqual([0, 1, 2, 5, 4, 3, 6, 7, 8]);
+    for (let i = 0; i < 9; i++) expect(serpentineIndex(serpentineIndex(i, 3), 3)).toBe(i);
+  });
+
+  it("probes in an S but stores each reading at its grid position", async () => {
+    let z = 0;
+    const publishAt = (zNow: number) => {
+      const status = createMachineStatus();
+      useMachineStore.getState().setStatus({
+        ...status,
+        raw: `<Idle|MPos:0.000,0.000,${zNow.toFixed(3)}|FS:0,0>`,
+        mpos: { ...status.mpos, z: zNow },
+      });
+    };
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockImplementation(async (command: string) => {
+      const lift = command.match(/G53 G0 Z(-?[\d.]+)/);
+      if (lift) z = Number(lift[1]);
+      setTimeout(() => act(() => publishAt(z)), 0);
+    });
+    const controller = zController();
+    controller.form = { ...controller.form, bedWidth: 200, bedHeight: 100, origin: "bottom-left" };
+    const { result } = renderHook(() => useBedMeshCalibration(controller));
+    await act(async () => {
+      result.current.setXPoints(3);
+      result.current.setYPoints(2);
+    });
+    await act(async () => {
+      await result.current.startProbing();
+    });
+    // At each step the pen touches at a height that says which step it was.
+    for (let step = 0; step < 6; step++) {
+      z = -step / 10;
+      act(() => publishAt(z));
+      await act(async () => {
+        await result.current.recordPoint();
+      });
+    }
+
+    const visits = sendCommand.mock.calls
+      .map(([c]) => String(c).match(/X(-?[\d.]+) Y(-?[\d.]+)/))
+      .filter((m): m is RegExpMatchArray => m !== null)
+      .map((m) => `${Number(m[1])},${Number(m[2])}`);
+    expect(visits).toEqual(["0,0", "100,0", "200,0", "200,100", "100,100", "0,100"]);
+
+    // Stored row by row, left to right; step k touched at -k/10.
+    const zs = result.current.result!.points.map((p) => Number(p.z.toFixed(1)));
+    expect(zs).toEqual([0, -0.1, -0.2, -0.5, -0.4, -0.3]);
+  });
+
   it("lifts the pen with a negative Z move on machines with inverted Z jog", async () => {
     const controller = zController();
     controller.form = { ...controller.form, invertZJogControls: true };
     const { result } = renderHook(() => useBedMeshCalibration(controller));
+    await act(async () => {
+      result.current.setXPoints(2);
+      result.current.setYPoints(2);
+    });
     await runWithIdleStatus(() => result.current.startProbing());
-    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G91 G21 G0 Z-5");
+    await runWithIdleStatus(() => result.current.recordPoint()); // touched at Z0
+    expect(window.terraForge.fluidnc.sendCommand).toHaveBeenCalledWith("G21 G53 G0 Z-5.000");
+  });
+
+  // FluidNC 4.1 refuses HTTP commands while the machine moves, so the lift is
+  // one absolute line from the current machine Z, not G91 + a G90 restore.
+  it("lifts the pen with a single absolute move above the first touch", async () => {
+    act(() => publishIdleAt(-12.25));
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockImplementation(async () => {
+      setTimeout(() => act(() => publishIdleAt(-12.25)), 0);
+    });
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await act(async () => {
+      result.current.setXPoints(2);
+      result.current.setYPoints(2);
+    });
+    await act(async () => {
+      await result.current.startProbing();
+    });
+    sendCommand.mockClear();
+    await act(async () => {
+      await result.current.recordPoint(); // touched at -12.25
+    });
+    expect(sendCommand.mock.calls[0]).toEqual(["G21 G53 G0 Z-7.250"]);
+  });
+
+  it("doesn't lift a pen that's already above the start height when cancelled", async () => {
+    const { result } = renderHook(() => useBedMeshCalibration(zController()));
+    await runWithIdleStatus(() => result.current.startProbing()); // started at Z0
+    const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+    sendCommand.mockClear();
+    act(() => publishIdleAt(4)); // the user raised it further
+
+    await act(async () => {
+      await result.current.cancel();
+    });
+
+    expect(sendCommand.mock.calls.some(([c]) => String(c).includes("G53"))).toBe(false);
+    expect(result.current.wizardStep).toBe("closed");
   });
   it("tracks the point the pen is travelling to until the machine arrives", async () => {
     const { result } = renderHook(() => useBedMeshCalibration(zController()));
@@ -322,7 +482,7 @@ describe("useBedMeshCalibration", () => {
     async function homeWith(controller: MachineConfigDialogController) {
       const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
       sendCommand.mockImplementation(async () => {
-        act(() => publishIdleStatus());
+        act(() => publishHomingCycle());
       });
       const { result } = renderHook(() => useBedMeshCalibration(controller));
       await act(async () => {
@@ -330,6 +490,166 @@ describe("useBedMeshCalibration", () => {
       });
       return result;
     }
+
+    // FluidNC 4.1: an Idle report from where the machine was parked (the last
+    // probe point) arrives after $H is accepted but before homing starts.
+    it("ignores an Idle report from before the homing cycle started", async () => {
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async () => {
+        setTimeout(() => act(() => {
+          useMachineStore.getState().setStatus(createMachineStatus({
+            raw: "<Idle|MPos:594.000,420.000,20.000|FS:0,0>",
+            mpos: { x: 594, y: 420, z: 20 },
+          }));
+        }), 0);
+        setTimeout(() => act(() => publishHomingCycle()), 5);
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(result.current.error).toBeNull();
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    // Homing a machine already at home on 4.1: no status report at all, just
+    // the reply, held until the cycle ends.
+    it("finishes on the Homed message when no status report arrives", async () => {
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockResolvedValue("[MSG:Homed:XY]\nok\n");
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(result.current.error).toBeNull();
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    it("finishes on a Homed message on the console", async () => {
+      const onConsole = window.terraForge.fluidnc.onConsoleMessage as ReturnType<typeof vi.fn>;
+      let listener: (message: string) => void = () => {};
+      onConsole.mockImplementationOnce((cb: (message: string) => void) => {
+        listener = cb;
+        return () => {};
+      });
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async () => {
+        setTimeout(() => listener("[MSG:Homed:XY]"), 5);
+        return "ok";
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    it("reports a homing alarm", async () => {
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockResolvedValue("ALARM:9\n");
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(result.current.error).toMatch(/ALARM:9/);
+      expect(result.current.homeCheck).toBeNull();
+    });
+
+    // A stale report (e.g. one lost in a multi-line frame) can say the
+    // machine is still moving after it has stopped.
+    it("asks for a fresh status when the last report isn't Idle", async () => {
+      useMachineStore.setState({ status: createMachineStatus({ state: "Run" }) });
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async (command: string) => {
+        if (command === "?") act(() => publishIdleStatus());
+        return command === "$H" ? "[MSG:Homed:XY]\nok\n" : "";
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(sendCommand.mock.calls[0]).toEqual(["?"]);
+      expect(result.current.error).toBeNull();
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    // A machine with end stops starts up in Alarm until it's homed.
+    it("homes from Alarm", async () => {
+      useMachineStore.setState({ status: createMachineStatus({ state: "Alarm" }) });
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async (command: string) => {
+        if (command === "?") act(() => publishIdleStatus());
+        return command === "$H" ? "[MSG:Homed:XY]\nok\n" : "";
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(sendCommand.mock.calls[0]).toEqual(["$H"]);
+      expect(result.current.error).toBeNull();
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    it("homes when the last report is a leftover Home", async () => {
+      useMachineStore.setState({ status: createMachineStatus({ state: "Home" }) });
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async (command: string) => {
+        if (command === "?") act(() => publishIdleStatus());
+        return command === "$H" ? "[MSG:Homed:XY]\nok\n" : "";
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(sendCommand.mock.calls[0]).toEqual(["$H"]);
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
+
+    it("won't home while the machine reports it's moving", async () => {
+      useMachineStore.setState({ status: createMachineStatus({ state: "Jog" }) });
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockResolvedValue(""); // "?" brings no newer report
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(sendCommand).not.toHaveBeenCalledWith("$H");
+      expect(result.current.error).toMatch(/reports Jog/);
+    });
+
+    // FluidNC 4.1 may hold the HTTP reply until the cycle ends.
+    it("carries on when the $H reply times out but the machine is homing", async () => {
+      const sendCommand = window.terraForge.fluidnc.sendCommand as ReturnType<typeof vi.fn>;
+      sendCommand.mockImplementation(async () => {
+        act(() => useMachineStore.getState().setStatus(createMachineStatus({ state: "Home" })));
+        setTimeout(() => act(() => publishIdleStatus()), 5);
+        throw new Error("Error invoking remote method 'fluidnc:sendCommand': TimeoutError: The operation timed out");
+      });
+      const { result } = renderHook(() =>
+        useBedMeshCalibration(controllerWithWco("0.000,0.000,26.962")),
+      );
+      await act(async () => {
+        await result.current.home();
+      });
+      expect(result.current.error).toBeNull();
+      expect(result.current.homeCheck).toEqual({ kind: "at-home" });
+    });
 
     it("is ready when X0 Y0 is the homed position", async () => {
       const result = await homeWith(controllerWithWco("0.000,0.000,26.962"));
