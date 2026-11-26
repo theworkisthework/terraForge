@@ -120,7 +120,7 @@ describe("FluidNC WebSocket lifecycle", () => {
   // first must still update the status, not land in the console.
   it("handles each line of a multi-line frame", () => {
     const state = createState();
-    const parseStatus = vi.fn((text: string) => ({ state: text.slice(1, 5) }));
+    const parseStatus = vi.fn().mockImplementation((text: string) => ({ state: text.slice(1, 5) }));
     const emitStatus = vi.fn();
     const emitConsole = vi.fn();
 
